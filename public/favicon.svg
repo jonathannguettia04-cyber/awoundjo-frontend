@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Fond bleu ciel -->
+  <rect width="100" height="100" rx="18" fill="#1A56DB"/>
+  <!-- Lettre A blanche -->
+  <text x="50" y="72" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">A</text>
+</svg>

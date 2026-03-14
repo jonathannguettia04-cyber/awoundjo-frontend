@@ -24,7 +24,9 @@ export default function Login() {
 
           {/* Header */}
           <div className="bg-gradient-to-r from-brand-500 to-brand-600 px-8 py-8 text-center">
-            <div className="text-5xl mb-3">🌿</div>
+            <div className="flex justify-center mb-3">
+              <img src="/logo-awoundjo.jpg" alt="Awoundjô" className="w-20 h-20 rounded-xl object-cover object-top shadow-lg" />
+            </div>
             <h1 className="text-2xl font-bold text-white">Awoundjô</h1>
             <p className="text-white/70 text-sm mt-1">Mutuelle Santé · Côte d'Ivoire</p>
           </div>

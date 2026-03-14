@@ -27,7 +27,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 text-white font-bold text-lg">
-          <span className="text-2xl">🌿</span>
+          <img src="/logo-awoundjo.jpg" alt="Awoundjô" className="w-8 h-8 rounded-md object-cover object-top" />
           <span className="hidden sm:block">Awoundjô</span>
         </Link>
 
