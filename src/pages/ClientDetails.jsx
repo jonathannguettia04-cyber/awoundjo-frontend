@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import { clientAPI, paymentAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
@@ -11,7 +12,6 @@ const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
 export default function ClientDetails() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
   const [client,  setClient]  = useState(null);
@@ -90,6 +90,13 @@ export default function ClientDetails() {
     } catch (err) {
       setPayError(err.response?.data?.error || "Erreur lors du paiement");
     } finally { setPaySaving(false); }
+  }
+
+  function handleClosePayModal() {
+    setShowPay(false);
+    setWaveLink("");
+    setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
+    loadClient();
   }
 
   if (loading) return (
@@ -255,27 +262,49 @@ export default function ClientDetails() {
       </Modal>
 
       {/* Modal paiement */}
-      <Modal open={showPay} onClose={() => { setShowPay(false); setWaveLink(""); }} title="Enregistrer un paiement">
+      <Modal open={showPay} onClose={handleClosePayModal} title="Enregistrer un paiement">
         {waveLink ? (
-          <div className="text-center space-y-4">
-            <p className="text-2xl">📱</p>
-            <p className="font-medium text-slate-800">Lien Wave généré</p>
-            <a href={waveLink} target="_blank" rel="noopener noreferrer"
-              className="block w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg text-sm transition-colors">
-              Ouvrir le lien Wave →
-            </a>
-            <button onClick={() => { setWaveLink(""); loadClient(); setShowPay(false); }}
-              className="text-sm text-slate-500 hover:underline">Fermer</button>
+          /* ── QR Code Wave ── */
+          <div className="flex flex-col items-center space-y-5 py-2">
+            <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+              <QRCodeSVG
+                value={waveLink}
+                size={220}
+                bgColor="#fff7ed"
+                fgColor="#c2410c"
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-slate-800 text-lg">📱 Scanner avec Wave</p>
+              <p className="text-slate-500 text-sm mt-1">{c.name} · {fmt(payForm.amount)}</p>
+              <p className="text-slate-400 text-xs mt-1 capitalize">{payForm.type}</p>
+            </div>
+            <div className="w-full bg-orange-50 rounded-lg p-3 text-center">
+              <p className="text-xs text-orange-700 font-medium">
+                Le client scanne ce QR code avec l'application Wave pour payer
+              </p>
+            </div>
+            <button
+              onClick={handleClosePayModal}
+              className="w-full py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              ✅ Paiement confirmé — Fermer
+            </button>
           </div>
         ) : (
+          /* ── Formulaire paiement ── */
           <form onSubmit={handlePay} className="space-y-4">
             {payError && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{payError}</div>}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Montant (FCFA) *</label>
-              <input required type="number" min="1" value={payForm.amount}
+              <input
+                required type="number" min="1" value={payForm.amount}
                 onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
                 placeholder="Ex : 5000"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
@@ -290,15 +319,15 @@ export default function ClientDetails() {
               <select value={payForm.payment_method} onChange={(e) => setPayForm({ ...payForm, payment_method: e.target.value })}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option value="cash">💵 Cash</option>
-                <option value="wave">📱 Wave</option>
+                <option value="wave">📱 Wave (QR Code)</option>
               </select>
             </div>
             <div className="flex gap-3 justify-end pt-2">
-              <button type="button" onClick={() => setShowPay(false)}
+              <button type="button" onClick={handleClosePayModal}
                 className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Annuler</button>
               <button type="submit" disabled={paySaving}
                 className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-60 font-medium">
-                {paySaving ? "Traitement…" : payForm.payment_method === "wave" ? "Générer lien Wave" : "Valider le paiement"}
+                {paySaving ? "Traitement…" : payForm.payment_method === "wave" ? "📱 Générer QR Code" : "✅ Valider le paiement"}
               </button>
             </div>
           </form>
