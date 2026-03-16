@@ -69,10 +69,20 @@ export default function ClientDetails() {
     setPayError(""); setWaveLink(""); setPaySaving(true);
     try {
       if (payForm.payment_method === "wave") {
-        const { data } = await paymentAPI.getWaveLink({ client_id: id, amount: Number(payForm.amount), type: payForm.type });
-        setWaveLink(data.wave_link);
+        const { data } = await paymentAPI.getWaveLink({
+          amount: Number(payForm.amount),
+          clientName: c.name,
+          type: payForm.type,
+          mutualNumber: c.mutual_number
+        });
+        setWaveLink(data.payment_link);
       } else {
-        await paymentAPI.create({ client_id: id, amount: Number(payForm.amount), type: payForm.type, payment_method: "cash" });
+        await paymentAPI.create({
+          client_id: id,
+          amount: Number(payForm.amount),
+          type: payForm.type,
+          payment_method: "cash"
+        });
         setShowPay(false);
         setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
         loadClient();
@@ -185,7 +195,7 @@ export default function ClientDetails() {
                 {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-slate-500 text-xs">
-                      {new Date(p.paid_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                      {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
                     </td>
                     <td className="px-4 py-3"><TypeBadge type={p.type} /></td>
                     <td className="px-4 py-3"><MethodBadge method={p.payment_method} /></td>
