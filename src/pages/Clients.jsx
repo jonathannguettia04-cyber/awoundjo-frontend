@@ -55,6 +55,10 @@ export default function Clients() {
   const [saving,    setSaving]    = useState(false);
   const [formError, setFormError] = useState("");
 
+  // ✅ Code d'accès client
+  const [accessCode, setAccessCode] = useState("");
+  const [showCode,   setShowCode]   = useState(false);
+
   // Modal import CSV
   const [showImport,   setShowImport]   = useState(false);
   const [csvRows,      setCsvRows]      = useState([]);
@@ -85,9 +89,14 @@ export default function Clients() {
     e.preventDefault();
     setFormError(""); setSaving(true);
     try {
-      await clientAPI.create(form);
+      const { data } = await clientAPI.create(form);
       setShowModal(false);
       setForm(EMPTY);
+      // ✅ Afficher le code d'accès généré
+      if (data.access_code) {
+        setAccessCode(data.access_code);
+        setShowCode(true);
+      }
       load(1);
     } catch (err) {
       setFormError(err.response?.data?.error || "Erreur lors de la création");
@@ -184,110 +193,115 @@ export default function Clients() {
       {/* Filtres */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <input
-          type="text"
-          placeholder="Rechercher (nom, téléphone, N° mutualiste)…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          type="text" placeholder="🔍 Rechercher nom, téléphone, numéro…"
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-          className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">Tous les statuts</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={filterPlan} onChange={(e) => setFilterPlan(e.target.value)}
-          className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">Toutes les formules</option>
           {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : clients.length === 0 ? (
-          <div className="text-center py-16 text-slate-400">
-            <p className="text-4xl mb-3">👥</p>
-            <p className="font-medium">Aucun client trouvé</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full text-sm min-w-[700px]">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
-                  <tr>
-                    <th className="text-left px-4 py-3">Client</th>
-                    <th className="text-left px-4 py-3">N° Mutualiste</th>
-                    <th className="text-left px-4 py-3">Formule</th>
-                    <th className="text-left px-4 py-3">Statut</th>
-                    <th className="text-left px-4 py-3">Ville</th>
-                    <th className="text-right px-4 py-3">Total payé</th>
-                    <th className="text-right px-4 py-3">Action</th>
+      {loading ? (
+        <div className="text-center py-20 text-slate-400">Chargement…</div>
+      ) : clients.length === 0 ? (
+        <div className="text-center py-20 text-slate-400">
+          <p className="text-4xl mb-3">👥</p>
+          <p className="font-medium">Aucun client trouvé</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Nom</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Téléphone</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Ville</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Formule</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Statut</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">N° Mutuel</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Total payé</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {clients.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <Link to={`/clients/${c.id}`} className="font-semibold text-brand-600 hover:underline">
+                        {c.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{c.phone}</td>
+                    <td className="px-4 py-3 text-slate-500">{c.city || "—"}</td>
+                    <td className="px-4 py-3"><PlanBadge plan={c.plan} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{c.mutual_number}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">
+                      {Number(c.total_paid).toLocaleString("fr-FR")} FCFA
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {clients.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-slate-800">{c.name}</p>
-                        <p className="text-xs text-slate-400">{c.phone}</p>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.mutual_number}</td>
-                      <td className="px-4 py-3"><PlanBadge plan={c.plan} /></td>
-                      <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
-                      <td className="px-4 py-3 text-slate-500">{c.city || "—"}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-brand-600">
-                        {Number(c.total_paid || 0).toLocaleString("fr-FR")} FCFA
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link to={`/clients/${c.id}`} className="text-brand-500 hover:text-brand-700 font-medium text-xs">
-                          Voir →
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-50 text-sm text-slate-500">
-                <span>Page {pagination.page} / {pagination.pages}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => load(pagination.page - 1)} disabled={pagination.page <= 1}
-                    className="px-3 py-1 border border-slate-200 rounded disabled:opacity-40 hover:bg-slate-50">← Préc</button>
-                  <button onClick={() => load(pagination.page + 1)} disabled={pagination.page >= pagination.pages}
-                    className="px-3 py-1 border border-slate-200 rounded disabled:opacity-40 hover:bg-slate-50">Suiv →</button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {/* ── Modal nouveau client ───────────────────────────────── */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nouveau client">
+          {/* Pagination */}
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Page {pagination.page} / {pagination.pages} · {pagination.total} clients
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={pagination.page <= 1}
+                  onClick={() => load(pagination.page - 1)}
+                  className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50"
+                >← Préc.</button>
+                <button
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() => load(pagination.page + 1)}
+                  className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50"
+                >Suiv. →</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Modal nouveau client ───────────────────────────────────── */}
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="➕ Nouveau client">
         <form onSubmit={handleCreate} className="space-y-4">
-          {formError && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{formError}</div>}
-          <div className="grid sm:grid-cols-2 gap-4">
+          {formError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+              {formError}
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nom complet *</label>
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Ex : Koné Aminata"
+                placeholder="Ex: Kouamé Jean"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone *</label>
               <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="Ex : 0701234567"
+                placeholder="Ex: 0707070707"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Ville</label>
               <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
-                placeholder="Ex : Abidjan"
+                placeholder="Ex: Abidjan"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
@@ -314,6 +328,29 @@ export default function Clients() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ✅ Modal code d'accès client ─────────────────────────────── */}
+      <Modal open={showCode} onClose={() => setShowCode(false)} title="🔑 Code d'accès client">
+        <div className="text-center space-y-4 py-2">
+          <p className="text-slate-600 text-sm">Communiquez ce code au client pour sa première connexion sur le portail :</p>
+          <div className="bg-slate-100 rounded-xl px-6 py-5">
+            <p className="text-3xl font-mono font-bold tracking-widest text-brand-600">{accessCode}</p>
+          </div>
+          <p className="text-xs text-red-500 font-medium">⚠️ Ce code ne sera plus affiché après fermeture</p>
+          <button
+            onClick={() => navigator.clipboard.writeText(accessCode)}
+            className="w-full py-2 text-sm font-semibold border border-brand-200 text-brand-600 rounded-xl hover:bg-brand-50"
+          >
+            📋 Copier le code
+          </button>
+          <button
+            onClick={() => setShowCode(false)}
+            className="w-full py-2 text-sm font-semibold bg-brand-500 text-white rounded-xl hover:bg-brand-600"
+          >
+            J'ai noté le code ✓
+          </button>
+        </div>
       </Modal>
 
       {/* ── Modal import CSV ───────────────────────────────────── */}
