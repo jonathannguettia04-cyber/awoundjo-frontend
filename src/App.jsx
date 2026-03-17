@@ -8,6 +8,7 @@ import ClientDetails from "./pages/ClientDetails";
 import Payments      from "./pages/Payments";
 import Agents        from "./pages/Agents";
 import Commissions   from "./pages/Commissions";
+import Groups        from "./pages/Groups";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, isAdmin } = useAuth();
@@ -40,6 +41,9 @@ export default function App() {
           } />
           <Route path="/commissions" element={
             <ProtectedRoute><Commissions /></ProtectedRoute>
+          } />
+          <Route path="/groups" element={
+            <ProtectedRoute><Groups /></ProtectedRoute>
           } />
           <Route path="/agents" element={
             <ProtectedRoute adminOnly><Agents /></ProtectedRoute>

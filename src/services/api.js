@@ -8,14 +8,12 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// ── Injection automatique du JWT ───────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ── Gestion des erreurs globales ───────────────────────────────
 api.interceptors.response.use(
   (res) => res,
   (error) => {
@@ -28,20 +26,17 @@ api.interceptors.response.use(
   }
 );
 
-// ── Auth ───────────────────────────────────────────────────────
 export const authAPI = {
   login: (data) => api.post("/auth/login", data),
   me:    ()     => api.get("/auth/me"),
 };
 
-// ── Agents ────────────────────────────────────────────────────
 export const agentAPI = {
   create: (data)     => api.post("/agents", data),
   getAll: ()         => api.get("/agents"),
   update: (id, data) => api.put(`/agents/${id}`, data),
 };
 
-// ── Clients ───────────────────────────────────────────────────
 export const clientAPI = {
   create:  (data)        => api.post("/clients", data),
   getAll:  (params = {}) => api.get("/clients", { params }),
@@ -49,17 +44,24 @@ export const clientAPI = {
   update:  (id, data)    => api.put(`/clients/${id}`, data),
 };
 
-// ── Paiements ─────────────────────────────────────────────────
 export const paymentAPI = {
   create:      (data)        => api.post("/payments", data),
   getAll:      (params = {}) => api.get("/payments", { params }),
   getWaveLink: (data)        => api.post("/payments/wave-link", data),
 };
 
-// ── Stats ─────────────────────────────────────────────────────
+export const groupAPI = {
+  create:       (data)        => api.post("/groups", data),
+  getAll:       ()            => api.get("/groups"),
+  getById:      (id)          => api.get(`/groups/${id}`),
+  addMembers:   (id, data)    => api.post(`/groups/${id}/members`, data),
+  removeMember: (id, cid)     => api.delete(`/groups/${id}/members/${cid}`),
+  pay:          (id, data)    => api.post(`/groups/${id}/payment`, data),
+};
+
 export const statsAPI = {
-  dashboard:   ()              => api.get("/stats/dashboard"),
-  commissions: (params = {})   => api.get("/stats/commissions", { params }),
+  dashboard:   ()            => api.get("/stats/dashboard"),
+  commissions: (params = {}) => api.get("/stats/commissions", { params }),
 };
 
 export default api;
