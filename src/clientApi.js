@@ -1,9 +1,12 @@
 // src/clientApi.js
+// Adapté à votre stack : Vite + React + Axios
+// Compatible UUID (Supabase)
+
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// Instance axios dédiée portail client
+// Instance axios dédiée portail client (séparée de l'instance agent)
 const clientApi = axios.create({
   baseURL: `${API_URL}/api/client`,
   headers: { "Content-Type": "application/json" },
@@ -16,14 +19,10 @@ clientApi.interceptors.request.use((config) => {
   return config;
 });
 
-// ✅ Ne redirige PAS si on est déjà sur /client/login
 clientApi.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (
-      error.response?.status === 401 &&
-      !window.location.pathname.includes("/client/login")
-    ) {
+    if (error.response?.status === 401) {
       localStorage.removeItem("client_token");
       localStorage.removeItem("client_data");
       window.location.href = "/client/login";
@@ -99,4 +98,4 @@ export const STATUS_LABELS = {
   suspended:        { label: "Suspendu",              color: "#EF4444", bg: "#FEF2F2" },
   renewal_required: { label: "Renouvellement requis", color: "#F59E0B", bg: "#FFFBEB" },
   late:             { label: "En retard",             color: "#EF4444", bg: "#FEF2F2" },
-};s
+};
