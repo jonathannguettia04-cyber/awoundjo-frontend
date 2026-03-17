@@ -1,6 +1,4 @@
 // src/App.jsx
-// Votre App.jsx + routes /client/* ajoutées
-
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
@@ -22,7 +20,6 @@ import ClientDashboard   from "./pages/client/ClientDashboard";
 import ClientCarte       from "./pages/client/ClientCarte";
 import ClientCotisations from "./pages/client/ClientCotisations";
 import ClientFamille     from "./pages/client/ClientFamille";
-import ClientDossier     from "./pages/client/ClientDossier";
 import ClientTeleconsult from "./pages/client/ClientTeleconsult";
 import ClientReseau      from "./pages/client/ClientReseau";
 import ClientProfil      from "./pages/client/ClientProfil";
@@ -69,7 +66,6 @@ export default function App() {
             <Route path="carte"            element={<ClientCarte />} />
             <Route path="cotisations"      element={<ClientCotisations />} />
             <Route path="famille"          element={<ClientFamille />} />
-            <Route path="dossier"          element={<ClientDossier />} />
             <Route path="teleconsultation" element={<ClientTeleconsult />} />
             <Route path="reseau"           element={<ClientReseau />} />
             <Route path="profil"           element={<ClientProfil />} />
