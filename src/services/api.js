@@ -58,7 +58,8 @@ export const paymentAPI = {
 
 // ── Stats ─────────────────────────────────────────────────────
 export const statsAPI = {
-  dashboard: () => api.get("/stats/dashboard"),
+  dashboard:   ()              => api.get("/stats/dashboard"),
+  commissions: (params = {})   => api.get("/stats/commissions", { params }),
 };
 
 export default api;
