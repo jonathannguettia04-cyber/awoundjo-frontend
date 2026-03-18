@@ -23,6 +23,7 @@ import ClientFamille     from "./pages/client/ClientFamille";
 import ClientTeleconsult from "./pages/client/ClientTeleconsult";
 import ClientReseau      from "./pages/client/ClientReseau";
 import ClientProfil      from "./pages/client/ClientProfil";
+import ClientDossier     from "./pages/client/ClientDossier";
 
 // ── Guards ───────────────────────────────────────────────────────
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
           <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
           <Route path="/agents" element={<ProtectedRoute adminOnly><Agents /></ProtectedRoute>} />
+          <Route path="dossier" element={<ClientDossier />} />
 
           {/* ✅ Routes CLIENT ────────────────────────────────── */}
           <Route path="/client/login" element={<ClientLogin />} />
