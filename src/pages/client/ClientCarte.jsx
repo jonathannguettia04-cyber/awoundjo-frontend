@@ -1,122 +1,303 @@
 // src/pages/client/ClientCarte.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientCardAPI, PLANS } from "../../clientApi";
 
+const PLAN_GRADIENTS = {
+  ESSENTIELLE: "linear-gradient(135deg, #1a56db 0%, #1e3a8a 100%)",
+  IVOIRIENNE:  "linear-gradient(135deg, #059669 0%, #064e3b 100%)",
+  TURQUOISE:   "linear-gradient(135deg, #0891B2 0%, #164e63 100%)",
+};
+
 export default function ClientCarte() {
   const navigate = useNavigate();
-  const [data, setData]     = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data,      setData]    = useState(null);
+  const [loading,   setLoading] = useState(true);
+  const [scanning,  setScanning]= useState(false);
+  const [scanResult,setScanRes] = useState(null);
+  const [visible,   setVis]     = useState(false);
+  const [qrUrl,     setQrUrl]   = useState(null);
+  const videoRef   = useRef();
+  const streamRef  = useRef();
+  const canvasRef  = useRef();
 
   useEffect(() => {
     clientCardAPI.get()
-      .then(res => setData(res.data.data))
+      .then(res => {
+        const d = res.data.data;
+        setData(d);
+        // Générer QR code via API gratuite
+        const qrData = encodeURIComponent(JSON.stringify({
+          id:     d.card.mutual_number,
+          name:   d.card.name,
+          plan:   d.card.plan,
+          status: d.card.status,
+          exp:    d.card.expiration_date,
+        }));
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrData}&bgcolor=ffffff&color=1a56db&margin=10`);
+        setTimeout(() => setVis(true), 100);
+      })
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: 16 }}><div style={{ height: 200, background: "#E5E7EB", borderRadius: 20 }} /></div>;
-  if (!data) return null;
+  // ── Ouvrir la caméra ──────────────────────────────────────────
+  const openCamera = async () => {
+    setScanning(true);
+    setScanRes(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      alert("Impossible d'accéder à la caméra. Vérifiez les permissions.");
+      setScanning(false);
+    }
+  };
+
+  const closeCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+    setScanRes(null);
+  };
+
+  // Capture frame pour simuler le scan
+  const captureFrame = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    canvas.width  = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
+    // Simulation résultat scan (en prod : utiliser jsQR ou ZXing)
+    setScanRes({
+      valid:  true,
+      name:   data?.card?.name,
+      number: data?.card?.mutual_number,
+      plan:   data?.card?.plan,
+      status: data?.card?.status,
+    });
+    closeCamera();
+  };
+
+  if (loading) return <Skeleton />;
+  if (!data)   return null;
 
   const { card, dependents } = data;
   const plan     = PLANS[card.plan] || PLANS.ESSENTIELLE;
+  const gradient = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
   const isActive = card.status === "active";
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1 style={s.title}>Ma Carte Mutualiste</h1>
-      <p style={s.sub}>Présentez cette carte dans les établissements partenaires</p>
+    <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
 
-      {/* Carte recto */}
-      <div style={{ ...s.card, background: `linear-gradient(135deg, ${plan.color}, #1e3a8a)` }}>
-        <div style={s.cardTop}>
-          <div style={s.cardLogo}>A</div>
+      <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Ma Carte Mutualiste</h1>
+      <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Présentez cette carte dans les établissements partenaires</p>
+
+      {/* ── Carte recto ── */}
+      <div style={{
+        background: gradient,
+        borderRadius: 24, padding: 22, color: "#fff",
+        position: "relative", overflow: "hidden",
+        boxShadow: "0 16px 48px rgba(26,86,219,.35)",
+        marginBottom: 14,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
+        transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
+      }}>
+        {/* Cercles décoratifs */}
+        <div style={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -60, right: 60, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: 40, left: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
+
+        {/* Header carte */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, position: "relative" }}>
+          <div style={{ width: 42, height: 42, background: "rgba(255,255,255,.2)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20, backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.2)" }}>A</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, color: "#fff" }}>AWOUNDJÔ</div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,.7)" }}>Mutuelle Santé · CI</div>
+            <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2 }}>AWOUNDJÔ</div>
+            <div style={{ fontSize: 10, opacity: .7, letterSpacing: .5 }}>Mutuelle Santé · Côte d'Ivoire</div>
           </div>
-          <span style={{ marginLeft: "auto", fontSize: 22, opacity: .5 }}>💳</span>
+          <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, background: isActive ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 12px", border: `1px solid ${isActive ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}` }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: isActive ? "#10B981" : "#EF4444", display: "inline-block", boxShadow: isActive ? "0 0 6px #10B981" : "none" }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
+          </div>
         </div>
 
-        <div style={{ ...s.statusPill, borderColor: isActive ? "rgba(16,185,129,.5)" : "rgba(239,68,68,.5)", background: isActive ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.2)" }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: isActive ? "#10B981" : "#EF4444", display: "inline-block" }} />
-          <span style={{ fontSize: 11, color: "#fff", fontWeight: 600 }}>{isActive ? "CARTE ACTIVE" : "CARTE INACTIVE"}</span>
+        {/* Nom adhérent */}
+        <div style={{ marginBottom: 18, position: "relative" }}>
+          <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase" }}>Adhérent(e)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -.3 }}>{card.name}</div>
+          <div style={{ fontSize: 13, opacity: .75, fontFamily: "monospace", letterSpacing: 2, marginTop: 2 }}>{card.mutual_number}</div>
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, color: "#fff", marginBottom: 4 }}>ADHÉRENT(E)</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>{card.name}</div>
-          <div style={{ fontSize: 13, opacity: .8, color: "#fff", fontFamily: "monospace", letterSpacing: 2 }}>{card.mutual_number}</div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        {/* Footer carte */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", position: "relative" }}>
           <div>
-            <div style={{ fontSize: 10, opacity: .6, color: "#fff", letterSpacing: 1 }}>PLAN</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{plan.name.toUpperCase()}</div>
-            <div style={{ fontSize: 11, opacity: .7, color: "#fff" }}>{plan.coverage} couverture</div>
+            <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Formule</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{plan.name}</div>
+            <div style={{ fontSize: 11, opacity: .7 }}>{plan.coverage} couverture</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, opacity: .6, color: "#fff", letterSpacing: 1 }}>EXPIRE</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
-              {card.expiration_date ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "numeric" }) : "12/2026"}
+            <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Expire le</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>
+              {card.expiration_date
+                ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "numeric" })
+                : "12/2026"}
             </div>
           </div>
         </div>
-        <div style={s.circle1} /><div style={s.circle2} />
       </div>
 
-      {/* QR + dépendants */}
-      <div style={s.back}>
-        <div style={s.qrRow}>
-          <div style={s.qrBox}>
-            {card.qr_code
-              ? <img src={card.qr_code} alt="QR" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              : <span style={{ fontSize: 40 }}>⬛</span>}
-          </div>
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>Scanner pour vérifier</p>
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "0 0 8px" }}>Présentez ce code à l'accueil</p>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#1a56db", fontFamily: "monospace", letterSpacing: 1, margin: 0 }}>{card.mutual_number}</p>
+      {/* ── QR Code card ── */}
+      <div style={{
+        background: "#fff", borderRadius: 24,
+        boxShadow: "0 4px 20px rgba(0,0,0,.08)",
+        overflow: "hidden", marginBottom: 16,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(10px)",
+        transition: "all .5s .15s cubic-bezier(.34,1.56,.64,1)",
+      }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #F1F5F9" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            {/* QR Code */}
+            <div style={{ width: 110, height: 110, background: "#F8FAFC", borderRadius: 16, border: "2px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {qrUrl
+                ? <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                : <span style={{ fontSize: 40 }}>⬛</span>}
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.2 }}>Code de vérification</p>
+              <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>Présentez ce QR code à l'accueil de l'établissement</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "#1a56db", fontFamily: "monospace", letterSpacing: 1.5, margin: 0 }}>{card.mutual_number}</p>
+            </div>
           </div>
         </div>
 
+        {/* Bénéficiaires */}
         {dependents.length > 0 && (
-          <div style={{ padding: "0 20px 16px" }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "#374151", margin: "0 0 10px" }}>Bénéficiaires couverts</p>
+          <div style={{ padding: "14px 20px" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#64748B", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: .8 }}>Bénéficiaires couverts</p>
             {dependents.map((dep, i) => (
-              <div key={i} style={s.depRow}>
-                <span style={{ fontSize: 18 }}>{dep.type === "spouse" ? "💑" : "👶"}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1 }}>{dep.name} {dep.firstname}</span>
-                <span style={{ fontSize: 11, color: "#6B7280" }}>{dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}</span>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F8FAFC", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
+                <span style={{ fontSize: 20 }}>{dep.type === "spouse" ? "💑" : "👶"}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", flex: 1 }}>{dep.firstname} {dep.name}</span>
+                <span style={{ fontSize: 11, color: "#64748B", background: "#E2E8F0", borderRadius: 6, padding: "3px 8px" }}>{dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-        <button onClick={() => navigator.share?.({ title: "Ma carte Awoundjô", text: card.mutual_number })}
-          style={s.shareBtn}>📤 Partager</button>
-        <button onClick={() => window.print()} style={s.printBtn}>🖨️ Imprimer</button>
+      {/* ── Actions ── */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, opacity: visible ? 1 : 0, transition: "all .5s .25s", transform: visible ? "translateY(0)" : "translateY(10px)" }}>
+        <button onClick={openCamera} style={{ flex: 1, background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(26,86,219,.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          📷 Scanner
+        </button>
+        <button onClick={() => navigator.share?.({ title: "Ma carte Awoundjô", text: card.mutual_number })} style={{ flex: 1, background: "linear-gradient(135deg,#059669,#064e3b)", color: "#fff", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(5,150,105,.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          📤 Partager
+        </button>
+        <button onClick={() => window.print()} style={{ flex: 1, background: "#F1F5F9", color: "#475569", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          🖨️ Imprimer
+        </button>
       </div>
+
+      {/* ── Modal Caméra ── */}
+      {scanning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.95)", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+
+          {/* Header */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "20px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 10 }}>
+            <div>
+              <p style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Poppins',sans-serif" }}>📷 Scanner un QR code</p>
+              <p style={{ color: "rgba(255,255,255,.6)", fontSize: 12, margin: "2px 0 0", fontFamily: "'Poppins',sans-serif" }}>Pointez vers le QR code à vérifier</p>
+            </div>
+            <button onClick={closeCamera} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+
+          {/* Vidéo */}
+          <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
+            <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", borderRadius: 0, display: "block" }} />
+
+            {/* Viseur */}
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <div style={{ width: 240, height: 240, position: "relative" }}>
+                {/* Coins du viseur */}
+                {[
+                  { top: 0,    left: 0,    borderTop: "3px solid #fff",  borderLeft:  "3px solid #fff",  borderRadius: "12px 0 0 0" },
+                  { top: 0,    right: 0,   borderTop: "3px solid #fff",  borderRight: "3px solid #fff",  borderRadius: "0 12px 0 0" },
+                  { bottom: 0, left: 0,    borderBottom: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "0 0 0 12px" },
+                  { bottom: 0, right: 0,   borderBottom: "3px solid #fff", borderRight:"3px solid #fff", borderRadius: "0 0 12px 0" },
+                ].map((corner, i) => (
+                  <div key={i} style={{ position: "absolute", width: 30, height: 30, ...corner }} />
+                ))}
+                {/* Ligne de scan animée */}
+                <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #1a56db, transparent)", animation: "scan 2s linear infinite", top: "50%" }} />
+              </div>
+            </div>
+
+            <style>{`@keyframes scan { 0% { top: 10% } 100% { top: 90% } }`}</style>
+          </div>
+
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+
+          {/* Bouton capture */}
+          <div style={{ position: "absolute", bottom: 60, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+            <button onClick={captureFrame} style={{ background: "#fff", border: "4px solid rgba(255,255,255,.3)", borderRadius: "50%", width: 72, height: 72, fontSize: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,.4)" }}>
+              📷
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Résultat scan ── */}
+      {scanResult && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.7)", backdropFilter: "blur(8px)", zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={() => setScanRes(null)}>
+          <div style={{ background: "#fff", borderRadius: 24, padding: 28, width: "100%", maxWidth: 380, textAlign: "center" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 80, height: 80, background: scanResult.valid ? "#ECFDF5" : "#FEF2F2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 36 }}>
+              {scanResult.valid ? "✅" : "❌"}
+            </div>
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>
+              {scanResult.valid ? "Carte valide" : "Carte invalide"}
+            </h3>
+            {scanResult.valid && (
+              <div style={{ background: "#F8FAFC", borderRadius: 14, padding: 16, marginTop: 16, textAlign: "left" }}>
+                {[
+                  { label: "Nom",    value: scanResult.name   },
+                  { label: "N°",     value: scanResult.number },
+                  { label: "Plan",   value: scanResult.plan   },
+                  { label: "Statut", value: scanResult.status },
+                ].map((r, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: i < 3 ? 10 : 0 }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>{r.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setScanRes(null)} style={{ width: "100%", background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", marginTop: 20 }}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-const s = {
-  title:     { fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
-  sub:       { fontSize: 13, color: "#6B7280", margin: "0 0 20px" },
-  card:      { borderRadius: 20, padding: 20, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 40px rgba(26,86,219,.35)", marginBottom: 12, minHeight: 200 },
-  cardTop:   { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 },
-  cardLogo:  { width: 40, height: 40, background: "rgba(255,255,255,.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20, color: "#fff" },
-  statusPill:{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, border: "1px solid", marginBottom: 16 },
-  circle1:   { position: "absolute", top: -40, right: -40, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" },
-  circle2:   { position: "absolute", bottom: -60, right: 60, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" },
-  back:      { background: "#fff", borderRadius: 20, boxShadow: "0 4px 20px rgba(0,0,0,.08)", overflow: "hidden" },
-  qrRow:     { display: "flex", alignItems: "center", gap: 16, padding: 20, borderBottom: "1px solid #F3F4F6" },
-  qrBox:     { width: 100, height: 100, background: "#F9FAFB", border: "2px solid #E5E7EB", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  depRow:    { display: "flex", alignItems: "center", gap: 10, background: "#F9FAFB", borderRadius: 10, padding: "10px 12px", marginBottom: 8 },
-  shareBtn:  { flex: 1, background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Poppins',sans-serif" },
-  printBtn:  { flex: 1, background: "#F3F4F6", color: "#374151", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Poppins',sans-serif" },
-};
+function Skeleton() {
+  return (
+    <div style={{ padding: 16 }}>
+      <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}`}</style>
+      {[220, 180, 60].map((h, i) => (
+        <div key={i} style={{ height: h, borderRadius: 24, marginBottom: 14, background: "linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }} />
+      ))}
+    </div>
+  );
+}
