@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { healthcareAPI, clientAPI } from "../../services/api";
+import { healthcareAPI } from "../../services/api";
+import { clientProfileAPI } from "../../clientApi";
 import { useAuth } from "../../context/AuthContext";
-import clientApi from "../../clientApi"; // l'instance axios client
+
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -107,7 +108,6 @@ export default function ClientDossier({ clientId: propClientId }) {
   const [error,   setError]   = useState("");
   const [section, setSection] = useState("general");
 
-  // Formulaires d'ajout
   const [addingAllergy,      setAddingAllergy]      = useState(false);
   const [addingHistory,      setAddingHistory]      = useState(false);
   const [addingConsultation, setAddingConsultation] = useState(false);
@@ -118,22 +118,29 @@ export default function ClientDossier({ clientId: propClientId }) {
   const canWrite = ["ADMIN", "MEDECIN", "INFIRMIER"].includes(user?.role);
 
   async function loadData() {
-  setLoading(true);
-  try {
-    const [clientRes, medicalRes] = await Promise.all([
-      clientApi.get("/profile"),  // ← utilise l'instance client avec client_token
-      healthcareAPI.getMedical(clientId).catch(() => ({ data: null })),
-    ]);
-    setClient(clientRes.data.client || clientRes.data);
-    setMedical(medicalRes.data || null);
-  } catch (e) {
-    setError("Impossible de charger le dossier médical");
-  } finally {
-    setLoading(false);
+    setLoading(true);
+    try {
+      const [clientRes, medicalRes] = await Promise.all([
+        clientProfileAPI.get(),
+        healthcareAPI.getMedical(clientId).catch(() => ({ data: null })),
+      ]);
+      setClient(clientRes.data.client || clientRes.data);
+      setMedical(medicalRes.data || null);
+    } catch (e) {
+      setError("Impossible de charger le dossier médical");
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
-  useEffect(() => { if (clientId) loadData(); }, [clientId]);
+  useEffect(() => {
+    if (clientId) {
+      loadData();
+    } else {
+      setError("Identifiant client introuvable. Reconnectez-vous.");
+      setLoading(false);
+    }
+  }, [clientId]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
