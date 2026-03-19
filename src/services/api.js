@@ -94,7 +94,7 @@ export const dashboardAPI = {
 
 // Alias utilisé par Dashboard.jsx
 export const statsAPI = {
-  getStats:     ()       => api.get("/dashboard/stats"),
+  getStats:     ()       => api.get("/stats/dashboard"),
   getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
   getTopAgents: ()       => api.get("/dashboard/top-agents"),
 };
