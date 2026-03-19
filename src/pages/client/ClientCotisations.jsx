@@ -42,7 +42,7 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
-  const handlePay = async () => {
+ const handlePay = async () => {
   if (!amount || parseInt(amount) < 1000) return setError("Montant minimum : 1 000 FCFA");
   setError(""); setPaying(true);
 
@@ -51,10 +51,11 @@ export default function ClientCotisations() {
     const data = res.data.data;
 
     if (method === "Wave" && data.wave_link) {
-      // Ouvre Wave dans une nouvelle fenêtre
-      window.open(data.wave_link, "_blank");
+      setModal(false);
+      // Force l'ouverture de l'app Wave
+      window.location.href = data.wave_link;
 
-      // Après retour de Wave, on confirme le paiement
+      // Confirme le paiement après retour
       setTimeout(async () => {
         try {
           await clientContribAPI.confirm({
@@ -63,29 +64,22 @@ export default function ClientCotisations() {
             transaction_reference: data.transaction_reference,
           });
           setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
-          setModal(false); setAmount("");
           load();
           setTimeout(() => setSuccess(""), 6000);
-        } catch {
-          // L'utilisateur peut confirmer manuellement si besoin
-        }
-      }, 5000); // attend 5s après ouverture de Wave
-
-      setModal(false);
-      setSuccess("🌊 Lien Wave ouvert — Complétez le paiement dans l'app Wave");
-      setTimeout(() => setSuccess(""), 10000);
+        } catch {}
+      }, 5000);
 
     } else {
-      // Cash, Orange Money, MTN → confirmation directe
       setSuccess(`✅ Paiement confirmé — Réf: ${data.transaction_reference}`);
-      setModal(false); setAmount("");
+      setModal(false);
+      setAmount("");
       load();
       setTimeout(() => setSuccess(""), 6000);
     }
   } catch (err) {
     setError(err.response?.data?.error || "Erreur paiement");
   } finally {
-    setPaying(false); 
+    setPaying(false);
   }
 };
 
