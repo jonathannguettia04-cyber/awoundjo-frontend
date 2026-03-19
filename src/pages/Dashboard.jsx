@@ -45,7 +45,7 @@ export default function Dashboard() {
   const [error,   setError]   = useState("");
 
   useEffect(() => {
-    statsAPI.dashboard()
+    statsAPI.getStats()
       .then(({ data }) => setData(data))
       .catch(() => setError("Impossible de charger le tableau de bord"))
       .finally(() => setLoading(false));
