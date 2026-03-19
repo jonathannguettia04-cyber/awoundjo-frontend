@@ -10,10 +10,6 @@ const STATUS_STYLE = {
   upcoming: { icon: "⏳", label: "À venir", color: "#94A3B8", bg: "#F8FAFC",                                 border: "#E2E8F0" },
 };
 
-const METHODS = [
-  { id: "Wave", icon: "🌊", label: "Wave", color: "#1a56db", bg: "#EFF6FF" },
-];
-
 const METHOD_ICON = { "Wave": "🌊" };
 
 export default function ClientCotisations() {
@@ -21,7 +17,6 @@ export default function ClientCotisations() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(false);
-  const [method,  setMethod]  = useState("Wave");
   const [amount,  setAmount]  = useState("");
   const [paying,  setPaying]  = useState(false);
   const [error,   setError]   = useState("");
@@ -38,25 +33,43 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
-  if (method === "Wave" && data.wave_link) {
-  setModal(false);
-  
-  // Ouvre dans un nouvel onglet — Wave gère le reste
-  window.open(data.wave_link, "_blank", "noopener");
+  const handlePay = async () => {
+    if (!amount || parseInt(amount) < 10000) return setError("Montant minimum : 10 000 FCFA");
+    setError(""); setPaying(true);
 
-  setTimeout(async () => {
     try {
-      await clientContribAPI.confirm({
-        amount: parseInt(amount),
-        payment_method: method,
-        transaction_reference: data.transaction_reference,
-      });
-      setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
-      load();
-      setTimeout(() => setSuccess(""), 6000);
-    } catch {}
-  }, 10000);
-}
+      const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: "Wave" });
+      const data = res.data.data;
+
+      if (data.wave_link) {
+        setModal(false);
+
+        // Ouvre dans un nouvel onglet — Wave gère l'ouverture de l'app
+        window.open(data.wave_link, "_blank", "noopener");
+
+        // Confirme le paiement après retour
+        setTimeout(async () => {
+          try {
+            await clientContribAPI.confirm({
+              amount: parseInt(amount),
+              payment_method: "Wave",
+              transaction_reference: data.transaction_reference,
+            });
+            setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
+            load();
+            setTimeout(() => setSuccess(""), 6000);
+          } catch {}
+        }, 10000);
+
+        setSuccess("🌊 Page Wave ouverte — Complétez le paiement puis revenez");
+        setTimeout(() => setSuccess(""), 15000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur paiement");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   if (loading) return <Skeleton />;
   if (!data)   return null;
@@ -243,7 +256,7 @@ export default function ClientCotisations() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>💰 Payer une cotisation</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>🌊 Payer via Wave</h3>
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 10 000 FCFA</p>
               </div>
               <button onClick={() => setModal(false)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
@@ -260,7 +273,7 @@ export default function ClientCotisations() {
             </div>
 
             {/* Montants rapides */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
               {[10000, 15000, 20000, 25000].map(v => (
                 <button key={v} onClick={() => setAmount(String(v))} style={{
                   flex: 1, padding: "10px 4px", border: `2px solid ${amount === String(v) ? "#1a56db" : "#E2E8F0"}`,
@@ -274,19 +287,12 @@ export default function ClientCotisations() {
               ))}
             </div>
 
-            {/* Méthode Wave uniquement */}
-            <label style={ls.label}>Méthode de paiement</label>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                padding: "20px", borderRadius: 14,
-                border: "2px solid #1a56db",
-                background: "#EFF6FF",
-                boxShadow: "0 4px 12px rgba(26,86,219,.2)",
-              }}>
-                <span style={{ fontSize: 36 }}>🌊</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a56db" }}>Wave</span>
-                <span style={{ fontSize: 11, color: "#64748B", textAlign: "center" }}>Vous serez redirigé vers l'app Wave</span>
+            {/* Info Wave */}
+            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 14, padding: "14px 16px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 28 }}>🌊</span>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1e3a8a" }}>Paiement Wave</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#3B82F6" }}>Vous serez redirigé vers la page Wave pour finaliser</p>
               </div>
             </div>
 
@@ -298,7 +304,7 @@ export default function ClientCotisations() {
               boxShadow: paying ? "none" : "0 6px 20px rgba(26,86,219,.35)",
               transition: "all .2s",
             }}>
-              {paying ? "⏳ Traitement en cours..." : `🌊 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA via Wave" : "via Wave"}`}
+              {paying ? "⏳ Traitement en cours..." : `🌊 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via Wave`}
             </button>
           </div>
         </div>
