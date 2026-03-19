@@ -1,4 +1,3 @@
-// src/pages/client/ClientCotisations.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientContribAPI } from "../../clientApi";
@@ -12,13 +11,10 @@ const STATUS_STYLE = {
 };
 
 const METHODS = [
-  { id: "Wave",         icon: "🌊", label: "Wave",         color: "#1a56db", bg: "#EFF6FF" },
-  { id: "Orange Money", icon: "🟠", label: "Orange Money", color: "#EA580C", bg: "#FFF7ED" },
-  { id: "MTN Money",    icon: "🟡", label: "MTN Money",    color: "#CA8A04", bg: "#FEFCE8" },
-  { id: "Cash",         icon: "💵", label: "Espèces",      color: "#059669", bg: "#ECFDF5" },
+  { id: "Wave", icon: "🌊", label: "Wave", color: "#1a56db", bg: "#EFF6FF" },
 ];
 
-const METHOD_ICON = { "Wave": "🌊", "Orange Money": "🟠", "MTN Money": "🟡", "Cash": "💵" };
+const METHOD_ICON = { "Wave": "🌊" };
 
 export default function ClientCotisations() {
   const navigate = useNavigate();
@@ -31,7 +27,7 @@ export default function ClientCotisations() {
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState("");
   const [visible, setVis]     = useState(false);
-  const [tab,     setTab]     = useState("calendar"); // "calendar" | "history"
+  const [tab,     setTab]     = useState("calendar");
 
   const load = () => {
     clientContribAPI.get()
@@ -42,46 +38,46 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
- const handlePay = async () => {
-  if (!amount || parseInt(amount) < 1000) return setError("Montant minimum : 1 000 FCFA");
-  setError(""); setPaying(true);
+  const handlePay = async () => {
+    if (!amount || parseInt(amount) < 10000) return setError("Montant minimum : 10 000 FCFA");
+    setError(""); setPaying(true);
 
-  try {
-    const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: method });
-    const data = res.data.data;
+    try {
+      const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: method });
+      const data = res.data.data;
 
-    if (method === "Wave" && data.wave_link) {
-      setModal(false);
-      // Force l'ouverture de l'app Wave
-      window.location.href = data.wave_link;
+      if (method === "Wave" && data.wave_link) {
+        setModal(false);
+        // Force l'ouverture de l'app Wave
+        window.location.href = data.wave_link;
 
-      // Confirme le paiement après retour
-      setTimeout(async () => {
-        try {
-          await clientContribAPI.confirm({
-            amount: parseInt(amount),
-            payment_method: method,
-            transaction_reference: data.transaction_reference,
-          });
-          setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
-          load();
-          setTimeout(() => setSuccess(""), 6000);
-        } catch {}
-      }, 5000);
+        // Confirme le paiement après retour
+        setTimeout(async () => {
+          try {
+            await clientContribAPI.confirm({
+              amount: parseInt(amount),
+              payment_method: method,
+              transaction_reference: data.transaction_reference,
+            });
+            setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
+            load();
+            setTimeout(() => setSuccess(""), 6000);
+          } catch {}
+        }, 5000);
 
-    } else {
-      setSuccess(`✅ Paiement confirmé — Réf: ${data.transaction_reference}`);
-      setModal(false);
-      setAmount("");
-      load();
-      setTimeout(() => setSuccess(""), 6000);
+      } else {
+        setSuccess(`✅ Paiement confirmé — Réf: ${data.transaction_reference}`);
+        setModal(false);
+        setAmount("");
+        load();
+        setTimeout(() => setSuccess(""), 6000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur paiement");
+    } finally {
+      setPaying(false);
     }
-  } catch (err) {
-    setError(err.response?.data?.error || "Erreur paiement");
-  } finally {
-    setPaying(false);
-  }
-};
+  };
 
   if (loading) return <Skeleton />;
   if (!data)   return null;
@@ -116,7 +112,7 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* ── Hero stats card ── */}
+      {/* Hero stats card */}
       <div style={{
         background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
         borderRadius: 24, padding: "22px 20px", color: "#fff",
@@ -129,7 +125,6 @@ export default function ClientCotisations() {
         <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -30, left: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
 
-        {/* Progression annuelle */}
         <div style={{ marginBottom: 18, position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 13, opacity: .8, fontWeight: 500 }}>Progression annuelle</span>
@@ -144,7 +139,6 @@ export default function ClientCotisations() {
           </div>
         </div>
 
-        {/* Stats row */}
         <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,.12)", borderRadius: 14, overflow: "hidden", backdropFilter: "blur(8px)" }}>
           {[
             { label: "Mois payés",  val: paid,  color: "#34D399" },
@@ -159,7 +153,7 @@ export default function ClientCotisations() {
         </div>
       </div>
 
-      {/* ── Bouton payer ── */}
+      {/* Bouton payer */}
       <button onClick={() => { setError(""); setModal(true); }} style={{
         width: "100%", background: "linear-gradient(135deg,#059669,#065F46)",
         color: "#fff", border: "none", borderRadius: 16, padding: 16,
@@ -173,7 +167,7 @@ export default function ClientCotisations() {
         💰 Payer une cotisation
       </button>
 
-      {/* ── Onglets ── */}
+      {/* Onglets */}
       <div style={{ display: "flex", background: "#F1F5F9", borderRadius: 14, padding: 4, marginBottom: 16, opacity: visible ? 1 : 0, transition: "all .5s .15s" }}>
         {[
           { id: "calendar", label: "📅 Calendrier" },
@@ -188,7 +182,7 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* ── Calendrier ── */}
+      {/* Calendrier */}
       {tab === "calendar" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, opacity: visible ? 1 : 0, transition: "all .5s .2s" }}>
           {data.monthly_status.map((m, i) => {
@@ -216,7 +210,7 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* ── Historique ── */}
+      {/* Historique */}
       {tab === "history" && (
         <div style={{ opacity: visible ? 1 : 0, transition: "all .5s .2s" }}>
           {data.payments.length === 0 ? (
@@ -261,7 +255,7 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* ── Modal paiement ── */}
+      {/* Modal paiement */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
           onClick={() => setModal(false)}>
@@ -271,7 +265,7 @@ export default function ClientCotisations() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>💰 Payer une cotisation</h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 1 000 FCFA</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 10 000 FCFA</p>
               </div>
               <button onClick={() => setModal(false)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
@@ -288,7 +282,7 @@ export default function ClientCotisations() {
 
             {/* Montants rapides */}
             <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              {[5000, 10000, 15000, 25000].map(v => (
+              {[10000, 15000, 20000, 25000].map(v => (
                 <button key={v} onClick={() => setAmount(String(v))} style={{
                   flex: 1, padding: "10px 4px", border: `2px solid ${amount === String(v) ? "#1a56db" : "#E2E8F0"}`,
                   borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -301,33 +295,31 @@ export default function ClientCotisations() {
               ))}
             </div>
 
-            {/* Méthode */}
+            {/* Méthode Wave uniquement */}
             <label style={ls.label}>Méthode de paiement</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
-              {METHODS.map(m => (
-                <button key={m.id} onClick={() => setMethod(m.id)} style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                  padding: "14px 10px", borderRadius: 14, cursor: "pointer",
-                  fontFamily: "'Poppins',sans-serif", transition: "all .15s",
-                  border: `2px solid ${method === m.id ? m.color : "#E2E8F0"}`,
-                  background: method === m.id ? m.bg : "#fff",
-                  boxShadow: method === m.id ? `0 4px 12px ${m.color}25` : "none",
-                }}>
-                  <span style={{ fontSize: 26 }}>{m.icon}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: method === m.id ? m.color : "#475569" }}>{m.label}</span>
-                </button>
-              ))}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                padding: "20px", borderRadius: 14,
+                border: "2px solid #1a56db",
+                background: "#EFF6FF",
+                boxShadow: "0 4px 12px rgba(26,86,219,.2)",
+              }}>
+                <span style={{ fontSize: 36 }}>🌊</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#1a56db" }}>Wave</span>
+                <span style={{ fontSize: 11, color: "#64748B", textAlign: "center" }}>Vous serez redirigé vers l'app Wave</span>
+              </div>
             </div>
 
             <button onClick={handlePay} disabled={paying} style={{
-              width: "100%", background: paying ? "#94A3B8" : "linear-gradient(135deg,#059669,#065F46)",
+              width: "100%", background: paying ? "#94A3B8" : "linear-gradient(135deg,#1a56db,#1e3a8a)",
               color: "#fff", border: "none", borderRadius: 16, padding: 16,
               fontSize: 15, fontWeight: 700, cursor: paying ? "not-allowed" : "pointer",
               fontFamily: "'Poppins',sans-serif",
-              boxShadow: paying ? "none" : "0 6px 20px rgba(5,150,105,.35)",
+              boxShadow: paying ? "none" : "0 6px 20px rgba(26,86,219,.35)",
               transition: "all .2s",
             }}>
-              {paying ? "⏳ Traitement en cours..." : `💰 Confirmer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""}`}
+              {paying ? "⏳ Traitement en cours..." : `🌊 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA via Wave" : "via Wave"}`}
             </button>
           </div>
         </div>
