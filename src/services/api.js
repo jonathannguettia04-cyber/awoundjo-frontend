@@ -62,6 +62,9 @@ export const paymentsAPI = {
   delete:      (id)       => api.delete(`/payments/${id}`),
 };
 
+// Alias sans "s" pour compatibilité avec ClientDetails.jsx
+export const paymentAPI = paymentsAPI;
+
 // ── COMMISSIONS ──────────────────────────────────────────────────
 export const commissionsAPI = {
   getAll:     (params) => api.get("/commissions", { params }),
