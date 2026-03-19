@@ -58,7 +58,6 @@ export default function App() {
           <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
           <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
           <Route path="/agents" element={<ProtectedRoute adminOnly><Agents /></ProtectedRoute>} />
-          <Route path="dossier" element={<ClientDossier />} />
 
           {/* ✅ Routes CLIENT ────────────────────────────────── */}
           <Route path="/client/login" element={<ClientLogin />} />
@@ -68,6 +67,7 @@ export default function App() {
             <Route path="carte"            element={<ClientCarte />} />
             <Route path="cotisations"      element={<ClientCotisations />} />
             <Route path="famille"          element={<ClientFamille />} />
+            <Route path="dossier"          element={<ClientDossier />} />
             <Route path="teleconsultation" element={<ClientTeleconsult />} />
             <Route path="reseau"           element={<ClientReseau />} />
             <Route path="profil"           element={<ClientProfil />} />
