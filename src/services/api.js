@@ -42,6 +42,8 @@ export const agentsAPI = {
   update:  (id, data) => api.put(`/agents/${id}`, data),
   delete:  (id)       => api.delete(`/agents/${id}`),
 };
+// Alias sans "s" pour compatibilité avec Agents.jsx
+export const agentAPI = agentsAPI;
 
 // ── CLIENTS ──────────────────────────────────────────────────────
 export const clientAPI = {
@@ -71,6 +73,8 @@ export const commissionsAPI = {
   getByAgent: (id)     => api.get(`/commissions/agent/${id}`),
   validate:   (id)     => api.put(`/commissions/${id}/validate`),
 };
+// Alias sans "s" pour compatibilité
+export const commissionAPI = commissionsAPI;
 
 // ── GROUPES ──────────────────────────────────────────────────────
 export const groupsAPI = {
@@ -80,6 +84,8 @@ export const groupsAPI = {
   update:  (id, data) => api.put(`/groups/${id}`, data),
   delete:  (id)       => api.delete(`/groups/${id}`),
 };
+// Alias sans "s" pour compatibilité
+export const groupAPI = groupsAPI;
 
 // ── DASHBOARD / STATS ────────────────────────────────────────────
 export const dashboardAPI = {
@@ -92,6 +98,8 @@ export const statsAPI = {
   getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
   getTopAgents: ()       => api.get("/dashboard/top-agents"),
 };
+// Alias sans "s" pour compatibilité
+export const statAPI = statsAPI;
 
 // ── HEALTHCARE (réseau de soins + dossiers médicaux) ─────────────
 export const healthcareAPI = {
