@@ -36,11 +36,11 @@ export const authAPI = {
 
 // ── AGENTS ───────────────────────────────────────────────────────
 export const agentsAPI = {
-  getAll:  (params) => api.get("/agents", { params }),
-  getById: (id)     => api.get(`/agents/${id}`),
-  create:  (data)   => api.post("/agents", data),
+  getAll:  (params)   => api.get("/agents", { params }),
+  getById: (id)       => api.get(`/agents/${id}`),
+  create:  (data)     => api.post("/agents", data),
   update:  (id, data) => api.put(`/agents/${id}`, data),
-  delete:  (id)     => api.delete(`/agents/${id}`),
+  delete:  (id)       => api.delete(`/agents/${id}`),
 };
 
 // ── CLIENTS ──────────────────────────────────────────────────────
@@ -55,18 +55,18 @@ export const clientAPI = {
 
 // ── PAIEMENTS ────────────────────────────────────────────────────
 export const paymentsAPI = {
-  getAll:     (params)   => api.get("/payments", { params }),
-  getByClient:(id)       => api.get(`/payments/client/${id}`),
-  create:     (data)     => api.post("/payments", data),
-  update:     (id, data) => api.put(`/payments/${id}`, data),
-  delete:     (id)       => api.delete(`/payments/${id}`),
+  getAll:      (params)   => api.get("/payments", { params }),
+  getByClient: (id)       => api.get(`/payments/client/${id}`),
+  create:      (data)     => api.post("/payments", data),
+  update:      (id, data) => api.put(`/payments/${id}`, data),
+  delete:      (id)       => api.delete(`/payments/${id}`),
 };
 
 // ── COMMISSIONS ──────────────────────────────────────────────────
 export const commissionsAPI = {
-  getAll:    (params) => api.get("/commissions", { params }),
-  getByAgent:(id)     => api.get(`/commissions/agent/${id}`),
-  validate:  (id)     => api.put(`/commissions/${id}/validate`),
+  getAll:     (params) => api.get("/commissions", { params }),
+  getByAgent: (id)     => api.get(`/commissions/agent/${id}`),
+  validate:   (id)     => api.put(`/commissions/${id}/validate`),
 };
 
 // ── GROUPES ──────────────────────────────────────────────────────
@@ -78,22 +78,29 @@ export const groupsAPI = {
   delete:  (id)       => api.delete(`/groups/${id}`),
 };
 
-// ── DASHBOARD ────────────────────────────────────────────────────
+// ── DASHBOARD / STATS ────────────────────────────────────────────
 export const dashboardAPI = {
   getStats: () => api.get("/dashboard/stats"),
+};
+
+// Alias utilisé par Dashboard.jsx
+export const statsAPI = {
+  getStats:     ()       => api.get("/dashboard/stats"),
+  getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
+  getTopAgents: ()       => api.get("/dashboard/top-agents"),
 };
 
 // ── HEALTHCARE (réseau de soins + dossiers médicaux) ─────────────
 export const healthcareAPI = {
   // Établissements
-  getProviders:   (params)   => api.get("/healthcare/providers", { params }),
-  createProvider: (data)     => api.post("/healthcare/providers", data),
-  updateProvider: (id, data) => api.put(`/healthcare/providers/${id}`, data),
-  deleteProvider: (id)       => api.delete(`/healthcare/providers/${id}`),
+  getProviders:    (params)         => api.get("/healthcare/providers", { params }),
+  createProvider:  (data)           => api.post("/healthcare/providers", data),
+  updateProvider:  (id, data)       => api.put(`/healthcare/providers/${id}`, data),
+  deleteProvider:  (id)             => api.delete(`/healthcare/providers/${id}`),
 
   // Dossier médical complet
-  getMedical:     (clientId) => api.get(`/healthcare/medical/${clientId}`),
-  upsertMedical:  (clientId, data) => api.put(`/healthcare/medical/${clientId}`, data),
+  getMedical:      (clientId)       => api.get(`/healthcare/medical/${clientId}`),
+  upsertMedical:   (clientId, data) => api.put(`/healthcare/medical/${clientId}`, data),
 
   // Sous-sections du dossier
   addAllergy:      (clientId, data) => api.post(`/healthcare/medical/${clientId}/allergies`, data),
