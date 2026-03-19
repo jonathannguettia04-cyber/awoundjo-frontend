@@ -11,7 +11,8 @@ const NAV_COMMON = [
 ];
 
 const NAV_ADMIN_EXTRA = [
-  { to: "/agents", label: "Agents", icon: "🧑‍💼" },
+  { to: "/healthcare", label: "Réseau de soins", icon: "🏥" },
+  { to: "/agents",     label: "Agents",          icon: "🧑‍💼" },
 ];
 
 export default function Navbar() {
@@ -22,22 +23,17 @@ export default function Navbar() {
 
   const links = isAdmin ? [...NAV_COMMON, ...NAV_ADMIN_EXTRA] : NAV_COMMON;
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
-  }
+  function handleLogout() { logout(); navigate("/login"); }
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-brand-600 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2 text-white font-bold text-lg flex-shrink-0">
           <img src="/logo-awoundjo.jpg" alt="Awoundjô" className="w-8 h-8 rounded-md object-cover object-top" />
           <span className="hidden sm:block">Awoundjô</span>
         </Link>
 
-        {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
           {links.map(({ to, label, icon }) => {
             const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
@@ -51,7 +47,6 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* User + logout */}
         <div className="hidden md:flex items-center gap-3 flex-shrink-0">
           <div className="text-right">
             <p className="text-white text-sm font-medium leading-none">{user?.name}</p>
@@ -63,13 +58,11 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile hamburger */}
         <button className="md:hidden text-white p-1" onClick={() => setMenuOpen((v) => !v)}>
           <span className="text-2xl">{menuOpen ? "✕" : "☰"}</span>
         </button>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-brand-700 px-4 pb-4 space-y-1">
           {links.map(({ to, label, icon }) => {

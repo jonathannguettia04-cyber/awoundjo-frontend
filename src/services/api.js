@@ -51,17 +51,34 @@ export const paymentAPI = {
 };
 
 export const groupAPI = {
-  create:       (data)        => api.post("/groups", data),
-  getAll:       ()            => api.get("/groups"),
-  getById:      (id)          => api.get(`/groups/${id}`),
-  addMembers:   (id, data)    => api.post(`/groups/${id}/members`, data),
-  removeMember: (id, cid)     => api.delete(`/groups/${id}/members/${cid}`),
-  pay:          (id, data)    => api.post(`/groups/${id}/payment`, data),
+  create:       (data)     => api.post("/groups", data),
+  getAll:       ()         => api.get("/groups"),
+  getById:      (id)       => api.get(`/groups/${id}`),
+  addMembers:   (id, data) => api.post(`/groups/${id}/members`, data),
+  removeMember: (id, cid)  => api.delete(`/groups/${id}/members/${cid}`),
+  pay:          (id, data) => api.post(`/groups/${id}/payment`, data),
 };
 
 export const statsAPI = {
   dashboard:   ()            => api.get("/stats/dashboard"),
   commissions: (params = {}) => api.get("/stats/commissions", { params }),
+};
+
+export const healthcareAPI = {
+  // Établissements
+  getProviders:   (params = {}) => api.get("/healthcare/providers", { params }),
+  createProvider: (data)        => api.post("/healthcare/providers", data),
+  updateProvider: (id, data)    => api.put(`/healthcare/providers/${id}`, data),
+  deleteProvider: (id)          => api.delete(`/healthcare/providers/${id}`),
+
+  // Carnet médical
+  getMedical:         (clientId)       => api.get(`/healthcare/medical/${clientId}`),
+  upsertMedical:      (clientId, data) => api.put(`/healthcare/medical/${clientId}`, data),
+  addAllergy:         (clientId, data) => api.post(`/healthcare/medical/${clientId}/allergies`, data),
+  addHistory:         (clientId, data) => api.post(`/healthcare/medical/${clientId}/history`, data),
+  addConsultation:    (clientId, data) => api.post(`/healthcare/medical/${clientId}/consultations`, data),
+  addPrescription:    (clientId, data) => api.post(`/healthcare/medical/${clientId}/prescriptions`, data),
+  addAnalyse:         (clientId, data) => api.post(`/healthcare/medical/${clientId}/analyses`, data),
 };
 
 export default api;
