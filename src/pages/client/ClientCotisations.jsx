@@ -38,46 +38,38 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
-  const handlePay = async () => {
-    if (!amount || parseInt(amount) < 10000) return setError("Montant minimum : 10 000 FCFA");
-    setError(""); setPaying(true);
+  if (method === "Wave" && data.wave_link) {
+  setModal(false);
 
+  // Détecte Android et force l'intent
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  if (isAndroid) {
+    // Intent Android — force l'ouverture de Wave sans passer par PlayStore
+    const intentUrl = `intent://${data.wave_link.replace("https://", "")}#Intent;scheme=https;package=com.wave.payment;end`;
+    window.location.href = intentUrl;
+  } else if (isIOS) {
+    window.location.href = data.wave_link;
+  } else {
+    // Desktop
+    window.open(data.wave_link, "_blank");
+  }
+
+  // Confirme après retour
+  setTimeout(async () => {
     try {
-      const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: method });
-      const data = res.data.data;
-
-      if (method === "Wave" && data.wave_link) {
-        setModal(false);
-        // Force l'ouverture de l'app Wave
-        window.location.href = data.wave_link;
-
-        // Confirme le paiement après retour
-        setTimeout(async () => {
-          try {
-            await clientContribAPI.confirm({
-              amount: parseInt(amount),
-              payment_method: method,
-              transaction_reference: data.transaction_reference,
-            });
-            setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
-            load();
-            setTimeout(() => setSuccess(""), 6000);
-          } catch {}
-        }, 5000);
-
-      } else {
-        setSuccess(`✅ Paiement confirmé — Réf: ${data.transaction_reference}`);
-        setModal(false);
-        setAmount("");
-        load();
-        setTimeout(() => setSuccess(""), 6000);
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || "Erreur paiement");
-    } finally {
-      setPaying(false);
-    }
-  };
+      await clientContribAPI.confirm({
+        amount: parseInt(amount),
+        payment_method: method,
+        transaction_reference: data.transaction_reference,
+      });
+      setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
+      load();
+      setTimeout(() => setSuccess(""), 6000);
+    } catch {}
+  }, 5000);
+}
 
   if (loading) return <Skeleton />;
   if (!data)   return null;
