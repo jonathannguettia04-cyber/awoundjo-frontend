@@ -97,6 +97,7 @@ export const statsAPI = {
   getStats:     ()       => api.get("/stats/dashboard"),
   getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
   getTopAgents: ()       => api.get("/dashboard/top-agents"),
+  commissions:  (params) => api.get("/stats/commissions", { params }),
 };
 // Alias sans "s" pour compatibilité
 export const statAPI = statsAPI;
