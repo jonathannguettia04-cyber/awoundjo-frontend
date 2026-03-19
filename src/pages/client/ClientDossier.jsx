@@ -50,7 +50,7 @@ export default function ClientDossier({ clientId: propClientId }) {
   const storedClient = JSON.parse(localStorage.getItem("client_data") || "{}");
   const clientId = propClientId || paramId || storedClient.id;
 
-  const [client,  setClient]  = useState(null);
+  const [client, setClient] = useState(storedClient || null);
   const [medical, setMedical] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
