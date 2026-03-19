@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { healthcareAPI } from "../../services/api";
-import { clientProfileAPI } from "../../clientApi";
+import { clientProfileAPI, clientMedicalAPI } from "../../clientApi";
 import { useAuth } from "../../context/AuthContext";
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -46,61 +45,10 @@ function EmptyState({ label }) {
   );
 }
 
-function QuickForm({ fields, onSave, onCancel }) {
-  const [form, setForm] = useState(Object.fromEntries(fields.map((f) => [f.key, f.default || ""])));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setSaving(true); setError("");
-    try { await onSave(form); }
-    catch (err) { setError(err.response?.data?.error || "Erreur"); }
-    finally { setSaving(false); }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl p-4 space-y-3 mb-4">
-      {error && <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg">{error}</div>}
-      <div className="grid sm:grid-cols-2 gap-3">
-        {fields.map((f) => (
-          <div key={f.key} className={f.full ? "sm:col-span-2" : ""}>
-            <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}{f.required ? " *" : ""}</label>
-            {f.type === "select" ? (
-              <select required={f.required} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-                {f.options.map((o) => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
-              </select>
-            ) : f.type === "textarea" ? (
-              <textarea required={f.required} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                rows={2} placeholder={f.placeholder}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
-            ) : (
-              <input required={f.required} type={f.type || "text"} value={form[f.key]}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                placeholder={f.placeholder}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">Annuler</button>
-        <button type="submit" disabled={saving}
-          className="px-4 py-1.5 text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-60">
-          {saving ? "…" : "Enregistrer"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
 export default function ClientDossier({ clientId: propClientId }) {
   const { id: paramId } = useParams();
   const storedClient = JSON.parse(localStorage.getItem("client_data") || "{}");
   const clientId = propClientId || paramId || storedClient.id;
-  const { user } = useAuth();
 
   const [client,  setClient]  = useState(null);
   const [medical, setMedical] = useState(null);
@@ -108,21 +56,15 @@ export default function ClientDossier({ clientId: propClientId }) {
   const [error,   setError]   = useState("");
   const [section, setSection] = useState("general");
 
-  const [addingAllergy,      setAddingAllergy]      = useState(false);
-  const [addingHistory,      setAddingHistory]      = useState(false);
-  const [addingConsultation, setAddingConsultation] = useState(false);
-  const [addingPrescription, setAddingPrescription] = useState(false);
-  const [addingAnalyse,      setAddingAnalyse]      = useState(false);
-  const [editingGeneral,     setEditingGeneral]     = useState(false);
-
-  const canWrite = ["ADMIN", "MEDECIN", "INFIRMIER"].includes(user?.role);
+  // Lecture seule pour le portail client
+  const canWrite = false;
 
   async function loadData() {
     setLoading(true);
     try {
       const [clientRes, medicalRes] = await Promise.all([
         clientProfileAPI.get(),
-        healthcareAPI.getMedical(clientId).catch(() => ({ data: null })),
+        clientMedicalAPI.get().catch(() => ({ data: null })),
       ]);
       setClient(clientRes.data.client || clientRes.data);
       setMedical(medicalRes.data || null);
@@ -196,22 +138,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Général ── */}
       {section === "general" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-          <SectionHeader title="Informations médicales générales" icon="👤"
-            onAdd={canWrite ? () => setEditingGeneral(true) : null} addLabel="Modifier" />
-
-          {editingGeneral && (
-            <QuickForm
-              fields={[
-                { key: "blood_type", label: "Groupe sanguin", type: "select", options: BLOOD_TYPES.map((b) => ({ value: b, label: b })) },
-                { key: "weight_kg",  label: "Poids (kg)",     type: "number", placeholder: "Ex: 70" },
-                { key: "height_cm",  label: "Taille (cm)",    type: "number", placeholder: "Ex: 175" },
-                { key: "chronic_diseases", label: "Maladies chroniques", type: "textarea", full: true, placeholder: "Ex: Diabète type 2, HTA…" },
-                { key: "notes", label: "Notes générales", type: "textarea", full: true, placeholder: "Observations particulières…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.upsertMedical(clientId, form); setEditingGeneral(false); loadData(); }}
-              onCancel={() => setEditingGeneral(false)}
-            />
-          )}
+          <SectionHeader title="Informations médicales générales" icon="👤" />
 
           {r ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -249,20 +176,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Allergies ── */}
       {section === "allergies" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <SectionHeader title="Allergies" icon="⚠️"
-            onAdd={canWrite ? () => setAddingAllergy(true) : null} addLabel="Ajouter allergie" />
-
-          {addingAllergy && (
-            <QuickForm
-              fields={[
-                { key: "allergen", label: "Allergène *", required: true, placeholder: "Ex: Pénicilline, Arachides" },
-                { key: "severity", label: "Sévérité", type: "select", options: [{ value: "mild", label: "Légère" }, { value: "moderate", label: "Modérée" }, { value: "severe", label: "Sévère" }], default: "moderate" },
-                { key: "reaction", label: "Réaction observée", type: "textarea", full: true, placeholder: "Ex: Urticaire, choc anaphylactique…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.addAllergy(clientId, form); setAddingAllergy(false); loadData(); }}
-              onCancel={() => setAddingAllergy(false)}
-            />
-          )}
+          <SectionHeader title="Allergies" icon="⚠️" />
 
           {!medical?.allergies?.length ? <EmptyState label="Aucune allergie enregistrée" /> : (
             <div className="space-y-2">
@@ -292,21 +206,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Antécédents ── */}
       {section === "history" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <SectionHeader title="Antécédents médicaux" icon="📋"
-            onAdd={canWrite ? () => setAddingHistory(true) : null} addLabel="Ajouter antécédent" />
-
-          {addingHistory && (
-            <QuickForm
-              fields={[
-                { key: "condition", label: "Condition / Maladie *", required: true, placeholder: "Ex: Diabète type 2, HTA" },
-                { key: "diagnosed_at", label: "Date diagnostic", type: "date" },
-                { key: "status", label: "Statut", type: "select", options: [{ value: "active", label: "Actif" }, { value: "chronic", label: "Chronique" }, { value: "resolved", label: "Résolu" }], default: "active" },
-                { key: "notes", label: "Notes", type: "textarea", full: true, placeholder: "Observations…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.addHistory(clientId, form); setAddingHistory(false); loadData(); }}
-              onCancel={() => setAddingHistory(false)}
-            />
-          )}
+          <SectionHeader title="Antécédents médicaux" icon="📋" />
 
           {!medical?.history?.length ? <EmptyState label="Aucun antécédent médical enregistré" /> : (
             <div className="space-y-2">
@@ -332,23 +232,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Consultations ── */}
       {section === "consultations" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <SectionHeader title="Consultations" icon="🩺"
-            onAdd={canWrite ? () => setAddingConsultation(true) : null} addLabel="Nouvelle consultation" />
-
-          {addingConsultation && (
-            <QuickForm
-              fields={[
-                { key: "consultation_date", label: "Date *", type: "date", required: true },
-                { key: "doctor_name",  label: "Médecin",    placeholder: "Dr. Koné" },
-                { key: "provider_name", label: "Établissement", placeholder: "Clinique Sainte Marie" },
-                { key: "reason",     label: "Motif *",     required: true, type: "textarea", full: true, placeholder: "Ex: Douleurs abdominales" },
-                { key: "diagnosis",  label: "Diagnostic",  type: "textarea", full: true, placeholder: "Ex: Gastrite aiguë" },
-                { key: "notes",      label: "Notes",       type: "textarea", full: true, placeholder: "Observations complémentaires…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.addConsultation(clientId, form); setAddingConsultation(false); loadData(); }}
-              onCancel={() => setAddingConsultation(false)}
-            />
-          )}
+          <SectionHeader title="Consultations" icon="🩺" />
 
           {!medical?.consultations?.length ? <EmptyState label="Aucune consultation enregistrée" /> : (
             <div className="space-y-3">
@@ -382,22 +266,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Prescriptions ── */}
       {section === "prescriptions" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <SectionHeader title="Ordonnances & Médicaments" icon="💊"
-            onAdd={canWrite ? () => setAddingPrescription(true) : null} addLabel="Ajouter ordonnance" />
-
-          {addingPrescription && (
-            <QuickForm
-              fields={[
-                { key: "medication", label: "Médicament *", required: true, placeholder: "Ex: Paracétamol 500mg" },
-                { key: "dosage",     label: "Dosage",       placeholder: "Ex: 500mg" },
-                { key: "frequency",  label: "Fréquence",    placeholder: "Ex: 3 fois par jour" },
-                { key: "duration",   label: "Durée",        placeholder: "Ex: 7 jours" },
-                { key: "notes",      label: "Notes",        type: "textarea", full: true, placeholder: "Instructions particulières…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.addPrescription(clientId, form); setAddingPrescription(false); loadData(); }}
-              onCancel={() => setAddingPrescription(false)}
-            />
-          )}
+          <SectionHeader title="Ordonnances & Médicaments" icon="💊" />
 
           {!medical?.prescriptions?.length ? <EmptyState label="Aucune ordonnance enregistrée" /> : (
             <div className="space-y-2">
@@ -424,21 +293,7 @@ export default function ClientDossier({ clientId: propClientId }) {
       {/* ── Section Analyses ── */}
       {section === "analyses" && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <SectionHeader title="Analyses & Examens" icon="🔬"
-            onAdd={canWrite ? () => setAddingAnalyse(true) : null} addLabel="Ajouter analyse" />
-
-          {addingAnalyse && (
-            <QuickForm
-              fields={[
-                { key: "type",        label: "Type d'analyse *", required: true, placeholder: "Ex: NFS, Glycémie, Échographie" },
-                { key: "result_date", label: "Date résultat",    type: "date" },
-                { key: "result",      label: "Résultat",         type: "textarea", full: true, placeholder: "Ex: Glycémie à jeun : 1,2 g/L (normale)" },
-                { key: "notes",       label: "Interprétation",   type: "textarea", full: true, placeholder: "Commentaires du médecin…" },
-              ]}
-              onSave={async (form) => { await healthcareAPI.addAnalyse(clientId, form); setAddingAnalyse(false); loadData(); }}
-              onCancel={() => setAddingAnalyse(false)}
-            />
-          )}
+          <SectionHeader title="Analyses & Examens" icon="🔬" />
 
           {!medical?.analyses?.length ? <EmptyState label="Aucune analyse enregistrée" /> : (
             <div className="space-y-2">
