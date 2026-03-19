@@ -97,7 +97,8 @@ function QuickForm({ fields, onSave, onCancel }) {
 
 export default function ClientDossier({ clientId: propClientId }) {
   const { id: paramId } = useParams();
-  const clientId = propClientId || paramId;
+  const storedClient = JSON.parse(localStorage.getItem("client_data") || "{}");
+  const clientId = propClientId || paramId || storedClient.id;
   const { user } = useAuth();
 
   const [client,  setClient]  = useState(null);
