@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { healthcareAPI, clientAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-
+import clientApi from "../../clientApi"; // l'instance axios client
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -118,20 +118,20 @@ export default function ClientDossier({ clientId: propClientId }) {
   const canWrite = ["ADMIN", "MEDECIN", "INFIRMIER"].includes(user?.role);
 
   async function loadData() {
-    setLoading(true);
-    try {
-      const [clientRes, medicalRes] = await Promise.all([
-        clientAPI.getById(clientId),
-        healthcareAPI.getMedical(clientId).catch(() => ({ data: null })),
-      ]);
-      setClient(clientRes.data.client);
-      setMedical(medicalRes.data || null);
-    } catch (e) {
-      setError("Impossible de charger le dossier médical");
-    } finally {
-      setLoading(false);
-    }
+  setLoading(true);
+  try {
+    const [clientRes, medicalRes] = await Promise.all([
+      clientApi.get("/profile"),  // ← utilise l'instance client avec client_token
+      healthcareAPI.getMedical(clientId).catch(() => ({ data: null })),
+    ]);
+    setClient(clientRes.data.client || clientRes.data);
+    setMedical(medicalRes.data || null);
+  } catch (e) {
+    setError("Impossible de charger le dossier médical");
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => { if (clientId) loadData(); }, [clientId]);
 
