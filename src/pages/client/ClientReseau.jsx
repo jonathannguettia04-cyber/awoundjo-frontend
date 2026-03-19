@@ -1,47 +1,112 @@
 // src/pages/client/ClientReseau.jsx
-export default function ClientReseau() {
-  const [filter, setFilter] = import("react").then ? null : null;
-  const { useState } = require("react");
-  const [f, setF] = useState("all");
+import { useState } from "react";
 
-  const NETWORK = [
-    { name: "Clinique Avicenne",    type: "clinic",   address: "Rue des Jardins, Cocody",    city: "Abidjan", phone: "+225 27 22 41 00 00", plans: ["ESSENTIELLE","IVOIRIENNE","TURQUOISE"], icon: "🏥" },
-    { name: "Pharmacie du Plateau", type: "pharmacy", address: "Avenue Général de Gaulle",   city: "Abidjan", phone: "+225 27 20 21 00 00", plans: ["ESSENTIELLE","IVOIRIENNE","TURQUOISE"], icon: "💊" },
-    { name: "CHU de Cocody",        type: "hospital", address: "Boulevard de l'Université",  city: "Abidjan", phone: "+225 27 22 44 00 00", plans: ["IVOIRIENNE","TURQUOISE"],               icon: "🏨" },
-    { name: "Laboratoire Bio Plus", type: "lab",      address: "Marcory Zone 4",             city: "Abidjan", phone: "+225 27 21 75 00 00", plans: ["TURQUOISE"],                            icon: "🔬" },
-  ];
-  const TYPES = [{ id: "all", label: "Tous" }, { id: "clinic", label: "Cliniques" }, { id: "pharmacy", label: "Pharmacies" }, { id: "hospital", label: "Hôpitaux" }, { id: "lab", label: "Labos" }];
-  const filtered = f === "all" ? NETWORK : NETWORK.filter(n => n.type === f);
+const NETWORK = [
+  { name: "Clinique Avicenne",       type: "clinic",   address: "Rue des Jardins, Cocody",   city: "Abidjan", phone: "+225 27 22 41 00 00", plans: ["ESSENTIELLE","IVOIRIENNE","TURQUOISE"], icon: "🏥" },
+  { name: "Pharmacie du Plateau",    type: "pharmacy", address: "Avenue Général de Gaulle",  city: "Abidjan", phone: "+225 27 20 21 00 00", plans: ["ESSENTIELLE","IVOIRIENNE","TURQUOISE"], icon: "💊" },
+  { name: "CHU de Cocody",           type: "hospital", address: "Boulevard de l'Université", city: "Abidjan", phone: "+225 27 22 44 00 00", plans: ["IVOIRIENNE","TURQUOISE"],               icon: "🏨" },
+  { name: "Laboratoire Bio Plus",    type: "lab",      address: "Marcory Zone 4",            city: "Abidjan", phone: "+225 27 21 75 00 00", plans: ["TURQUOISE"],                            icon: "🔬" },
+  { name: "Polyclinique Internationale", type: "clinic", address: "Deux Plateaux, Cocody",  city: "Abidjan", phone: "+225 27 22 41 50 00", plans: ["IVOIRIENNE","TURQUOISE"],               icon: "🏥" },
+  { name: "Pharmacie Sainte Marie",  type: "pharmacy", address: "Adjamé, Rue 12",           city: "Abidjan", phone: "+225 27 20 37 00 00", plans: ["ESSENTIELLE","IVOIRIENNE","TURQUOISE"], icon: "💊" },
+];
+
+const TYPES = [
+  { id: "all",      label: "Tous",       icon: "🗂️" },
+  { id: "clinic",   label: "Cliniques",  icon: "🏥" },
+  { id: "pharmacy", label: "Pharmacies", icon: "💊" },
+  { id: "hospital", label: "Hôpitaux",   icon: "🏨" },
+  { id: "lab",      label: "Labos",      icon: "🔬" },
+];
+
+const TYPE_COLOR = {
+  clinic:   { color: "#1D4ED8", bg: "#EFF6FF" },
+  pharmacy: { color: "#059669", bg: "#ECFDF5" },
+  hospital: { color: "#7C3AED", bg: "#F5F3FF" },
+  lab:      { color: "#0891B2", bg: "#ECFEFF" },
+};
+
+export default function ClientReseau() {
+  const [filter,  setFilter]  = useState("all");
+  const [visible, setVisible] = useState(true);
+
+  const filtered = filter === "all" ? NETWORK : NETWORK.filter(n => n.type === filter);
 
   return (
-    <div style={{ padding: 16, fontFamily: "'Poppins',sans-serif" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>Réseau de Soins</h1>
-      <p style={{ fontSize: 13, color: "#6B7280", margin: "0 0 16px" }}>Établissements partenaires Awoundjô</p>
+    <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
 
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 12, marginBottom: 16 }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Réseau de Soins</h1>
+      <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Établissements partenaires Awoundjô</p>
+
+      {/* Filtres */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 20 }}>
         {TYPES.map(t => (
-          <button key={t.id} onClick={() => setF(t.id)}
-            style={{ padding: "8px 16px", borderRadius: 20, border: "none", background: f === t.id ? "#1a56db" : "#F3F4F6", color: f === t.id ? "#fff" : "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'Poppins',sans-serif" }}>
-            {t.label}
+          <button key={t.id} onClick={() => setFilter(t.id)} style={{
+            padding: "9px 16px", borderRadius: 20, border: "none",
+            background: filter === t.id ? "linear-gradient(135deg,#1a56db,#1e40af)" : "#fff",
+            color: filter === t.id ? "#fff" : "#475569",
+            fontSize: 12, fontWeight: 700, cursor: "pointer",
+            whiteSpace: "nowrap", fontFamily: "'Poppins',sans-serif",
+            boxShadow: filter === t.id ? "0 4px 12px rgba(26,86,219,.3)" : "0 2px 8px rgba(0,0,0,.06)",
+            transition: "all .2s cubic-bezier(.34,1.56,.64,1)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span>{t.icon}</span> {t.label}
           </button>
         ))}
       </div>
 
-      {filtered.map((n, i) => (
-        <div key={i} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
-          <div style={{ width: 48, height: 48, background: "#F0F7FF", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{n.icon}</div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 2px" }}>{n.name}</p>
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "0 0 6px" }}>📍 {n.address}, {n.city}</p>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {n.plans.map(p => (
-                <span key={p} style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "#EFF6FF", color: "#1a56db" }}>{p}</span>
-              ))}
+      {/* Compteur */}
+      <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14, fontWeight: 500 }}>
+        {filtered.length} établissement{filtered.length > 1 ? "s" : ""} trouvé{filtered.length > 1 ? "s" : ""}
+      </p>
+
+      {/* Liste */}
+      {filtered.map((n, i) => {
+        const tc = TYPE_COLOR[n.type] || TYPE_COLOR.clinic;
+        return (
+          <div key={i} style={{
+            background: "#fff", borderRadius: 18, padding: "16px",
+            marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 14,
+            boxShadow: "0 2px 10px rgba(0,0,0,.06)",
+            border: "1px solid #F1F5F9",
+            opacity: visible ? 1 : 0,
+            transform: visible ? "translateY(0)" : "translateY(10px)",
+            transition: `all .4s ${i * .06}s`,
+          }}>
+            <div style={{ width: 52, height: 52, background: tc.bg, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>
+              {n.icon}
             </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: "0 0 3px", letterSpacing: -.2 }}>{n.name}</p>
+              <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 4 }}>
+                📍 {n.address}, {n.city}
+              </p>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {n.plans.map(p => (
+                  <span key={p} style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 8, background: tc.bg, color: tc.color }}>
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <a href={`tel:${n.phone}`} style={{
+              background: "linear-gradient(135deg,#1a56db,#1e40af)",
+              color: "#fff", borderRadius: 12, padding: "10px 14px",
+              fontSize: 18, textDecoration: "none", flexShrink: 0,
+              boxShadow: "0 4px 12px rgba(26,86,219,.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>📞</a>
           </div>
-          <a href={`tel:${n.phone}`} style={{ background: "#EFF6FF", color: "#1a56db", borderRadius: 10, padding: "10px 12px", fontSize: 20, textDecoration: "none", flexShrink: 0 }}>📞</a>
+        );
+      })}
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: "center", padding: "50px 20px", background: "#fff", borderRadius: 20 }}>
+          <span style={{ fontSize: 48 }}>🏥</span>
+          <p style={{ color: "#64748B", fontSize: 15, fontWeight: 600, margin: "12px 0 4px" }}>Aucun établissement</p>
+          <p style={{ color: "#94A3B8", fontSize: 13, margin: 0 }}>pour ce type de filtre</p>
         </div>
-      ))}
+      )}
     </div>
   );
 }
