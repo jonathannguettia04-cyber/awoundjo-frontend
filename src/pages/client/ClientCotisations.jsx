@@ -40,23 +40,10 @@ export default function ClientCotisations() {
 
   if (method === "Wave" && data.wave_link) {
   setModal(false);
+  
+  // Ouvre dans un nouvel onglet — Wave gère le reste
+  window.open(data.wave_link, "_blank", "noopener");
 
-  // Détecte Android et force l'intent
-  const isAndroid = /android/i.test(navigator.userAgent);
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
-  if (isAndroid) {
-    // Intent Android — force l'ouverture de Wave sans passer par PlayStore
-    const intentUrl = `intent://${data.wave_link.replace("https://", "")}#Intent;scheme=https;package=com.wave.payment;end`;
-    window.location.href = intentUrl;
-  } else if (isIOS) {
-    window.location.href = data.wave_link;
-  } else {
-    // Desktop
-    window.open(data.wave_link, "_blank");
-  }
-
-  // Confirme après retour
   setTimeout(async () => {
     try {
       await clientContribAPI.confirm({
@@ -68,7 +55,7 @@ export default function ClientCotisations() {
       load();
       setTimeout(() => setSuccess(""), 6000);
     } catch {}
-  }, 5000);
+  }, 10000);
 }
 
   if (loading) return <Skeleton />;
