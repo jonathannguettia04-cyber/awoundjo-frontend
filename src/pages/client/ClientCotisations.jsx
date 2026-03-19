@@ -43,18 +43,51 @@ export default function ClientCotisations() {
   useEffect(() => { load(); }, []);
 
   const handlePay = async () => {
-    if (!amount || parseInt(amount) < 1000) return setError("Montant minimum : 1 000 FCFA");
-    setError(""); setPaying(true);
-    try {
-      const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: method });
-      setSuccess(`✅ Paiement confirmé — Réf: ${res.data.data.transaction_reference}`);
+  if (!amount || parseInt(amount) < 1000) return setError("Montant minimum : 1 000 FCFA");
+  setError(""); setPaying(true);
+
+  try {
+    const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: method });
+    const data = res.data.data;
+
+    if (method === "Wave" && data.wave_link) {
+      // Ouvre Wave dans une nouvelle fenêtre
+      window.open(data.wave_link, "_blank");
+
+      // Après retour de Wave, on confirme le paiement
+      setTimeout(async () => {
+        try {
+          await clientContribAPI.confirm({
+            amount: parseInt(amount),
+            payment_method: method,
+            transaction_reference: data.transaction_reference,
+          });
+          setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
+          setModal(false); setAmount("");
+          load();
+          setTimeout(() => setSuccess(""), 6000);
+        } catch {
+          // L'utilisateur peut confirmer manuellement si besoin
+        }
+      }, 5000); // attend 5s après ouverture de Wave
+
+      setModal(false);
+      setSuccess("🌊 Lien Wave ouvert — Complétez le paiement dans l'app Wave");
+      setTimeout(() => setSuccess(""), 10000);
+
+    } else {
+      // Cash, Orange Money, MTN → confirmation directe
+      setSuccess(`✅ Paiement confirmé — Réf: ${data.transaction_reference}`);
       setModal(false); setAmount("");
       load();
       setTimeout(() => setSuccess(""), 6000);
-    } catch (err) {
-      setError(err.response?.data?.error || "Erreur paiement");
-    } finally { setPaying(false); }
-  };
+    }
+  } catch (err) {
+    setError(err.response?.data?.error || "Erreur paiement");
+  } finally {
+    setPaying(false); 
+  }
+};
 
   if (loading) return <Skeleton />;
   if (!data)   return null;

@@ -51,10 +51,10 @@ export const clientCardAPI = {
 
 // ── COTISATIONS ──────────────────────────────────────────────────
 export const clientContribAPI = {
-  get: ()     => clientApi.get("/contributions"),
-  pay: (data) => clientApi.post("/contributions/pay", data),
+  get:     ()     => clientApi.get("/contributions"),
+  pay:     (data) => clientApi.post("/contributions/pay", data),
+  confirm: (data) => clientApi.post("/contributions/confirm", data), // ← ajoute ça
 };
-
 // ── DÉPENDANTS ───────────────────────────────────────────────────
 export const clientDepsAPI = {
   get:    ()     => clientApi.get("/dependents"),
