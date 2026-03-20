@@ -1,32 +1,36 @@
 import { useEffect, useState } from "react";
 import { healthcareAPI } from "../services/api";
 import Modal from "../components/Modal";
+import * as XLSX from "xlsx";
 
 const TYPES = [
-  { id: "pharmacy", label: "Pharmacie",  icon: "💊", color: "bg-green-100 text-green-700 border-green-200" },
-  { id: "clinic",   label: "Clinique",   icon: "🏥", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { id: "hospital", label: "Hôpital",    icon: "🏨", color: "bg-purple-100 text-purple-700 border-purple-200" },
-  { id: "lab",      label: "Laboratoire",icon: "🔬", color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  { id: "pharmacy", label: "Pharmacie",   icon: "💊", color: "bg-green-100 text-green-700 border-green-200" },
+  { id: "clinic",   label: "Clinique",    icon: "🏥", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { id: "hospital", label: "Hôpital",     icon: "🏨", color: "bg-purple-100 text-purple-700 border-purple-200" },
+  { id: "lab",      label: "Laboratoire", icon: "🔬", color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
 ];
 
 const TYPE_MAP = Object.fromEntries(TYPES.map((t) => [t.id, t]));
 const EMPTY = { name: "", type: "pharmacy", address: "", city: "", phone: "", phone2: "", email: "", website: "" };
 
 export default function HealthcareAdmin() {
-  const [providers,   setProviders]   = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [filterType,  setFilterType]  = useState("all");
-  const [filterCity,  setFilterCity]  = useState("");
-  const [search,      setSearch]      = useState("");
+  const [providers,    setProviders]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [filterType,   setFilterType]   = useState("all");
+  const [filterCity,   setFilterCity]   = useState("");
+  const [search,       setSearch]       = useState("");
 
-  const [showModal,   setShowModal]   = useState(false);
-  const [editing,     setEditing]     = useState(null); // null = création
-  const [form,        setForm]        = useState(EMPTY);
-  const [saving,      setSaving]      = useState(false);
-  const [formError,   setFormError]   = useState("");
+  const [showModal,    setShowModal]    = useState(false);
+  const [editing,      setEditing]      = useState(null);
+  const [form,         setForm]         = useState(EMPTY);
+  const [saving,       setSaving]       = useState(false);
+  const [formError,    setFormError]    = useState("");
 
-  const [confirm,     setConfirm]     = useState(null);
+  const [confirm,      setConfirm]      = useState(null);
+  const [importing,    setImporting]    = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
+  // ── Chargement ───────────────────────────────────────────────
   async function load() {
     setLoading(true);
     try {
@@ -38,13 +42,19 @@ export default function HealthcareAdmin() {
 
   useEffect(() => { load(); }, []);
 
+  // ── CRUD ─────────────────────────────────────────────────────
   function openCreate() {
     setEditing(null); setForm(EMPTY); setFormError(""); setShowModal(true);
   }
 
   function openEdit(p) {
     setEditing(p);
-    setForm({ name: p.name, type: p.type, address: p.address || "", city: p.city || "", phone: p.phone || "", phone2: p.phone2 || "", email: p.email || "", website: p.website || "" });
+    setForm({
+      name: p.name, type: p.type,
+      address: p.address || "", city: p.city || "",
+      phone: p.phone || "", phone2: p.phone2 || "",
+      email: p.email || "", website: p.website || "",
+    });
     setFormError(""); setShowModal(true);
   }
 
@@ -81,12 +91,65 @@ export default function HealthcareAdmin() {
     } catch { /* ignore */ }
   }
 
+  // ── Import Excel ─────────────────────────────────────────────
+  async function handleImportExcel(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+
+      let ok = 0;
+      const errors = [];
+
+      for (const row of rows) {
+        const payload = {
+          name:    String(row["Nom"]         || row["name"]    || "").trim(),
+          type:    String(row["Type"]        || row["type"]    || "pharmacy").trim().toLowerCase(),
+          city:    String(row["Ville"]       || row["city"]    || "").trim(),
+          address: String(row["Adresse"]     || row["address"] || "").trim(),
+          phone:   String(row["Téléphone"]   || row["phone"]   || "").trim(),
+          phone2:  String(row["Téléphone 2"] || row["phone2"]  || "").trim(),
+          email:   String(row["Email"]       || row["email"]   || "").trim(),
+          website: String(row["Site web"]    || row["website"] || "").trim(),
+        };
+
+        if (!payload.name) { errors.push("Ligne ignorée : nom manquant"); continue; }
+        if (!["pharmacy", "clinic", "hospital", "lab"].includes(payload.type)) {
+          payload.type = "pharmacy";
+        }
+
+        try {
+          await healthcareAPI.createProvider(payload);
+          ok++;
+        } catch (err) {
+          errors.push(`${payload.name} : ${err.response?.data?.error || "erreur"}`);
+        }
+      }
+
+      setImportResult({ ok, errors });
+      load();
+    } catch {
+      setImportResult({ ok: 0, errors: ["Fichier invalide ou illisible"] });
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  }
+
+  // ── Données filtrées ──────────────────────────────────────────
   const cities = ["Toutes", ...Array.from(new Set(providers.map((p) => p.city).filter(Boolean))).sort()];
 
   const filtered = providers.filter((p) => {
     const matchType   = filterType === "all" || p.type === filterType;
     const matchCity   = !filterCity || filterCity === "Toutes" || p.city === filterCity;
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.city || "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search
+      || p.name.toLowerCase().includes(search.toLowerCase())
+      || (p.city || "").toLowerCase().includes(search.toLowerCase());
     return matchType && matchCity && matchSearch;
   });
 
@@ -95,25 +158,82 @@ export default function HealthcareAdmin() {
     return acc;
   }, {});
 
+  // ── Rendu ─────────────────────────────────────────────────────
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Réseau de Soins</h1>
           <p className="text-slate-500 text-sm">{providers.filter((p) => p.active).length} établissements actifs</p>
         </div>
-        <button onClick={openCreate}
-          className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm w-full sm:w-auto">
-          + Nouvel établissement
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {/* Bouton Import Excel */}
+          <label className={`cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-xl border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 text-sm font-semibold transition-all ${importing ? "opacity-60 pointer-events-none" : ""}`}>
+            {importing ? "⏳ Import…" : "📥 Importer Excel"}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportExcel}
+              disabled={importing}
+            />
+          </label>
+
+          <button
+            onClick={openCreate}
+            className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm">
+            + Nouvel établissement
+          </button>
+        </div>
+      </div>
+
+      {/* Résultat import */}
+      {importResult && (
+        <div className={`rounded-xl p-4 text-sm mb-5 border ${importResult.errors.length ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"}`}>
+          <p className="font-semibold text-slate-700 mb-1">
+            ✅ {importResult.ok} établissement(s) importé(s)
+            {importResult.errors.length > 0 && ` · ⚠️ ${importResult.errors.length} erreur(s)`}
+          </p>
+          {importResult.errors.map((e, i) => (
+            <p key={i} className="text-xs text-amber-700">• {e}</p>
+          ))}
+          <button
+            onClick={() => setImportResult(null)}
+            className="text-xs text-slate-400 hover:text-slate-600 mt-1 underline">
+            Fermer
+          </button>
+        </div>
+      )}
+
+      {/* Modèle Excel à télécharger */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 flex items-center justify-between gap-3">
+        <p className="text-xs text-slate-500">
+          📋 Format Excel attendu — colonnes : <span className="font-mono font-semibold">Nom, Type, Ville, Adresse, Téléphone, Téléphone 2, Email, Site web</span>
+          <br />Types valides : <span className="font-mono">pharmacy · clinic · hospital · lab</span>
+        </p>
+        <button
+          onClick={() => {
+            const ws = XLSX.utils.aoa_to_sheet([
+              ["Nom", "Type", "Ville", "Adresse", "Téléphone", "Téléphone 2", "Email", "Site web"],
+              ["Pharmacie du Plateau", "pharmacy", "Abidjan", "Plateau, Rue du Commerce", "0101020304", "", "", ""],
+              ["Clinique Sainte Marie", "clinic", "Yamoussoukro", "Centre-ville", "0505060708", "", "", ""],
+            ]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Établissements");
+            XLSX.writeFile(wb, "modele_etablissements.xlsx");
+          }}
+          className="flex-shrink-0 text-xs font-semibold text-brand-600 border border-brand-200 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
+          ⬇️ Modèle
         </button>
       </div>
 
       {/* KPI par type */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {TYPES.map((t) => (
-          <button key={t.id} onClick={() => setFilterType(filterType === t.id ? "all" : t.id)}
+          <button key={t.id}
+            onClick={() => setFilterType(filterType === t.id ? "all" : t.id)}
             className={`bg-white rounded-2xl border p-4 text-left transition-all hover:shadow-md
               ${filterType === t.id ? "border-brand-300 shadow-md" : "border-slate-100"}`}>
             <span className="text-2xl">{t.icon}</span>
@@ -125,10 +245,15 @@ export default function HealthcareAdmin() {
 
       {/* Filtres */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <input value={search} onChange={(e) => setSearch(e.target.value)}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher un établissement…"
-          className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-        <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)}
+          className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <select
+          value={filterCity}
+          onChange={(e) => setFilterCity(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           {cities.map((c) => <option key={c}>{c}</option>)}
         </select>
@@ -156,7 +281,7 @@ export default function HealthcareAdmin() {
                   <div className={`w-11 h-11 rounded-xl border flex items-center justify-center text-xl flex-shrink-0 ${t.color}`}>
                     {t.icon}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-wrap justify-end">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${t.color}`}>{t.label}</span>
                     {!p.active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactif</span>}
                   </div>
@@ -165,7 +290,9 @@ export default function HealthcareAdmin() {
                 {(p.address || p.city) && (
                   <p className="text-xs text-slate-400 mt-1">📍 {[p.address, p.city].filter(Boolean).join(", ")}</p>
                 )}
-                {p.phone && <p className="text-xs text-slate-500 mt-0.5">📞 {p.phone}{p.phone2 ? ` · ${p.phone2}` : ""}</p>}
+                {p.phone && (
+                  <p className="text-xs text-slate-500 mt-0.5">📞 {p.phone}{p.phone2 ? ` · ${p.phone2}` : ""}</p>
+                )}
 
                 <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50">
                   <button onClick={() => openEdit(p)}
