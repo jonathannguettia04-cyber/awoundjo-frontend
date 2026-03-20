@@ -1,6 +1,6 @@
 // src/pages/AdminProviders.jsx
 import { useEffect, useState } from "react";
-import { api } from "../services/api";
+import api from "../services/api";
 
 const fmt     = (n) => Number(n||0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
