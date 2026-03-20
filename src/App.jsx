@@ -3,6 +3,7 @@
 
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import HealthcareAdmin from "./pages/HealthcareAdmin";
 
 // ── Pages AGENT existantes (NE PAS TOUCHER) ──────────────────────
 import Navbar        from "./components/Navbar";
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
           <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
           <Route path="/agents" element={<ProtectedRoute adminOnly><Agents /></ProtectedRoute>} />
+          <Route path="/healthcare" element={<ProtectedRoute adminOnly><HealthcareAdmin /></ProtectedRoute>} />
 
           {/* ✅ Routes CLIENT ────────────────────────────────── */}
           <Route path="/client/login" element={<ClientLogin />} />
