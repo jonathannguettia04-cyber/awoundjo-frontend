@@ -29,7 +29,7 @@ export default function ClientLayout() {
       <header style={s.header}>
         <div style={s.hInner}>
           <div style={s.hLeft} onClick={() => navigate("/client/dashboard")}>
-            <div style={s.logo}>A</div>
+            <img src="/logo-awoundjjo.png" alt="Awoundjô" style={s.logo} />
             <div>
               <div style={s.appName}>Awoundjô</div>
               <div style={s.appSub}>Espace Adhérent</div>
@@ -87,8 +87,7 @@ const s = {
   header:    { background: "linear-gradient(135deg,#1a56db,#1e40af)", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 12px rgba(26,86,219,.25)" },
   hInner:    { maxWidth: 768, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" },
   hLeft:     { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  logo:      { width: 36, height: 36, background: "rgba(255,255,255,.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 18 },
-  appName:   { color: "#fff", fontWeight: 700, fontSize: 16, lineHeight: 1.2 },
+  logo:      { width: 36, height: 36, borderRadius: 10, objectFit: "contain", background: "rgba(255,255,255,.15)", padding: 3 },
   appSub:    { color: "rgba(255,255,255,.7)", fontSize: 11 },
   hRight:    { display: "flex", alignItems: "center", gap: 10 },
   avatar:    { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "rgba(255,255,255,.2)", borderRadius: "50%", color: "#fff", fontWeight: 700, fontSize: 14 },

@@ -28,6 +28,14 @@ import ClientTeleconsult from "./pages/client/ClientTeleconsult";
 import ClientReseau      from "./pages/client/ClientReseau";
 import ClientProfil      from "./pages/client/ClientProfil";
 
+// pages ettablissement
+import EtablissementLogin from "./pages/provider/EtablissementLogin";
+import ProviderLayout     from "./pages/provider/ProviderLayout";
+import ProviderDashboard  from "./pages/provider/ProviderDashboard";
+import ProviderScan       from "./pages/provider/ProviderScan";
+import ProviderServices   from "./pages/provider/ProviderServices";
+import ProviderMedical    from "./pages/provider/ProviderMedical";
+import ProviderBilling    from "./pages/provider/ProviderBilling";
 // ── Guards ───────────────────────────────────────────────────────
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, isAdmin } = useAuth();
@@ -76,6 +84,16 @@ export default function App() {
             <Route path="reseau"           element={<ClientReseau />} />
             <Route path="profil"           element={<ClientProfil />} />
           </Route>
+
+          <Route path="/etablissement" element={<EtablissementLogin />} />
+          <Route path="/etablissement" element={<ProviderLayout />}>
+          <Route path="dashboard"        element={<ProviderDashboard />} />
+          <Route path="scan"             element={<ProviderScan />} />
+          <Route path="services"         element={<ProviderServices />} />
+         <Route path="services/new"     element={<ProviderServices />} />
+         <Route path="medical/:clientId" element={<ProviderMedical />} />
+         <Route path="billing"          element={<ProviderBilling />} />
+       </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

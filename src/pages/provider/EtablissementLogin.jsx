@@ -1,0 +1,206 @@
+// src/pages/provider/EtablissementLogin.jsx
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { providerAuthAPI, providerLogin } from "../../providerApi";
+
+const TYPES = [
+  { id: "pharmacy", label: "Pharmacie",    icon: "💊" },
+  { id: "clinic",   label: "Clinique",     icon: "🏥" },
+  { id: "hospital", label: "Hôpital",      icon: "🏨" },
+  { id: "lab",      label: "Laboratoire",  icon: "🔬" },
+];
+
+const S = {
+  root: { minHeight: "100vh", background: "linear-gradient(160deg,#0f2942 0%,#0a3d62 50%,#0f2942 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'DM Sans',system-ui,sans-serif", position: "relative", overflow: "hidden" },
+  blob1: { position: "absolute", top: -120, right: -120, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,188,212,.15),transparent 70%)", pointerEvents: "none" },
+  blob2: { position: "absolute", bottom: -100, left: -100, width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,150,136,.12),transparent 70%)", pointerEvents: "none" },
+  logo:  { display: "flex", alignItems: "center", gap: 12, marginBottom: 32 },
+  logoImg: { width: 48, height: 48, objectFit: "contain", borderRadius: 12, background: "rgba(255,255,255,.1)", padding: 6 },
+  logoText: { color: "#fff", fontSize: 22, fontWeight: 800, letterSpacing: -.5 },
+  logoSub:  { color: "rgba(255,255,255,.55)", fontSize: 12, marginTop: 2 },
+  card:  { background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 24, padding: "32px 28px", width: "100%", maxWidth: 440 },
+  tabs:  { display: "flex", background: "rgba(255,255,255,.06)", borderRadius: 14, padding: 4, marginBottom: 28, gap: 4 },
+  tab:   { flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all .25s", fontFamily: "inherit" },
+  tabActive:   { background: "#00BCD4", color: "#fff", boxShadow: "0 4px 12px rgba(0,188,212,.3)" },
+  tabInactive: { background: "transparent", color: "rgba(255,255,255,.55)" },
+  label: { display: "block", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.6)", marginBottom: 6, textTransform: "uppercase", letterSpacing: .8 },
+  input: { width: "100%", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color .2s" },
+  select: { width: "100%", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
+  field: { marginBottom: 16 },
+  btn:   { width: "100%", padding: "14px", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8, fontFamily: "inherit", boxShadow: "0 6px 20px rgba(0,188,212,.35)", transition: "transform .2s, box-shadow .2s" },
+  err:   { background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: "10px 14px", color: "#FCA5A5", fontSize: 13, marginBottom: 16 },
+  suc:   { background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.3)", borderRadius: 10, padding: "10px 14px", color: "#86EFAC", fontSize: 13, marginBottom: 16 },
+  title: { color: "#fff", fontSize: 20, fontWeight: 800, marginBottom: 4 },
+  sub:   { color: "rgba(255,255,255,.5)", fontSize: 13, marginBottom: 24 },
+  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+};
+
+export default function EtablissementLogin() {
+  const navigate = useNavigate();
+  const [tab, setTab]     = useState("login");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Login
+  const [loginForm, setLoginForm] = useState({ login: "", password: "" });
+
+  // Request
+  const [reqForm, setReqForm] = useState({
+    name: "", type: "pharmacy", phone: "", email: "",
+    address: "", city: "", manager_name: "",
+  });
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    try {
+      const { data } = await providerAuthAPI.login(loginForm);
+      providerLogin(data.token, data.provider);
+      if (data.temp_password) {
+        navigate("/etablissement/change-password");
+      } else {
+        navigate("/etablissement/dashboard");
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Identifiants incorrects");
+    } finally { setLoading(false); }
+  }
+
+  async function handleRequest(e) {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    try {
+      await providerAuthAPI.requestAccess(reqForm);
+      setSuccess("✅ Demande envoyée ! L'équipe Awoundjô vous contactera sous 48h.");
+      setReqForm({ name: "", type: "pharmacy", phone: "", email: "", address: "", city: "", manager_name: "" });
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de l'envoi");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div style={S.root}>
+      <div style={S.blob1} />
+      <div style={S.blob2} />
+
+      {/* Logo */}
+      <div style={S.logo}>
+        <img src="/logo-awoundjjo.png" alt="Awoundjô" style={S.logoImg} />
+        <div>
+          <div style={S.logoText}>Awoundjô</div>
+          <div style={S.logoSub}>Portail Établissements</div>
+        </div>
+      </div>
+
+      {/* Card */}
+      <div style={S.card}>
+        {/* Tabs */}
+        <div style={S.tabs}>
+          {[{ id: "login", label: "🔑 Connexion" }, { id: "request", label: "📋 Demande d'accès" }].map(t => (
+            <button key={t.id} style={{ ...S.tab, ...(tab === t.id ? S.tabActive : S.tabInactive) }}
+              onClick={() => { setTab(t.id); setError(""); setSuccess(""); }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {error   && <div style={S.err}>{error}</div>}
+        {success && <div style={S.suc}>{success}</div>}
+
+        {/* LOGIN */}
+        {tab === "login" && (
+          <>
+            <div style={S.title}>Bon retour 👋</div>
+            <div style={S.sub}>Connectez-vous à votre espace établissement</div>
+            <form onSubmit={handleLogin}>
+              <div style={S.field}>
+                <label style={S.label}>Téléphone ou Email</label>
+                <input style={S.input} type="text" required placeholder="Ex : 0707080910"
+                  value={loginForm.login}
+                  onChange={e => setLoginForm({ ...loginForm, login: e.target.value })} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Mot de passe</label>
+                <input style={S.input} type="password" required placeholder="••••••••"
+                  value={loginForm.password}
+                  onChange={e => setLoginForm({ ...loginForm, password: e.target.value })} />
+              </div>
+              <button style={S.btn} type="submit" disabled={loading}
+                onMouseEnter={e => { e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 10px 28px rgba(0,188,212,.45)"; }}
+                onMouseLeave={e => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = "0 6px 20px rgba(0,188,212,.35)"; }}>
+                {loading ? "Connexion…" : "Se connecter →"}
+              </button>
+            </form>
+          </>
+        )}
+
+        {/* REQUEST ACCESS */}
+        {tab === "request" && (
+          <>
+            <div style={S.title}>Rejoindre le réseau 🏥</div>
+            <div style={S.sub}>Remplissez ce formulaire — nous validerons votre demande</div>
+            <form onSubmit={handleRequest}>
+              <div style={S.field}>
+                <label style={S.label}>Nom de l'établissement *</label>
+                <input style={S.input} required placeholder="Ex : Pharmacie du Plateau"
+                  value={reqForm.name}
+                  onChange={e => setReqForm({ ...reqForm, name: e.target.value })} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Type *</label>
+                <select style={S.select} required value={reqForm.type}
+                  onChange={e => setReqForm({ ...reqForm, type: e.target.value })}>
+                  {TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+                </select>
+              </div>
+              <div style={{ ...S.grid2, marginBottom: 0 }}>
+                <div style={S.field}>
+                  <label style={S.label}>Téléphone *</label>
+                  <input style={S.input} required placeholder="0707..."
+                    value={reqForm.phone}
+                    onChange={e => setReqForm({ ...reqForm, phone: e.target.value })} />
+                </div>
+                <div style={S.field}>
+                  <label style={S.label}>Email</label>
+                  <input style={S.input} type="email" placeholder="contact@..."
+                    value={reqForm.email}
+                    onChange={e => setReqForm({ ...reqForm, email: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ ...S.grid2, marginBottom: 0 }}>
+                <div style={S.field}>
+                  <label style={S.label}>Ville</label>
+                  <input style={S.input} placeholder="Abidjan"
+                    value={reqForm.city}
+                    onChange={e => setReqForm({ ...reqForm, city: e.target.value })} />
+                </div>
+                <div style={S.field}>
+                  <label style={S.label}>Quartier / Adresse</label>
+                  <input style={S.input} placeholder="Plateau..."
+                    value={reqForm.address}
+                    onChange={e => setReqForm({ ...reqForm, address: e.target.value })} />
+                </div>
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Nom du responsable *</label>
+                <input style={S.input} required placeholder="Nom complet du gérant"
+                  value={reqForm.manager_name}
+                  onChange={e => setReqForm({ ...reqForm, manager_name: e.target.value })} />
+              </div>
+              <button style={S.btn} type="submit" disabled={loading}
+                onMouseEnter={e => { e.target.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}>
+                {loading ? "Envoi…" : "Envoyer la demande →"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+
+      <p style={{ color: "rgba(255,255,255,.3)", fontSize: 12, marginTop: 24, textAlign: "center" }}>
+        © 2025 Mutuelle Santé Awoundjô — Côte d'Ivoire
+      </p>
+    </div>
+  );
+}
