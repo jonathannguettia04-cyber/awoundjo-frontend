@@ -8,12 +8,12 @@ const NAV_COMMON = [
   { to: "/groups",      label: "Groupes",         icon: "👨‍👩‍👧‍👦" },
   { to: "/payments",    label: "Paiements",       icon: "💳" },
   { to: "/commissions", label: "Commissions",     icon: "💰" },
-  <Link to="/admin/providers">🏥 Établissements</Link>
 ];
 
 const NAV_ADMIN_EXTRA = [
-  { to: "/healthcare", label: "Réseau de soins", icon: "🏥" },
-  { to: "/agents",     label: "Agents",          icon: "🧑‍💼" },
+  { to: "/healthcare",     label: "Réseau de soins",  icon: "🏥" },
+  { to: "/admin/providers",label: "Établissements",   icon: "🏨" },
+  { to: "/agents",         label: "Agents",           icon: "🧑‍💼" },
 ];
 
 export default function Navbar() {
