@@ -8,7 +8,6 @@ import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Ba
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
 
-// Barre de progression colorée
 function ProgressBar({ value, max, color = "bg-brand-500" }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
@@ -18,7 +17,6 @@ function ProgressBar({ value, max, color = "bg-brand-500" }) {
   );
 }
 
-// Miniature graphique en barres (évolution)
 function MiniChart({ data = [] }) {
   if (!data.length) return null;
   const max = Math.max(...data.map((d) => Number(d.revenue || 0)), 1);
@@ -45,7 +43,7 @@ export default function Dashboard() {
   const [error,   setError]   = useState("");
 
   useEffect(() => {
-   api.get("/stats/dashboard")
+    statsAPI.getStats()
       .then(({ data }) => setData(data))
       .catch(() => setError("Impossible de charger le tableau de bord"))
       .finally(() => setLoading(false));
@@ -75,7 +73,6 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
 
-      {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-slate-400 text-sm">{greeting} 👋</p>
@@ -100,79 +97,37 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── KPI Revenus ────────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Revenus</h2>
           <Link to="/payments" className="text-xs text-brand-500 hover:underline font-medium">Voir les paiements →</Link>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            label="Revenu total"
-            value={fmt(ps.total_revenue)}
-            icon="💰"
-            color="success"
-            sub={`${ps.total_payments} paiements`}
-            to="/payments"
-          />
-          <StatsCard
-            label="Aujourd'hui"
-            value={fmt(ps.today_revenue)}
-            icon="📅"
-            color="brand"
-            sub={`${ps.today_payments} paiements`}
-            to="/payments"
-          />
-          <StatsCard
-            label="Adhésions"
-            value={fmt(ps.adhesions_revenue)}
-            icon="📋"
-            color="purple"
-            to="/payments"
-          />
-          <StatsCard
-            label="Mensualités"
-            value={fmt(ps.mensualites_revenue)}
-            icon="🔄"
-            color="teal"
-            to="/payments"
-          />
+          <StatsCard label="Revenu total" value={fmt(ps.total_revenue)} icon="💰" color="success" sub={`${ps.total_payments} paiements`} to="/payments" />
+          <StatsCard label="Aujourd'hui" value={fmt(ps.today_revenue)} icon="📅" color="brand" sub={`${ps.today_payments} paiements`} to="/payments" />
+          <StatsCard label="Adhésions" value={fmt(ps.adhesions_revenue)} icon="📋" color="purple" to="/payments" />
+          <StatsCard label="Mensualités" value={fmt(ps.mensualites_revenue)} icon="🔄" color="teal" to="/payments" />
         </div>
-
-        {/* Méthodes de paiement */}
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/payments")}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">📱 Wave</p>
               <span className="text-sm font-bold text-orange-600">{fmt(ps.wave_revenue)}</span>
             </div>
-            <ProgressBar
-              value={Number(ps.wave_revenue)}
-              max={Number(ps.total_revenue)}
-              color="bg-orange-400"
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              {ps.total_revenue > 0 ? Math.round((ps.wave_revenue / ps.total_revenue) * 100) : 0}% du total
-            </p>
+            <ProgressBar value={Number(ps.wave_revenue)} max={Number(ps.total_revenue)} color="bg-orange-400" />
+            <p className="text-xs text-slate-400 mt-1">{ps.total_revenue > 0 ? Math.round((ps.wave_revenue / ps.total_revenue) * 100) : 0}% du total</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/payments")}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">💵 Cash</p>
               <span className="text-sm font-bold text-green-600">{fmt(ps.cash_revenue)}</span>
             </div>
-            <ProgressBar
-              value={Number(ps.cash_revenue)}
-              max={Number(ps.total_revenue)}
-              color="bg-green-400"
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              {ps.total_revenue > 0 ? Math.round((ps.cash_revenue / ps.total_revenue) * 100) : 0}% du total
-            </p>
+            <ProgressBar value={Number(ps.cash_revenue)} max={Number(ps.total_revenue)} color="bg-green-400" />
+            <p className="text-xs text-slate-400 mt-1">{ps.total_revenue > 0 ? Math.round((ps.cash_revenue / ps.total_revenue) * 100) : 0}% du total</p>
           </div>
         </div>
       </section>
 
-      {/* ── KPI Clients ────────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Clients</h2>
@@ -186,8 +141,6 @@ export default function Dashboard() {
           <StatsCard label="Ivoirienne"  value={cs.plan_ivoirienne}  icon="🌿" color="purple"  to="/clients?plan=IVOIRIENNE" />
           <StatsCard label="Turquoise"   value={cs.plan_turquoise}   icon="💎" color="teal"    to="/clients?plan=TURQUOISE" />
         </div>
-
-        {/* Répartition plans */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 mt-4">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Répartition par formule</p>
           <div className="space-y-3">
@@ -208,7 +161,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* ── Évolution 12 mois ──────────────────────────────────── */}
       {evolution.length > 0 && (
         <section className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -216,9 +168,7 @@ export default function Dashboard() {
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Évolution des revenus</p>
               <p className="text-xs text-slate-400 mt-0.5">12 derniers mois</p>
             </div>
-            <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-              {evolution.length} mois
-            </span>
+            <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">{evolution.length} mois</span>
           </div>
           <MiniChart data={evolution} />
           <div className="flex justify-between mt-2">
@@ -228,7 +178,6 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* ── Top Agents (admin seulement) ───────────────────────── */}
       {isAdmin && top_agents?.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -262,10 +211,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* ── Dernières activités ────────────────────────────────── */}
       <div className="grid lg:grid-cols-2 gap-6">
-
-        {/* Derniers clients */}
         <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
             <h2 className="font-semibold text-slate-800 text-sm">Derniers clients inscrits</h2>
@@ -278,7 +224,6 @@ export default function Dashboard() {
             {last_clients?.map((c) => (
               <Link key={c.id} to={`/clients/${c.id}`}
                 className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors group">
-                {/* Avatar */}
                 <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-brand-600 font-bold text-sm">{c.name?.charAt(0)?.toUpperCase()}</span>
                 </div>
@@ -294,14 +239,12 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/50">
-            <Link to="/clients/new"
-              className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
+            <Link to="/clients/new" className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
               + Enregistrer un nouveau client
             </Link>
           </div>
         </section>
 
-        {/* Derniers paiements */}
         <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
             <h2 className="font-semibold text-slate-800 text-sm">Derniers paiements reçus</h2>
@@ -313,7 +256,6 @@ export default function Dashboard() {
             )}
             {last_payments?.map((p) => (
               <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
-                {/* Icône type */}
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${p.type === "adhesion" ? "bg-purple-50 border border-purple-100" : "bg-teal-50 border border-teal-100"}`}>
                   <span className="text-base">{p.type === "adhesion" ? "📋" : "🔄"}</span>
                 </div>
@@ -335,8 +277,7 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/50">
-            <Link to="/clients"
-              className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
+            <Link to="/clients" className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
               + Enregistrer un paiement
             </Link>
           </div>
