@@ -50,7 +50,11 @@ export default function ClientLogin() {
       <div style={s.card}>
         {/* Logo */}
         <div style={s.logoWrap}>
-          <div style={s.logoBox}><span style={s.logoLetter}>A</span></div>
+          <img
+            src="/logo-awoundjjo.jpg"
+            alt="Awoundjô"
+            style={{ width: 72, height: 72, borderRadius: 16, objectFit: "contain", margin: "0 auto 12px", display: "block", boxShadow: "0 8px 20px rgba(26,86,219,.35)" }}
+          />
           <h1 style={s.appName}>Awoundjô</h1>
           <p style={s.appSub}>Mutuelle Santé · Côte d'Ivoire</p>
         </div>
@@ -135,22 +139,20 @@ function Field({ label, children }) {
 }
 
 const s = {
-  page:      { minHeight: "100vh", background: "linear-gradient(135deg,#1a56db 0%,#1e3a8a 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, position: "relative", overflow: "hidden", fontFamily: "'Poppins',sans-serif" },
-  blob1:     { position: "absolute", top: -100, right: -100, width: 400, height: 400, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" },
-  blob2:     { position: "absolute", bottom: -150, left: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" },
-  card:      { background: "#fff", borderRadius: 24, padding: "40px 32px", width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(0,0,0,.25)", position: "relative", zIndex: 1 },
-  logoWrap:  { textAlign: "center", marginBottom: 28 },
-  logoBox:   { width: 64, height: 64, background: "linear-gradient(135deg,#1a56db,#1e40af)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: "0 8px 20px rgba(26,86,219,.35)" },
-  logoLetter:{ color: "#fff", fontSize: 28, fontWeight: 800 },
-  appName:   { fontSize: 22, fontWeight: 700, color: "#1e3a8a", margin: "0 0 4px" },
-  appSub:    { fontSize: 13, color: "#6B7280", margin: 0 },
-  title:     { fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
-  sub:       { fontSize: 13, color: "#6B7280", margin: "0 0 20px" },
-  err:       { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 16px", color: "#DC2626", fontSize: 14, marginBottom: 16 },
-  form:      { display: "flex", flexDirection: "column", gap: 16 },
-  input:     { border: "1.5px solid #E5E7EB", borderRadius: 10, padding: "12px 14px", fontSize: 15, color: "#111827", outline: "none", fontFamily: "'Poppins',sans-serif", width: "100%", boxSizing: "border-box" },
-  eye:       { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18 },
-  btn:       { background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 15px rgba(26,86,219,.35)" },
-  link:      { background: "none", border: "none", color: "#1a56db", fontSize: 13, cursor: "pointer", textAlign: "center", fontFamily: "'Poppins',sans-serif", textDecoration: "underline" },
-  footer:    { textAlign: "center", color: "#9CA3AF", fontSize: 12, marginTop: 24, marginBottom: 0 },
+  page:    { minHeight: "100vh", background: "linear-gradient(135deg,#1a56db 0%,#1e3a8a 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, position: "relative", overflow: "hidden", fontFamily: "'Poppins',sans-serif" },
+  blob1:   { position: "absolute", top: -100, right: -100, width: 400, height: 400, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" },
+  blob2:   { position: "absolute", bottom: -150, left: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" },
+  card:    { background: "#fff", borderRadius: 24, padding: "40px 32px", width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(0,0,0,.25)", position: "relative", zIndex: 1 },
+  logoWrap:{ textAlign: "center", marginBottom: 28 },
+  appName: { fontSize: 22, fontWeight: 700, color: "#1e3a8a", margin: "0 0 4px" },
+  appSub:  { fontSize: 13, color: "#6B7280", margin: 0 },
+  title:   { fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
+  sub:     { fontSize: 13, color: "#6B7280", margin: "0 0 20px" },
+  err:     { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 16px", color: "#DC2626", fontSize: 14, marginBottom: 16 },
+  form:    { display: "flex", flexDirection: "column", gap: 16 },
+  input:   { border: "1.5px solid #E5E7EB", borderRadius: 10, padding: "12px 14px", fontSize: 15, color: "#111827", outline: "none", fontFamily: "'Poppins',sans-serif", width: "100%", boxSizing: "border-box" },
+  eye:     { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18 },
+  btn:     { background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 15px rgba(26,86,219,.35)" },
+  link:    { background: "none", border: "none", color: "#1a56db", fontSize: 13, cursor: "pointer", textAlign: "center", fontFamily: "'Poppins',sans-serif", textDecoration: "underline" },
+  footer:  { textAlign: "center", color: "#9CA3AF", fontSize: 12, marginTop: 24, marginBottom: 0 },
 };
