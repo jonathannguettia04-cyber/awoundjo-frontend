@@ -59,8 +59,8 @@ function ProviderRoute({ children }) {
 export default function App() {
   const { user } = useAuth();
   const path = window.location.pathname;
-  const isClientPage    = path.startsWith("/client");
-  const isProviderPage  = path.startsWith("/etablissement");
+  const isClientPage   = path.startsWith("/client");
+  const isProviderPage = path.startsWith("/etablissement");
   const showNavbar = user && !isClientPage && !isProviderPage;
 
   return (
@@ -96,18 +96,21 @@ export default function App() {
           </Route>
 
           {/* ── Routes ÉTABLISSEMENT ──────────────────────────── */}
+          {/* Login page — path exact */}
           <Route path="/etablissement" element={<EtablissementLogin />} />
-          <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
-            <Route path="dashboard"          element={<ProviderDashboard />} />
-            <Route path="scan"               element={<ProviderScan />} />
-            <Route path="search"             element={<ProviderScan />} />
-            <Route path="services"           element={<ProviderServices />} />
-            <Route path="services/new"       element={<ProviderServices />} />
-            <Route path="medical/:clientId"  element={<ProviderMedical />} />
-            <Route path="medical"            element={<ProviderScan />} />
-            <Route path="billing"            element={<ProviderBilling />} />
-            <Route path="history"            element={<ProviderServices />} />
-            <Route path="profile"            element={<ProviderDashboard />} />
+
+          {/* Pages protégées — sous /etablissement/* */}
+          <Route path="/etablissement/*" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
+            <Route path="dashboard"         element={<ProviderDashboard />} />
+            <Route path="scan"              element={<ProviderScan />} />
+            <Route path="search"            element={<ProviderScan />} />
+            <Route path="services"          element={<ProviderServices />} />
+            <Route path="services/new"      element={<ProviderServices />} />
+            <Route path="medical/:clientId" element={<ProviderMedical />} />
+            <Route path="medical"           element={<ProviderScan />} />
+            <Route path="billing"           element={<ProviderBilling />} />
+            <Route path="history"           element={<ProviderServices />} />
+            <Route path="profile"           element={<ProviderDashboard />} />
           </Route>
 
           {/* ── Fallback ──────────────────────────────────────── */}
