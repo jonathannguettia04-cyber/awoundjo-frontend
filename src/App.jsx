@@ -2,20 +2,19 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
-// ── Pages AGENT ──────────────────────────────────────────────────
-import Navbar         from "./components/Navbar";
-import Login          from "./pages/Login";
-import Dashboard      from "./pages/Dashboard";
-import Clients        from "./pages/Clients";
-import ClientDetails  from "./pages/ClientDetails";
-import Payments       from "./pages/Payments";
-import Agents         from "./pages/Agents";
-import Commissions    from "./pages/Commissions";
-import Groups         from "./pages/Groups";
+import Navbar          from "./components/Navbar";
+import Login           from "./pages/Login";
+import Dashboard       from "./pages/Dashboard";
+import AdminHub        from "./pages/AdminHub";
+import Clients         from "./pages/Clients";
+import ClientDetails   from "./pages/ClientDetails";
+import Payments        from "./pages/Payments";
+import Agents          from "./pages/Agents";
+import Commissions     from "./pages/Commissions";
+import Groups          from "./pages/Groups";
 import HealthcareAdmin from "./pages/HealthcareAdmin";
 import AdminProviders  from "./pages/AdminProviders";
 
-// ── Pages CLIENT ─────────────────────────────────────────────────
 import ClientLogin       from "./pages/client/ClientLogin";
 import ClientLayout      from "./pages/client/ClientLayout";
 import ClientDashboard   from "./pages/client/ClientDashboard";
@@ -27,7 +26,6 @@ import ClientTeleconsult from "./pages/client/ClientTeleconsult";
 import ClientReseau      from "./pages/client/ClientReseau";
 import ClientProfil      from "./pages/client/ClientProfil";
 
-// ── Pages ÉTABLISSEMENT ──────────────────────────────────────────
 import EtablissementLogin from "./pages/provider/EtablissementLogin";
 import ProviderLayout     from "./pages/provider/ProviderLayout";
 import ProviderDashboard  from "./pages/provider/ProviderDashboard";
@@ -36,11 +34,20 @@ import ProviderServices   from "./pages/provider/ProviderServices";
 import ProviderMedical    from "./pages/provider/ProviderMedical";
 import ProviderBilling    from "./pages/provider/ProviderBilling";
 
-// ── Guards ───────────────────────────────────────────────────────
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, isAdmin } = useAuth();
+const ALL_STAFF   = ["ADMIN","MANAGER","CONSEILLERE","AGENT"];
+const MANAGEMENT  = ["ADMIN","MANAGER"];
+const ADMIN_ONLY  = ["ADMIN"];
+const CLIENTELE   = ["ADMIN","CONSEILLERE"];
+
+function hasRole(user, roles) {
+  if (!user) return false;
+  return roles.includes((user.role || "AGENT").toUpperCase());
+}
+
+function ProtectedRoute({ children, roles = ALL_STAFF }) {
+  const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
+  if (!hasRole(user, roles)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -68,20 +75,19 @@ export default function App() {
       {showNavbar && <Navbar />}
       <main className={showNavbar ? "pt-16" : ""}>
         <Routes>
-
-          {/* ── Routes AGENT ──────────────────────────────────── */}
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
-          <Route path="/clients/:id" element={<ProtectedRoute><ClientDetails /></ProtectedRoute>} />
-          <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-          <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
-          <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
-          <Route path="/agents" element={<ProtectedRoute adminOnly><Agents /></ProtectedRoute>} />
-          <Route path="/healthcare" element={<ProtectedRoute adminOnly><HealthcareAdmin /></ProtectedRoute>} />
-          <Route path="/admin/providers" element={<ProtectedRoute adminOnly><AdminProviders /></ProtectedRoute>} />
+          <Route path="/"      element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
 
-          {/* ── Routes CLIENT ─────────────────────────────────── */}
+          <Route path="/clients"     element={<ProtectedRoute roles={ALL_STAFF}><Clients /></ProtectedRoute>} />
+          <Route path="/clients/:id" element={<ProtectedRoute roles={ALL_STAFF}><ClientDetails /></ProtectedRoute>} />
+          <Route path="/payments"    element={<ProtectedRoute roles={ALL_STAFF}><Payments /></ProtectedRoute>} />
+          <Route path="/groups"      element={<ProtectedRoute roles={ALL_STAFF}><Groups /></ProtectedRoute>} />
+          <Route path="/commissions" element={<ProtectedRoute roles={MANAGEMENT}><Commissions /></ProtectedRoute>} />
+          <Route path="/agents"      element={<ProtectedRoute roles={MANAGEMENT}><Agents /></ProtectedRoute>} />
+          <Route path="/healthcare"  element={<ProtectedRoute roles={CLIENTELE}><HealthcareAdmin /></ProtectedRoute>} />
+          <Route path="/admin/providers" element={<ProtectedRoute roles={ADMIN_ONLY}><AdminProviders /></ProtectedRoute>} />
+
           <Route path="/client/login" element={<ClientLogin />} />
           <Route path="/client" element={<ClientRoute><ClientLayout /></ClientRoute>}>
             <Route index element={<Navigate to="/client/dashboard" replace />} />
@@ -95,11 +101,7 @@ export default function App() {
             <Route path="profil"           element={<ClientProfil />} />
           </Route>
 
-          {/* ── Routes ÉTABLISSEMENT ──────────────────────────── */}
-          {/* Login page — path exact */}
           <Route path="/etablissement" element={<EtablissementLogin />} />
-
-          {/* Pages protégées — sous /etablissement/* */}
           <Route path="/etablissement/*" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
             <Route path="dashboard"         element={<ProviderDashboard />} />
             <Route path="scan"              element={<ProviderScan />} />
@@ -113,9 +115,7 @@ export default function App() {
             <Route path="profile"           element={<ProviderDashboard />} />
           </Route>
 
-          {/* ── Fallback ──────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
-
         </Routes>
       </main>
     </div>

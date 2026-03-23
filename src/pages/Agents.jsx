@@ -1,273 +1,302 @@
+// src/pages/Agents.jsx
 import { useEffect, useState } from "react";
-import { agentAPI } from "../services/api";
-import Modal from "../components/Modal";
+import { agentsAPI } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
-const EMPTY = { name: "", phone: "", password: "", role: "AGENT" };
-const fmt   = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const ROLES = [
+  { value: "AGENT",       label: "Commercial",              icon: "🤝", color: "#059669", bg: "#ECFDF5", desc: "Enregistre clients et paiements" },
+  { value: "MANAGER",     label: "Responsable Commercial",  icon: "📊", color: "#0891B2", bg: "#ECFEFF", desc: "Gère l'équipe commerciale" },
+  { value: "CONSEILLERE", label: "Conseillère Clientèle",   icon: "💼", color: "#DB2777", bg: "#FDF2F8", desc: "Clients, établissements, exports" },
+  { value: "ADMIN",       label: "Administrateur Général",  icon: "🔐", color: "#7C3AED", bg: "#F5F3FF", desc: "Accès complet à la plateforme" },
+];
+
+const STATUS_CFG = {
+  active:    { label: "Actif",      color: "#059669", bg: "#ECFDF5" },
+  suspended: { label: "Suspendu",   color: "#EF4444", bg: "#FEF2F2" },
+  inactive:  { label: "Inactif",    color: "#94A3B8", bg: "#F1F5F9" },
+};
+
+const roleConfig = (role) => ROLES.find(r => r.value === role?.toUpperCase()) || ROLES[0];
 
 export default function Agents() {
+  const { user } = useAuth();
   const [agents,    setAgents]    = useState([]);
   const [loading,   setLoading]   = useState(true);
+  const [modal,     setModal]     = useState(null); // null | "create" | agent object
+  const [filter,    setFilter]    = useState("ALL");
+  const [search,    setSearch]    = useState("");
+  const [error,     setError]     = useState("");
+  const [success,   setSuccess]   = useState("");
+  const [form,      setForm]      = useState({ name: "", phone: "", email: "", role: "AGENT", password: "", zone: "" });
+  const [saving,    setSaving]    = useState(false);
 
-  // Modal création
-  const [showCreate, setShowCreate] = useState(false);
-  const [form,       setForm]       = useState(EMPTY);
-  const [saving,     setSaving]     = useState(false);
-  const [formError,  setFormError]  = useState("");
-  const [showPass,   setShowPass]   = useState(false);
-
-  // Modal confirmation action
-  const [confirm,    setConfirm]    = useState(null); // { agent, action: "suspend"|"activate"|"delete" }
-  const [acting,     setActing]     = useState(false);
-  const [actError,   setActError]   = useState("");
-
-  async function loadAgents() {
+  async function load() {
     setLoading(true);
     try {
-      const { data } = await agentAPI.getAll();
-      setAgents(data.agents || data);
-    } catch { /* ignore */ }
+      const { data } = await agentsAPI.getAll();
+      setAgents(data.agents || data || []);
+    } catch { setError("Erreur chargement agents"); }
     finally { setLoading(false); }
   }
 
-  useEffect(() => { loadAgents(); }, []);
+  useEffect(() => { load(); }, []);
 
-  async function handleCreate(e) {
-    e.preventDefault();
-    setFormError(""); setSaving(true);
+  async function handleSubmit(e) {
+    e.preventDefault(); setSaving(true); setError("");
     try {
-      await agentAPI.create(form);
-      setShowCreate(false);
-      setForm(EMPTY);
-      loadAgents();
+      if (modal === "create") {
+        await agentsAPI.create(form);
+        setSuccess("Agent créé avec succès");
+      } else {
+        await agentsAPI.update(modal.id, form);
+        setSuccess("Agent mis à jour");
+      }
+      setModal(null);
+      setForm({ name: "", phone: "", email: "", role: "AGENT", password: "", zone: "" });
+      load();
     } catch (err) {
-      setFormError(err.response?.data?.error || "Erreur lors de la création");
+      setError(err.response?.data?.error || "Erreur");
     } finally { setSaving(false); }
   }
 
-  async function handleAction() {
-    if (!confirm) return;
-    setActError(""); setActing(true);
-    try {
-      const { agent, action } = confirm;
-      if (action === "suspend") {
-        await agentAPI.update(agent.id, { active: false });
-      } else if (action === "activate") {
-        await agentAPI.update(agent.id, { active: true });
-      } else if (action === "delete") {
-        await agentAPI.update(agent.id, { active: false }); // soft delete via suspension
-      }
-      setConfirm(null);
-      loadAgents();
-    } catch (err) {
-      setActError(err.response?.data?.error || "Erreur lors de l'opération");
-    } finally { setActing(false); }
+  function openEdit(agent) {
+    setForm({ name: agent.name, phone: agent.phone, email: agent.email || "", role: (agent.role || "AGENT").toUpperCase(), password: "", zone: agent.zone || "" });
+    setModal(agent);
   }
 
-  const actionConfig = {
-    suspend:  { label: "Suspendre",  color: "bg-amber-500 hover:bg-amber-600",  icon: "⏸️", text: "Le compte de cet agent sera suspendu. Il ne pourra plus se connecter." },
-    activate: { label: "Réactiver",  color: "bg-green-500 hover:bg-green-600",  icon: "▶️", text: "Le compte de cet agent sera réactivé. Il pourra se reconnecter." },
-    delete:   { label: "Désactiver", color: "bg-red-500   hover:bg-red-600",    icon: "🗑️", text: "Le compte sera désactivé définitivement. Les données clients sont conservées." },
-  };
+  async function toggleStatus(agent) {
+    try {
+      const newStatus = agent.status === "active" ? "suspended" : "active";
+      await agentsAPI.update(agent.id, { status: newStatus });
+      setSuccess(`Agent ${newStatus === "active" ? "réactivé" : "suspendu"}`);
+      load();
+    } catch { setError("Erreur changement statut"); }
+  }
+
+  const filtered = agents.filter(a => {
+    const matchRole   = filter === "ALL" || (a.role || "AGENT").toUpperCase() === filter;
+    const matchSearch = !search || a.name?.toLowerCase().includes(search.toLowerCase()) || a.phone?.includes(search);
+    return matchRole && matchSearch;
+  });
+
+  const counts = ROLES.reduce((acc, r) => {
+    acc[r.value] = agents.filter(a => (a.role || "AGENT").toUpperCase() === r.value).length;
+    return acc;
+  }, { ALL: agents.length });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
-
+    <div style={s.page}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div style={s.header}>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Agents</h1>
-          <p className="text-slate-500 text-sm">
-            {agents.filter(a => a.active).length} actif(s) · {agents.filter(a => !a.active).length} suspendu(s)
-          </p>
+          <h1 style={s.title}>Gestion des agents</h1>
+          <p style={s.sub}>{agents.length} compte(s) enregistré(s)</p>
         </div>
-        <button
-          onClick={() => { setForm(EMPTY); setFormError(""); setShowCreate(true); }}
-          className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm w-full sm:w-auto"
-        >
+        <button onClick={() => { setModal("create"); setForm({ name: "", phone: "", email: "", role: "AGENT", password: "", zone: "" }); }} style={s.btnPrimary}>
           + Nouvel agent
         </button>
       </div>
 
-      {/* Grid agents */}
+      {error   && <Alert type="error"   msg={error}   onClose={() => setError("")} />}
+      {success && <Alert type="success" msg={success} onClose={() => setSuccess("")} />}
+
+      {/* Filtres par rôle */}
+      <div style={s.filters}>
+        <FilterChip label={`Tous (${counts.ALL})`} active={filter === "ALL"} onClick={() => setFilter("ALL")} color="#2563EB" />
+        {ROLES.map(r => (
+          <FilterChip key={r.value} label={`${r.icon} ${r.label} (${counts[r.value] || 0})`} active={filter === r.value} onClick={() => setFilter(r.value)} color={r.color} />
+        ))}
+      </div>
+
+      {/* Recherche */}
+      <div style={s.searchRow}>
+        <div style={s.searchBox}>
+          <span>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher par nom ou téléphone…" style={s.searchInput} />
+        </div>
+      </div>
+
+      {/* Liste */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : agents.length === 0 ? (
-        <div className="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-100">
-          <p className="text-4xl mb-3">🧑‍💼</p>
-          <p className="font-medium">Aucun agent enregistré</p>
-        </div>
+        <div style={s.empty}>Chargement…</div>
+      ) : filtered.length === 0 ? (
+        <div style={s.empty}>Aucun agent trouvé</div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((a) => (
-            <div key={a.id}
-              className={`bg-white rounded-2xl border shadow-sm p-5 transition-all hover:shadow-md
-                ${!a.active ? "border-slate-200 opacity-60" : "border-slate-100"}`}>
-
-              {/* Top */}
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0
-                  ${a.active ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-400"}`}>
-                  {a.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    a.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                  }`}>{a.role}</span>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    a.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                  }`}>{a.active ? "Actif" : "Suspendu"}</span>
-                </div>
-              </div>
-
-              {/* Infos */}
-              <p className="font-semibold text-slate-800">{a.name}</p>
-              <p className="text-sm text-slate-400 mt-0.5">📞 {a.phone}</p>
-
-              {/* Stats */}
-              {a.nb_clients !== undefined && (
-                <div className="mt-3 pt-3 border-t border-slate-50 grid grid-cols-2 gap-2 text-sm">
+        <div style={s.table}>
+          <div style={s.tableHeader}>
+            <span style={s.th}>Agent</span>
+            <span style={s.th}>Rôle</span>
+            <span style={s.th}>Zone</span>
+            <span style={s.th}>Statut</span>
+            <span style={s.th}>Actions</span>
+          </div>
+          {filtered.map(agent => {
+            const rc     = roleConfig(agent.role);
+            const sc     = STATUS_CFG[agent.status] || STATUS_CFG.active;
+            return (
+              <div key={agent.id} style={s.row}>
+                <div style={s.agentCell}>
+                  <div style={{ ...s.avatar, background: rc.bg, color: rc.color }}>
+                    {agent.name?.charAt(0).toUpperCase()}
+                  </div>
                   <div>
-                    <p className="text-xs text-slate-400">Clients</p>
-                    <p className="font-semibold text-slate-700">{a.nb_clients}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400">Collecté</p>
-                    <p className="font-semibold text-brand-600">{fmt(a.total_revenue)}</p>
+                    <p style={s.agentName}>{agent.name}</p>
+                    <p style={s.agentPhone}>{agent.phone}</p>
                   </div>
                 </div>
-              )}
-
-              {/* Actions */}
-              {a.role !== "ADMIN" && (
-                <div className="mt-4 pt-3 border-t border-slate-50 flex gap-2">
-                  {a.active ? (
-                    <button
-                      onClick={() => { setActError(""); setConfirm({ agent: a, action: "suspend" }); }}
-                      className="flex-1 text-xs font-semibold py-2 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 active:scale-95 transition-all"
-                    >
-                      ⏸️ Suspendre
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => { setActError(""); setConfirm({ agent: a, action: "activate" }); }}
-                      className="flex-1 text-xs font-semibold py-2 rounded-lg border border-green-200 text-green-600 hover:bg-green-50 active:scale-95 transition-all"
-                    >
-                      ▶️ Réactiver
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { setActError(""); setConfirm({ agent: a, action: "delete" }); }}
-                    className="flex-1 text-xs font-semibold py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all"
-                  >
-                    🗑️ Désactiver
+                <div>
+                  <span style={{ ...s.rolePill, background: rc.bg, color: rc.color }}>
+                    {rc.icon} {rc.label}
+                  </span>
+                </div>
+                <span style={s.zoneCell}>{agent.zone || "—"}</span>
+                <span style={{ ...s.statusPill, background: sc.bg, color: sc.color }}>
+                  {sc.label}
+                </span>
+                <div style={s.actions}>
+                  <button onClick={() => openEdit(agent)} style={s.btnEdit}>Modifier</button>
+                  <button onClick={() => toggleStatus(agent)} style={{ ...s.btnToggle, color: agent.status === "active" ? "#EF4444" : "#059669" }}>
+                    {agent.status === "active" ? "Suspendre" : "Réactiver"}
                   </button>
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* ── Modal création ──────────────────────────────────── */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nouvel agent">
-        <form onSubmit={handleCreate} className="space-y-4">
-          {formError && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{formError}</div>}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nom complet *</label>
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Ex : Koné Aminata"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone *</label>
-            <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="Ex : 0701234567"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Mot de passe *</label>
-            <div className="relative">
-              <input required type={showPass ? "text" : "password"} value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Minimum 6 caractères"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 pr-10" />
-              <button type="button" onClick={() => setShowPass((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">
-                {showPass ? "🙈" : "👁️"}
-              </button>
+      {/* Modal création/édition */}
+      {modal && (
+        <div style={s.overlay} onClick={() => setModal(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <h2 style={s.modalTitle}>{modal === "create" ? "Créer un agent" : `Modifier — ${modal.name}`}</h2>
+              <button onClick={() => setModal(null)} style={s.closeBtn}>✕</button>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Rôle</label>
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-              <option value="AGENT">Agent commercial</option>
-              <option value="ADMIN">Administrateur</option>
-            </select>
-          </div>
+            {/* Sélection du rôle */}
+            <p style={s.fieldLabel}>Rôle *</p>
+            <div style={s.roleGrid}>
+              {ROLES.map(r => (
+                <button key={r.value} type="button" onClick={() => setForm({ ...form, role: r.value })}
+                  style={{ ...s.roleCard, border: `2px solid ${form.role === r.value ? r.color : "#E2E8F0"}`, background: form.role === r.value ? r.bg : "#fff" }}>
+                  <span style={{ fontSize: 22 }}>{r.icon}</span>
+                  <p style={{ ...s.roleCardLabel, color: form.role === r.value ? r.color : "#1E293B" }}>{r.label}</p>
+                  <p style={s.roleCardDesc}>{r.desc}</p>
+                </button>
+              ))}
+            </div>
 
-          <div className="flex gap-3 justify-end pt-2">
-            <button type="button" onClick={() => setShowCreate(false)}
-              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Annuler</button>
-            <button type="submit" disabled={saving}
-              className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl disabled:opacity-60 font-semibold">
-              {saving ? "Création…" : "Créer l'agent"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ── Modal confirmation action ───────────────────────── */}
-      <Modal
-        open={!!confirm}
-        onClose={() => !acting && setConfirm(null)}
-        title={confirm ? `${actionConfig[confirm.action]?.icon} ${actionConfig[confirm.action]?.label} l'agent` : ""}
-      >
-        {confirm && (
-          <div className="space-y-4">
-            {actError && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{actError}</div>}
-
-            {/* Fiche agent */}
-            <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 font-bold flex items-center justify-center">
-                {confirm.agent.name?.charAt(0).toUpperCase()}
+            <form onSubmit={handleSubmit}>
+              <div style={s.formGrid}>
+                <Field label="Nom complet *">
+                  <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Prénom Nom" style={s.input} />
+                </Field>
+                <Field label="Téléphone *">
+                  <input required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="0707…" style={s.input} />
+                </Field>
+                <Field label="Email">
+                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@exemple.com" style={s.input} />
+                </Field>
+                <Field label="Zone / Secteur">
+                  <input value={form.zone} onChange={e => setForm({ ...form, zone: e.target.value })} placeholder="Ex: Yopougon, Plateau…" style={s.input} />
+                </Field>
               </div>
-              <div>
-                <p className="font-semibold text-slate-800">{confirm.agent.name}</p>
-                <p className="text-sm text-slate-400">{confirm.agent.phone}</p>
+              <Field label={modal === "create" ? "Mot de passe *" : "Nouveau mot de passe (laisser vide pour ne pas changer)"}>
+                <input type="password" required={modal === "create"} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="••••••••" style={s.input} />
+              </Field>
+
+              {error && <div style={{ color: "#DC2626", fontSize: 13, marginTop: 8 }}>⚠️ {error}</div>}
+
+              <div style={s.modalActions}>
+                <button type="button" onClick={() => setModal(null)} style={s.btnCancel}>Annuler</button>
+                <button type="submit" disabled={saving} style={s.btnSave}>
+                  {saving ? "Enregistrement…" : modal === "create" ? "Créer l'agent" : "Enregistrer"}
+                </button>
               </div>
-            </div>
-
-            <p className="text-sm text-slate-600">{actionConfig[confirm.action]?.text}</p>
-
-            <div className="flex gap-3 justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => setConfirm(null)}
-                disabled={acting}
-                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={handleAction}
-                disabled={acting}
-                className={`px-5 py-2 text-sm text-white rounded-xl font-semibold disabled:opacity-60 transition-all active:scale-95 ${actionConfig[confirm.action]?.color}`}
-              >
-                {acting ? "Traitement…" : actionConfig[confirm.action]?.label}
-              </button>
-            </div>
+            </form>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }
+
+function FilterChip({ label, active, onClick, color }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: "7px 14px", borderRadius: 20, border: `1.5px solid ${active ? color : "#E2E8F0"}`,
+      background: active ? color : "#fff", color: active ? "#fff" : "#64748B",
+      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+    }}>{label}</button>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <p style={s.fieldLabel}>{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function Alert({ type, msg, onClose }) {
+  const cfg = type === "error"
+    ? { bg: "#FEF2F2", border: "#FECACA", color: "#DC2626" }
+    : { bg: "#ECFDF5", border: "#A7F3D0", color: "#059669" };
+  return (
+    <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12, padding: "12px 16px", color: cfg.color, fontSize: 13, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span>{msg}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: cfg.color, fontSize: 16 }}>✕</button>
+    </div>
+  );
+}
+
+const s = {
+  page:         { maxWidth: 1100, margin: "0 auto", padding: "32px 24px", fontFamily: "'DM Sans',system-ui,sans-serif" },
+  header:       { display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 },
+  title:        { fontSize: 24, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" },
+  sub:          { fontSize: 14, color: "#94A3B8", margin: 0 },
+  btnPrimary:   { background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+
+  filters:      { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 },
+  searchRow:    { marginBottom: 20 },
+  searchBox:    { display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "10px 16px", maxWidth: 400 },
+  searchInput:  { border: "none", outline: "none", fontSize: 14, color: "#1E293B", background: "transparent", fontFamily: "inherit", flex: 1 },
+
+  empty:        { textAlign: "center", padding: "60px 20px", color: "#94A3B8", fontSize: 15 },
+
+  table:        { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" },
+  tableHeader:  { display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1.5fr", padding: "12px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", gap: 12 },
+  th:           { fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8 },
+  row:          { display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1.5fr", padding: "14px 20px", borderBottom: "1px solid #F1F5F9", alignItems: "center", gap: 12 },
+  agentCell:    { display: "flex", alignItems: "center", gap: 10 },
+  avatar:       { width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, flexShrink: 0 },
+  agentName:    { fontSize: 14, fontWeight: 700, color: "#1E293B", margin: "0 0 2px" },
+  agentPhone:   { fontSize: 12, color: "#94A3B8", margin: 0 },
+  rolePill:     { fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, display: "inline-block" },
+  zoneCell:     { fontSize: 13, color: "#64748B" },
+  statusPill:   { fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, display: "inline-block" },
+  actions:      { display: "flex", gap: 8 },
+  btnEdit:      { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#475569", fontFamily: "inherit" },
+  btnToggle:    { background: "none", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "6px 0" },
+
+  overlay:      { position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
+  modal:        { background: "#fff", borderRadius: 20, padding: "28px 32px", width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" },
+  modalHeader:  { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalTitle:   { fontSize: 18, fontWeight: 800, color: "#0F172A", margin: 0 },
+  closeBtn:     { background: "#F1F5F9", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#64748B" },
+
+  roleGrid:     { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 },
+  roleCard:     { borderRadius: 12, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", background: "#fff", fontFamily: "inherit", transition: "all .15s" },
+  roleCardLabel:{ fontSize: 12, fontWeight: 700, margin: 0, textAlign: "center", lineHeight: 1.3 },
+  roleCardDesc: { fontSize: 10, color: "#94A3B8", margin: 0, textAlign: "center", lineHeight: 1.3 },
+
+  formGrid:     { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 },
+  fieldLabel:   { fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 },
+  input:        { width: "100%", border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "11px 14px", fontSize: 14, fontFamily: "inherit", outline: "none", color: "#1E293B", boxSizing: "border-box" },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 },
+  btnCancel:    { background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748B", fontFamily: "inherit" },
+  btnSave:      { background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 10, padding: "11px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+};
