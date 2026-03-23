@@ -66,8 +66,8 @@ export default function Agents() {
 
   async function toggleStatus(agent) {
     try {
-      const newStatus = agent.status === "active" ? "suspended" : "active";
-      await agentsAPI.update(agent.id, { status: newStatus });
+      const newStatus = agent.active === false ? "active" : "suspended";
+      await agentsAPI.update(agent.id, { active: newStatus !== "suspended" });
       setSuccess(`Agent ${newStatus === "active" ? "réactivé" : "suspendu"}`);
       load();
     } catch { setError("Erreur changement statut"); }
@@ -131,8 +131,10 @@ export default function Agents() {
             <span style={s.th}>Actions</span>
           </div>
           {filtered.map(agent => {
-            const rc     = roleConfig(agent.role);
-            const sc     = STATUS_CFG[agent.status] || STATUS_CFG.active;
+            const rc = roleConfig(agent.role);
+            // Le backend retourne `active` (boolean), pas `status`
+            const isActive = agent.active !== false;
+            const sc = isActive ? STATUS_CFG.active : STATUS_CFG.suspended;
             return (
               <div key={agent.id} style={s.row}>
                 <div style={s.agentCell}>
@@ -149,14 +151,14 @@ export default function Agents() {
                     {rc.icon} {rc.label}
                   </span>
                 </div>
-                <span style={s.zoneCell}>{agent.zone || "—"}</span>
+                <div style={s.zoneCell}>{agent.zone || "—"}</div>
                 <span style={{ ...s.statusPill, background: sc.bg, color: sc.color }}>
                   {sc.label}
                 </span>
                 <div style={s.actions}>
                   <button onClick={() => openEdit(agent)} style={s.btnEdit}>Modifier</button>
-                  <button onClick={() => toggleStatus(agent)} style={{ ...s.btnToggle, color: agent.status === "active" ? "#EF4444" : "#059669" }}>
-                    {agent.status === "active" ? "Suspendre" : "Réactiver"}
+                  <button onClick={() => toggleStatus(agent)} style={{ ...s.btnToggle, color: isActive ? "#EF4444" : "#059669" }}>
+                    {isActive ? "Suspendre" : "Réactiver"}
                   </button>
                 </div>
               </div>
@@ -174,11 +176,12 @@ export default function Agents() {
               <button onClick={() => setModal(null)} style={s.closeBtn}>✕</button>
             </div>
 
-            {/* Sélection du rôle */}
+            {/* Sélection du rôle — utilise prev pour ne pas écraser les autres champs */}
             <p style={s.fieldLabel}>Rôle *</p>
             <div style={s.roleGrid}>
               {ROLES.map(r => (
-                <button key={r.value} type="button" onClick={() => setForm({ ...form, role: r.value })}
+                <button key={r.value} type="button"
+                  onClick={() => setForm(prev => ({ ...prev, role: r.value }))}
                   style={{ ...s.roleCard, border: `2px solid ${form.role === r.value ? r.color : "#E2E8F0"}`, background: form.role === r.value ? r.bg : "#fff" }}>
                   <span style={{ fontSize: 22 }}>{r.icon}</span>
                   <p style={{ ...s.roleCardLabel, color: form.role === r.value ? r.color : "#1E293B" }}>{r.label}</p>
@@ -190,20 +193,30 @@ export default function Agents() {
             <form onSubmit={handleSubmit}>
               <div style={s.formGrid}>
                 <Field label="Nom complet *">
-                  <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Prénom Nom" style={s.input} />
+                  <input required value={form.name}
+                    onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Prénom Nom" style={s.input} />
                 </Field>
                 <Field label="Téléphone *">
-                  <input required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="0707…" style={s.input} />
+                  <input required value={form.phone}
+                    onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="0707…" style={s.input} />
                 </Field>
                 <Field label="Email">
-                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@exemple.com" style={s.input} />
+                  <input type="email" value={form.email}
+                    onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="email@exemple.com" style={s.input} />
                 </Field>
                 <Field label="Zone / Secteur">
-                  <input value={form.zone} onChange={e => setForm({ ...form, zone: e.target.value })} placeholder="Ex: Yopougon, Plateau…" style={s.input} />
+                  <input value={form.zone}
+                    onChange={e => setForm(prev => ({ ...prev, zone: e.target.value }))}
+                    placeholder="Ex: Yopougon, Plateau…" style={s.input} />
                 </Field>
               </div>
               <Field label={modal === "create" ? "Mot de passe *" : "Nouveau mot de passe (laisser vide pour ne pas changer)"}>
-                <input type="password" required={modal === "create"} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="••••••••" style={s.input} />
+                <input type="password" required={modal === "create"} value={form.password}
+                  onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••" style={s.input} />
               </Field>
 
               {error && <div style={{ color: "#DC2626", fontSize: 13, marginTop: 8 }}>⚠️ {error}</div>}
