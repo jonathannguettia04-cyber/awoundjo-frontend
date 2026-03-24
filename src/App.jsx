@@ -37,6 +37,14 @@ import ProviderServices   from "./pages/provider/ProviderServices";
 import ProviderMedical    from "./pages/provider/ProviderMedical";
 import ProviderBilling    from "./pages/provider/ProviderBilling";
 
+// Pages Ambassadeur Diaspora
+import DiasporaAuth from "./pages/diaspora/DiasporaAuth";
+import { DiasporaLayout } from "./pages/diaspora/DiasporaDashboard";
+import DiasporaDashboard from "./pages/diaspora/DiasporaDashboard";
+import { DiasporaBeneficiaries, DiasporaNewBeneficiary,
+         DiasporaPayments, DiasporaNewPayment,
+         DiasporaEarnings, DiasporaReferral } from "./pages/diaspora/DiasporaPages";
+
 // ── Guards ───────────────────────────────────────────────────
 
 // Rôles ayant accès à l'espace agent
@@ -148,6 +156,20 @@ export default function App() {
             <Route path="history"           element={<ProviderServices />} />
             <Route path="profile"           element={<ProviderDashboard />} />
           </Route>
+
+          {/* Routes Ambassadeur Diaspora */}
+
+          <Route path="/diaspora" element={<DiasporaAuth />} />
+          <Route path="/diaspora/login" element={<DiasporaAuth />} />
+          <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
+          <Route path="dashboard"        element={<DiasporaDashboard />} />
+          <Route path="beneficiaries"    element={<DiasporaBeneficiaries />} />
+          <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
+          <Route path="payments"         element={<DiasporaPayments />} />
+         <Route path="payments/new"     element={<DiasporaNewPayment />} />
+         <Route path="earnings"         element={<DiasporaEarnings />} />
+         <Route path="referral"         element={<DiasporaReferral />} />
+        </Route>
 
           {/* ── Fallback ──────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
