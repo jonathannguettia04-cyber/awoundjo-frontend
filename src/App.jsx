@@ -41,9 +41,7 @@ import ProviderBilling    from "./pages/provider/ProviderBilling";
 import DiasporaAuth from "./pages/diaspora/DiasporaAuth";
 import { DiasporaLayout } from "./pages/diaspora/DiasporaDashboard";
 import DiasporaDashboard from "./pages/diaspora/DiasporaDashboard";
-import { DiasporaBeneficiaries, DiasporaNewBeneficiary,
-         DiasporaPayments, DiasporaNewPayment,
-         DiasporaEarnings, DiasporaReferral } from "./pages/diaspora/DiasporaPages";
+import { DiasporaBeneficiaries, DiasporaNewBeneficiary,DiasporaPayments, DiasporaNewPayment,DiasporaEarnings, DiasporaReferral } from "./pages/diaspora/DiasporaPages";
 
 // ── Guards ───────────────────────────────────────────────────
 
