@@ -20,6 +20,7 @@ function getNavLinks(role) {
       { to: "/healthcare",      label: "Réseau de soins", icon: "🏥" },
       { to: "/admin/providers", label: "Établissements",  icon: "🏨" },
       { to: "/agents",          label: "Agents",          icon: "🧑‍💼" },
+      { to: "/hub",             label: "Hub Admin",        icon: "🔑" },
     ],
     AGENT: [
       ...common,
