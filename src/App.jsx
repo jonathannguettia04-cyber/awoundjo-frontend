@@ -112,7 +112,8 @@ export default function App() {
   const path = window.location.pathname;
   const isClientPage   = path.startsWith("/client");
   const isProviderPage = path.startsWith("/etablissement");
-  const showNavbar = user && !isClientPage && !isProviderPage;
+  const isDiasporaPage = path.startsWith("/diaspora");
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
