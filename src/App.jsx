@@ -1,58 +1,83 @@
 // src/App.jsx
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
-// ── Pages AGENT ──────────────────────────────────────────────
-import Navbar         from "./components/Navbar";
-import Login          from "./pages/Login";
-import Dashboard      from "./pages/Dashboard";
-import AdminHub        from "./pages/AdminHub";
-import Clients        from "./pages/Clients";
-import ClientDetails  from "./pages/ClientDetails";
-import Payments       from "./pages/Payments";
-import Agents         from "./pages/Agents";
-import Commissions    from "./pages/Commissions";
-import Groups         from "./pages/Groups";
-import HealthcareAdmin from "./pages/HealthcareAdmin";
-import AdminProviders  from "./pages/AdminProviders";
+// ── Composants NON lazy (toujours affichés) ──────────────────
+import Navbar from "./components/Navbar";
 
-// ── Pages CLIENT ─────────────────────────────────────────────
-import ClientLogin       from "./pages/client/ClientLogin";
-import ClientLayout      from "./pages/client/ClientLayout";
-import ClientDashboard   from "./pages/client/ClientDashboard";
-import ClientCarte       from "./pages/client/ClientCarte";
-import ClientCotisations from "./pages/client/ClientCotisations";
-import ClientFamille     from "./pages/client/ClientFamille";
-import ClientDossier     from "./pages/client/ClientDossier";
-import ClientTeleconsult from "./pages/client/ClientTeleconsult";
-import ClientReseau      from "./pages/client/ClientReseau";
-import ClientProfil      from "./pages/client/ClientProfil";
+// ── Pages AGENT — lazy ───────────────────────────────────────
+const Login                = lazy(() => import("./pages/Login"));
+const Dashboard            = lazy(() => import("./pages/Dashboard"));
+const AdminHub             = lazy(() => import("./pages/AdminHub"));
+const Clients              = lazy(() => import("./pages/Clients"));
+const ClientDetails        = lazy(() => import("./pages/ClientDetails"));
+const Payments             = lazy(() => import("./pages/Payments"));
+const Agents               = lazy(() => import("./pages/Agents"));
+const Commissions          = lazy(() => import("./pages/Commissions"));
+const Groups               = lazy(() => import("./pages/Groups"));
+const HealthcareAdmin      = lazy(() => import("./pages/HealthcareAdmin"));
+const AdminProviders       = lazy(() => import("./pages/AdminProviders"));
 
-// ── Pages ÉTABLISSEMENT ──────────────────────────────────────
-import EtablissementLogin from "./pages/provider/EtablissementLogin";
-import ProviderLayout     from "./pages/provider/ProviderLayout";
-import ProviderDashboard  from "./pages/provider/ProviderDashboard";
-import ProviderScan       from "./pages/provider/ProviderScan";
-import ProviderServices   from "./pages/provider/ProviderServices";
-import ProviderMedical    from "./pages/provider/ProviderMedical";
-import ProviderBilling    from "./pages/provider/ProviderBilling";
+// ── Pages CLIENT — lazy ──────────────────────────────────────
+const ClientLogin          = lazy(() => import("./pages/client/ClientLogin"));
+const ClientLayout         = lazy(() => import("./pages/client/ClientLayout"));
+const ClientDashboard      = lazy(() => import("./pages/client/ClientDashboard"));
+const ClientCarte          = lazy(() => import("./pages/client/ClientCarte"));
+const ClientCotisations    = lazy(() => import("./pages/client/ClientCotisations"));
+const ClientFamille        = lazy(() => import("./pages/client/ClientFamille"));
+const ClientDossier        = lazy(() => import("./pages/client/ClientDossier"));
+const ClientTeleconsult    = lazy(() => import("./pages/client/ClientTeleconsult"));
+const ClientReseau         = lazy(() => import("./pages/client/ClientReseau"));
+const ClientProfil         = lazy(() => import("./pages/client/ClientProfil"));
 
-// ── Pages AMBASSADEUR DIASPORA ───────────────────────────────
-import DiasporaAuth from "./pages/diaspora/DiasporaAuth";
-import { DiasporaLayout } from "./pages/diaspora/DiasporaDashboard";
-import DiasporaDashboard from "./pages/diaspora/DiasporaDashboard";
-import {
-  DiasporaBeneficiaries,
-  DiasporaNewBeneficiary,
-  DiasporaPayments,
-  DiasporaNewPayment,
-  DiasporaEarnings,
-  DiasporaReferral,
-} from "./pages/diaspora/DiasporaPages";
+// ── Pages ÉTABLISSEMENT — lazy ───────────────────────────────
+const EtablissementLogin   = lazy(() => import("./pages/provider/EtablissementLogin"));
+const ProviderLayout       = lazy(() => import("./pages/provider/ProviderLayout"));
+const ProviderDashboard    = lazy(() => import("./pages/provider/ProviderDashboard"));
+const ProviderScan         = lazy(() => import("./pages/provider/ProviderScan"));
+const ProviderServices     = lazy(() => import("./pages/provider/ProviderServices"));
+const ProviderMedical      = lazy(() => import("./pages/provider/ProviderMedical"));
+const ProviderBilling      = lazy(() => import("./pages/provider/ProviderBilling"));
+
+// ── Pages AMBASSADEUR DIASPORA — lazy ────────────────────────
+const DiasporaAuth           = lazy(() => import("./pages/diaspora/DiasporaAuth"));
+const DiasporaDashboard      = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
+const DiasporaLayout         = lazy(() =>
+  import("./pages/diaspora/DiasporaDashboard").then((m) => ({ default: m.DiasporaLayout }))
+);
+const DiasporaBeneficiaries  = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaBeneficiaries }))
+);
+const DiasporaNewBeneficiary = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaNewBeneficiary }))
+);
+const DiasporaPayments       = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaPayments }))
+);
+const DiasporaNewPayment     = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaNewPayment }))
+);
+const DiasporaEarnings       = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaEarnings }))
+);
+const DiasporaReferral       = lazy(() =>
+  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaReferral }))
+);
+
+// ── Fallback de chargement ───────────────────────────────────
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-500 text-sm">Chargement...</p>
+      </div>
+    </div>
+  );
+}
 
 // ── Guards ───────────────────────────────────────────────────
-
-// Rôles ayant accès à l'espace agent
 const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
@@ -75,13 +100,13 @@ function ProviderRoute({ children }) {
   return children;
 }
 
-// ✅ CORRECTION : DiasporaGuard ajouté (était manquant → causait l'erreur)
 function DiasporaGuard({ children }) {
   const token = localStorage.getItem("diaspora_token");
   if (!token) return <Navigate to="/diaspora/login" replace />;
   return children;
 }
 
+// ── App ──────────────────────────────────────────────────────
 export default function App() {
   const { user } = useAuth();
   const path = window.location.pathname;
@@ -93,100 +118,89 @@ export default function App() {
     <div className="min-h-screen bg-slate-50">
       {showNavbar && <Navbar />}
       <main className={showNavbar ? "pt-16" : ""}>
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
 
-          {/* ── Authentification ──────────────────────────── */}
-          <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-          <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
+            {/* ── Authentification ────────────────────────── */}
+            <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+            <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
 
-          {/* ── Routes communes (tous les rôles agent) ────── */}
-          <Route path="/" element={
-            <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
-          } />
-          <Route path="/clients" element={
-            <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
-          } />
-          <Route path="/clients/:id" element={
-            <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
-          } />
+            {/* ── Routes AGENT ────────────────────────────── */}
+            <Route path="/" element={
+              <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
+            } />
+            <Route path="/clients" element={
+              <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
+            } />
+            <Route path="/clients/:id" element={
+              <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
+            } />
+            <Route path="/payments" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
+            } />
+            <Route path="/commissions" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+            } />
+            <Route path="/groups" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
+            } />
+            <Route path="/agents" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
+            } />
+            <Route path="/healthcare" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
+            } />
+            <Route path="/admin/providers" element={
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+            } />
 
-          {/* Paiements — tous sauf CC */}
-          <Route path="/payments" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
-          } />
+            {/* ── Routes CLIENT ───────────────────────────── */}
+            <Route path="/client/login" element={<ClientLogin />} />
+            <Route path="/client" element={<ClientRoute><ClientLayout /></ClientRoute>}>
+              <Route index element={<Navigate to="/client/dashboard" replace />} />
+              <Route path="dashboard"        element={<ClientDashboard />} />
+              <Route path="carte"            element={<ClientCarte />} />
+              <Route path="cotisations"      element={<ClientCotisations />} />
+              <Route path="famille"          element={<ClientFamille />} />
+              <Route path="dossier"          element={<ClientDossier />} />
+              <Route path="teleconsultation" element={<ClientTeleconsult />} />
+              <Route path="reseau"           element={<ClientReseau />} />
+              <Route path="profil"           element={<ClientProfil />} />
+            </Route>
 
-          {/* Commissions — ADMIN, AGENT, RC */}
-          <Route path="/commissions" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
-          } />
+            {/* ── Routes ÉTABLISSEMENT ────────────────────── */}
+            <Route path="/etablissement" element={<EtablissementLogin />} />
+            <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
+              <Route path="dashboard"         element={<ProviderDashboard />} />
+              <Route path="scan"              element={<ProviderScan />} />
+              <Route path="search"            element={<ProviderScan />} />
+              <Route path="services"          element={<ProviderServices />} />
+              <Route path="services/new"      element={<ProviderServices />} />
+              <Route path="medical/:clientId" element={<ProviderMedical />} />
+              <Route path="medical"           element={<ProviderScan />} />
+              <Route path="billing"           element={<ProviderBilling />} />
+              <Route path="history"           element={<ProviderServices />} />
+              <Route path="profile"           element={<ProviderDashboard />} />
+            </Route>
 
-          {/* Groupes — ADMIN, AGENT, RC */}
-          <Route path="/groups" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
-          } />
+            {/* ── Routes AMBASSADEUR DIASPORA ─────────────── */}
+            <Route path="/diaspora/login" element={<DiasporaAuth />} />
+            <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
+              <Route index                    element={<Navigate to="/diaspora/dashboard" replace />} />
+              <Route path="dashboard"         element={<DiasporaDashboard />} />
+              <Route path="beneficiaries"     element={<DiasporaBeneficiaries />} />
+              <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
+              <Route path="payments"          element={<DiasporaPayments />} />
+              <Route path="payments/new"      element={<DiasporaNewPayment />} />
+              <Route path="earnings"          element={<DiasporaEarnings />} />
+              <Route path="referral"          element={<DiasporaReferral />} />
+            </Route>
 
-          {/* Agents — ADMIN et RC uniquement */}
-          <Route path="/agents" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
-          } />
+            {/* ── Fallback ────────────────────────────────── */}
+            <Route path="*" element={<Navigate to="/" replace />} />
 
-          {/* Réseau de soins — ADMIN et CC */}
-          <Route path="/healthcare" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
-          } />
-
-          {/* Établissements (admin validation) — ADMIN et CC */}
-          <Route path="/admin/providers" element={
-            <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
-          } />
-
-          {/* ── Routes CLIENT ─────────────────────────────── */}
-          <Route path="/client/login" element={<ClientLogin />} />
-          <Route path="/client" element={<ClientRoute><ClientLayout /></ClientRoute>}>
-            <Route index element={<Navigate to="/client/dashboard" replace />} />
-            <Route path="dashboard"        element={<ClientDashboard />} />
-            <Route path="carte"            element={<ClientCarte />} />
-            <Route path="cotisations"      element={<ClientCotisations />} />
-            <Route path="famille"          element={<ClientFamille />} />
-            <Route path="dossier"          element={<ClientDossier />} />
-            <Route path="teleconsultation" element={<ClientTeleconsult />} />
-            <Route path="reseau"           element={<ClientReseau />} />
-            <Route path="profil"           element={<ClientProfil />} />
-          </Route>
-
-          {/* ── Routes ÉTABLISSEMENT ──────────────────────── */}
-          <Route path="/etablissement" element={<EtablissementLogin />} />
-          <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
-            <Route path="dashboard"         element={<ProviderDashboard />} />
-            <Route path="scan"              element={<ProviderScan />} />
-            <Route path="search"            element={<ProviderScan />} />
-            <Route path="services"          element={<ProviderServices />} />
-            <Route path="services/new"      element={<ProviderServices />} />
-            <Route path="medical/:clientId" element={<ProviderMedical />} />
-            <Route path="medical"           element={<ProviderScan />} />
-            <Route path="billing"           element={<ProviderBilling />} />
-            <Route path="history"           element={<ProviderServices />} />
-            <Route path="profile"           element={<ProviderDashboard />} />
-          </Route>
-
-          {/* ── Routes AMBASSADEUR DIASPORA ───────────────── */}
-          {/* ✅ CORRECTION : route login séparée + plus de doublon sur /diaspora */}
-          <Route path="/diaspora/login" element={<DiasporaAuth />} />
-          <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
-            <Route index                    element={<Navigate to="/diaspora/dashboard" replace />} />
-            <Route path="dashboard"         element={<DiasporaDashboard />} />
-            <Route path="beneficiaries"     element={<DiasporaBeneficiaries />} />
-            <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
-            <Route path="payments"          element={<DiasporaPayments />} />
-            <Route path="payments/new"      element={<DiasporaNewPayment />} />
-            <Route path="earnings"          element={<DiasporaEarnings />} />
-            <Route path="referral"          element={<DiasporaReferral />} />
-          </Route>
-
-          {/* ── Fallback ──────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-
-        </Routes>
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );
