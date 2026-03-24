@@ -6,6 +6,7 @@ import { useAuth } from "./context/AuthContext";
 import Navbar         from "./components/Navbar";
 import Login          from "./pages/Login";
 import Dashboard      from "./pages/Dashboard";
+import AdminHub        from "./pages/AdminHub";
 import Clients        from "./pages/Clients";
 import ClientDetails  from "./pages/ClientDetails";
 import Payments       from "./pages/Payments";
@@ -76,6 +77,7 @@ export default function App() {
 
           {/* ── Authentification ──────────────────────────── */}
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+          <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
 
           {/* ── Routes communes (tous les rôles agent) ────── */}
           <Route path="/" element={
