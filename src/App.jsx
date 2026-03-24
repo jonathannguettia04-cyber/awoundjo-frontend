@@ -37,16 +37,23 @@ import ProviderServices   from "./pages/provider/ProviderServices";
 import ProviderMedical    from "./pages/provider/ProviderMedical";
 import ProviderBilling    from "./pages/provider/ProviderBilling";
 
-// Pages Ambassadeur Diaspora
+// ── Pages AMBASSADEUR DIASPORA ───────────────────────────────
 import DiasporaAuth from "./pages/diaspora/DiasporaAuth";
 import { DiasporaLayout } from "./pages/diaspora/DiasporaDashboard";
 import DiasporaDashboard from "./pages/diaspora/DiasporaDashboard";
-import { DiasporaBeneficiaries, DiasporaNewBeneficiary,DiasporaPayments, DiasporaNewPayment,DiasporaEarnings, DiasporaReferral } from "./pages/diaspora/DiasporaPages";
+import {
+  DiasporaBeneficiaries,
+  DiasporaNewBeneficiary,
+  DiasporaPayments,
+  DiasporaNewPayment,
+  DiasporaEarnings,
+  DiasporaReferral,
+} from "./pages/diaspora/DiasporaPages";
 
 // ── Guards ───────────────────────────────────────────────────
 
 // Rôles ayant accès à l'espace agent
-const AGENT_ROLES = ["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"];
+const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user } = useAuth();
@@ -65,6 +72,13 @@ function ClientRoute({ children }) {
 function ProviderRoute({ children }) {
   const token = localStorage.getItem("provider_token");
   if (!token) return <Navigate to="/etablissement" replace />;
+  return children;
+}
+
+// ✅ CORRECTION : DiasporaGuard ajouté (était manquant → causait l'erreur)
+function DiasporaGuard({ children }) {
+  const token = localStorage.getItem("diaspora_token");
+  if (!token) return <Navigate to="/diaspora/login" replace />;
   return children;
 }
 
@@ -96,34 +110,34 @@ export default function App() {
             <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
           } />
 
-          {/* Paiements — tous sauf CC (qui fait uniquement adhésions, géré dans Clients) */}
+          {/* Paiements — tous sauf CC */}
           <Route path="/payments" element={
-            <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
           } />
 
           {/* Commissions — ADMIN, AGENT, RC */}
           <Route path="/commissions" element={
-            <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
           } />
 
           {/* Groupes — ADMIN, AGENT, RC */}
           <Route path="/groups" element={
-            <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
           } />
 
           {/* Agents — ADMIN et RC uniquement */}
           <Route path="/agents" element={
-            <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
           } />
 
           {/* Réseau de soins — ADMIN et CC */}
           <Route path="/healthcare" element={
-            <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
           } />
 
           {/* Établissements (admin validation) — ADMIN et CC */}
           <Route path="/admin/providers" element={
-            <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
           } />
 
           {/* ── Routes CLIENT ─────────────────────────────── */}
@@ -155,22 +169,23 @@ export default function App() {
             <Route path="profile"           element={<ProviderDashboard />} />
           </Route>
 
-          {/* Routes Ambassadeur Diaspora */}
-
-          <Route path="/diaspora" element={<DiasporaAuth />} />
+          {/* ── Routes AMBASSADEUR DIASPORA ───────────────── */}
+          {/* ✅ CORRECTION : route login séparée + plus de doublon sur /diaspora */}
           <Route path="/diaspora/login" element={<DiasporaAuth />} />
           <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
-          <Route path="dashboard"        element={<DiasporaDashboard />} />
-          <Route path="beneficiaries"    element={<DiasporaBeneficiaries />} />
-          <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
-          <Route path="payments"         element={<DiasporaPayments />} />
-         <Route path="payments/new"     element={<DiasporaNewPayment />} />
-         <Route path="earnings"         element={<DiasporaEarnings />} />
-         <Route path="referral"         element={<DiasporaReferral />} />
-        </Route>
+            <Route index                    element={<Navigate to="/diaspora/dashboard" replace />} />
+            <Route path="dashboard"         element={<DiasporaDashboard />} />
+            <Route path="beneficiaries"     element={<DiasporaBeneficiaries />} />
+            <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
+            <Route path="payments"          element={<DiasporaPayments />} />
+            <Route path="payments/new"      element={<DiasporaNewPayment />} />
+            <Route path="earnings"          element={<DiasporaEarnings />} />
+            <Route path="referral"          element={<DiasporaReferral />} />
+          </Route>
 
           {/* ── Fallback ──────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
+
         </Routes>
       </main>
     </div>
