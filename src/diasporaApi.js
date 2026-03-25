@@ -1,126 +1,136 @@
 // src/diasporaApi.js
+// ─────────────────────────────────────────────────────────────
+//  Client API pour le module Diaspora Awoundjô
+// ─────────────────────────────────────────────────────────────
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/diaspora`;
 
-const diasporaApi = axios.create({
-  baseURL: `${API_URL}/api/diaspora`,
-  headers: { "Content-Type": "application/json" },
-  timeout: 20000,
-});
+// ── Token helpers ─────────────────────────────────────────────
 
-// ── Intercepteur requête : injecte le token ──────────────────
-diasporaApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("diaspora_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-// ── Intercepteur réponse : gère les 401 proprement ──────────
-// CORRECTION : on ne redirige vers /login QUE si on n'est pas
-// déjà sur /diaspora/login (évite la boucle infinie)
-diasporaApi.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    const status = error.response?.status;
-    const isLoginPage = window.location.pathname === "/diaspora/login";
-
-    if (status === 401 && !isLoginPage) {
-      // Nettoyer le storage
-      localStorage.removeItem("diaspora_token");
-      localStorage.removeItem("diaspora_data");
-      // Rediriger une seule fois
-      window.location.replace("/diaspora/login");
-    }
-
-    return Promise.reject(error);
-  }
-);
-
-// ── Auth ─────────────────────────────────────────────────────
-export const diasporaAuthAPI = {
-  register: (data) => diasporaApi.post("/register", data),
-  login:    (data) => diasporaApi.post("/login",    data),
-  me:       ()     => diasporaApi.get("/me"),
-  update:   (data) => diasporaApi.put("/me",        data),
-};
-
-// ── Dashboard ────────────────────────────────────────────────
-export const diasporaDashAPI = {
-  stats: () => diasporaApi.get("/dashboard"),
-};
-
-// ── Bénéficiaires ────────────────────────────────────────────
-export const diasporaBeneAPI = {
-  create:  (data) => diasporaApi.post("/beneficiaries",     data),
-  getAll:  (p)    => diasporaApi.get("/beneficiaries",      { params: p }),
-  getById: (id)   => diasporaApi.get(`/beneficiaries/${id}`),
-};
-
-// ── Paiements ────────────────────────────────────────────────
-export const diasporaPayAPI = {
-  initiate: (data) => diasporaApi.post("/payments",         data),
-  confirm:  (data) => diasporaApi.post("/payments/confirm", data),
-  getAll:   ()     => diasporaApi.get("/payments"),
-};
-
-// ── Commissions ──────────────────────────────────────────────
-export const diasporaCommAPI = {
-  getAll: () => diasporaApi.get("/commissions"),
-};
-
-// ── Parrainage ───────────────────────────────────────────────
-export const diasporaRefAPI = {
-  getLink:      () => diasporaApi.get("/referral-link"),
-  getReferrals: () => diasporaApi.get("/referrals"),
-};
-
-// ── Réseau MLM ───────────────────────────────────────────────
-export const diasporaNetAPI = {
-  getNetwork: () => diasporaApi.get("/network"),
-};
-
-// ── Classement ───────────────────────────────────────────────
-export const diasporaLeaderAPI = {
-  getLeaderboard: (period = "month") =>
-    diasporaApi.get("/leaderboard", { params: { period } }),
-};
-
-// ── Notifications ────────────────────────────────────────────
-export const diasporaNotifAPI = {
-  getAll:   () => diasporaApi.get("/notifications"),
-  markRead: () => diasporaApi.put("/notifications/read"),
-};
-
-// ── Helpers session ──────────────────────────────────────────
-export function diasporaLogin(token, data) {
-  localStorage.setItem("diaspora_token", token);
-  localStorage.setItem("diaspora_data",  JSON.stringify(data));
-}
-
-export function diasporaLogout() {
-  localStorage.removeItem("diaspora_token");
-  localStorage.removeItem("diaspora_data");
-  window.location.replace("/diaspora/login");
+export function getDiasporaToken() {
+  return localStorage.getItem("diaspora_token");
 }
 
 export function getDiasporaData() {
-  try { return JSON.parse(localStorage.getItem("diaspora_data")); }
-  catch { return null; }
+  try {
+    const raw = localStorage.getItem("diaspora_data");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
-// Vérifier si le token existe et n'est pas expiré côté client
+/**
+ * Vérifie que le token JWT existe ET n'est pas expiré côté client.
+ * Évite le flash dashboard → login : on redirige avant même d'appeler l'API.
+ */
 export function isDiasporaTokenValid() {
-  const token = localStorage.getItem("diaspora_token");
+  const token = getDiasporaToken();
   if (!token) return false;
   try {
-    // Décoder sans vérifier la signature (juste pour lire exp)
+    // Décoder le payload sans vérifier la signature (côté client)
     const payload = JSON.parse(atob(token.split(".")[1]));
-    const now = Math.floor(Date.now() / 1000);
-    return payload.exp > now;
+    // exp est en secondes, Date.now() en ms
+    return payload.exp * 1000 > Date.now();
   } catch {
     return false;
   }
 }
 
-export default diasporaApi;
+// ── Instance axios avec token auto-injecté ────────────────────
+
+const api = axios.create({ baseURL: BASE });
+
+api.interceptors.request.use((config) => {
+  const token = getDiasporaToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Intercepteur 401 : nettoyer + rediriger — mais pas si on est déjà
+// sur la page de login (évite la boucle infinie)
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (
+      error.response?.status === 401 &&
+      !window.location.pathname.includes("/diaspora/login")
+    ) {
+      localStorage.removeItem("diaspora_token");
+      localStorage.removeItem("diaspora_data");
+      window.location.href = "/diaspora/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ── Auth ──────────────────────────────────────────────────────
+
+export const diasporaAuthAPI = {
+  register: (data) => api.post("/register", data),
+  login:    (data) => api.post("/login",    data),
+};
+
+// ── Dashboard ─────────────────────────────────────────────────
+
+export const diasporaDashAPI = {
+  getStats: () => api.get("/dashboard"),
+};
+
+// ── Profil ambassadeur ────────────────────────────────────────
+
+export const diasporaProfileAPI = {
+  getMe:  ()     => api.get("/me"),
+  update: (data) => api.put("/me", data),
+};
+
+// ── Bénéficiaires ─────────────────────────────────────────────
+
+export const diasporaBeneAPI = {
+  getAll:  (params) => api.get("/beneficiaries", { params }),
+  getById: (id)     => api.get(`/beneficiaries/${id}`),
+  create:  (data)   => api.post("/beneficiaries", data),
+};
+
+// ── Paiements ─────────────────────────────────────────────────
+
+export const diasporaPayAPI = {
+  getAll:   (params) => api.get("/payments", { params }),
+  initiate: (data)   => api.post("/payments",         data),
+  confirm:  (data)   => api.post("/payments/confirm", data),
+};
+
+// ── Commissions ───────────────────────────────────────────────
+
+export const diasporaCommAPI = {
+  getAll: (params) => api.get("/commissions", { params }),
+};
+
+// ── Parrainage ────────────────────────────────────────────────
+
+export const diasporaRefAPI = {
+  getLink:     () => api.get("/referral-link"),
+  getReferrals:() => api.get("/referrals"),
+};
+
+// ── Réseau MLM ────────────────────────────────────────────────
+
+export const diasporaNetAPI = {
+  getNetwork: () => api.get("/network"),
+};
+
+// ── Classement ────────────────────────────────────────────────
+
+export const diasporaLeaderAPI = {
+  getLeaderboard: (period = "month") => api.get("/leaderboard", { params: { period } }),
+};
+
+// ── Notifications ─────────────────────────────────────────────
+
+export const diasporaNotifAPI = {
+  getAll:   () => api.get("/notifications"),
+  markRead: () => api.put("/notifications/read"),
+};
+
+export default api;

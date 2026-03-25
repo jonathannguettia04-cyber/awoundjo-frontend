@@ -20,6 +20,9 @@ const Groups               = lazy(() => import("./pages/Groups"));
 const HealthcareAdmin      = lazy(() => import("./pages/HealthcareAdmin"));
 const AdminProviders       = lazy(() => import("./pages/AdminProviders"));
 
+// ── Pages ADMIN — vue ambassadeurs diaspora ──────────────────
+const AdminDiaspora        = lazy(() => import("./pages/AdminDiaspora"));
+
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin          = lazy(() => import("./pages/client/ClientLogin"));
 const ClientLayout         = lazy(() => import("./pages/client/ClientLayout"));
@@ -44,9 +47,14 @@ const ProviderBilling      = lazy(() => import("./pages/provider/ProviderBilling
 // ── Pages DIASPORA ───────────────────────────────────────────
 const DiasporaAuth         = lazy(() => import("./pages/diaspora/DiasporaAuth"));
 const DiasporaDashboard    = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
+
+// CORRECTION : DiasporaLayout exporté nommé depuis DiasporaDashboard
 const DiasporaLayout       = lazy(() =>
   import("./pages/diaspora/DiasporaDashboard").then((m) => ({ default: m.DiasporaLayout }))
 );
+
+// NOUVEAU : page profil ambassadeur (corrige le bug onglet Profil → admin commercial)
+const DiasporaProfile      = lazy(() => import("./pages/diaspora/DiasporaProfile"));
 
 const diasporaPage = (name) =>
   lazy(() =>
@@ -98,11 +106,10 @@ function ProviderRoute({ children }) {
   return children;
 }
 
-// CORRECTION : vérifier que le token existe ET n'est pas expiré
+// Vérifier que le token existe ET n'est pas expiré
 // avant de laisser entrer — évite le flash dashboard → login
 function DiasporaGuard({ children }) {
   if (!isDiasporaTokenValid()) {
-    // Nettoyer au cas où le token existerait mais soit expiré
     localStorage.removeItem("diaspora_token");
     localStorage.removeItem("diaspora_data");
     return <Navigate to="/diaspora/login" replace />;
@@ -159,6 +166,12 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
+            {/* ── ADMIN — Vue ambassadeurs diaspora ─────── */}
+            {/* NOUVEAU : accessible depuis la navbar admin commercial */}
+            <Route path="/admin/diaspora" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminDiaspora /></ProtectedRoute>
+            } />
+
             {/* ── CLIENT ──────────────────────────────────── */}
             <Route path="/client/login" element={<ClientLogin />} />
             <Route path="/client" element={<ClientRoute><ClientLayout /></ClientRoute>}>
@@ -202,6 +215,8 @@ export default function App() {
               <Route path="network"           element={<DiasporaNetwork />} />
               <Route path="leaderboard"       element={<DiasporaLeaderboard />} />
               <Route path="notifications"     element={<DiasporaNotifications />} />
+              {/* CORRECTION : profil pointe désormais sur DiasporaProfile (plus sur l'admin commercial) */}
+              <Route path="profile"           element={<DiasporaProfile />} />
             </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}

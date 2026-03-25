@@ -1,213 +1,551 @@
 // src/pages/diaspora/DiasporaDashboard.jsx
-import { useEffect, useState } from "react";
-import { useNavigate, Outlet, useLocation, Link } from "react-router-dom";
-import { diasporaDashAPI, diasporaRefAPI, getDiasporaData, diasporaLogout } from "../../diasporaApi";
+// ─────────────────────────────────────────────────────────────
+//  Dashboard principal + DiasporaLayout (sidebar + nav mobile)
+// ─────────────────────────────────────────────────────────────
+import { useState, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import {
+  diasporaDashAPI,
+  diasporaRefAPI,
+  getDiasporaData,
+} from "../../diasporaApi";
 
-const fmt    = (n, cur="€") => `${Number(n||0).toLocaleString("fr-FR", { minimumFractionDigits:2, maximumFractionDigits:2 })} ${cur}`;
-const fmtXof = (n) => `${Number(n||0).toLocaleString("fr-FR")} FCFA`;
+// ── Palette ──────────────────────────────────────────────────
+const C = {
+  blue:   "#1B4FD8",
+  blueL:  "#EEF2FF",
+  green:  "#059669",
+  greenL: "#ECFDF5",
+  gold:   "#D97706",
+  goldL:  "#FFFBEB",
+  red:    "#DC2626",
+  redL:   "#FEF2F2",
+  purple: "#7C3AED",
+  purpleL:"#F5F3FF",
+  slate:  "#64748B",
+  dark:   "#0F172A",
+  border: "#E2E8F0",
+  bg:     "#F8FAFC",
+};
 
+const fmt = (n) =>
+  Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
+
+const roleLabel = {
+  DIRIGEANTE: { label: "Dirigeante", color: C.purple, bg: C.purpleL },
+  DIASPORA:   { label: "Ambassadrice Diaspora", color: C.blue,   bg: C.blueL  },
+  PAYS:       { label: "Ambassadeur Pays",       color: C.green,  bg: C.greenL },
+  VILLE:      { label: "Ambassadeur Ville",       color: C.gold,   bg: C.goldL  },
+  RECRUTEUR:  { label: "Recruteur",              color: C.slate,  bg: C.bg     },
+};
+
+// ── Navigation items ─────────────────────────────────────────
 const NAV = [
-  { to:"/diaspora/dashboard",     icon:"🏠", label:"Accueil" },
-  { to:"/diaspora/beneficiaries", icon:"👨‍👩‍👧‍👦", label:"Bénéficiaires" },
-  { to:"/diaspora/payments",      icon:"💳", label:"Paiements" },
-  { to:"/diaspora/earnings",      icon:"💰", label:"Commissions" },
-  { to:"/diaspora/referral",      icon:"🔗", label:"Parrainage" },
+  { path: "/diaspora/dashboard",       icon: "🏠", label: "Accueil"        },
+  { path: "/diaspora/network",         icon: "🌐", label: "Mon réseau"     },
+  { path: "/diaspora/beneficiaries",   icon: "👤", label: "Bénéficiaires"  },
+  { path: "/diaspora/payments",        icon: "💳", label: "Paiements"      },
+  { path: "/diaspora/earnings",        icon: "💰", label: "Mes gains"      },
+  { path: "/diaspora/referral",        icon: "🔗", label: "Parrainage"     },
+  { path: "/diaspora/leaderboard",     icon: "🏆", label: "Classement"     },
+  { path: "/diaspora/notifications",   icon: "🔔", label: "Notifications"  },
+  { path: "/diaspora/profile",         icon: "👤", label: "Mon profil"     },
 ];
 
-// ── Layout ────────────────────────────────────────────────────
+// ── DiasporaLayout ────────────────────────────────────────────
 export function DiasporaLayout() {
-  const { pathname } = useLocation();
-  const navigate     = useNavigate();
-  const [menu, setMenu] = useState(false);
-  const ambassador = getDiasporaData();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [unread, setUnread]         = useState(0);
+  const amb = getDiasporaData();
 
-  return (
-    <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:"'DM Sans',system-ui,sans-serif" }}>
-      {/* Header */}
-      <header style={{ background:"linear-gradient(135deg,#0F2942,#1a3a5c)", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 16px rgba(15,41,66,.4)" }}>
-        <div style={{ maxWidth:768, margin:"0 auto", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => navigate("/diaspora/dashboard")}>
-            <img src="/logo-awoundjjo.png" alt="" style={{ width:34, height:34, objectFit:"contain", borderRadius:8, background:"rgba(255,255,255,.1)", padding:4 }} />
-            <div>
-              <div style={{ color:"#fff", fontWeight:700, fontSize:15 }}>Awoundjô Diaspora</div>
-              <div style={{ color:"rgba(255,255,255,.5)", fontSize:11 }}>🌍 {ambassador?.country}</div>
-            </div>
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ background:"rgba(0,188,212,.2)", border:"1px solid rgba(0,188,212,.3)", borderRadius:8, padding:"3px 10px" }}>
-              <span style={{ color:"#00BCD4", fontSize:11, fontWeight:700 }}>AMB</span>
-            </div>
-            <button onClick={() => setMenu(!menu)} style={{ background:"none", border:"none", color:"#fff", fontSize:20, cursor:"pointer" }}>
-              {menu ? "✕" : "☰"}
-            </button>
+  useEffect(() => {
+    // Compter les notifications non lues au chargement
+    import("../../diasporaApi").then(({ diasporaNotifAPI }) => {
+      diasporaNotifAPI.getAll().then(r => {
+        setUnread(r.data?.unread_count || 0);
+      }).catch(() => {});
+    });
+  }, [location.pathname]);
+
+  const logout = () => {
+    localStorage.removeItem("diaspora_token");
+    localStorage.removeItem("diaspora_data");
+    navigate("/diaspora/login");
+  };
+
+  const isActive = (path) => location.pathname === path;
+
+  const SidebarContent = () => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Logo */}
+      <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "linear-gradient(135deg, #1B4FD8, #3B82F6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18,
+          }}>🌍</div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 900, fontSize: 15, color: C.dark }}>Awoundjô</p>
+            <p style={{ margin: 0, fontSize: 10, color: C.slate, fontWeight: 600 }}>DIASPORA</p>
           </div>
         </div>
-      </header>
 
-      {/* Dropdown menu */}
-      {menu && (
-        <div style={{ position:"fixed", top:58, left:0, right:0, background:"#0a3d62", boxShadow:"0 8px 30px rgba(0,0,0,.3)", zIndex:99, maxWidth:768, margin:"0 auto" }}>
-          <div style={{ padding:"16px 20px", borderBottom:"1px solid rgba(255,255,255,.1)" }}>
-            <p style={{ fontWeight:700, fontSize:15, color:"#fff", margin:0 }}>{ambassador?.name}</p>
-            <p style={{ fontSize:12, color:"rgba(255,255,255,.5)", margin:0 }}>{ambassador?.email}</p>
-            <p style={{ fontSize:11, color:"#00BCD4", fontFamily:"monospace", margin:"4px 0 0", fontWeight:700 }}>{ambassador?.referral_code}</p>
+        {/* Info ambassadeur */}
+        {amb && (
+          <div style={{ marginTop: 14, padding: "10px 12px", background: C.blueL, borderRadius: 10 }}>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: C.dark }}>{amb.name}</p>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 999, marginTop: 4,
+              display: "inline-block",
+              background: roleLabel[amb.role]?.bg || C.bg,
+              color: roleLabel[amb.role]?.color || C.slate,
+            }}>
+              {roleLabel[amb.role]?.label || amb.role}
+            </span>
           </div>
-          <Link to="/diaspora/profile" onClick={() => setMenu(false)} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 20px", color:"rgba(255,255,255,.8)", textDecoration:"none", fontSize:14 }}>
-            👤 Mon profil
-          </Link>
-          <button onClick={diasporaLogout} style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"13px 20px", background:"none", border:"none", borderTop:"1px solid rgba(255,255,255,.08)", fontSize:14, color:"#FF6B6B", cursor:"pointer", fontFamily:"inherit" }}>
-            🚪 Se déconnecter
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Contenu */}
-      <main style={{ maxWidth:768, margin:"0 auto", padding:"16px 16px 100px" }}>
-        <Outlet />
-      </main>
-
-      {/* Bottom nav */}
-      <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0F2942", borderTop:"1px solid rgba(255,255,255,.08)", display:"flex", boxShadow:"0 -4px 20px rgba(0,0,0,.25)", zIndex:100, maxWidth:768, margin:"0 auto" }}>
+      {/* Navigation */}
+      <nav style={{ flex: 1, padding: "12px 12px", overflowY: "auto" }}>
         {NAV.map(item => {
-          const active = pathname === item.to || pathname.startsWith(item.to + "/");
+          const active = isActive(item.path);
           return (
-            <Link key={item.to} to={item.to}
-              style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"8px 4px", gap:3, textDecoration:"none", background: active ? "rgba(0,188,212,.1)" : "transparent", transition:"background .15s" }}>
-              <span style={{ fontSize:20 }}>{item.icon}</span>
-              <span style={{ fontSize:10, color: active ? "#00BCD4" : "rgba(255,255,255,.45)", fontFamily:"inherit" }}>{item.label}</span>
-            </Link>
+            <button
+              key={item.path}
+              onClick={() => { navigate(item.path); setMobileOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "9px 12px", borderRadius: 8, border: "none",
+                background: active ? C.blue : "transparent",
+                color: active ? "#fff" : C.slate,
+                fontWeight: active ? 700 : 500, fontSize: 13,
+                cursor: "pointer", marginBottom: 2, textAlign: "left",
+                transition: "all 0.15s",
+                position: "relative",
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{item.icon}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.path === "/diaspora/notifications" && unread > 0 && (
+                <span style={{
+                  background: C.red, color: "#fff",
+                  fontSize: 10, fontWeight: 800, padding: "1px 6px",
+                  borderRadius: 999, minWidth: 18, textAlign: "center",
+                }}>
+                  {unread}
+                </span>
+              )}
+            </button>
           );
         })}
       </nav>
+
+      {/* Déconnexion */}
+      <div style={{ padding: "12px 12px", borderTop: `1px solid ${C.border}` }}>
+        <button
+          onClick={logout}
+          style={{
+            width: "100%", padding: "9px 12px", borderRadius: 8,
+            border: `1.5px solid ${C.border}`, background: "#fff",
+            color: C.red, fontWeight: 700, fontSize: 13, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 8,
+          }}
+        >
+          🚪 Se déconnecter
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
+
+      {/* Sidebar desktop */}
+      <aside style={{
+        width: 240, flexShrink: 0, background: "#fff",
+        borderRight: `1px solid ${C.border}`,
+        position: "sticky", top: 0, height: "100vh", overflowY: "auto",
+        display: "none",
+        // Affiché via media query inline — on utilise une classe css
+      }}
+        className="diaspora-sidebar"
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Overlay mobile */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+            zIndex: 40,
+          }}
+        />
+      )}
+
+      {/* Drawer mobile */}
+      <aside style={{
+        position: "fixed", top: 0, left: mobileOpen ? 0 : -280,
+        width: 260, height: "100vh", background: "#fff",
+        borderRight: `1px solid ${C.border}`,
+        zIndex: 50, transition: "left 0.25s ease",
+        overflowY: "auto",
+      }}>
+        <SidebarContent />
+      </aside>
+
+      {/* Zone principale */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+        {/* Top bar mobile */}
+        <header style={{
+          background: "#fff", borderBottom: `1px solid ${C.border}`,
+          padding: "12px 16px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", position: "sticky", top: 0, zIndex: 30,
+        }}>
+          <button
+            onClick={() => setMobileOpen(true)}
+            style={{ border: "none", background: "none", fontSize: 22, cursor: "pointer", color: C.dark }}
+          >
+            ☰
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: "linear-gradient(135deg, #1B4FD8, #3B82F6)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+            }}>🌍</div>
+            <span style={{ fontWeight: 900, fontSize: 14, color: C.dark }}>Awoundjô Diaspora</span>
+          </div>
+          <button
+            onClick={() => navigate("/diaspora/notifications")}
+            style={{ border: "none", background: "none", fontSize: 22, cursor: "pointer", position: "relative" }}
+          >
+            🔔
+            {unread > 0 && (
+              <span style={{
+                position: "absolute", top: -4, right: -4,
+                background: C.red, color: "#fff", borderRadius: 999,
+                fontSize: 9, fontWeight: 800, padding: "1px 4px",
+              }}>
+                {unread}
+              </span>
+            )}
+          </button>
+        </header>
+
+        {/* Contenu des pages */}
+        <main style={{ flex: 1, overflowY: "auto" }}>
+          <Outlet />
+        </main>
+      </div>
+
+      {/* CSS sidebar desktop */}
+      <style>{`
+        @media (min-width: 768px) {
+          .diaspora-sidebar { display: block !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
-// ── Dashboard ────────────────────────────────────────────────
+// ── DiasporaDashboard ─────────────────────────────────────────
 export default function DiasporaDashboard() {
-  const navigate   = useNavigate();
-  const ambassador = getDiasporaData();
-  const [stats,    setStats]   = useState(null);
-  const [refLink,  setRefLink] = useState("");
-  const [copied,   setCopied]  = useState(false);
-  const [loading,  setLoading] = useState(true);
-  const [visible,  setVisible] = useState(false);
+  const navigate         = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [link, setLink]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied]   = useState(false);
+  const amb = getDiasporaData();
 
   useEffect(() => {
     Promise.all([
-      diasporaDashAPI.stats(),
+      diasporaDashAPI.getStats(),
       diasporaRefAPI.getLink(),
-    ]).then(([s, r]) => {
+    ]).then(([s, l]) => {
       setStats(s.data);
-      setRefLink(r.data.link);
-      setTimeout(() => setVisible(true), 80);
-    }).catch(() => setVisible(true))
-      .finally(() => setLoading(false));
+      setLink(l.data);
+    }).finally(() => setLoading(false));
   }, []);
 
-  const hour   = new Date().getHours();
-  const greet  = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
-
-  function copyRef() {
-    navigator.clipboard.writeText(refLink);
+  const copyLink = () => {
+    navigator.clipboard.writeText(link?.link || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }
+  };
 
-  const kpis = [
-    { label:"Bénéficiaires actifs",   value: stats?.beneficiaries?.active || 0,               icon:"👨‍👩‍👧‍👦", color:"#2563EB", bg:"#EFF6FF" },
-    { label:"Total bénéficiaires",    value: stats?.beneficiaries?.total  || 0,               icon:"👥", color:"#059669", bg:"#ECFDF5" },
-    { label:"Paiements effectués",    value: stats?.payments?.total        || 0,               icon:"💳", color:"#D97706", bg:"#FFFBEB" },
-    { label:"Commissions en attente", value: fmt(stats?.commissions?.pending),                 icon:"⏳", color:"#7C3AED", bg:"#F5F3FF" },
+  const role = amb?.role || "RECRUTEUR";
+  const rl   = roleLabel[role] || roleLabel.RECRUTEUR;
+
+  // ── Cartes statistiques principales ──
+  const statCards = stats ? [
+    {
+      icon: "👥",
+      label: "Bénéficiaires actifs",
+      value: stats.beneficiaries?.active || 0,
+      sub: `${stats.beneficiaries?.total || 0} au total`,
+      color: C.blue,
+      bg: C.blueL,
+      path: "/diaspora/beneficiaries",
+    },
+    {
+      icon: "🎴",
+      label: "Cartes vendues",
+      value: stats.payments?.total || 0,
+      sub: `${fmt(stats.payments?.amount_eur || 0)} € encaissés`,
+      color: C.green,
+      bg: C.greenL,
+      path: "/diaspora/payments",
+    },
+    {
+      icon: "💰",
+      label: "Commissions ce mois",
+      value: `${fmt(stats.commissions?.this_month || 0)} €`,
+      sub: `Total : ${fmt(stats.commissions?.total_earned || 0)} €`,
+      color: C.gold,
+      bg: C.goldL,
+      path: "/diaspora/earnings",
+      isText: true,
+    },
+    {
+      icon: "🌐",
+      label: "Mon réseau",
+      value: stats.network_size || 0,
+      sub: `${stats.referrals || 0} filleul(s) direct(s)`,
+      color: C.purple,
+      bg: C.purpleL,
+      path: "/diaspora/network",
+    },
+  ] : [];
+
+  // ── Actions rapides ──
+  const quickActions = [
+    { icon: "➕", label: "Nouveau bénéficiaire", path: "/diaspora/beneficiaries/new", color: C.blue  },
+    { icon: "💳", label: "Nouveau paiement",     path: "/diaspora/payments/new",      color: C.green },
+    { icon: "🌐", label: "Mon réseau",           path: "/diaspora/network",            color: C.purple },
+    { icon: "🏆", label: "Classement",           path: "/diaspora/leaderboard",        color: C.gold  },
   ];
 
-  return (
-    <div>
-      {/* Hero */}
-      <div style={{
-        background:"linear-gradient(135deg,#0F2942,#1a3a5c)",
-        borderRadius:20, padding:"22px 20px", marginBottom:18,
-        opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(16px)",
-        transition:"all .5s cubic-bezier(.34,1.56,.64,1)",
-      }}>
-        <p style={{ color:"rgba(255,255,255,.6)", fontSize:13, margin:"0 0 4px" }}>{greet} 👋</p>
-        <h2 style={{ color:"#fff", fontSize:20, fontWeight:800, margin:"0 0 8px", letterSpacing:-.3 }}>{ambassador?.name}</h2>
-        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <span style={{ background:"rgba(0,188,212,.2)", color:"#00BCD4", fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, border:"1px solid rgba(0,188,212,.3)", fontFamily:"monospace" }}>
-            {ambassador?.referral_code}
-          </span>
-          <span style={{ color:"rgba(255,255,255,.5)", fontSize:12 }}>🌍 {ambassador?.country}</span>
-        </div>
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 300 }}>
+        <div style={{
+          width: 40, height: 40, border: `3px solid ${C.blueL}`,
+          borderTop: `3px solid ${C.blue}`, borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
-        {/* Commissions totales */}
-        <div style={{ background:"rgba(255,255,255,.07)", borderRadius:14, padding:"14px 16px", marginTop:16, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div>
-            <p style={{ color:"rgba(255,255,255,.5)", fontSize:11, margin:"0 0 3px", textTransform:"uppercase", letterSpacing:.8 }}>Total commissions gagnées</p>
-            <p style={{ color:"#00BCD4", fontSize:22, fontWeight:900, margin:0 }}>{fmt(stats?.commissions?.total_earned)}</p>
-          </div>
-          <div style={{ textAlign:"right" }}>
-            <p style={{ color:"rgba(255,255,255,.5)", fontSize:11, margin:"0 0 3px" }}>Parrainages</p>
-            <p style={{ color:"#fff", fontSize:18, fontWeight:800, margin:0 }}>{stats?.referrals || 0}</p>
-          </div>
+  return (
+    <div style={{ padding: "20px 16px", maxWidth: 960, margin: "0 auto" }}>
+
+      {/* ── Bannière ambassadeur ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1B4FD8 0%, #3B82F6 100%)",
+        borderRadius: 16, padding: "20px 24px", marginBottom: 24,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: 16,
+      }}>
+        <div>
+          <p style={{ margin: "0 0 4px", color: "rgba(255,255,255,0.75)", fontSize: 12, fontWeight: 600 }}>
+            BONJOUR 👋
+          </p>
+          <h1 style={{ margin: "0 0 8px", color: "#fff", fontSize: 22, fontWeight: 900 }}>
+            {amb?.name || "Ambassadeur"}
+          </h1>
+          <span style={{
+            background: rl.bg, color: rl.color,
+            padding: "3px 12px", borderRadius: 999,
+            fontSize: 11, fontWeight: 700,
+          }}>
+            {rl.label}
+          </span>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ margin: "0 0 4px", color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 }}>
+            GAINS EN ATTENTE
+          </p>
+          <p style={{ margin: 0, color: "#fff", fontSize: 28, fontWeight: 900 }}>
+            {fmt(stats?.commissions?.pending || 0)} €
+          </p>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
-        {kpis.map((k, i) => (
-          <div key={i} style={{ background:"#fff", borderRadius:16, padding:"16px", borderTop:`3px solid ${k.color}`,
-            opacity: visible ? 1 : 0, transform: visible ? "scale(1)" : "scale(.95)",
-            transition:`all .4s ${.1+i*.06}s cubic-bezier(.34,1.56,.64,1)` }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <p style={{ fontSize:11, color:"#94A3B8", fontWeight:600, textTransform:"uppercase", letterSpacing:.8, margin:0 }}>{k.label}</p>
-              <div style={{ width:32, height:32, borderRadius:9, background:k.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>{k.icon}</div>
+      {/* ── Cartes stats cliquables ── */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+        gap: 14, marginBottom: 24,
+      }}>
+        {statCards.map(s => (
+          <div
+            key={s.label}
+            onClick={() => navigate(s.path)}
+            style={{
+              background: s.bg, borderRadius: 14,
+              border: `1px solid ${s.color}22`,
+              padding: "16px 18px", cursor: "pointer",
+              transition: "transform 0.15s, box-shadow 0.15s",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = `0 4px 20px ${s.color}33`;
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = "none";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 26 }}>{s.icon}</span>
+              <span style={{ fontSize: 10, color: s.color, fontWeight: 700 }}>Voir →</span>
             </div>
-            <p style={{ fontSize:22, fontWeight:800, color:k.color, margin:0 }}>{k.value}</p>
+            <p style={{ margin: "10px 0 2px", fontSize: s.isText ? 20 : 28, fontWeight: 900, color: s.color }}>
+              {s.isText ? s.value : fmt(s.value)}
+            </p>
+            <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{s.label}</p>
+            <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>{s.sub}</p>
           </div>
         ))}
       </div>
 
-      {/* Lien de parrainage */}
-      {refLink && (
-        <div style={{ background:"#fff", borderRadius:16, padding:"16px 18px", marginBottom:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-          <p style={{ fontSize:12, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:.8, margin:"0 0 10px" }}>🔗 Mon lien de parrainage</p>
-          <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-            <div style={{ flex:1, background:"#F8FAFC", borderRadius:10, padding:"10px 12px", fontSize:12, color:"#475569", fontFamily:"monospace", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", border:"1px solid #E2E8F0" }}>
-              {refLink}
-            </div>
-            <button onClick={copyRef} style={{ background: copied ? "#059669" : "#0F2942", color:"#fff", border:"none", borderRadius:10, padding:"10px 14px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0, transition:"background .2s" }}>
-              {copied ? "✓ Copié !" : "📋 Copier"}
+      {/* ── Bloc partage lien ambassadeur ── */}
+      {link && (
+        <div style={{
+          background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`,
+          padding: "18px 20px", marginBottom: 24,
+        }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 800, color: C.dark, fontSize: 15 }}>
+            🔗 Mon lien ambassadeur
+          </p>
+
+          {/* Lien affiché */}
+          <div style={{
+            background: C.bg, border: `1.5px solid ${C.border}`,
+            borderRadius: 8, padding: "10px 14px", marginBottom: 12,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
+          }}>
+            <span style={{
+              fontSize: 12, color: C.blue, fontWeight: 600,
+              wordBreak: "break-all", flex: 1,
+            }}>
+              {link.link}
+            </span>
+            <span style={{
+              background: C.blueL, color: C.blue,
+              padding: "3px 12px", borderRadius: 999,
+              fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+            }}>
+              Code : {link.code}
+            </span>
+          </div>
+
+          {/* Boutons partage */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={copyLink} style={{
+              padding: "8px 18px", borderRadius: 8,
+              border: `1.5px solid ${C.blue}`, background: C.blueL,
+              color: C.blue, fontWeight: 700, fontSize: 13, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              {copied ? "✅ Copié !" : "📋 Copier le lien"}
+            </button>
+            {link.whatsapp_message && (
+              <a
+                href={link.whatsapp_message}
+                target="_blank" rel="noreferrer"
+                style={{
+                  padding: "8px 18px", borderRadius: 8, border: "none",
+                  background: "#25D366", color: "#fff", fontWeight: 700,
+                  fontSize: 13, textDecoration: "none",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                }}
+              >
+                📲 Partager sur WhatsApp
+              </a>
+            )}
+            <button onClick={() => navigate("/diaspora/referral")} style={{
+              padding: "8px 18px", borderRadius: 8,
+              border: `1.5px solid ${C.border}`, background: "#fff",
+              color: C.slate, fontWeight: 600, fontSize: 13, cursor: "pointer",
+            }}>
+              👥 Voir mes filleuls
             </button>
           </div>
-          <p style={{ fontSize:11, color:"#94A3B8", margin:"8px 0 0" }}>
-            Partagez ce lien — gagnez <strong style={{ color:"#0F2942" }}>5% sur chaque adhésion</strong> de vos filleuls
-          </p>
         </div>
       )}
 
-      {/* Actions rapides */}
-      <p style={{ fontSize:13, fontWeight:800, color:"#0F2942", marginBottom:12 }}>Actions rapides</p>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-        {[
-          { icon:"➕", label:"Ajouter un bénéficiaire", desc:"Inscrire un proche", to:"/diaspora/beneficiaries/new", color:"#00BCD4", bg:"linear-gradient(135deg,#E0F7FA,#B2EBF2)" },
-          { icon:"💳", label:"Effectuer un paiement",   desc:"Cotisation ou adhésion",to:"/diaspora/payments/new",      color:"#059669", bg:"linear-gradient(135deg,#ECFDF5,#D1FAE5)" },
-          { icon:"👥", label:"Mes bénéficiaires",        desc:"Voir la liste",         to:"/diaspora/beneficiaries",     color:"#2563EB", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
-          { icon:"💰", label:"Mes commissions",           desc:"Suivre mes gains",      to:"/diaspora/earnings",          color:"#7C3AED", bg:"linear-gradient(135deg,#F5F3FF,#EDE9FE)" },
-        ].map((a, i) => (
-          <button key={i} onClick={() => navigate(a.to)}
-            style={{ background:a.bg, borderRadius:16, padding:"16px 14px", display:"flex", flexDirection:"column", alignItems:"flex-start", gap:8, border:"none", cursor:"pointer", textAlign:"left", fontFamily:"inherit",
-              opacity: visible ? 1 : 0, transform: visible ? "scale(1)" : "scale(.95)",
-              transition:`all .4s ${.3+i*.06}s cubic-bezier(.34,1.56,.64,1)` }}>
-            <div style={{ width:40, height:40, background:"rgba(255,255,255,.8)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 2px 8px rgba(0,0,0,.08)" }}>
-              {a.icon}
-            </div>
-            <div>
-              <p style={{ fontSize:12, fontWeight:700, color:a.color, margin:"0 0 2px" }}>{a.label}</p>
-              <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{a.desc}</p>
-            </div>
-          </button>
-        ))}
+      {/* ── Actions rapides ── */}
+      <div style={{
+        background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`,
+        padding: "18px 20px", marginBottom: 24,
+      }}>
+        <p style={{ margin: "0 0 14px", fontWeight: 800, color: C.dark, fontSize: 15 }}>
+          ⚡ Actions rapides
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+          {quickActions.map(a => (
+            <button
+              key={a.path}
+              onClick={() => navigate(a.path)}
+              style={{
+                padding: "12px 10px", borderRadius: 10,
+                border: `2px solid ${a.color}22`,
+                background: `${a.color}11`, cursor: "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = `${a.color}22`}
+              onMouseLeave={e => e.currentTarget.style.background = `${a.color}11`}
+            >
+              <span style={{ fontSize: 22 }}>{a.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: a.color, textAlign: "center" }}>{a.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* ── Résumé réseau ── */}
+      {stats && (
+        <div
+          onClick={() => navigate("/diaspora/network")}
+          style={{
+            background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`,
+            padding: "18px 20px", cursor: "pointer",
+            transition: "box-shadow 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.08)"}
+          onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <p style={{ margin: 0, fontWeight: 800, color: C.dark, fontSize: 15 }}>🌐 Mon réseau</p>
+            <span style={{ fontSize: 12, color: C.blue, fontWeight: 700 }}>Voir le détail →</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            {[
+              { label: "Total",    value: stats.network_size, color: C.blue   },
+              { label: "Filleuls", value: stats.referrals,    color: C.green  },
+              { label: "Actifs",   value: stats.beneficiaries?.active, color: C.gold   },
+              { label: "En attente",value:stats.beneficiaries?.pending,color: C.slate  },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign: "center", padding: "10px 6px", background: C.bg, borderRadius: 8 }}>
+                <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: s.color }}>{fmt(s.value)}</p>
+                <p style={{ margin: "3px 0 0", fontSize: 10, color: C.slate, fontWeight: 600 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ function getNavLinks(role) {
       { to: "/healthcare",      label: "Réseau de soins", icon: "🏥" },
       { to: "/admin/providers", label: "Établissements",  icon: "🏨" },
       { to: "/agents",          label: "Agents",          icon: "🧑‍💼" },
+      { to: "/admin/diaspora",  label: "Diaspora",         icon: "🌍" },
       { to: "/hub",             label: "Hub Admin",        icon: "🔑" },
     ],
     AGENT: [
@@ -33,7 +34,7 @@ function getNavLinks(role) {
       { to: "/groups",      label: "Groupes",     icon: "👨‍👩‍👧‍👦" },
       { to: "/payments",    label: "Paiements",   icon: "💳" },
       { to: "/commissions", label: "Commissions", icon: "💰" },
-      { to: "/agents",      label: "Mon équipe",  icon: "🧑‍💼" },
+      { to: "/agents",          label: "Mon équipe",  icon: "🧑‍💼" },
     ],
     CONSEILLERE_CLIENTELE: [
       ...common,
