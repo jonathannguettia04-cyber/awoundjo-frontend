@@ -1,520 +1,185 @@
 // src/pages/diaspora/DiasporaPages.jsx
-// Contient : Beneficiaries, NewBeneficiary, Payments, NewPayment, Earnings, Referral,
-//            Network, Leaderboard, Notifications
-
-import { useEffect, useState } from "react";
+// ─────────────────────────────────────────────────────────────
+//  Toutes les pages du module Diaspora Awoundjô
+//  Exports nommés utilisés dans App.jsx via diasporaPage()
+// ─────────────────────────────────────────────────────────────
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { diasporaBeneAPI, diasporaPayAPI, diasporaCommAPI, diasporaRefAPI, diasporaNetAPI, diasporaLeaderAPI, diasporaNotifAPI } from "../../diasporaApi";
+import {
+  diasporaBeneAPI,
+  diasporaPayAPI,
+  diasporaCommAPI,
+  diasporaRefAPI,
+  diasporaNetAPI,
+  diasporaLeaderAPI,
+  diasporaNotifAPI,
+  getDiasporaData,
+} from "../../diasporaApi";
 
-const fmt      = (n, c="€") => `${Number(n||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})} ${c}`;
-const fmtXof   = (n) => `${Number(n||0).toLocaleString("fr-FR")} FCFA`;
-const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}) : "—";
-
-const PLAN_CFG = {
-  ESSENTIELLE:{ color:"#2563EB", bg:"#EFF6FF", label:"Essentielle", price:"~15€/mois", coverage:"50%" },
-  IVOIRIENNE: { color:"#059669", bg:"#ECFDF5", label:"Ivoirienne",  price:"~25€/mois", coverage:"70%" },
-  TURQUOISE:  { color:"#0891B2", bg:"#ECFEFF", label:"Turquoise",   price:"~40€/mois", coverage:"90%" },
+// ── Palette couleurs Awoundjô ─────────────────────────────────
+// Bleu principal + vert santé + or accent
+const C = {
+  blue:    "#1B4FD8",
+  blueL:   "#EEF2FF",
+  green:   "#059669",
+  greenL:  "#ECFDF5",
+  gold:    "#D97706",
+  goldL:   "#FFFBEB",
+  red:     "#DC2626",
+  redL:    "#FEF2F2",
+  slate:   "#64748B",
+  dark:    "#0F172A",
+  border:  "#E2E8F0",
+  bg:      "#F8FAFC",
 };
 
-const STATUS_CFG = {
-  active:    { label:"Actif",      bg:"#ECFDF5", color:"#059669" },
-  pending:   { label:"En attente", bg:"#FFFBEB", color:"#D97706" },
-  suspended: { label:"Suspendu",   bg:"#FEF2F2", color:"#DC2626" },
-  expired:   { label:"Expiré",     bg:"#F1F5F9", color:"#64748B" },
+// ── Helpers UI ────────────────────────────────────────────────
+const fmt = (n) =>
+  Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+const roleLabel = {
+  DIRIGEANTE: { label: "Dirigeante", color: "#7C3AED", bg: "#F5F3FF" },
+  DIASPORA:   { label: "Diaspora",   color: "#1B4FD8", bg: "#EEF2FF" },
+  PAYS:       { label: "Pays",       color: "#059669", bg: "#ECFDF5" },
+  VILLE:      { label: "Ville",      color: "#D97706", bg: "#FFFBEB" },
+  RECRUTEUR:  { label: "Recruteur",  color: "#64748B", bg: "#F1F5F9" },
 };
 
-// Rôles Awoundjô
-const ROLE_CFG = {
-  DIRIGEANTE: { label:"Dirigeante",  color:"#7C3AED", bg:"#F5F3FF", icon:"👑" },
-  DIASPORA:   { label:"Diaspora",    color:"#0891B2", bg:"#ECFEFF", icon:"🌍" },
-  PAYS:       { label:"Ambassadeur Pays",  color:"#059669", bg:"#ECFDF5", icon:"🗺️" },
-  VILLE:      { label:"Ambassadeur Ville", color:"#2563EB", bg:"#EFF6FF", icon:"🏙️" },
-  RECRUTEUR:  { label:"Recruteur",   color:"#D97706", bg:"#FFFBEB", icon:"🚀" },
-};
+function RoleBadge({ role }) {
+  const r = roleLabel[role] || roleLabel.RECRUTEUR;
+  return (
+    <span style={{
+      background: r.bg, color: r.color,
+      padding: "2px 10px", borderRadius: 999,
+      fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+    }}>
+      {r.label}
+    </span>
+  );
+}
 
-const S = {
-  page:    { paddingBottom:20, fontFamily:"'DM Sans',system-ui,sans-serif" },
-  title:   { fontSize:20, fontWeight:800, color:"#0F2942", marginBottom:16 },
-  card:    { background:"#fff", borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", marginBottom:12 },
-  label:   { fontSize:11, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:.8, marginBottom:8, display:"block" },
-  input:   { width:"100%", border:"1.5px solid #E2E8F0", borderRadius:12, padding:"12px 14px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" },
-  select:  { width:"100%", border:"1.5px solid #E2E8F0", borderRadius:12, padding:"12px 14px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#fff" },
-  btn:     { width:"100%", padding:14, background:"linear-gradient(135deg,#0F2942,#1a3a5c)", color:"#fff", border:"none", borderRadius:14, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  btnGreen:{ width:"100%", padding:14, background:"linear-gradient(135deg,#00BCD4,#0097A7)", color:"#fff", border:"none", borderRadius:14, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  err:     { background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:12, padding:"10px 14px", color:"#DC2626", fontSize:13, marginBottom:14 },
-  suc:     { background:"#ECFDF5", border:"1px solid #BBF7D0", borderRadius:12, padding:"10px 14px", color:"#059669", fontSize:13, marginBottom:14 },
-  fieldGap:{ marginBottom:14 },
-};
+function StatusDot({ active }) {
+  return (
+    <span style={{
+      display: "inline-block", width: 8, height: 8,
+      borderRadius: "50%", marginRight: 6,
+      background: active ? C.green : C.slate,
+    }} />
+  );
+}
 
-// ════════════════════════════════════════════════════════════
-// LISTE BÉNÉFICIAIRES
-// ════════════════════════════════════════════════════════════
+function Card({ children, style = {} }) {
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      padding: 20, ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function PageHeader({ title, subtitle, action }) {
+  return (
+    <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: C.dark }}>{title}</h1>
+        {subtitle && <p style={{ margin: "4px 0 0", color: C.slate, fontSize: 14 }}>{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function Loader() {
+  return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 200 }}>
+      <div style={{
+        width: 36, height: 36, border: `3px solid ${C.blueL}`,
+        borderTop: `3px solid ${C.blue}`, borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, desc }) {
+  return (
+    <div style={{ textAlign: "center", padding: "48px 24px", color: C.slate }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>{icon}</div>
+      <p style={{ margin: 0, fontWeight: 700, color: C.dark, fontSize: 15 }}>{title}</p>
+      {desc && <p style={{ margin: "6px 0 0", fontSize: 13 }}>{desc}</p>}
+    </div>
+  );
+}
+
+function Btn({ children, onClick, variant = "primary", style = {}, disabled = false }) {
+  const styles = {
+    primary: { background: C.blue, color: "#fff", border: "none" },
+    outline: { background: "#fff", color: C.blue, border: `1.5px solid ${C.blue}` },
+    ghost:   { background: "transparent", color: C.slate, border: "none" },
+    danger:  { background: C.red, color: "#fff", border: "none" },
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1,
+        display: "inline-flex", alignItems: "center", gap: 6, transition: "opacity 0.15s",
+        ...styles[variant], ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : BÉNÉFICIAIRES
+// ═════════════════════════════════════════════════════════════
 export function DiasporaBeneficiaries() {
   const navigate = useNavigate();
-  const [benes,   setBenes]   = useState([]);
+  const [benes, setBenes]   = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    diasporaBeneAPI.getAll().then(r => setBenes(r.data.beneficiaries)).catch(() => {}).finally(() => setLoading(false));
+    diasporaBeneAPI.getAll().then(r => setBenes(r.data.beneficiaries || [])).finally(() => setLoading(false));
   }, []);
 
   return (
-    <div style={S.page}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <h1 style={S.title}>Mes bénéficiaires</h1>
-        <button onClick={() => navigate("/diaspora/beneficiaries/new")}
-          style={{ background:"#0F2942", color:"#fff", border:"none", borderRadius:12, padding:"10px 16px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-          + Ajouter
-        </button>
-      </div>
-
-      {loading ? <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Chargement…</div>
-      : benes.length === 0 ? (
-        <div style={{ ...S.card, textAlign:"center", padding:"40px 20px" }}>
-          <p style={{ fontSize:40, marginBottom:12 }}>👨‍👩‍👧‍👦</p>
-          <p style={{ fontWeight:700, color:"#0F2942", marginBottom:8 }}>Aucun bénéficiaire</p>
-          <p style={{ color:"#94A3B8", fontSize:13, marginBottom:16 }}>Commencez par inscrire un proche en Côte d'Ivoire</p>
-          <button onClick={() => navigate("/diaspora/beneficiaries/new")} style={{ ...S.btnGreen, width:"auto", padding:"12px 24px", fontSize:13 }}>
-            + Ajouter un bénéficiaire
-          </button>
-        </div>
-      ) : benes.map(b => {
-        const plan = PLAN_CFG[b.plan] || PLAN_CFG.ESSENTIELLE;
-        const stat = STATUS_CFG[b.status] || STATUS_CFG.pending;
-        return (
-          <div key={b.id} style={{ ...S.card, cursor:"pointer" }} onClick={() => navigate(`/diaspora/beneficiaries/${b.id}`)}>
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
-              <div style={{ width:44, height:44, borderRadius:12, background:plan.bg, color:plan.color, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:18, flexShrink:0 }}>
-                {b.name?.charAt(0)}
-              </div>
-              <div style={{ flex:1 }}>
-                <p style={{ fontWeight:800, color:"#0F2942", margin:"0 0 2px" }}>{b.name}</p>
-                <p style={{ fontSize:12, color:"#94A3B8", fontFamily:"monospace", margin:0 }}>{b.mutual_number}</p>
-              </div>
-              <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:stat.bg, color:stat.color }}>{stat.label}</span>
-            </div>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:plan.bg, color:plan.color, border:`1px solid ${plan.color}30` }}>
-                {plan.label} · {plan.coverage}
-              </span>
-              {b.city && <span style={{ fontSize:11, color:"#64748B" }}>📍 {b.city}</span>}
-              <span style={{ fontSize:11, color:"#64748B" }}>Total payé : {fmt(b.total_paid)}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// NOUVEAU BÉNÉFICIAIRE
-// ════════════════════════════════════════════════════════════
-export function DiasporaNewBeneficiary() {
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-
-  async function handleSubmit(e) {
-    e.preventDefault(); setError(""); setLoading(true);
-    try {
-      const { data } = await diasporaBeneAPI.create(form);
-      navigate(`/diaspora/beneficiaries/${data.beneficiary.id}`);
-    } catch (err) { setError(err.response?.data?.error || "Erreur création"); }
-    finally { setLoading(false); }
-  }
-
-  return (
-    <div style={S.page}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-        <button onClick={() => navigate(-1)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer" }}>←</button>
-        <h1 style={{ ...S.title, marginBottom:0 }}>Nouveau bénéficiaire</h1>
-      </div>
-
-      {error && <div style={S.err}>{error}</div>}
-
-      <form onSubmit={handleSubmit}>
-        <div style={S.card}>
-          <div style={S.fieldGap}>
-            <label style={S.label}>Nom complet *</label>
-            <input required style={S.input} placeholder="Kouassi Jean" value={form.name} onChange={e => setForm({...form, name:e.target.value})} />
-          </div>
-          <div style={S.fieldGap}>
-            <label style={S.label}>Téléphone (en CI)</label>
-            <input style={S.input} placeholder="07 07 08 09 10" value={form.phone} onChange={e => setForm({...form, phone:e.target.value})} />
-          </div>
-          <div style={S.fieldGap}>
-            <label style={S.label}>Ville de résidence</label>
-            <input style={S.input} placeholder="Abidjan, Yopougon…" value={form.city} onChange={e => setForm({...form, city:e.target.value})} />
-          </div>
-        </div>
-
-        <div style={S.card}>
-          <label style={S.label}>Choisir la formule *</label>
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {Object.entries(PLAN_CFG).map(([key, p]) => (
-              <button key={key} type="button" onClick={() => setForm({...form, plan:key})}
-                style={{ padding:"14px 16px", borderRadius:14, border:`2px solid ${form.plan===key ? p.color : "#E2E8F0"}`, background: form.plan===key ? p.bg : "#fff", cursor:"pointer", fontFamily:"inherit", textAlign:"left", transition:"all .15s" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <div>
-                    <p style={{ fontWeight:800, color: form.plan===key ? p.color : "#0F2942", margin:"0 0 3px", fontSize:15 }}>{p.label}</p>
-                    <p style={{ fontSize:12, color:"#64748B", margin:0 }}>Couverture {p.coverage} · {p.price}</p>
-                  </div>
-                  {form.plan===key && <span style={{ width:22, height:22, borderRadius:"50%", background:p.color, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800 }}>✓</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderRadius:14, padding:"14px 16px", marginBottom:16 }}>
-          <p style={{ color:"#92400E", fontSize:13, margin:0 }}>
-            ⚠️ Le bénéficiaire sera en statut <strong>En attente</strong> jusqu'au premier paiement d'adhésion.
-          </p>
-        </div>
-
-        <button type="submit" disabled={loading} style={S.btn}>
-          {loading ? "Création…" : "Créer le bénéficiaire →"}
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// PAIEMENTS
-// ════════════════════════════════════════════════════════════
-export function DiasporaPayments() {
-  const navigate  = useNavigate();
-  const [payments, setPayments] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-
-  useEffect(() => {
-    diasporaPayAPI.getAll().then(r => setPayments(r.data.payments)).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  const statusBg = { COMPLETED:"#ECFDF5", PENDING:"#FFFBEB", FAILED:"#FEF2F2" };
-  const statusTx = { COMPLETED:"#059669", PENDING:"#D97706", FAILED:"#DC2626" };
-  const statusLb = { COMPLETED:"Complété", PENDING:"En attente", FAILED:"Échoué" };
-
-  return (
-    <div style={S.page}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <h1 style={S.title}>Paiements</h1>
-        <button onClick={() => navigate("/diaspora/payments/new")}
-          style={{ background:"#00BCD4", color:"#fff", border:"none", borderRadius:12, padding:"10px 16px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-          + Payer
-        </button>
-      </div>
-      {loading ? <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Chargement…</div>
-      : payments.length === 0 ? (
-        <div style={{ ...S.card, textAlign:"center", padding:"40px 20px" }}>
-          <p style={{ fontSize:36, marginBottom:12 }}>💳</p>
-          <p style={{ fontWeight:700, color:"#0F2942" }}>Aucun paiement</p>
-        </div>
-      ) : payments.map(p => (
-        <div key={p.id} style={S.card}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-            <div>
-              <p style={{ fontWeight:800, color:"#0F2942", margin:"0 0 2px", fontSize:14 }}>{p.beneficiary_name}</p>
-              <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>{p.payment_type === "adhesion" ? "🎫 Adhésion" : "🔄 Mensualité"} · {fmtDate(p.created_at)}</p>
-            </div>
-            <div style={{ textAlign:"right" }}>
-              <p style={{ fontWeight:800, color:"#0F2942", margin:"0 0 3px" }}>{fmt(p.amount, p.currency)}</p>
-              <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20, background:statusBg[p.status]||"#F1F5F9", color:statusTx[p.status]||"#64748B" }}>
-                {statusLb[p.status]||p.status}
-              </span>
-            </div>
-          </div>
-          {p.transaction_reference && (
-            <p style={{ fontSize:11, color:"#94A3B8", fontFamily:"monospace", margin:0 }}>{p.transaction_reference}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// NOUVEAU PAIEMENT
-// ════════════════════════════════════════════════════════════
-export function DiasporaNewPayment() {
-  const navigate = useNavigate();
-  const [benes,   setBenes]   = useState([]);
-  const [form,    setForm]    = useState({ beneficiary_id:"", amount:"", currency:"EUR", payment_type:"adhesion", payment_method:"wave" });
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    diasporaBeneAPI.getAll().then(r => setBenes(r.data.beneficiaries)).catch(() => {});
-  }, []);
-
-  async function handlePay(e) {
-    e.preventDefault(); setError(""); setLoading(true);
-    try {
-      const { data } = await diasporaPayAPI.initiate(form);
-      await diasporaPayAPI.confirm({ payment_id: data.payment.id });
-      setSuccess(true);
-    } catch (err) { setError(err.response?.data?.error || "Erreur paiement"); }
-    finally { setLoading(false); }
-  }
-
-  // Estimation FCFA
-  const rateMap = { EUR:655.957, USD:605, GBP:780 };
-  const estimXof = form.amount ? Math.round(Number(form.amount) * (rateMap[form.currency]||655.957)) : 0;
-
-  if (success) return (
-    <div style={{ ...S.page, textAlign:"center", paddingTop:40 }}>
-      <div style={{ fontSize:64, marginBottom:16 }}>✅</div>
-      <h2 style={{ fontWeight:800, color:"#0F2942", marginBottom:8 }}>Paiement réussi !</h2>
-      <p style={{ color:"#64748B", marginBottom:24 }}>Le bénéficiaire a été activé et les commissions calculées.</p>
-      <button onClick={() => navigate("/diaspora/beneficiaries")} style={S.btnGreen}>
-        Voir mes bénéficiaires →
-      </button>
-    </div>
-  );
-
-  return (
-    <div style={S.page}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-        <button onClick={() => navigate(-1)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer" }}>←</button>
-        <h1 style={{ ...S.title, marginBottom:0 }}>Effectuer un paiement</h1>
-      </div>
-
-      {error && <div style={S.err}>{error}</div>}
-
-      <form onSubmit={handlePay}>
-        <div style={S.card}>
-          <div style={S.fieldGap}>
-            <label style={S.label}>Bénéficiaire *</label>
-            <select required style={S.select} value={form.beneficiary_id} onChange={e => setForm({...form, beneficiary_id:e.target.value})}>
-              <option value="">Sélectionner un bénéficiaire…</option>
-              {benes.map(b => <option key={b.id} value={b.id}>{b.name} · {b.plan} · {b.mutual_number}</option>)}
-            </select>
-          </div>
-
-          <div style={S.fieldGap}>
-            <label style={S.label}>Type de paiement *</label>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-              {[{ id:"adhesion", label:"🎫 Adhésion", desc:"Première inscription" },{ id:"mensualite", label:"🔄 Mensualité", desc:"Cotisation mensuelle" }].map(t => (
-                <button key={t.id} type="button" onClick={() => setForm({...form, payment_type:t.id})}
-                  style={{ padding:"12px 10px", borderRadius:12, border:`2px solid ${form.payment_type===t.id ? "#0F2942" : "#E2E8F0"}`, background: form.payment_type===t.id ? "#EFF6FF" : "#fff", cursor:"pointer", fontFamily:"inherit" }}>
-                  <p style={{ fontWeight:700, color: form.payment_type===t.id ? "#0F2942" : "#374151", margin:"0 0 3px", fontSize:13 }}>{t.label}</p>
-                  <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{t.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={S.fieldGap}>
-            <label style={S.label}>Montant *</label>
-            <div style={{ display:"flex", gap:8 }}>
-              <input required type="number" min="1" step="0.01" style={{ ...S.input, flex:1 }}
-                placeholder="25.00" value={form.amount} onChange={e => setForm({...form, amount:e.target.value})} />
-              <select style={{ ...S.select, width:100 }} value={form.currency} onChange={e => setForm({...form, currency:e.target.value})}>
-                <option value="EUR">€ EUR</option>
-                <option value="USD">$ USD</option>
-                <option value="GBP">£ GBP</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={S.fieldGap}>
-            <label style={S.label}>Mode de paiement *</label>
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {[
-                { id:"wave",         icon:"🌊", label:"Wave",           desc:"Paiement mobile Wave CI" },
-                { id:"orange_money", icon:"🟠", label:"Orange Money",   desc:"Orange Money CI" },
-                { id:"mtn",          icon:"🟡", label:"MTN MoMo",       desc:"MTN Mobile Money" },
-                { id:"stripe",       icon:"💳", label:"Carte bancaire",  desc:"Visa, Mastercard via Stripe" },
-              ].map(m => (
-                <button key={m.id} type="button" onClick={() => setForm({...form, payment_method:m.id})}
-                  style={{ padding:"12px 16px", borderRadius:12, border:`2px solid ${form.payment_method===m.id ? "#00BCD4" : "#E2E8F0"}`, background: form.payment_method===m.id ? "#E0F7FA" : "#fff", cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:12, textAlign:"left" }}>
-                  <span style={{ fontSize:22 }}>{m.icon}</span>
-                  <div>
-                    <p style={{ fontWeight:700, color: form.payment_method===m.id ? "#0097A7" : "#0F2942", margin:"0 0 2px", fontSize:13 }}>{m.label}</p>
-                    <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{m.desc}</p>
-                  </div>
-                  {form.payment_method===m.id && <span style={{ marginLeft:"auto", color:"#00BCD4", fontSize:18 }}>✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {form.amount && (
-          <div style={{ ...S.card, background:"#F0F7FF", border:"1px solid #BFDBFE", marginBottom:16 }}>
-            <p style={{ fontSize:12, fontWeight:700, color:"#1E40AF", margin:"0 0 8px", textTransform:"uppercase", letterSpacing:.8 }}>Récapitulatif</p>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-              <span style={{ fontSize:13, color:"#64748B" }}>Montant</span>
-              <span style={{ fontWeight:700, color:"#0F2942" }}>{form.amount} {form.currency}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontSize:13, color:"#64748B" }}>Équivalent FCFA (≈)</span>
-              <span style={{ fontWeight:700, color:"#0F2942" }}>{estimXof.toLocaleString("fr-FR")} FCFA</span>
-            </div>
-          </div>
-        )}
-
-        <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:12, padding:"12px 14px", marginBottom:16 }}>
-          <p style={{ color:"#166534", fontSize:12, margin:0 }}>🔒 Paiement sécurisé · Données chiffrées SSL</p>
-        </div>
-
-        <button type="submit" disabled={loading || !form.beneficiary_id || !form.amount}
-          style={{ ...S.btnGreen, opacity:(!form.beneficiary_id||!form.amount)?0.6:1 }}>
-          {loading ? "Traitement en cours…" : `💳 Payer ${form.amount||""} ${form.currency}`}
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// COMMISSIONS / GAINS
-// ════════════════════════════════════════════════════════════
-export function DiasporaEarnings() {
-  const [data,    setData]    = useState({ commissions:[], totals:{}, by_source:[] });
-  const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState("overview"); // overview | history
-
-  useEffect(() => {
-    diasporaCommAPI.getAll().then(r => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  const { commissions, totals, by_source } = data;
-
-  const statBg = { PENDING:"#FFFBEB", VALIDATED:"#EFF6FF", PAID:"#ECFDF5", CANCELLED:"#FEF2F2" };
-  const statTx = { PENDING:"#D97706", VALIDATED:"#2563EB", PAID:"#059669", CANCELLED:"#DC2626" };
-  const statLb = { PENDING:"En attente", VALIDATED:"Validée", PAID:"Payée", CANCELLED:"Annulée" };
-
-  // Règles commission affichées selon organigramme
-  const RULES = [
-    { case:"Cas 1", desc:"Diaspora recrute Pays",      rates:{ RECRUTEUR:0, VILLE:0, PAYS:0, DIASPORA:12, DIRIGEANTE:5 } },
-    { case:"Cas 2", desc:"Pays recrute Ville",          rates:{ RECRUTEUR:0, VILLE:0, PAYS:12, DIASPORA:10, DIRIGEANTE:5 } },
-    { case:"Cas 3", desc:"Recruteur vend une carte",   rates:{ RECRUTEUR:12, VILLE:10, PAYS:10, DIASPORA:10, DIRIGEANTE:5 } },
-  ];
-
-  return (
-    <div style={S.page}>
-      <h1 style={S.title}>Mes commissions 💰</h1>
-
-      {/* KPIs période */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:18 }}>
-        {[
-          { label:"Aujourd'hui", value:fmt(totals.today),      color:"#2563EB", bg:"#EFF6FF" },
-          { label:"Ce mois",     value:fmt(totals.this_month), color:"#059669", bg:"#ECFDF5" },
-          { label:"Total gagné", value:fmt(totals.total_earned),color:"#7C3AED", bg:"#F5F3FF" },
-        ].map((k,i) => (
-          <div key={i} style={{ background:k.bg, borderRadius:14, padding:"12px 10px", border:`1px solid ${k.color}20`, textAlign:"center" }}>
-            <p style={{ fontSize:10, color:"#64748B", fontWeight:600, textTransform:"uppercase", letterSpacing:.5, margin:"0 0 5px" }}>{k.label}</p>
-            <p style={{ fontSize:15, fontWeight:800, color:k.color, margin:0 }}>{k.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* KPIs statuts */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
-        {[
-          { label:"En attente", value:fmt(totals.pending),   color:"#D97706", bg:"#FFFBEB" },
-          { label:"Validées",   value:fmt(totals.validated), color:"#2563EB", bg:"#EFF6FF" },
-          { label:"Payées",     value:fmt(totals.paid),      color:"#059669", bg:"#ECFDF5" },
-          { label:"Cette semaine", value:fmt(totals.this_week), color:"#0891B2", bg:"#ECFEFF" },
-        ].map((k,i) => (
-          <div key={i} style={{ background:k.bg, borderRadius:14, padding:"14px 16px", border:`1px solid ${k.color}25` }}>
-            <p style={{ fontSize:11, color:"#64748B", fontWeight:600, textTransform:"uppercase", letterSpacing:.8, margin:"0 0 6px" }}>{k.label}</p>
-            <p style={{ fontSize:18, fontWeight:800, color:k.color, margin:0 }}>{k.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, background:"#F1F5F9", borderRadius:12, padding:4 }}>
-        {[{ id:"overview", label:"Vue d'ensemble" },{ id:"history", label:"Historique" },{ id:"rules", label:"Règles" }].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ flex:1, padding:"8px 4px", borderRadius:10, border:"none", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
-              background: tab===t.id ? "#0F2942" : "transparent", color: tab===t.id ? "#fff" : "#64748B" }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* VUE D'ENSEMBLE */}
-      {tab === "overview" && (
-        <div>
-          {by_source.length > 0 && (
-            <>
-              <p style={S.label}>Par source</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:18 }}>
-                {by_source.map((s,i) => {
-                  const r = ROLE_CFG[s.source_role] || ROLE_CFG.RECRUTEUR;
-                  return (
-                    <div key={i} style={{ background:r.bg, borderRadius:14, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:20 }}>{r.icon}</span>
-                        <div>
-                          <p style={{ fontWeight:700, color:r.color, margin:"0 0 2px", fontSize:13 }}>{r.label}</p>
-                          <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>{s.count} vente(s)</p>
-                        </div>
-                      </div>
-                      <p style={{ fontWeight:800, color:r.color, fontSize:16, margin:0 }}>{fmt(s.total)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* HISTORIQUE */}
-      {tab === "history" && (
-        loading ? <div style={{ textAlign:"center", padding:30, color:"#94A3B8" }}>Chargement…</div>
-        : commissions.length === 0 ? (
-          <div style={{ ...S.card, textAlign:"center", padding:"30px 20px" }}>
-            <p style={{ fontSize:32, marginBottom:8 }}>💰</p>
-            <p style={{ color:"#64748B" }}>Aucune commission pour le moment</p>
-          </div>
-        ) : commissions.map(c => (
-          <div key={c.id} style={S.card}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
+      <PageHeader
+        title="Mes bénéficiaires"
+        subtitle={`${benes.length} bénéficiaire(s) enregistré(s)`}
+        action={<Btn onClick={() => navigate("/diaspora/beneficiaries/new")}>➕ Nouveau</Btn>}
+      />
+      {loading ? <Loader /> : benes.length === 0 ? (
+        <EmptyState icon="👤" title="Aucun bénéficiaire" desc="Ajoutez votre premier bénéficiaire" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {benes.map(b => (
+            <Card key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <p style={{ fontWeight:700, color:"#0F2942", margin:"0 0 3px", fontSize:14 }}>{c.beneficiary_name || "—"}</p>
-                <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>{fmtDate(c.created_at)} · Taux {c.rate_pct}% · {c.source === "direct" ? "Vente directe" : "Réseau"}</p>
+                <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>{b.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{b.phone} • {b.city}</p>
               </div>
-              <div style={{ textAlign:"right" }}>
-                <p style={{ fontWeight:800, color:"#059669", fontSize:16, margin:"0 0 4px" }}>{fmt(c.amount)}</p>
-                <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20, background:statBg[c.status]||"#F1F5F9", color:statTx[c.status]||"#64748B" }}>
-                  {statLb[c.status]||c.status}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.blue, background: C.blueL, padding: "3px 10px", borderRadius: 999 }}>{b.plan}</span>
+                <span style={{ fontSize: 12 }}>
+                  <StatusDot active={b.status === "active"} />
+                  {b.status === "active" ? "Actif" : "En attente"}
                 </span>
+                <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(b.created_at)}</span>
               </div>
-            </div>
-          </div>
-        ))
-      )}
-
-      {/* RÈGLES */}
-      {tab === "rules" && (
-        <div>
-          {RULES.map((r, i) => (
-            <div key={i} style={{ ...S.card, marginBottom:12 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                <span style={{ background:"#0F2942", color:"#00BCD4", fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, fontFamily:"monospace" }}>{r.case}</span>
-                <p style={{ fontWeight:700, color:"#0F2942", margin:0, fontSize:13 }}>{r.desc}</p>
-              </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                {Object.entries(r.rates).filter(([,v]) => v > 0).map(([role, pct]) => {
-                  const cfg = ROLE_CFG[role] || ROLE_CFG.RECRUTEUR;
-                  return (
-                    <div key={role} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:cfg.bg, borderRadius:10, padding:"8px 12px" }}>
-                      <span style={{ fontSize:12, color:cfg.color, fontWeight:700 }}>{cfg.icon} {cfg.label}</span>
-                      <span style={{ fontWeight:900, color:cfg.color, fontSize:15 }}>{pct}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -522,349 +187,842 @@ export function DiasporaEarnings() {
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// PARRAINAGE
-// ════════════════════════════════════════════════════════════
-export function DiasporaReferral() {
-  const [refData,   setRefData]   = useState({ code:"", link:"", whatsapp_message:"" });
-  const [referrals, setReferrals] = useState([]);
-  const [copied,    setCopied]    = useState(false);
-  const [loading,   setLoading]   = useState(true);
+// ═════════════════════════════════════════════════════════════
+// PAGE : NOUVEAU BÉNÉFICIAIRE
+// ═════════════════════════════════════════════════════════════
+export function DiasporaNewBeneficiary() {
+  const navigate = useNavigate();
+  const [form, setForm]     = useState({ name: "", phone: "", city: "", plan: "ESSENTIELLE" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState("");
 
-  useEffect(() => {
-    Promise.all([diasporaRefAPI.getLink(), diasporaRefAPI.getReferrals()])
-      .then(([r, refs]) => { setRefData(r.data); setReferrals(refs.data.referrals||[]); })
-      .catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  const plans = [
+    { value: "ESSENTIELLE", label: "🌿 Essentielle", desc: "Couverture de base" },
+    { value: "IVOIRIENNE",  label: "🌍 Ivoirienne",  desc: "Couverture élargie" },
+    { value: "TURQUOISE",   label: "💎 Turquoise",   desc: "Couverture premium" },
+  ];
 
-  function copy(text) {
-    navigator.clipboard.writeText(text);
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  }
-
-  const totalCommRef = referrals.reduce((s,r) => s + Number(r.commission_earned||0), 0);
+  const submit = async () => {
+    if (!form.name) return setError("Le nom est requis");
+    setLoading(true); setError("");
+    try {
+      await diasporaBeneAPI.create(form);
+      navigate("/diaspora/beneficiaries");
+    } catch (e) {
+      setError(e.response?.data?.error || "Erreur lors de la création");
+    } finally { setLoading(false); }
+  };
 
   return (
-    <div style={S.page}>
-      <h1 style={S.title}>Mon parrainage 🔗</h1>
-
-      {/* Code + lien */}
-      <div style={{ ...S.card, background:"linear-gradient(135deg,#0F2942,#1a3a5c)", color:"#fff" }}>
-        <p style={{ fontSize:12, color:"rgba(255,255,255,.6)", fontWeight:600, textTransform:"uppercase", letterSpacing:.8, margin:"0 0 16px" }}>Mon code ambassadeur</p>
-        <div style={{ fontSize:28, fontWeight:900, fontFamily:"monospace", color:"#00BCD4", margin:"0 0 16px", letterSpacing:3 }}>
-          {refData.code || "…"}
-        </div>
-        <div style={{ background:"rgba(255,255,255,.07)", borderRadius:12, padding:"10px 14px", marginBottom:12 }}>
-          <span style={{ fontSize:12, color:"rgba(255,255,255,.7)", fontFamily:"monospace", overflow:"hidden", display:"block", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-            {refData.link || "…"}
-          </span>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-          <button onClick={() => copy(refData.link)}
-            style={{ padding:"11px 8px", background: copied ? "#059669" : "rgba(0,188,212,.2)", border:"1px solid rgba(0,188,212,.3)", borderRadius:12, color:"#00BCD4", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-            {copied ? "✓ Copié" : "📋 Copier"}
-          </button>
-          <button onClick={() => { if (navigator.share) navigator.share({ title:"Awoundjô", url:refData.link }); else copy(refData.link); }}
-            style={{ padding:"11px 8px", background:"rgba(255,255,255,.1)", border:"1px solid rgba(255,255,255,.15)", borderRadius:12, color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-            📤 Partager
-          </button>
-          <a href={refData.whatsapp_message} target="_blank" rel="noreferrer"
-            style={{ padding:"11px 8px", background:"rgba(37,211,102,.2)", border:"1px solid rgba(37,211,102,.3)", borderRadius:12, color:"#25D366", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit", textDecoration:"none", textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            💬 WhatsApp
-          </a>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:18 }}>
-        {[
-          { label:"Filleuls",    value:referrals.length, icon:"👥" },
-          { label:"Actifs",      value:referrals.filter(r=>Number(r.beneficiary_count)>0).length, icon:"✅" },
-          { label:"Commissions", value:`${Math.round(totalCommRef*100)/100}€`, icon:"💰" },
-        ].map((k,i) => (
-          <div key={i} style={{ ...S.card, textAlign:"center", padding:"14px 10px", marginBottom:0 }}>
-            <p style={{ fontSize:22, marginBottom:4 }}>{k.icon}</p>
-            <p style={{ fontWeight:800, color:"#0F2942", margin:"0 0 3px", fontSize:18 }}>{k.value}</p>
-            <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{k.label}</p>
+    <div style={{ padding: "24px 20px", maxWidth: 560, margin: "0 auto" }}>
+      <PageHeader title="Nouveau bénéficiaire" subtitle="Enregistrez un client sous votre parrainage" />
+      <Card>
+        {error && (
+          <div style={{ background: C.redL, color: C.red, padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+            ⚠️ {error}
           </div>
+        )}
+        {[
+          { key: "name", label: "Nom complet *", placeholder: "Jean Dupont" },
+          { key: "phone", label: "Téléphone WhatsApp", placeholder: "+225 07 00 00 00 00" },
+          { key: "city", label: "Ville", placeholder: "Abidjan" },
+        ].map(f => (
+          <div key={f.key} style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>{f.label}</label>
+            <input
+              value={form[f.key]}
+              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              placeholder={f.placeholder}
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14,
+                border: `1.5px solid ${C.border}`, outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+        ))}
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 8 }}>Offre choisie *</label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {plans.map(p => (
+              <div
+                key={p.value}
+                onClick={() => setForm(prev => ({ ...prev, plan: p.value }))}
+                style={{
+                  flex: 1, minWidth: 140, padding: "12px 14px", borderRadius: 10,
+                  border: `2px solid ${form.plan === p.value ? C.blue : C.border}`,
+                  background: form.plan === p.value ? C.blueL : "#fff",
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
+              >
+                <p style={{ margin: 0, fontWeight: 700, color: C.dark, fontSize: 13 }}>{p.label}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Btn variant="outline" onClick={() => navigate(-1)}>Annuler</Btn>
+          <Btn onClick={submit} disabled={loading}>{loading ? "Enregistrement…" : "✅ Enregistrer"}</Btn>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : PAIEMENTS
+// ═════════════════════════════════════════════════════════════
+export function DiasporaPayments() {
+  const navigate = useNavigate();
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    diasporaPayAPI.getAll().then(r => setPayments(r.data.payments || [])).finally(() => setLoading(false));
+  }, []);
+
+  const statusStyle = {
+    COMPLETED: { color: C.green,  bg: C.greenL, label: "✅ Complété" },
+    PENDING:   { color: C.gold,   bg: C.goldL,  label: "⏳ En attente" },
+    FAILED:    { color: C.red,    bg: C.redL,   label: "❌ Échoué" },
+    REFUNDED:  { color: C.slate,  bg: C.bg,     label: "↩️ Remboursé" },
+  };
+
+  return (
+    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
+      <PageHeader
+        title="Mes paiements"
+        subtitle={`${payments.length} paiement(s) enregistré(s)`}
+        action={<Btn onClick={() => navigate("/diaspora/payments/new")}>💳 Nouveau paiement</Btn>}
+      />
+      {loading ? <Loader /> : payments.length === 0 ? (
+        <EmptyState icon="💳" title="Aucun paiement" desc="Initiez votre premier paiement" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {payments.map(p => {
+            const s = statusStyle[p.status] || statusStyle.PENDING;
+            return (
+              <Card key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>{p.beneficiary_name}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{p.plan} • {fmtDate(p.created_at)}</p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ margin: 0, fontWeight: 800, color: C.dark, fontSize: 15 }}>{fmt(p.amount)} {p.currency}</p>
+                    {p.amount_xof && <p style={{ margin: 0, fontSize: 11, color: C.slate }}>{fmt(p.amount_xof)} FCFA</p>}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: s.color, background: s.bg, padding: "3px 10px", borderRadius: 999 }}>
+                    {s.label}
+                  </span>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : NOUVEAU PAIEMENT
+// ═════════════════════════════════════════════════════════════
+export function DiasporaNewPayment() {
+  const navigate = useNavigate();
+  const [benes, setBenes]     = useState([]);
+  const [form, setForm]       = useState({ beneficiary_id: "", amount: "", currency: "EUR", payment_type: "cotisation", payment_method: "stripe" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    diasporaBeneAPI.getAll().then(r => setBenes(r.data.beneficiaries || []));
+  }, []);
+
+  const methods = [
+    { value: "stripe",       label: "💳 Carte bancaire",  desc: "Visa / Mastercard" },
+    { value: "wave",         label: "🌊 Wave",            desc: "Mobile Money" },
+    { value: "orange_money", label: "🟠 Orange Money",    desc: "Mobile Money" },
+    { value: "mtn_money",    label: "🟡 MTN Money",       desc: "Mobile Money" },
+  ];
+
+  const submit = async () => {
+    if (!form.beneficiary_id || !form.amount) return setError("Bénéficiaire et montant requis");
+    setLoading(true); setError("");
+    try {
+      await diasporaPayAPI.initiate(form);
+      navigate("/diaspora/payments");
+    } catch (e) {
+      setError(e.response?.data?.error || "Erreur lors du paiement");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ padding: "24px 20px", maxWidth: 560, margin: "0 auto" }}>
+      <PageHeader title="Nouveau paiement" subtitle="Enregistrez une cotisation ou adhésion" />
+      <Card>
+        {error && (
+          <div style={{ background: C.redL, color: C.red, padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+            ⚠️ {error}
+          </div>
+        )}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>Bénéficiaire *</label>
+          <select
+            value={form.beneficiary_id}
+            onChange={e => setForm(p => ({ ...p, beneficiary_id: e.target.value }))}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14, border: `1.5px solid ${C.border}`, background: "#fff", boxSizing: "border-box" }}
+          >
+            <option value="">— Sélectionner —</option>
+            {benes.map(b => <option key={b.id} value={b.id}>{b.name} ({b.plan})</option>)}
+          </select>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>Montant *</label>
+            <input
+              type="number" value={form.amount}
+              onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+              placeholder="0.00"
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14, border: `1.5px solid ${C.border}`, boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>Devise</label>
+            <select
+              value={form.currency}
+              onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14, border: `1.5px solid ${C.border}`, background: "#fff", boxSizing: "border-box" }}
+            >
+              {["EUR","USD","XOF","GBP","CHF"].map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 8 }}>Méthode de paiement</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {methods.map(m => (
+              <div
+                key={m.value}
+                onClick={() => setForm(p => ({ ...p, payment_method: m.value }))}
+                style={{
+                  padding: "10px 12px", borderRadius: 10,
+                  border: `2px solid ${form.payment_method === m.value ? C.blue : C.border}`,
+                  background: form.payment_method === m.value ? C.blueL : "#fff",
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
+              >
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 12, color: C.dark }}>{m.label}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>{m.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Btn variant="outline" onClick={() => navigate(-1)}>Annuler</Btn>
+          <Btn onClick={submit} disabled={loading}>{loading ? "Traitement…" : "✅ Valider le paiement"}</Btn>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : COMMISSIONS / GAINS
+// ═════════════════════════════════════════════════════════════
+export function DiasporaEarnings() {
+  const [data, setData]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]       = useState("overview");
+
+  useEffect(() => {
+    diasporaCommAPI.getAll().then(r => setData(r.data)).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 24 }}><Loader /></div>;
+
+  const t = data?.totals || {};
+  const commissions = data?.commissions || [];
+
+  const statCards = [
+    { label: "Aujourd'hui",    value: t.today,      color: C.blue,  bg: C.blueL,  icon: "📅" },
+    { label: "Cette semaine",  value: t.this_week,  color: C.green, bg: C.greenL, icon: "📆" },
+    { label: "Ce mois",        value: t.this_month, color: C.gold,  bg: C.goldL,  icon: "🗓️" },
+    { label: "Total gagné",    value: t.total_earned, color: "#7C3AED", bg: "#F5F3FF", icon: "💰" },
+  ];
+
+  const rules = [
+    { cas: "Cas 1", desc: "DIASPORA recrute PAYS",      recruteur: "0%", ville: "0%", pays: "0%",   diaspora: "12%", dirigeante: "5%" },
+    { cas: "Cas 2", desc: "PAYS recrute VILLE",         recruteur: "0%", ville: "0%", pays: "12%",  diaspora: "10%", dirigeante: "5%" },
+    { cas: "Cas 3", desc: "RECRUTEUR recrute CLIENT",   recruteur: "12%",ville: "10%",pays: "10%",  diaspora: "10%", dirigeante: "5%" },
+  ];
+
+  return (
+    <div style={{ padding: "24px 20px", maxWidth: 960, margin: "0 auto" }}>
+      <PageHeader title="Mes gains" subtitle="Commissions et bonus réseau" />
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#F1F5F9", borderRadius: 10, padding: 4, width: "fit-content" }}>
+        {[
+          { key: "overview", label: "Vue d'ensemble" },
+          { key: "history",  label: "Historique" },
+          { key: "rules",    label: "Règles MLM" },
+        ].map(t2 => (
+          <button key={t2.key} onClick={() => setTab(t2.key)} style={{
+            padding: "6px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", transition: "all 0.15s",
+            background: tab === t2.key ? "#fff" : "transparent",
+            color: tab === t2.key ? C.dark : C.slate,
+            boxShadow: tab === t2.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+          }}>
+            {t2.label}
+          </button>
         ))}
       </div>
 
-      {/* Liste filleuls */}
-      {referrals.length > 0 && (
+      {/* Vue d'ensemble */}
+      {tab === "overview" && (
         <>
-          <p style={{ fontSize:13, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:.8, margin:"0 0 10px" }}>Mes filleuls directs</p>
-          {referrals.map(r => {
-            const roleCfg = ROLE_CFG[r.referred_role] || ROLE_CFG.RECRUTEUR;
-            return (
-              <div key={r.id} style={S.card}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <div>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                      <p style={{ fontWeight:700, color:"#0F2942", margin:0 }}>{r.referred_name}</p>
-                      <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:20, background:roleCfg.bg, color:roleCfg.color }}>{roleCfg.icon} {roleCfg.label}</span>
-                    </div>
-                    <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>🌍 {r.country} · {fmtDate(r.joined_at)}</p>
-                    <p style={{ fontSize:12, color:"#64748B", margin:"3px 0 0" }}>{r.beneficiary_count} bénéficiaire(s)</p>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <p style={{ fontWeight:800, color:"#059669", fontSize:14, margin:0 }}>{fmt(r.commission_earned)}</p>
-                    <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>commissions</p>
-                  </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
+            {statCards.map(s => (
+              <Card key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}22` }}>
+                <p style={{ margin: 0, fontSize: 20 }}>{s.icon}</p>
+                <p style={{ margin: "8px 0 4px", fontSize: 22, fontWeight: 800, color: s.color }}>{fmt(s.value)} €</p>
+                <p style={{ margin: 0, fontSize: 12, color: C.slate, fontWeight: 600 }}>{s.label}</p>
+              </Card>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Card>
+              <p style={{ margin: "0 0 12px", fontWeight: 700, color: C.dark }}>Statut des commissions</p>
+              {[
+                { label: "En attente",  value: t.pending,   color: C.gold  },
+                { label: "Validées",    value: t.validated, color: C.blue  },
+                { label: "Payées",      value: t.paid,      color: C.green },
+              ].map(s => (
+                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 13, color: C.slate }}>{s.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{fmt(s.value)} €</span>
                 </div>
+              ))}
+            </Card>
+            <Card>
+              <p style={{ margin: "0 0 12px", fontWeight: 700, color: C.dark }}>Type de commissions</p>
+              {[
+                { label: "Ventes directes", value: t.direct_count,  icon: "🎯" },
+                { label: "Réseau",          value: t.network_count, icon: "🌐" },
+              ].map(s => (
+                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 13, color: C.slate }}>{s.icon} {s.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>{s.value || 0}</span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        </>
+      )}
+
+      {/* Historique */}
+      {tab === "history" && (
+        commissions.length === 0 ? <EmptyState icon="📊" title="Aucune commission" desc="Vos commissions apparaîtront ici après vos ventes" /> :
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {commissions.map(c => (
+            <Card key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: C.dark, fontSize: 13 }}>{c.beneficiary_name || "—"}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>{c.plan} • {fmtDate(c.created_at)}</p>
               </div>
-            );
-          })}
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontWeight: 800, color: C.green, fontSize: 15 }}>+{fmt(c.amount)} €</p>
+                  <p style={{ margin: 0, fontSize: 11, color: C.slate }}>{c.rate_pct}% • {c.source === "direct" ? "Direct" : "Réseau"}</p>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                  background: c.status === "PAID" ? C.greenL : c.status === "VALIDATED" ? C.blueL : C.goldL,
+                  color: c.status === "PAID" ? C.green : c.status === "VALIDATED" ? C.blue : C.gold,
+                }}>
+                  {c.status}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Règles MLM */}
+      {tab === "rules" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {rules.map(r => (
+            <Card key={r.cas}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <span style={{ background: C.blueL, color: C.blue, padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700 }}>{r.cas}</span>
+                <span style={{ fontWeight: 700, color: C.dark, fontSize: 14 }}>{r.desc}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                {[
+                  { role: "Recruteur", value: r.recruteur },
+                  { role: "Ville",     value: r.ville },
+                  { role: "Pays",      value: r.pays },
+                  { role: "Diaspora",  value: r.diaspora },
+                  { role: "Dirigeante",value: r.dirigeante },
+                ].map(item => (
+                  <div key={item.role} style={{ textAlign: "center", padding: "10px 6px", background: C.bg, borderRadius: 8 }}>
+                    <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: item.value === "0%" ? C.slate : C.green }}>{item.value}</p>
+                    <p style={{ margin: "4px 0 0", fontSize: 10, color: C.slate, fontWeight: 600 }}>{item.role}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : PARRAINAGE
+// ═════════════════════════════════════════════════════════════
+export function DiasporaReferral() {
+  const [link, setLink]       = useState(null);
+  const [referrals, setReferrals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied]   = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      diasporaRefAPI.getLink(),
+      diasporaRefAPI.getReferrals(),
+    ]).then(([l, r]) => {
+      setLink(l.data);
+      setReferrals(r.data.referrals || []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const copy = () => {
+    navigator.clipboard.writeText(link?.link || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ padding: "24px 20px", maxWidth: 860, margin: "0 auto" }}>
+      <PageHeader title="Mon parrainage" subtitle="Recrutez et développez votre réseau" />
+
+      {loading ? <Loader /> : (
+        <>
+          <Card style={{ marginBottom: 20, background: "linear-gradient(135deg, #1B4FD8 0%, #3B82F6 100%)", border: "none" }}>
+            <p style={{ margin: "0 0 4px", color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 600 }}>MON CODE AMBASSADEUR</p>
+            <p style={{ margin: "0 0 12px", color: "#fff", fontSize: 28, fontWeight: 900, letterSpacing: "0.08em" }}>{link?.code}</p>
+            <RoleBadge role={link?.role} />
+            <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={copy} style={{
+                padding: "8px 18px", borderRadius: 8, border: "2px solid rgba(255,255,255,0.4)",
+                background: "rgba(255,255,255,0.15)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+              }}>
+                {copied ? "✅ Copié !" : "📋 Copier le lien"}
+              </button>
+              {link?.whatsapp_message && (
+                <a href={link.whatsapp_message} target="_blank" rel="noreferrer" style={{
+                  padding: "8px 18px", borderRadius: 8, border: "none",
+                  background: "#25D366", color: "#fff", fontWeight: 700, fontSize: 13,
+                  textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
+                }}>
+                  📲 Partager sur WhatsApp
+                </a>
+              )}
+            </div>
+          </Card>
+
+          <p style={{ fontWeight: 700, color: C.dark, marginBottom: 12 }}>
+            Mes filleuls directs ({referrals.length})
+          </p>
+          {referrals.length === 0 ? (
+            <EmptyState icon="👥" title="Aucun filleul" desc="Partagez votre lien pour recruter" />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {referrals.map(r => (
+                <Card key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>{r.referred_name}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{r.country} • Rejoint le {fmtDate(r.joined_at)}</p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <RoleBadge role={r.referred_role} />
+                    <span style={{ fontSize: 12 }}>
+                      <StatusDot active={r.referred_status === "ACTIVE"} />
+                      {r.referred_status === "ACTIVE" ? "Actif" : "Inactif"}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>{fmt(r.commission_earned)} €</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// MON RÉSEAU (MLM)
-// ════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+// PAGE : RÉSEAU MLM  ← NOUVELLE
+// Données : network.level1 / level2 / level3 + totals
+// ═════════════════════════════════════════════════════════════
 export function DiasporaNetwork() {
-  const [data,    setData]    = useState({ network:{ level1:[], level2:[], level3:[] }, totals:{} });
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [level,   setLevel]   = useState(1);
+  const [activeLevel, setActiveLevel] = useState(1);
 
   useEffect(() => {
-    diasporaNetAPI.getNetwork()
-      .then(r => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    diasporaNetAPI.getNetwork().then(r => setData(r.data)).finally(() => setLoading(false));
   }, []);
 
-  const { network, totals } = data;
-  const levelData = network[`level${level}`] || [];
+  if (loading) return <div style={{ padding: 24 }}><Loader /></div>;
 
-  const AMB_STATUS = {
-    ACTIVE:    { label:"Actif",    bg:"#ECFDF5", color:"#059669" },
-    PENDING:   { label:"En attente", bg:"#FFFBEB", color:"#D97706" },
-    SUSPENDED: { label:"Suspendu", bg:"#FEF2F2", color:"#DC2626" },
-  };
+  const { network = {}, totals = {} } = data || {};
+  const levels = { 1: network.level1 || [], 2: network.level2 || [], 3: network.level3 || [] };
+  const currentList = levels[activeLevel];
 
   return (
-    <div style={S.page}>
-      <h1 style={S.title}>Mon réseau 🌳</h1>
+    <div style={{ padding: "24px 20px", maxWidth: 960, margin: "0 auto" }}>
+      <PageHeader
+        title="Mon réseau"
+        subtitle={`${totals.total || 0} membre(s) au total dans votre équipe`}
+      />
 
-      {/* Totaux */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8, marginBottom:18 }}>
+      {/* Résumé total */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label:"Total",   value: totals.total || 0,   color:"#0F2942", bg:"#F1F5F9" },
-          { label:"Niv. 1",  value: totals.level1 || 0,  color:"#059669", bg:"#ECFDF5" },
-          { label:"Niv. 2",  value: totals.level2 || 0,  color:"#2563EB", bg:"#EFF6FF" },
-          { label:"Niv. 3",  value: totals.level3 || 0,  color:"#7C3AED", bg:"#F5F3FF" },
-        ].map((k,i) => (
-          <div key={i} style={{ background:k.bg, borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
-            <p style={{ fontSize:10, color:"#64748B", fontWeight:600, margin:"0 0 4px", textTransform:"uppercase", letterSpacing:.5 }}>{k.label}</p>
-            <p style={{ fontSize:20, fontWeight:900, color:k.color, margin:0 }}>{k.value}</p>
-          </div>
+          { label: "Total réseau", value: totals.total || 0,   icon: "🌐", color: C.blue,  bg: C.blueL },
+          { label: "Niveau 1",     value: totals.level1 || 0,  icon: "👤", color: C.green, bg: C.greenL },
+          { label: "Niveau 2",     value: totals.level2 || 0,  icon: "👥", color: C.gold,  bg: C.goldL },
+          { label: "Niveau 3",     value: totals.level3 || 0,  icon: "🫂", color: "#7C3AED", bg: "#F5F3FF" },
+        ].map(s => (
+          <Card key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}22`, textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: 22 }}>{s.icon}</p>
+            <p style={{ margin: "6px 0 2px", fontSize: 26, fontWeight: 900, color: s.color }}>{s.value}</p>
+            <p style={{ margin: 0, fontSize: 11, color: C.slate, fontWeight: 600 }}>{s.label}</p>
+          </Card>
         ))}
       </div>
 
-      {/* Tabs niveaux */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, background:"#F1F5F9", borderRadius:12, padding:4 }}>
-        {[1,2,3].map(l => (
-          <button key={l} onClick={() => setLevel(l)}
-            style={{ flex:1, padding:"8px 4px", borderRadius:10, border:"none", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
-              background: level===l ? "#0F2942" : "transparent", color: level===l ? "#fff" : "#64748B" }}>
-            Niveau {l} ({totals[`level${l}`] || 0})
+      {/* Sélecteur de niveau */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[1, 2, 3].map(lvl => (
+          <button key={lvl} onClick={() => setActiveLevel(lvl)} style={{
+            padding: "8px 20px", borderRadius: 8, border: `2px solid ${activeLevel === lvl ? C.blue : C.border}`,
+            background: activeLevel === lvl ? C.blue : "#fff",
+            color: activeLevel === lvl ? "#fff" : C.slate,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.15s",
+          }}>
+            Niveau {lvl} ({levels[lvl].length})
           </button>
         ))}
       </div>
 
-      {loading ? <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Chargement…</div>
-      : levelData.length === 0 ? (
-        <div style={{ ...S.card, textAlign:"center", padding:"40px 20px" }}>
-          <p style={{ fontSize:40, marginBottom:12 }}>🌱</p>
-          <p style={{ fontWeight:700, color:"#0F2942", marginBottom:4 }}>Réseau vide à ce niveau</p>
-          <p style={{ color:"#94A3B8", fontSize:13 }}>
-            {level === 1 ? "Partagez votre lien pour recruter votre premier membre" : "Vos recrues directes doivent à leur tour recruter"}
-          </p>
-        </div>
-      ) : levelData.map(m => {
-        const roleCfg = ROLE_CFG[m.role] || ROLE_CFG.RECRUTEUR;
-        const stCfg   = AMB_STATUS[m.status] || AMB_STATUS.PENDING;
-        return (
-          <div key={m.id} style={S.card}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:42, height:42, borderRadius:12, background:roleCfg.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-                {roleCfg.icon}
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:3 }}>
-                  <p style={{ fontWeight:800, color:"#0F2942", margin:0, fontSize:14 }}>{m.name}</p>
-                  <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:20, background:stCfg.bg, color:stCfg.color }}>{stCfg.label}</span>
+      {/* Liste des membres */}
+      {currentList.length === 0 ? (
+        <EmptyState
+          icon="👥"
+          title={`Aucun membre au niveau ${activeLevel}`}
+          desc={activeLevel === 1 ? "Recrutez votre premier ambassadeur" : "Ce niveau se remplira au fur et à mesure"}
+        />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {currentList.map(member => (
+            <Card key={member.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                {/* Avatar initiale */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                  background: `linear-gradient(135deg, ${C.blue}, #3B82F6)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontWeight: 900, fontSize: 16,
+                }}>
+                  {(member.name || "?")[0].toUpperCase()}
                 </div>
-                <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>
-                  🌍 {m.country} {m.city ? `· ${m.city}` : ""} · <span style={{ color:roleCfg.color, fontWeight:700 }}>{roleCfg.label}</span>
-                </p>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>{member.name}</p>
+                    <RoleBadge role={member.role} />
+                  </div>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
+                    🌍 {member.country}{member.city ? ` • ${member.city}` : ""} • Inscrit le {fmtDate(member.created_at)}
+                  </p>
+                  {/* Niveau 2 : afficher le parrain direct */}
+                  {member.parent_name && (
+                    <p style={{ margin: "2px 0 0", fontSize: 11, color: C.blue }}>↳ Via {member.parent_name}</p>
+                  )}
+                </div>
               </div>
-              <div style={{ textAlign:"right", flexShrink:0 }}>
-                <p style={{ fontSize:13, fontWeight:800, color:"#0F2942", margin:"0 0 2px" }}>{m.beneficiary_count || 0}</p>
-                <p style={{ fontSize:10, color:"#94A3B8", margin:0 }}>bénéf.</p>
-                {level === 1 && (
-                  <>
-                    <p style={{ fontSize:13, fontWeight:800, color:"#059669", margin:"4px 0 2px" }}>{m.recruited_count || 0}</p>
-                    <p style={{ fontSize:10, color:"#94A3B8", margin:0 }}>recrues</p>
-                  </>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ margin: 0, fontWeight: 800, color: C.dark, fontSize: 15 }}>{member.beneficiary_count || 0}</p>
+                  <p style={{ margin: 0, fontSize: 10, color: C.slate }}>Bénéficiaires</p>
+                </div>
+                {member.recruited_count !== undefined && (
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontWeight: 800, color: C.dark, fontSize: 15 }}>{member.recruited_count || 0}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: C.slate }}>Recrutés</p>
+                  </div>
                 )}
+                {member.total_earned !== undefined && (
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontWeight: 800, color: C.green, fontSize: 15 }}>{fmt(member.total_earned)} €</p>
+                    <p style={{ margin: 0, fontSize: 10, color: C.slate }}>Gains</p>
+                  </div>
+                )}
+                <span style={{
+                  fontSize: 11, padding: "3px 10px", borderRadius: 999, fontWeight: 700,
+                  background: member.status === "ACTIVE" ? C.greenL : C.bg,
+                  color: member.status === "ACTIVE" ? C.green : C.slate,
+                }}>
+                  <StatusDot active={member.status === "ACTIVE"} />
+                  {member.status === "ACTIVE" ? "Actif" : "Inactif"}
+                </span>
               </div>
-            </div>
-            {level === 2 && m.parent_name && (
-              <p style={{ fontSize:11, color:"#94A3B8", margin:"8px 0 0" }}>↳ Recruté par <strong style={{ color:"#0F2942" }}>{m.parent_name}</strong></p>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// CLASSEMENT
-// ════════════════════════════════════════════════════════════
-export function DiasporaLeaderboard() {
-  const [data,    setData]    = useState({ top_earners:[], top_recruiters:[], my_rank:null, period:"month" });
-  const [loading, setLoading] = useState(true);
-  const [period,  setPeriod]  = useState("month");
-  const [tab,     setTab]     = useState("earners");
-
-  useEffect(() => {
-    setLoading(true);
-    diasporaLeaderAPI.getLeaderboard(period)
-      .then(r => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [period]);
-
-  const medals = ["🥇","🥈","🥉"];
-  const list   = tab === "earners" ? data.top_earners : data.top_recruiters;
-
-  return (
-    <div style={S.page}>
-      <h1 style={S.title}>🏆 Classement</h1>
-
-      {/* Mon rang */}
-      {data.my_rank && (
-        <div style={{ background:"linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius:16, padding:"16px 18px", marginBottom:18, display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:48, height:48, borderRadius:12, background:"rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:900, color:"#fff" }}>
-            #{data.my_rank}
-          </div>
-          <div>
-            <p style={{ color:"rgba(255,255,255,.7)", fontSize:12, margin:"0 0 3px" }}>Mon classement ce {period === "month" ? "mois" : "semaine"}</p>
-            <p style={{ color:"#fff", fontWeight:800, fontSize:16, margin:0 }}>Position #{data.my_rank} sur le réseau</p>
-          </div>
+            </Card>
+          ))}
         </div>
       )}
-
-      {/* Filtre période */}
-      <div style={{ display:"flex", gap:8, marginBottom:12, background:"#F1F5F9", borderRadius:12, padding:4 }}>
-        {[{ id:"week", label:"Cette semaine" },{ id:"month", label:"Ce mois" },{ id:"all", label:"Tout temps" }].map(p => (
-          <button key={p.id} onClick={() => setPeriod(p.id)}
-            style={{ flex:1, padding:"8px 4px", borderRadius:10, border:"none", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
-              background: period===p.id ? "#0F2942" : "transparent", color: period===p.id ? "#fff" : "#64748B" }}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {[{ id:"earners", label:"💰 Top commissions" },{ id:"recruiters", label:"👥 Top recruteurs" }].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ flex:1, padding:"10px 8px", borderRadius:12, border:`2px solid ${tab===t.id ? "#0F2942" : "#E2E8F0"}`, background: tab===t.id ? "#0F2942" : "#fff", color: tab===t.id ? "#fff" : "#374151", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Chargement…</div>
-      : list.map((a, i) => {
-        const roleCfg = ROLE_CFG[a.role] || ROLE_CFG.RECRUTEUR;
-        return (
-          <div key={a.id} style={{ ...S.card, display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:36, height:36, borderRadius:10, background: i < 3 ? "#FFF7ED" : "#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center", fontSize: i < 3 ? 22 : 16, fontWeight:900, color: i < 3 ? "#D97706" : "#64748B", flexShrink:0 }}>
-              {i < 3 ? medals[i] : `#${i+1}`}
-            </div>
-            <div style={{ flex:1 }}>
-              <p style={{ fontWeight:800, color:"#0F2942", margin:"0 0 3px", fontSize:14 }}>{a.name}</p>
-              <p style={{ fontSize:12, color:"#94A3B8", margin:0 }}>🌍 {a.country} · <span style={{ color:roleCfg.color, fontWeight:700 }}>{roleCfg.label}</span></p>
-            </div>
-            <div style={{ textAlign:"right" }}>
-              <p style={{ fontWeight:900, color:"#059669", fontSize:16, margin:"0 0 2px" }}>
-                {tab === "earners" ? fmt(a.earnings) : `${a.recruits} recrues`}
-              </p>
-              <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{a.beneficiary_count} bénéf.</p>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// NOTIFICATIONS
-// ════════════════════════════════════════════════════════════
-export function DiasporaNotifications() {
-  const [notifs,  setNotifs]  = useState([]);
+// ═════════════════════════════════════════════════════════════
+// PAGE : CLASSEMENT  ← NOUVELLE
+// Données : top_earners, top_recruiters, my_rank, period
+// ═════════════════════════════════════════════════════════════
+export function DiasporaLeaderboard() {
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [unread,  setUnread]  = useState(0);
+  const [period, setPeriod]   = useState("month");
+  const [tab, setTab]         = useState("earners");
+  const me = getDiasporaData();
 
-  useEffect(() => {
-    diasporaNotifAPI.getAll()
-      .then(r => { setNotifs(r.data.notifications||[]); setUnread(r.data.unread_count||0); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-
-    // Marquer comme lues après 2s
-    const t = setTimeout(() => diasporaNotifAPI.markRead().catch(() => {}), 2000);
-    return () => clearTimeout(t);
+  const load = useCallback((p) => {
+    setLoading(true);
+    diasporaLeaderAPI.getLeaderboard(p).then(r => setData(r.data)).finally(() => setLoading(false));
   }, []);
 
-  const NOTIF_ICONS = {
-    new_sale:      { icon:"💳", bg:"#ECFDF5", color:"#059669" },
-    new_referral:  { icon:"👥", bg:"#EFF6FF", color:"#2563EB" },
-    commission:    { icon:"💰", bg:"#FFFBEB", color:"#D97706" },
-    challenge:     { icon:"🏆", bg:"#F5F3FF", color:"#7C3AED" },
-    welcome:       { icon:"👋", bg:"#ECFEFF", color:"#0891B2" },
+  useEffect(() => { load(period); }, [period, load]);
+
+  const periodLabels = { month: "Ce mois", week: "Cette semaine", all: "Tout temps" };
+  const medals = ["🥇", "🥈", "🥉"];
+
+  return (
+    <div style={{ padding: "24px 20px", maxWidth: 860, margin: "0 auto" }}>
+      <PageHeader
+        title="🏆 Classement"
+        subtitle="Compétition saine entre ambassadeurs"
+      />
+
+      {/* Mon rang */}
+      {data?.my_rank && (
+        <Card style={{ marginBottom: 20, background: "linear-gradient(135deg, #D97706, #F59E0B)", border: "none" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <p style={{ margin: 0, color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: 600 }}>VOTRE POSITION</p>
+              <p style={{ margin: "4px 0 0", color: "#fff", fontSize: 36, fontWeight: 900 }}>#{data.my_rank}</p>
+              <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.8)", fontSize: 13 }}>{periodLabels[period]}</p>
+            </div>
+            <div style={{ fontSize: 64, opacity: 0.4 }}>🏆</div>
+          </div>
+        </Card>
+      )}
+
+      {/* Filtres période */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {Object.entries(periodLabels).map(([key, label]) => (
+          <button key={key} onClick={() => setPeriod(key)} style={{
+            padding: "7px 18px", borderRadius: 8, border: `2px solid ${period === key ? C.gold : C.border}`,
+            background: period === key ? C.goldL : "#fff",
+            color: period === key ? C.gold : C.slate,
+            fontWeight: 700, fontSize: 12, cursor: "pointer", transition: "all 0.15s",
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabs gains / recruteurs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#F1F5F9", borderRadius: 10, padding: 4, width: "fit-content" }}>
+        {[
+          { key: "earners",    label: "💰 Top Gains" },
+          { key: "recruiters", label: "👥 Top Recruteurs" },
+        ].map(t2 => (
+          <button key={t2.key} onClick={() => setTab(t2.key)} style={{
+            padding: "6px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", transition: "all 0.15s",
+            background: tab === t2.key ? "#fff" : "transparent",
+            color: tab === t2.key ? C.dark : C.slate,
+            boxShadow: tab === t2.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+          }}>
+            {t2.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <Loader /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(tab === "earners" ? data?.top_earners : data?.top_recruiters || []).map((amb, i) => {
+            const isMe = amb.id === me?.id;
+            return (
+              <Card key={amb.id} style={{
+                display: "flex", alignItems: "center", gap: 16,
+                border: isMe ? `2px solid ${C.gold}` : `1px solid ${C.border}`,
+                background: isMe ? C.goldL : "#fff",
+              }}>
+                {/* Rang */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                  background: i < 3 ? "linear-gradient(135deg, #D97706, #F59E0B)" : C.bg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: i < 3 ? 20 : 15, fontWeight: 900,
+                  color: i < 3 ? "#fff" : C.slate,
+                }}>
+                  {i < 3 ? medals[i] : `#${i + 1}`}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>
+                      {amb.name} {isMe && <span style={{ color: C.gold, fontSize: 11 }}>← vous</span>}
+                    </p>
+                    <RoleBadge role={amb.role} />
+                  </div>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>🌍 {amb.country}</p>
+                </div>
+
+                {/* Score */}
+                <div style={{ textAlign: "right" }}>
+                  {tab === "earners" ? (
+                    <>
+                      <p style={{ margin: 0, fontWeight: 900, color: C.green, fontSize: 18 }}>{fmt(amb.earnings)} €</p>
+                      <p style={{ margin: 0, fontSize: 11, color: C.slate }}>{amb.beneficiary_count} bénéficiaires</p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ margin: 0, fontWeight: 900, color: C.blue, fontSize: 18 }}>{amb.recruits}</p>
+                      <p style={{ margin: 0, fontSize: 11, color: C.slate }}>recrutés</p>
+                    </>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+
+          {(tab === "earners" ? data?.top_earners : data?.top_recruiters || []).length === 0 && (
+            <EmptyState icon="🏆" title="Pas encore de classement" desc="Les données apparaîtront après les premières ventes" />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE : NOTIFICATIONS  ← NOUVELLE
+// Données : notifications[], unread_count
+// ═════════════════════════════════════════════════════════════
+export function DiasporaNotifications() {
+  const [notifs, setNotifs]   = useState([]);
+  const [unread, setUnread]   = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
+
+  const load = useCallback(() => {
+    diasporaNotifAPI.getAll().then(r => {
+      setNotifs(r.data.notifications || []);
+      setUnread(r.data.unread_count || 0);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const markAllRead = async () => {
+    setMarking(true);
+    try {
+      await diasporaNotifAPI.markRead();
+      setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+      setUnread(0);
+    } finally { setMarking(false); }
+  };
+
+  const typeConfig = {
+    NEW_SALE:          { icon: "🎉", color: C.green,    bg: C.greenL,  label: "Vente confirmée" },
+    NEW_REFERRAL:      { icon: "👥", color: C.blue,     bg: C.blueL,   label: "Nouveau filleul" },
+    COMMISSION_EARNED: { icon: "💰", color: C.gold,     bg: C.goldL,   label: "Commission" },
+    COMMISSION_PAID:   { icon: "✅", color: C.green,    bg: C.greenL,  label: "Paiement reçu" },
+    CHALLENGE_REACHED: { icon: "🏆", color: "#7C3AED",  bg: "#F5F3FF", label: "Challenge atteint" },
+    NETWORK_ACTIVITY:  { icon: "🌐", color: C.blue,     bg: C.blueL,   label: "Réseau" },
+    SYSTEM:            { icon: "⚙️", color: C.slate,    bg: C.bg,      label: "Système" },
   };
 
   return (
-    <div style={S.page}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-        <h1 style={{ ...S.title, marginBottom:0, flex:1 }}>Notifications 🔔</h1>
-        {unread > 0 && (
-          <span style={{ background:"#DC2626", color:"#fff", fontSize:11, fontWeight:800, padding:"3px 9px", borderRadius:20 }}>{unread} nouvelles</span>
-        )}
-      </div>
+    <div style={{ padding: "24px 20px", maxWidth: 760, margin: "0 auto" }}>
+      <PageHeader
+        title="Notifications"
+        subtitle={unread > 0 ? `${unread} non lue(s)` : "Tout est à jour"}
+        action={
+          unread > 0 && (
+            <Btn variant="outline" onClick={markAllRead} disabled={marking}>
+              {marking ? "…" : "✓ Tout marquer comme lu"}
+            </Btn>
+          )
+        }
+      />
 
-      {loading ? <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Chargement…</div>
-      : notifs.length === 0 ? (
-        <div style={{ ...S.card, textAlign:"center", padding:"40px 20px" }}>
-          <p style={{ fontSize:40, marginBottom:12 }}>🔔</p>
-          <p style={{ fontWeight:700, color:"#0F2942" }}>Aucune notification</p>
-          <p style={{ color:"#94A3B8", fontSize:13 }}>Elles apparaîtront ici dès qu'il y aura de l'activité</p>
+      {loading ? <Loader /> : notifs.length === 0 ? (
+        <EmptyState icon="🔔" title="Aucune notification" desc="Vous serez notifié de vos ventes, commissions et filleuls ici" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {notifs.map(n => {
+            const cfg = typeConfig[n.type] || typeConfig.SYSTEM;
+            return (
+              <div key={n.id} style={{
+                display: "flex", gap: 14, padding: "14px 16px",
+                borderRadius: 12, background: n.read ? "#fff" : cfg.bg,
+                border: `1px solid ${n.read ? C.border : cfg.color + "33"}`,
+                transition: "background 0.3s",
+              }}>
+                {/* Icône */}
+                <div style={{
+                  width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                  background: cfg.bg, border: `2px solid ${cfg.color}22`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                }}>
+                  {cfg.icon}
+                </div>
+
+                {/* Contenu */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <p style={{ margin: 0, fontWeight: n.read ? 600 : 800, color: C.dark, fontSize: 14 }}>{n.title}</p>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: "1px 7px", borderRadius: 999 }}>
+                      {cfg.label}
+                    </span>
+                    {!n.read && (
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.color, display: "inline-block", flexShrink: 0 }} />
+                    )}
+                  </div>
+                  <p style={{ margin: "2px 0 4px", fontSize: 13, color: C.slate, lineHeight: 1.4 }}>{n.body}</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 11, color: C.slate }}>{fmtDate(n.created_at)}</p>
+                    {n.amount && (
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.green }}>+{fmt(n.amount)} €</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : notifs.map(n => {
-        const cfg = NOTIF_ICONS[n.type] || NOTIF_ICONS.welcome;
-        return (
-          <div key={n.id} style={{ ...S.card, display:"flex", alignItems:"flex-start", gap:12, opacity: n.read ? 0.7 : 1 }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:cfg.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-              {cfg.icon}
-            </div>
-            <div style={{ flex:1 }}>
-              <p style={{ fontWeight: n.read ? 600 : 800, color:"#0F2942", margin:"0 0 3px", fontSize:14 }}>{n.title || n.type}</p>
-              <p style={{ fontSize:13, color:"#64748B", margin:"0 0 4px" }}>{n.message}</p>
-              <p style={{ fontSize:11, color:"#94A3B8", margin:0 }}>{fmtDate(n.created_at)}</p>
-            </div>
-            {!n.read && <div style={{ width:8, height:8, borderRadius:"50%", background:"#2563EB", marginTop:6, flexShrink:0 }} />}
-          </div>
-        );
-      })}
+      )}
     </div>
   );
 }
