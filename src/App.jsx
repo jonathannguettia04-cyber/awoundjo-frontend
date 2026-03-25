@@ -23,6 +23,9 @@ const AdminProviders       = lazy(() => import("./pages/AdminProviders"));
 // ── Pages ADMIN — vue ambassadeurs diaspora ──────────────────
 const AdminDiaspora        = lazy(() => import("./pages/AdminDiaspora"));
 
+// ── Pages ADMIN — vue ambassadeurs fédération ────────────────
+const AdminFederation      = lazy(() => import("./pages/AdminFederation"));
+
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin          = lazy(() => import("./pages/client/ClientLogin"));
 const ClientLayout         = lazy(() => import("./pages/client/ClientLayout"));
@@ -48,12 +51,12 @@ const ProviderBilling      = lazy(() => import("./pages/provider/ProviderBilling
 const DiasporaAuth         = lazy(() => import("./pages/diaspora/DiasporaAuth"));
 const DiasporaDashboard    = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
 
-// CORRECTION : DiasporaLayout exporté nommé depuis DiasporaDashboard
+// Export nommé DiasporaLayout depuis DiasporaDashboard
 const DiasporaLayout       = lazy(() =>
   import("./pages/diaspora/DiasporaDashboard").then((m) => ({ default: m.DiasporaLayout }))
 );
 
-// NOUVEAU : page profil ambassadeur (corrige le bug onglet Profil → admin commercial)
+// Page profil ambassadeur diaspora
 const DiasporaProfile      = lazy(() => import("./pages/diaspora/DiasporaProfile"));
 
 const diasporaPage = (name) =>
@@ -70,6 +73,13 @@ const DiasporaReferral       = diasporaPage("DiasporaReferral");
 const DiasporaNetwork        = diasporaPage("DiasporaNetwork");
 const DiasporaLeaderboard    = diasporaPage("DiasporaLeaderboard");
 const DiasporaNotifications  = diasporaPage("DiasporaNotifications");
+
+// ── Pages FÉDÉRATION ─────────────────────────────────────────
+// Export nommé FederationLayout + export default FederationDashboard
+const FederationLayout     = lazy(() =>
+  import("./pages/federation/FederationDashboard").then((m) => ({ default: m.FederationLayout }))
+);
+const FederationDashboard  = lazy(() => import("./pages/federation/FederationDashboard"));
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
@@ -102,12 +112,11 @@ function ClientRoute({ children }) {
 
 function ProviderRoute({ children }) {
   const token = localStorage.getItem("provider_token");
-  if (!token) return <Navigate to="/etablissement" replace />;
+  if (!token) return <Navigate to="/etablissement/login" replace />;
   return children;
 }
 
-// Vérifier que le token existe ET n'est pas expiré
-// avant de laisser entrer — évite le flash dashboard → login
+// Vérifie que le token diaspora existe ET n'est pas expiré
 function DiasporaGuard({ children }) {
   if (!isDiasporaTokenValid()) {
     localStorage.removeItem("diaspora_token");
@@ -124,7 +133,8 @@ export default function App() {
   const isClientPage   = path.startsWith("/client");
   const isProviderPage = path.startsWith("/etablissement");
   const isDiasporaPage = path.startsWith("/diaspora");
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage;
+  const isFederationPage = path.startsWith("/federation");
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isFederationPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -167,17 +177,13 @@ export default function App() {
             } />
 
             {/* ── ADMIN — Vue ambassadeurs diaspora ─────── */}
-            {/* NOUVEAU : accessible depuis la navbar admin commercial */}
             <Route path="/admin/diaspora" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminDiaspora /></ProtectedRoute>
-              
             } />
 
-            {/* ── ADMIN — Vue ambassadeurs federent ─────── */}
-            {/* NOUVEAU : accessible depuis la navbar admin commercial */}
+            {/* ── ADMIN — Vue ambassadeurs fédération ────── */}
             <Route path="/admin/federation" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminFederation /></ProtectedRoute>
-              
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}
@@ -195,8 +201,10 @@ export default function App() {
             </Route>
 
             {/* ── ÉTABLISSEMENT ───────────────────────────── */}
-            <Route path="/etablissement" element={<EtablissementLogin />} />
+            {/* Login sur un path distinct pour éviter le conflit */}
+            <Route path="/etablissement/login" element={<EtablissementLogin />} />
             <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
+              <Route index element={<Navigate to="/etablissement/dashboard" replace />} />
               <Route path="dashboard"         element={<ProviderDashboard />} />
               <Route path="scan"              element={<ProviderScan />} />
               <Route path="search"            element={<ProviderScan />} />
@@ -223,14 +231,15 @@ export default function App() {
               <Route path="network"           element={<DiasporaNetwork />} />
               <Route path="leaderboard"       element={<DiasporaLeaderboard />} />
               <Route path="notifications"     element={<DiasporaNotifications />} />
-              {/* CORRECTION : profil pointe désormais sur DiasporaProfile (plus sur l'admin commercial) */}
               <Route path="profile"           element={<DiasporaProfile />} />
             </Route>
 
-            {/*── FEDERENT ─────────────────────────────────── */}
-            <Route path="/federation" element={<FederationLayout />}>
-            <Route path="dashboard" element={<FederationDashboard />} />
-             </Route>
+            {/* ── FÉDÉRATION ──────────────────────────────── */}
+            {/* Pas de login séparé : DiasporaAuth gère les deux réseaux */}
+            <Route path="/federation" element={<DiasporaGuard><FederationLayout /></DiasporaGuard>}>
+              <Route index          element={<Navigate to="/federation/dashboard" replace />} />
+              <Route path="dashboard" element={<FederationDashboard />} />
+            </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />
