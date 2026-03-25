@@ -9,20 +9,30 @@ const diasporaApi = axios.create({
   timeout: 20000,
 });
 
+// ── Intercepteur requête : injecte le token ──────────────────
 diasporaApi.interceptors.request.use((config) => {
   const token = localStorage.getItem("diaspora_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
+// ── Intercepteur réponse : gère les 401 proprement ──────────
+// CORRECTION : on ne redirige vers /login QUE si on n'est pas
+// déjà sur /diaspora/login (évite la boucle infinie)
 diasporaApi.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const isLoginPage = window.location.pathname === "/diaspora/login";
+
+    if (status === 401 && !isLoginPage) {
+      // Nettoyer le storage
       localStorage.removeItem("diaspora_token");
       localStorage.removeItem("diaspora_data");
-      window.location.href = "/diaspora/login";
+      // Rediriger une seule fois
+      window.location.replace("/diaspora/login");
     }
+
     return Promise.reject(error);
   }
 );
@@ -30,9 +40,9 @@ diasporaApi.interceptors.response.use(
 // ── Auth ─────────────────────────────────────────────────────
 export const diasporaAuthAPI = {
   register: (data) => diasporaApi.post("/register", data),
-  login:    (data) => diasporaApi.post("/login", data),
+  login:    (data) => diasporaApi.post("/login",    data),
   me:       ()     => diasporaApi.get("/me"),
-  update:   (data) => diasporaApi.put("/me", data),
+  update:   (data) => diasporaApi.put("/me",        data),
 };
 
 // ── Dashboard ────────────────────────────────────────────────
@@ -42,14 +52,14 @@ export const diasporaDashAPI = {
 
 // ── Bénéficiaires ────────────────────────────────────────────
 export const diasporaBeneAPI = {
-  create:  (data) => diasporaApi.post("/beneficiaries", data),
-  getAll:  (p)    => diasporaApi.get("/beneficiaries", { params: p }),
+  create:  (data) => diasporaApi.post("/beneficiaries",     data),
+  getAll:  (p)    => diasporaApi.get("/beneficiaries",      { params: p }),
   getById: (id)   => diasporaApi.get(`/beneficiaries/${id}`),
 };
 
 // ── Paiements ────────────────────────────────────────────────
 export const diasporaPayAPI = {
-  initiate: (data) => diasporaApi.post("/payments", data),
+  initiate: (data) => diasporaApi.post("/payments",         data),
   confirm:  (data) => diasporaApi.post("/payments/confirm", data),
   getAll:   ()     => diasporaApi.get("/payments"),
 };
@@ -61,8 +71,8 @@ export const diasporaCommAPI = {
 
 // ── Parrainage ───────────────────────────────────────────────
 export const diasporaRefAPI = {
-  getLink:     () => diasporaApi.get("/referral-link"),
-  getReferrals:() => diasporaApi.get("/referrals"),
+  getLink:      () => diasporaApi.get("/referral-link"),
+  getReferrals: () => diasporaApi.get("/referrals"),
 };
 
 // ── Réseau MLM ───────────────────────────────────────────────
@@ -72,7 +82,8 @@ export const diasporaNetAPI = {
 
 // ── Classement ───────────────────────────────────────────────
 export const diasporaLeaderAPI = {
-  getLeaderboard: (period = "month") => diasporaApi.get("/leaderboard", { params: { period } }),
+  getLeaderboard: (period = "month") =>
+    diasporaApi.get("/leaderboard", { params: { period } }),
 };
 
 // ── Notifications ────────────────────────────────────────────
@@ -90,12 +101,26 @@ export function diasporaLogin(token, data) {
 export function diasporaLogout() {
   localStorage.removeItem("diaspora_token");
   localStorage.removeItem("diaspora_data");
-  window.location.href = "/diaspora/login";
+  window.location.replace("/diaspora/login");
 }
 
 export function getDiasporaData() {
   try { return JSON.parse(localStorage.getItem("diaspora_data")); }
   catch { return null; }
+}
+
+// Vérifier si le token existe et n'est pas expiré côté client
+export function isDiasporaTokenValid() {
+  const token = localStorage.getItem("diaspora_token");
+  if (!token) return false;
+  try {
+    // Décoder sans vérifier la signature (juste pour lire exp)
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp > now;
+  } catch {
+    return false;
+  }
 }
 
 export default diasporaApi;

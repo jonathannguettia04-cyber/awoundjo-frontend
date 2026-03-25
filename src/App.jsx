@@ -2,11 +2,12 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { isDiasporaTokenValid } from "./diasporaApi";
 
-// ── Composants NON lazy (toujours affichés) ──────────────────
+// ── Composants NON lazy ──────────────────────────────────────
 import Navbar from "./components/Navbar";
 
-// ── Pages AGENT — lazy ───────────────────────────────────────
+// ── Pages AGENT ──────────────────────────────────────────────
 const Login                = lazy(() => import("./pages/Login"));
 const Dashboard            = lazy(() => import("./pages/Dashboard"));
 const AdminHub             = lazy(() => import("./pages/AdminHub"));
@@ -19,7 +20,7 @@ const Groups               = lazy(() => import("./pages/Groups"));
 const HealthcareAdmin      = lazy(() => import("./pages/HealthcareAdmin"));
 const AdminProviders       = lazy(() => import("./pages/AdminProviders"));
 
-// ── Pages CLIENT — lazy ──────────────────────────────────────
+// ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin          = lazy(() => import("./pages/client/ClientLogin"));
 const ClientLayout         = lazy(() => import("./pages/client/ClientLayout"));
 const ClientDashboard      = lazy(() => import("./pages/client/ClientDashboard"));
@@ -31,7 +32,7 @@ const ClientTeleconsult    = lazy(() => import("./pages/client/ClientTeleconsult
 const ClientReseau         = lazy(() => import("./pages/client/ClientReseau"));
 const ClientProfil         = lazy(() => import("./pages/client/ClientProfil"));
 
-// ── Pages ÉTABLISSEMENT — lazy ───────────────────────────────
+// ── Pages ÉTABLISSEMENT ──────────────────────────────────────
 const EtablissementLogin   = lazy(() => import("./pages/provider/EtablissementLogin"));
 const ProviderLayout       = lazy(() => import("./pages/provider/ProviderLayout"));
 const ProviderDashboard    = lazy(() => import("./pages/provider/ProviderDashboard"));
@@ -40,15 +41,17 @@ const ProviderServices     = lazy(() => import("./pages/provider/ProviderService
 const ProviderMedical      = lazy(() => import("./pages/provider/ProviderMedical"));
 const ProviderBilling      = lazy(() => import("./pages/provider/ProviderBilling"));
 
-// ── Pages AMBASSADEUR DIASPORA — lazy ────────────────────────
-const DiasporaAuth           = lazy(() => import("./pages/diaspora/DiasporaAuth"));
-const DiasporaDashboard      = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
-const DiasporaLayout         = lazy(() =>
+// ── Pages DIASPORA ───────────────────────────────────────────
+const DiasporaAuth         = lazy(() => import("./pages/diaspora/DiasporaAuth"));
+const DiasporaDashboard    = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
+const DiasporaLayout       = lazy(() =>
   import("./pages/diaspora/DiasporaDashboard").then((m) => ({ default: m.DiasporaLayout }))
 );
 
 const diasporaPage = (name) =>
-  lazy(() => import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m[name] })));
+  lazy(() =>
+    import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m[name] }))
+  );
 
 const DiasporaBeneficiaries  = diasporaPage("DiasporaBeneficiaries");
 const DiasporaNewBeneficiary = diasporaPage("DiasporaNewBeneficiary");
@@ -60,7 +63,7 @@ const DiasporaNetwork        = diasporaPage("DiasporaNetwork");
 const DiasporaLeaderboard    = diasporaPage("DiasporaLeaderboard");
 const DiasporaNotifications  = diasporaPage("DiasporaNotifications");
 
-// ── Fallback de chargement ───────────────────────────────────
+// ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -95,9 +98,15 @@ function ProviderRoute({ children }) {
   return children;
 }
 
+// CORRECTION : vérifier que le token existe ET n'est pas expiré
+// avant de laisser entrer — évite le flash dashboard → login
 function DiasporaGuard({ children }) {
-  const token = localStorage.getItem("diaspora_token");
-  if (!token) return <Navigate to="/diaspora/login" replace />;
+  if (!isDiasporaTokenValid()) {
+    // Nettoyer au cas où le token existerait mais soit expiré
+    localStorage.removeItem("diaspora_token");
+    localStorage.removeItem("diaspora_data");
+    return <Navigate to="/diaspora/login" replace />;
+  }
   return children;
 }
 
@@ -117,11 +126,11 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
 
-            {/* ── Authentification ────────────────────────── */}
+            {/* ── Auth ────────────────────────────────────── */}
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
             <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
 
-            {/* ── Routes AGENT ────────────────────────────── */}
+            {/* ── AGENT ───────────────────────────────────── */}
             <Route path="/" element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
             } />
@@ -132,25 +141,25 @@ export default function App() {
               <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
             } />
             <Route path="/payments" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
             } />
             <Route path="/commissions" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
             } />
             <Route path="/groups" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
             } />
             <Route path="/agents" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
             } />
             <Route path="/healthcare" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
-            {/* ── Routes CLIENT ───────────────────────────── */}
+            {/* ── CLIENT ──────────────────────────────────── */}
             <Route path="/client/login" element={<ClientLogin />} />
             <Route path="/client" element={<ClientRoute><ClientLayout /></ClientRoute>}>
               <Route index element={<Navigate to="/client/dashboard" replace />} />
@@ -164,7 +173,7 @@ export default function App() {
               <Route path="profil"           element={<ClientProfil />} />
             </Route>
 
-            {/* ── Routes ÉTABLISSEMENT ────────────────────── */}
+            {/* ── ÉTABLISSEMENT ───────────────────────────── */}
             <Route path="/etablissement" element={<EtablissementLogin />} />
             <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
               <Route path="dashboard"         element={<ProviderDashboard />} />
@@ -179,7 +188,7 @@ export default function App() {
               <Route path="profile"           element={<ProviderDashboard />} />
             </Route>
 
-            {/* ── Routes AMBASSADEUR DIASPORA ─────────────── */}
+            {/* ── DIASPORA ────────────────────────────────── */}
             <Route path="/diaspora/login" element={<DiasporaAuth />} />
             <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
               <Route index                    element={<Navigate to="/diaspora/dashboard" replace />} />
@@ -195,7 +204,7 @@ export default function App() {
               <Route path="notifications"     element={<DiasporaNotifications />} />
             </Route>
 
-            {/* ── Fallback ────────────────────────────────── */}
+            {/* ── Fallback ─────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />
 
           </Routes>
