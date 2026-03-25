@@ -170,6 +170,14 @@ export default function App() {
             {/* NOUVEAU : accessible depuis la navbar admin commercial */}
             <Route path="/admin/diaspora" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminDiaspora /></ProtectedRoute>
+              
+            } />
+
+            {/* ── ADMIN — Vue ambassadeurs federent ─────── */}
+            {/* NOUVEAU : accessible depuis la navbar admin commercial */}
+            <Route path="/admin/federation" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminFederation /></ProtectedRoute>
+              
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}
@@ -218,6 +226,11 @@ export default function App() {
               {/* CORRECTION : profil pointe désormais sur DiasporaProfile (plus sur l'admin commercial) */}
               <Route path="profile"           element={<DiasporaProfile />} />
             </Route>
+
+            {/*── FEDERENT ─────────────────────────────────── */}
+            <Route path="/federation" element={<FederationLayout />}>
+            <Route path="dashboard" element={<FederationDashboard />} />
+             </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />
