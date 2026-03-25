@@ -96,6 +96,13 @@ export const diasporaDashAPI = {
   getStats: () => api.get("/dashboard"),
 };
 
+// ── Profil ambassadeur ────────────────────────────────────────
+
+export const diasporaProfileAPI = {
+  getMe:  ()     => api.get("/me"),
+  update: (data) => api.put("/me", data),
+};
+
 // ── Bénéficiaires ─────────────────────────────────────────────
 
 export const diasporaBeneAPI = {
