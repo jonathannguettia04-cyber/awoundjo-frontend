@@ -46,24 +46,19 @@ const DiasporaDashboard      = lazy(() => import("./pages/diaspora/DiasporaDashb
 const DiasporaLayout         = lazy(() =>
   import("./pages/diaspora/DiasporaDashboard").then((m) => ({ default: m.DiasporaLayout }))
 );
-const DiasporaBeneficiaries  = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaBeneficiaries }))
-);
-const DiasporaNewBeneficiary = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaNewBeneficiary }))
-);
-const DiasporaPayments       = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaPayments }))
-);
-const DiasporaNewPayment     = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaNewPayment }))
-);
-const DiasporaEarnings       = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaEarnings }))
-);
-const DiasporaReferral       = lazy(() =>
-  import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m.DiasporaReferral }))
-);
+
+const diasporaPage = (name) =>
+  lazy(() => import("./pages/diaspora/DiasporaPages").then((m) => ({ default: m[name] })));
+
+const DiasporaBeneficiaries  = diasporaPage("DiasporaBeneficiaries");
+const DiasporaNewBeneficiary = diasporaPage("DiasporaNewBeneficiary");
+const DiasporaPayments       = diasporaPage("DiasporaPayments");
+const DiasporaNewPayment     = diasporaPage("DiasporaNewPayment");
+const DiasporaEarnings       = diasporaPage("DiasporaEarnings");
+const DiasporaReferral       = diasporaPage("DiasporaReferral");
+const DiasporaNetwork        = diasporaPage("DiasporaNetwork");
+const DiasporaLeaderboard    = diasporaPage("DiasporaLeaderboard");
+const DiasporaNotifications  = diasporaPage("DiasporaNotifications");
 
 // ── Fallback de chargement ───────────────────────────────────
 function PageLoader() {
@@ -195,6 +190,9 @@ export default function App() {
               <Route path="payments/new"      element={<DiasporaNewPayment />} />
               <Route path="earnings"          element={<DiasporaEarnings />} />
               <Route path="referral"          element={<DiasporaReferral />} />
+              <Route path="network"           element={<DiasporaNetwork />} />
+              <Route path="leaderboard"       element={<DiasporaLeaderboard />} />
+              <Route path="notifications"     element={<DiasporaNotifications />} />
             </Route>
 
             {/* ── Fallback ────────────────────────────────── */}

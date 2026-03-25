@@ -27,6 +27,7 @@ diasporaApi.interceptors.response.use(
   }
 );
 
+// ── Auth ─────────────────────────────────────────────────────
 export const diasporaAuthAPI = {
   register: (data) => diasporaApi.post("/register", data),
   login:    (data) => diasporaApi.post("/login", data),
@@ -34,41 +35,64 @@ export const diasporaAuthAPI = {
   update:   (data) => diasporaApi.put("/me", data),
 };
 
+// ── Dashboard ────────────────────────────────────────────────
 export const diasporaDashAPI = {
   stats: () => diasporaApi.get("/dashboard"),
 };
 
+// ── Bénéficiaires ────────────────────────────────────────────
 export const diasporaBeneAPI = {
   create:  (data) => diasporaApi.post("/beneficiaries", data),
   getAll:  (p)    => diasporaApi.get("/beneficiaries", { params: p }),
   getById: (id)   => diasporaApi.get(`/beneficiaries/${id}`),
 };
 
+// ── Paiements ────────────────────────────────────────────────
 export const diasporaPayAPI = {
   initiate: (data) => diasporaApi.post("/payments", data),
   confirm:  (data) => diasporaApi.post("/payments/confirm", data),
   getAll:   ()     => diasporaApi.get("/payments"),
 };
 
+// ── Commissions ──────────────────────────────────────────────
 export const diasporaCommAPI = {
   getAll: () => diasporaApi.get("/commissions"),
 };
 
+// ── Parrainage ───────────────────────────────────────────────
 export const diasporaRefAPI = {
-  getLink:    () => diasporaApi.get("/referral-link"),
-  getReferrals: () => diasporaApi.get("/referrals"),
+  getLink:     () => diasporaApi.get("/referral-link"),
+  getReferrals:() => diasporaApi.get("/referrals"),
 };
 
-// Helpers
+// ── Réseau MLM ───────────────────────────────────────────────
+export const diasporaNetAPI = {
+  getNetwork: () => diasporaApi.get("/network"),
+};
+
+// ── Classement ───────────────────────────────────────────────
+export const diasporaLeaderAPI = {
+  getLeaderboard: (period = "month") => diasporaApi.get("/leaderboard", { params: { period } }),
+};
+
+// ── Notifications ────────────────────────────────────────────
+export const diasporaNotifAPI = {
+  getAll:   () => diasporaApi.get("/notifications"),
+  markRead: () => diasporaApi.put("/notifications/read"),
+};
+
+// ── Helpers session ──────────────────────────────────────────
 export function diasporaLogin(token, data) {
   localStorage.setItem("diaspora_token", token);
   localStorage.setItem("diaspora_data",  JSON.stringify(data));
 }
+
 export function diasporaLogout() {
   localStorage.removeItem("diaspora_token");
   localStorage.removeItem("diaspora_data");
   window.location.href = "/diaspora/login";
 }
+
 export function getDiasporaData() {
   try { return JSON.parse(localStorage.getItem("diaspora_data")); }
   catch { return null; }
