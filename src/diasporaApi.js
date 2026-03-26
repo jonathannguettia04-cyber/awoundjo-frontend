@@ -1,13 +1,13 @@
 // src/diasporaApi.js
 // ─────────────────────────────────────────────────────────────
-//  Client API pour le module Diaspora Awoundjô
+//  Client API Awoundjô — Réseaux Diaspora & Parrainage
+//  Token unique partagé entre les deux réseaux
 // ─────────────────────────────────────────────────────────────
 import axios from "axios";
 
 const BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/diaspora`;
 
-// ── Instance axios avec token auto-injecté ────────────────────
-
+// ── Instance axios ────────────────────────────────────────────
 const api = axios.create({
   baseURL: BASE,
   headers: { "Content-Type": "application/json" },
@@ -20,8 +20,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercepteur 401 : nettoyer + rediriger — mais pas si on est déjà
-// sur la page de login (évite la boucle infinie)
 api.interceptors.response.use(
   (res) => res,
   (error) => {
@@ -38,7 +36,6 @@ api.interceptors.response.use(
 );
 
 // ── Token helpers ─────────────────────────────────────────────
-
 export function getDiasporaToken() {
   return localStorage.getItem("diaspora_token");
 }
@@ -47,14 +44,12 @@ export function getDiasporaData() {
   try {
     const raw = localStorage.getItem("diaspora_data");
     return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 /**
- * Vérifie que le token JWT existe ET n'est pas expiré côté client.
- * Évite le flash dashboard → login : on redirige avant même d'appeler l'API.
+ * Valide le token JWT côté client (existence + non-expiré).
+ * Utilisé par DiasporaGuard dans App.jsx pour les deux réseaux.
  */
 export function isDiasporaTokenValid() {
   const token = getDiasporaToken();
@@ -62,14 +57,9 @@ export function isDiasporaTokenValid() {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
     return payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
-/**
- * Sauvegarde le token et les données utilisateur après connexion.
- */
 export function diasporaLogin(token, data) {
   localStorage.setItem("diaspora_token", token);
   localStorage.setItem("diaspora_data", JSON.stringify(data));
@@ -82,7 +72,6 @@ export function diasporaLogout() {
 }
 
 // ── Auth ──────────────────────────────────────────────────────
-
 export const diasporaAuthAPI = {
   register: (data) => api.post("/register", data),
   login:    (data) => api.post("/login",    data),
@@ -91,28 +80,30 @@ export const diasporaAuthAPI = {
 };
 
 // ── Dashboard ─────────────────────────────────────────────────
-
 export const diasporaDashAPI = {
   getStats: () => api.get("/dashboard"),
 };
 
-// ── Profil ambassadeur ────────────────────────────────────────
-
+// ── Profil ────────────────────────────────────────────────────
 export const diasporaProfileAPI = {
   getMe:  ()     => api.get("/me"),
   update: (data) => api.put("/me", data),
 };
 
-// ── Bénéficiaires ─────────────────────────────────────────────
-
+// ── Bénéficiaires / Clients (RECRUTEUR) ───────────────────────
 export const diasporaBeneAPI = {
-  getAll:  (params) => api.get("/beneficiaries", { params }),
+  // Clients finaux
+  getAll:  (params) => api.get("/beneficiaries",    { params }),
   getById: (id)     => api.get(`/beneficiaries/${id}`),
-  create:  (data)   => api.post("/beneficiaries", data),
+  create:  (data)   => api.post("/beneficiaries",   data),   // enregistre un client final
+
+  // Ambassadeurs intermédiaires (Amb. Pays, Recruteur)
+  // POST /api/diaspora/ambassadors — crée un rôle intermédiaire et retourne ses credentials
+  createAmbassador: (data)   => api.post("/ambassadors",   data),
+  getAmbassadors:   (params) => api.get("/ambassadors",    { params }),
 };
 
 // ── Paiements ─────────────────────────────────────────────────
-
 export const diasporaPayAPI = {
   getAll:   ()     => api.get("/payments"),
   initiate: (data) => api.post("/payments",         data),
@@ -120,35 +111,41 @@ export const diasporaPayAPI = {
 };
 
 // ── Commissions ───────────────────────────────────────────────
-
 export const diasporaCommAPI = {
   getAll: (params) => api.get("/commissions", { params }),
 };
 
 // ── Parrainage ────────────────────────────────────────────────
-
 export const diasporaRefAPI = {
   getLink:      () => api.get("/referral-link"),
   getReferrals: () => api.get("/referrals"),
 };
 
-// ── Réseau MLM ────────────────────────────────────────────────
-
+// ── Réseau ────────────────────────────────────────────────────
 export const diasporaNetAPI = {
   getNetwork: () => api.get("/network"),
 };
 
 // ── Classement ────────────────────────────────────────────────
-
 export const diasporaLeaderAPI = {
   getLeaderboard: (period = "month") => api.get("/leaderboard", { params: { period } }),
 };
 
 // ── Notifications ─────────────────────────────────────────────
-
 export const diasporaNotifAPI = {
   getAll:   () => api.get("/notifications"),
   markRead: () => api.put("/notifications/read"),
+};
+
+// ── Admin ─────────────────────────────────────────────────────
+// Routes admin pour voir/gérer les credentials de tous les ambassadeurs
+export const diasporaAdminAPI = {
+  getAll:           (params) => api.get("/admin/ambassadors",              { params }),
+  getCredentials:   (id)     => api.get(`/admin/ambassadors/${id}/credentials`),
+  resetPassword:    (id)     => api.post(`/admin/ambassadors/${id}/reset-password`),
+  generateTempPass: (id)     => api.post(`/admin/ambassadors/${id}/temp-password`),
+  validateComm:     (id)     => api.put(`/admin/commissions/${id}/validate`),
+  payComm:          (id)     => api.put(`/admin/commissions/${id}/pay`),
 };
 
 export default api;

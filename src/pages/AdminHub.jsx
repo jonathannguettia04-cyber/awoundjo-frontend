@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const ROLE_LABELS = {
-  ADMIN:       { label: "Administrateur Général", color: "#7C3AED", bg: "#F5F3FF" },
+  ADMIN:       { label: "Administrateur Général",  color: "#7C3AED", bg: "#F5F3FF" },
   MANAGER:     { label: "Responsable Commercial",  color: "#0891B2", bg: "#ECFEFF" },
   CONSEILLERE: { label: "Conseillère Clientèle",   color: "#DB2777", bg: "#FDF2F8" },
   AGENT:       { label: "Commercial",              color: "#059669", bg: "#ECFDF5" },
 };
 
 const SECTIONS = [
+  // ── Administration ──────────────────────────────────────────
   {
     title: "🏢 Administration",
     roles: ["ADMIN"],
@@ -17,13 +18,17 @@ const SECTIONS = [
     bg: "#F5F3FF",
     border: "#DDD6FE",
     links: [
-      { icon: "📊", label: "Tableau de bord général",    path: "/",                desc: "KPIs, revenus, stats globales" },
-      { icon: "👥", label: "Gestion des agents",          path: "/agents",          desc: "Créer, modifier, suspendre les comptes" },
-      { icon: "🏨", label: "Portail établissements",      path: "/admin/providers", desc: "Valider les demandes d'accès" },
-      { icon: "🏥", label: "Réseau de soins",             path: "/healthcare",      desc: "Gérer les établissements partenaires" },
-      { icon: "💰", label: "Commissions globales",        path: "/commissions",     desc: "Toutes les commissions agents" },
+      { icon: "📊", label: "Tableau de bord général",    path: "/",                    desc: "KPIs, revenus, stats globales" },
+      { icon: "👥", label: "Gestion des agents",          path: "/agents",              desc: "Créer, modifier, suspendre les comptes" },
+      { icon: "🏨", label: "Portail établissements",      path: "/admin/providers",     desc: "Valider les demandes d'accès" },
+      { icon: "🏥", label: "Réseau de soins",             path: "/healthcare",          desc: "Gérer les établissements partenaires" },
+      { icon: "💰", label: "Commissions globales",        path: "/commissions",         desc: "Toutes les commissions agents" },
+      { icon: "🌍", label: "Ambassadeurs Diaspora",       path: "/admin/diaspora",      desc: "Gérer le réseau ambassadeurs diaspora" },
+      { icon: "⛪", label: "Ambassadeurs Fédérations",    path: "/admin/federation",    desc: "Gérer le réseau fédérations & églises" },
     ],
   },
+
+  // ── Commerce ─────────────────────────────────────────────────
   {
     title: "🤝 Commerce",
     roles: ["ADMIN", "MANAGER"],
@@ -38,6 +43,8 @@ const SECTIONS = [
       { icon: "💵", label: "Paiements",                  path: "/payments",      desc: "Historique des paiements" },
     ],
   },
+
+  // ── Clientèle ────────────────────────────────────────────────
   {
     title: "🧑‍💼 Clientèle",
     roles: ["ADMIN", "CONSEILLERE"],
@@ -45,24 +52,44 @@ const SECTIONS = [
     bg: "#FDF2F8",
     border: "#FBCFE8",
     links: [
-      { icon: "👥", label: "Gérer les clients",          path: "/clients",       desc: "Créer, modifier, importer" },
-      { icon: "📥", label: "Import CSV clients",         path: "/clients",       desc: "Importation en masse" },
-      { icon: "📤", label: "Export clients",             path: "/clients?export=1", desc: "Exporter en Excel/CSV" },
-      { icon: "🏥", label: "Établissements réseau",      path: "/healthcare",    desc: "Gérer les établissements partenaires" },
-      { icon: "📤", label: "Export établissements",      path: "/healthcare?export=1", desc: "Exporter en Excel/CSV" },
-      { icon: "👨‍👩‍👧‍👦", label: "Groupes",                   path: "/groups",        desc: "Gérer les groupes cotisants" },
+      { icon: "👥", label: "Gérer les clients",          path: "/clients",            desc: "Créer, modifier, importer" },
+      { icon: "📥", label: "Import CSV clients",         path: "/clients",            desc: "Importation en masse" },
+      { icon: "📤", label: "Export clients",             path: "/clients?export=1",   desc: "Exporter en Excel/CSV" },
+      { icon: "🏥", label: "Établissements réseau",      path: "/healthcare",         desc: "Gérer les établissements partenaires" },
+      { icon: "📤", label: "Export établissements",      path: "/healthcare?export=1",desc: "Exporter en Excel/CSV" },
+      { icon: "👨‍👩‍👧‍👦", label: "Groupes",                   path: "/groups",             desc: "Gérer les groupes cotisants" },
     ],
   },
+
+  // ── Réseau Ambassadeurs ──────────────────────────────────────
   {
-    title: "🌐 Portails",
+    title: "🌐 Réseau Ambassadeurs",
     roles: ["ADMIN"],
     color: "#059669",
     bg: "#ECFDF5",
     border: "#A7F3D0",
     links: [
-      { icon: "👤", label: "Portail Adhérent",           path: "/client/login",        desc: "Espace client mutualiste", external: true },
-      { icon: "🏥", label: "Portail Établissement",      path: "/etablissement",       desc: "Espace prestataires de soins", external: true },
-      { icon: "🔐", label: "Connexion Admin/Agent",      path: "/login",               desc: "Connexion espace commercial", external: true },
+      { icon: "🌍", label: "Admin Diaspora",             path: "/admin/diaspora",                desc: "Gérer ambassadeurs diaspora" },
+      { icon: "⛪", label: "Admin Fédérations",          path: "/admin/federation",              desc: "Gérer ambassadeurs fédérations" },
+      { icon: "🚪", label: "Portail Ambassadeurs",       path: "/diaspora/login",                desc: "Accéder au portail unifié", external: true },
+      { icon: "🏆", label: "Classement Global",          path: "/admin/ambassador-leaderboard",  desc: "Classement diaspora + fédérations" },
+      { icon: "💰", label: "Commissions Ambassadeurs",   path: "/admin/ambassador-commissions",  desc: "Toutes les commissions réseau" },
+    ],
+  },
+
+  // ── Portails ─────────────────────────────────────────────────
+  {
+    title: "🔗 Portails",
+    roles: ["ADMIN"],
+    color: "#D97706",
+    bg: "#FFFBEB",
+    border: "#FDE68A",
+    links: [
+      { icon: "👤", label: "Portail Adhérent",           path: "/client/login",        desc: "Espace client mutualiste",           external: true },
+      { icon: "🏥", label: "Portail Établissement",      path: "/etablissement",       desc: "Espace prestataires de soins",       external: true },
+      { icon: "🔐", label: "Connexion Admin/Agent",      path: "/login",               desc: "Connexion espace commercial",        external: true },
+      { icon: "🌍", label: "Portail Diaspora",           path: "/diaspora/login",      desc: "Espace ambassadeurs diaspora",       external: true },
+      { icon: "⛪", label: "Portail Fédération",         path: "/diaspora/login",      desc: "Espace ambassadeurs fédération",     external: true },
     ],
   },
 ];
@@ -73,7 +100,6 @@ export default function AdminHub() {
   const role = user?.role?.toUpperCase();
   const roleConfig = ROLE_LABELS[role] || ROLE_LABELS.AGENT;
 
-  // Filtrer les sections selon le rôle
   const visibleSections = SECTIONS.filter(s => s.roles.includes(role));
 
   return (
@@ -93,9 +119,11 @@ export default function AdminHub() {
         </div>
         <div style={s.headerRight}>
           <p style={s.headerDate}>
-            {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {new Date().toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
           </p>
-          <p style={s.headerTime}>{new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p style={s.headerTime}>
+            {new Date().toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })}
+          </p>
         </div>
       </div>
 
@@ -116,16 +144,16 @@ export default function AdminHub() {
                   onClick={() => link.external ? window.open(link.path, "_blank") : navigate(link.path)}
                   style={s.linkCard}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = section.bg;
-                    e.currentTarget.style.borderColor = section.border;
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,.08)";
+                    e.currentTarget.style.background    = section.bg;
+                    e.currentTarget.style.borderColor   = section.border;
+                    e.currentTarget.style.transform     = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow     = "0 8px 24px rgba(0,0,0,.08)";
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = "#fff";
-                    e.currentTarget.style.borderColor = "#E2E8F0";
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,.04)";
+                    e.currentTarget.style.background    = "#fff";
+                    e.currentTarget.style.borderColor   = "#E2E8F0";
+                    e.currentTarget.style.transform     = "translateY(0)";
+                    e.currentTarget.style.boxShadow     = "0 1px 4px rgba(0,0,0,.04)";
                   }}
                 >
                   <div style={s.linkIconWrap}>

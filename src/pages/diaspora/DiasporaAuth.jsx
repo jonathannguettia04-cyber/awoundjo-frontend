@@ -1,4 +1,9 @@
 // src/pages/diaspora/DiasporaAuth.jsx
+// ─────────────────────────────────────────────────────────────
+//  Portail d'authentification unifié Awoundjô
+//  Réseaux : DIASPORA | REFERRAL (RUM/Leader/Pasteur/Responsable)
+//  Les rôles intermédiaires se connectent avec credentials générés
+// ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { diasporaAuthAPI, diasporaLogin } from "../../diasporaApi";
@@ -6,49 +11,71 @@ import { diasporaAuthAPI, diasporaLogin } from "../../diasporaApi";
 const COUNTRIES = [
   "France","Belgique","Suisse","Canada","États-Unis","Royaume-Uni","Italie","Espagne",
   "Allemagne","Pays-Bas","Portugal","Maroc","Sénégal","Ghana","Gabon","Congo",
-  "Cameroun","Togo","Bénin","Burkina Faso","Mali","Guinée","Autre",
+  "Cameroun","Togo","Bénin","Burkina Faso","Mali","Guinée","Côte d'Ivoire","Autre",
 ];
 
-// Rôles disponibles par réseau
-const ROLES_BY_NETWORK = {
+// ── Hiérarchies par réseau ────────────────────────────────────
+// Seuls les rôles "fondateurs" (top de chaque réseau) peuvent créer leur compte.
+// Les autres reçoivent leurs credentials générés par leur supérieur.
+const SELF_REGISTER_ROLES = {
   DIASPORA: [
-    { value: "RECRUTEUR", label: "🌍 Recruteur Diaspora" },
-    { value: "VILLE",     label: "🏙️ Ambassadeur Ville" },
-    { value: "PAYS",      label: "🗺️ Ambassadeur Pays" },
+    { value: "AMBASSADEUR_DIASPORA", label: "🌍 Ambassadeur Diaspora", desc: "Sommet du réseau Diaspora" },
   ],
-  FEDERATION: [
-    { value: "AMBASSADEUR_RECRUTEUR", label: "🤝 Recruteur Fédération" },
-    { value: "AMBASSADEUR_SUPERV",    label: "📋 Ambassadeur Superviseur" },
-    { value: "AMBASSADEUR_EGLISE",    label: "⛪ Ambassadeur Église" },
-    { value: "AMBASSADEUR_LEADER",    label: "👑 Ambassadeur Leader" },
+  REFERRAL: [
+    { value: "RUM",    label: "👑 RUM",    desc: "Responsable Unifié de Mission" },
   ],
 };
 
 const NETWORK_CONFIG = {
-  DIASPORA:   { label: "Réseau Diaspora",    icon: "🌍", color: "#1B4FD8", light: "#EEF2FF", desc: "Pour les membres de la diaspora africaine" },
-  FEDERATION: { label: "Réseau Fédération",  icon: "⛪", color: "#7C3AED", light: "#F5F3FF", desc: "Pour les ambassadeurs d'églises & fédérations" },
+  DIASPORA: {
+    label: "Réseau Diaspora",
+    icon:  "🌍",
+    color: "#1B4FD8",
+    light: "#EEF2FF",
+    desc:  "Ambassadeur Diaspora → Pays → Recruteur → Client",
+    dashPath: "/diaspora/dashboard",
+  },
+  REFERRAL: {
+    label: "Réseau Parrainage",
+    icon:  "⛪",
+    color: "#7C3AED",
+    light: "#F5F3FF",
+    desc:  "RUM → Leader → Pasteur → Responsable → Client",
+    dashPath: "/referral/dashboard",
+  },
 };
+
+// Redirection selon le rôle après connexion
+function getDashPath(ambassador) {
+  if (!ambassador) return "/diaspora/login";
+  const net = ambassador.network_type;
+  if (net === "REFERRAL") return "/referral/dashboard";
+  return "/diaspora/dashboard";
+}
 
 export default function DiasporaAuth() {
   const navigate      = useNavigate();
   const [params]      = useSearchParams();
-  const refCode       = params.get("ref") || "";
+  const refCode       = params.get("ref")     || "";
+  const netParam      = params.get("network") || "DIASPORA"; // réseau pré-sélectionné via URL
   const [tab, setTab] = useState(refCode ? "register" : "login");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [regForm,   setRegForm]   = useState({
-    name: "", country: "France", phone: "",
-    email: "", password: "",
+    name:         "",
+    country:      "Côte d'Ivoire",
+    phone:        "",
+    email:        "",
+    password:     "",
     referral_code: refCode,
-    network_type: "DIASPORA",
-    role: "RECRUTEUR",
+    network_type:  netParam in NETWORK_CONFIG ? netParam : "DIASPORA",
+    role:          SELF_REGISTER_ROLES[netParam in NETWORK_CONFIG ? netParam : "DIASPORA"][0].value,
   });
 
-  // Quand le réseau change → reset le rôle au premier disponible
   function handleNetworkChange(network) {
-    const firstRole = ROLES_BY_NETWORK[network][0].value;
+    const firstRole = SELF_REGISTER_ROLES[network][0].value;
     setRegForm(f => ({ ...f, network_type: network, role: firstRole }));
   }
 
@@ -57,14 +84,10 @@ export default function DiasporaAuth() {
     try {
       const { data } = await diasporaAuthAPI.login(loginForm);
       diasporaLogin(data.token, data.ambassador);
-      // Redirection selon le réseau
-      if (data.ambassador?.network_type === "FEDERATION") {
-        navigate("/federation/dashboard");
-      } else {
-        navigate("/diaspora/dashboard");
-      }
-    } catch (err) { setError(err.response?.data?.error || "Identifiants incorrects"); }
-    finally { setLoading(false); }
+      navigate(getDashPath(data.ambassador));
+    } catch (err) {
+      setError(err.response?.data?.error || "Identifiants incorrects");
+    } finally { setLoading(false); }
   }
 
   async function handleRegister(e) {
@@ -72,13 +95,10 @@ export default function DiasporaAuth() {
     try {
       const { data } = await diasporaAuthAPI.register(regForm);
       diasporaLogin(data.token, data.ambassador);
-      if (data.ambassador?.network_type === "FEDERATION") {
-        navigate("/federation/dashboard");
-      } else {
-        navigate("/diaspora/dashboard");
-      }
-    } catch (err) { setError(err.response?.data?.error || "Erreur d'inscription"); }
-    finally { setLoading(false); }
+      navigate(getDashPath(data.ambassador));
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur d'inscription");
+    } finally { setLoading(false); }
   }
 
   const net = NETWORK_CONFIG[regForm.network_type];
@@ -103,7 +123,7 @@ export default function DiasporaAuth() {
         .unif-input option { background: #1a3a5c; color: #fff; }
       `}</style>
 
-      {/* Blobs */}
+      {/* Blobs déco */}
       <div style={{ position:"absolute", top:-150, right:-100, width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,188,212,.12),transparent 70%)", pointerEvents:"none" }} />
       <div style={{ position:"absolute", bottom:-100, left:-100, width:350, height:350, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,.1),transparent 70%)", pointerEvents:"none" }} />
 
@@ -112,7 +132,7 @@ export default function DiasporaAuth() {
         <img src="/logo-awoundjjo.png" alt="Awoundjô" style={{ width:52, height:52, objectFit:"contain", borderRadius:14, background:"rgba(255,255,255,.1)", padding:6 }} />
         <div>
           <div style={{ color:"#fff", fontSize:22, fontWeight:900, letterSpacing:-.5 }}>Awoundjô</div>
-          <div style={{ color:"rgba(255,255,255,.5)", fontSize:12, marginTop:1 }}>🌍 Portail Ambassadeurs Unifié</div>
+          <div style={{ color:"rgba(255,255,255,.5)", fontSize:12, marginTop:1 }}>🌍 Portail Ambassadeurs</div>
         </div>
       </div>
 
@@ -123,7 +143,7 @@ export default function DiasporaAuth() {
         padding: "32px 28px", width: "100%", maxWidth: 480,
       }}>
 
-        {/* Tabs Connexion / Inscription */}
+        {/* Tabs */}
         <div style={{ display:"flex", background:"rgba(255,255,255,.06)", borderRadius:14, padding:4, marginBottom:24, gap:4 }}>
           {[{ id:"login", label:"🔑 Connexion" },{ id:"register", label:"✨ Créer un compte" }].map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setError(""); }}
@@ -149,11 +169,17 @@ export default function DiasporaAuth() {
         {tab === "login" && (
           <>
             <h2 style={{ color:"#fff", fontSize:20, fontWeight:800, margin:"0 0 6px" }}>Bon retour 👋</h2>
-            <p style={{ color:"rgba(255,255,255,.5)", fontSize:13, margin:"0 0 24px" }}>Accédez à votre espace ambassadeur</p>
+            <p style={{ color:"rgba(255,255,255,.5)", fontSize:13, margin:"0 0 6px" }}>
+              Accédez à votre espace ambassadeur
+            </p>
+            {/* Info pour rôles qui reçoivent credentials */}
+            <div style={{ background:"rgba(0,188,212,.08)", border:"1px solid rgba(0,188,212,.2)", borderRadius:10, padding:"10px 14px", marginBottom:18, fontSize:12, color:"rgba(255,255,255,.65)" }}>
+              💡 Recruteurs, Pasteurs, Responsables, Leaders : utilisez les identifiants transmis par votre supérieur.
+            </div>
             <form onSubmit={handleLogin} style={{ display:"flex", flexDirection:"column", gap:14 }}>
               {[
-                { key:"email",    label:"Email",           type:"email",    placeholder:"votre@email.com" },
-                { key:"password", label:"Mot de passe",    type:"password", placeholder:"••••••••" },
+                { key:"email",    label:"Email ou nom d'utilisateur", type:"text",     placeholder:"votre@email.com" },
+                { key:"password", label:"Mot de passe",               type:"password", placeholder:"••••••••" },
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>{f.label}</label>
@@ -170,13 +196,15 @@ export default function DiasporaAuth() {
           </>
         )}
 
-        {/* ── INSCRIPTION ── */}
+        {/* ── INSCRIPTION (seulement pour les rôles fondateurs) ── */}
         {tab === "register" && (
           <>
             <h2 style={{ color:"#fff", fontSize:20, fontWeight:800, margin:"0 0 6px" }}>Rejoignez notre réseau 🌍</h2>
-            <p style={{ color:"rgba(255,255,255,.5)", fontSize:13, margin:"0 0 20px" }}>Choisissez votre réseau pour commencer</p>
+            <p style={{ color:"rgba(255,255,255,.5)", fontSize:13, margin:"0 0 20px" }}>
+              Inscription réservée aux rôles fondateurs (Ambassadeur Diaspora, RUM)
+            </p>
 
-            {/* Sélecteur de réseau */}
+            {/* Sélecteur réseau */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
               {Object.entries(NETWORK_CONFIG).map(([key, cfg]) => (
                 <button key={key} type="button" onClick={() => handleNetworkChange(key)}
@@ -191,9 +219,22 @@ export default function DiasporaAuth() {
                   }}>
                   <div style={{ fontSize:26, marginBottom:6 }}>{cfg.icon}</div>
                   <div style={{ color:"#fff", fontWeight:800, fontSize:13 }}>{cfg.label}</div>
-                  <div style={{ color:"rgba(255,255,255,.6)", fontWeight:500, fontSize:10, marginTop:3 }}>{cfg.desc}</div>
+                  <div style={{ color:"rgba(255,255,255,.6)", fontSize:10, marginTop:3 }}>{cfg.desc}</div>
                 </button>
               ))}
+            </div>
+
+            {/* Badge rôle auto */}
+            <div style={{ background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.12)", borderRadius:12, padding:"10px 14px", marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:18 }}>🎖️</span>
+              <div>
+                <p style={{ color:"rgba(255,255,255,.9)", fontSize:13, fontWeight:700, margin:0 }}>
+                  Rôle : {SELF_REGISTER_ROLES[regForm.network_type][0].label}
+                </p>
+                <p style={{ color:"rgba(255,255,255,.5)", fontSize:11, margin:0 }}>
+                  {SELF_REGISTER_ROLES[regForm.network_type][0].desc}
+                </p>
+              </div>
             </div>
 
             {refCode && (
@@ -207,12 +248,10 @@ export default function DiasporaAuth() {
             )}
 
             <form onSubmit={handleRegister} style={{ display:"flex", flexDirection:"column", gap:14 }}>
-
-              {/* Champs communs */}
               {[
                 { key:"name",     label:"Nom complet *",  type:"text",     placeholder:"Jean Kouassi" },
                 { key:"email",    label:"Email *",         type:"email",    placeholder:"jean@email.com" },
-                { key:"phone",    label:"Téléphone",       type:"tel",      placeholder:"+33 6 12 34 56 78" },
+                { key:"phone",    label:"Téléphone",       type:"tel",      placeholder:"+225 07 00 00 00 00" },
                 { key:"password", label:"Mot de passe *",  type:"password", placeholder:"Min. 6 caractères" },
               ].map(f => (
                 <div key={f.key}>
@@ -223,7 +262,6 @@ export default function DiasporaAuth() {
                 </div>
               ))}
 
-              {/* Pays */}
               <div>
                 <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>Pays de résidence *</label>
                 <select className="unif-input" required value={regForm.country}
@@ -233,21 +271,6 @@ export default function DiasporaAuth() {
                 </select>
               </div>
 
-              {/* Rôle selon le réseau choisi */}
-              <div>
-                <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>
-                  Votre rôle dans le réseau {net.icon} *
-                </label>
-                <select className="unif-input" required value={regForm.role}
-                  onChange={e => setRegForm({ ...regForm, role: e.target.value })}
-                  style={{ background:"rgba(30,58,92,.9)" }}>
-                  {ROLES_BY_NETWORK[regForm.network_type].map(r => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Code parrainage */}
               <div>
                 <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>Code parrainage</label>
                 <input className="unif-input" value={regForm.referral_code}
