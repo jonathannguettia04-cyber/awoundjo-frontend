@@ -14,23 +14,58 @@ const CINETPAY_CONFIG = {
 };
 
 /**
+ * Attend que window.CinetPay soit disponible (max 10 secondes).
+ * Résout si OK, rejette si timeout.
+ */
+function waitForSDK(timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    if (window.CinetPay) {
+      resolve();
+      return;
+    }
+
+    const start = Date.now();
+    const interval = setInterval(() => {
+      if (window.CinetPay) {
+        clearInterval(interval);
+        resolve();
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error("SDK CinetPay introuvable après 10 secondes. Vérifiez index.html."));
+      }
+    }, 100);
+  });
+}
+
+/**
  * Lance le popup de paiement CinetPay.
  *
- * @param {Object} user         - { name, email, phone }
- * @param {number} amount       - Montant en XOF (ex: 15000)
- * @param {string} description  - Description affichée dans le popup
- * @param {string} transactionId - Identifiant unique (ex: `AWJ-${Date.now()}`)
- * @param {Function} onSuccess  - Callback appelé si paiement accepté
- * @param {Function} onError    - Callback appelé en cas d'erreur
+ * @param {Object}   user          - { name, email, phone }
+ * @param {number}   amount        - Montant en XOF (ex: 15000)
+ * @param {string}   description   - Description affichée dans le popup
+ * @param {string}   transactionId - Identifiant unique (ex: `AWJ-${Date.now()}`)
+ * @param {Function} onSuccess     - Callback appelé si paiement accepté
+ * @param {Function} onError       - Callback appelé en cas d'erreur
  */
-export function payWithCinetPay({ user, amount = 15000, description = "Adhésion Awoundjô", transactionId, onSuccess, onError }) {
-  if (!window.CinetPay) {
-    console.error("SDK CinetPay non chargé. Vérifiez index.html.");
-    onError?.({ message: "SDK CinetPay introuvable. Veuillez recharger la page." });
+export async function payWithCinetPay({
+  user,
+  amount = 15000,
+  description = "Adhésion Awoundjô",
+  transactionId,
+  onSuccess,
+  onError,
+}) {
+  try {
+    await waitForSDK();
+  } catch (err) {
+    console.error("[CinetPay]", err.message);
+    onError?.({ message: err.message });
     return;
   }
 
-  const txId = transactionId || `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+  const txId =
+    transactionId ||
+    `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
   window.CinetPay.setConfig({
     apikey:     CINETPAY_CONFIG.apikey,
@@ -40,18 +75,18 @@ export function payWithCinetPay({ user, amount = 15000, description = "Adhésion
   });
 
   window.CinetPay.getCheckout({
-    transaction_id:         txId,
-    amount:                 amount,
-    currency:               "XOF",
-    channels:               "ALL",        // Mobile Money + Wave + CB
-    description:            description,
-    customer_name:          user.name    || "",
-    customer_email:         user.email   || "",
-    customer_phone_number:  user.phone   || "",
-    customer_country:       "CI",
-    customer_state:         "CI",
-    customer_city:          "Abidjan",
-    customer_zip_code:      "00225",
+    transaction_id:        txId,
+    amount:                amount,
+    currency:              "XOF",
+    channels:              "ALL",       // Mobile Money + Wave + CB
+    description:           description,
+    customer_name:         user.name   || "",
+    customer_email:        user.email  || "",
+    customer_phone_number: user.phone  || "",
+    customer_country:      "CI",
+    customer_state:        "CI",
+    customer_city:         "Abidjan",
+    customer_zip_code:     "00225",
   });
 
   window.CinetPay.waitResponse(function (data) {
