@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import AdhesionForm from "../../components/AdhesionForm";
 import {
   diasporaBeneAPI,
   diasporaPayAPI,
@@ -163,58 +164,16 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
   );
 }
 
-// Formulaire d'enregistrement d'un rôle intermédiaire
-function RegisterRoleForm({ targetRole, targetLabel, onSuccess }) {
-  const [form, setForm] = useState({ name:"", email:"", phone:"", country:"Côte d'Ivoire" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-
-  async function submit(e) {
-    e.preventDefault(); setError(""); setLoading(true);
-    try {
-      const { data } = await diasporaBeneAPI.createAmbassador({ ...form, role: targetRole });
-      onSuccess(data.credentials, targetLabel);
-    } catch(err) {
-      setError(err.response?.data?.error || "Erreur lors de la création");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <Card>
-      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
-      <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
-        {[
-          { key:"name",    label:"Nom complet *",      type:"text",  placeholder:"Jean Kouassi" },
-          { key:"email",   label:"Email *",             type:"email", placeholder:"jean@email.com" },
-          { key:"phone",   label:"Téléphone WhatsApp",  type:"tel",   placeholder:"+225 07 00 00 00 00" },
-          { key:"country", label:"Pays de résidence",   type:"text",  placeholder:"Côte d'Ivoire" },
-        ].map(f => (
-          <div key={f.key}>
-            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
-            <input required={f.key==="name"||f.key==="email"} type={f.type} placeholder={f.placeholder}
-              value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
-          </div>
-        ))}
-        <div style={{ background:C.blueL, borderRadius:10, padding:"12px 14px", fontSize:13, color:C.blue, fontWeight:600 }}>
-          🔐 Des identifiants de connexion seront générés automatiquement.
-        </div>
-        <Btn disabled={loading} style={{ alignSelf:"flex-start" }}>
-          {loading ? "Création en cours…" : `✅ Créer ${targetLabel}`}
-        </Btn>
-      </form>
-    </Card>
-  );
-}
+// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER AMBASSADEUR PAYS (AMBASSADEUR_DIASPORA uniquement)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterPays() {
-  const [list, setList]     = useState([]);
+  const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]   = useState(null);
+  const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
@@ -223,19 +182,35 @@ export function DiasporaRegisterPays() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    // Rafraîchir la liste
+    diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => { setCreds(null); setShowForm(false); }} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+
       <PageHeader
         title="🗺️ Mes Ambassadeurs Pays"
         subtitle={`${list.length} ambassadeur(s) enregistré(s)`}
-        action={<Btn onClick={() => setShowForm(!showForm)}>{showForm ? "✕ Annuler" : "➕ Nouvel Ambassadeur Pays"}</Btn>}
+        action={
+          <Btn onClick={() => setShowForm(!showForm)}>
+            {showForm ? "✕ Annuler" : "➕ Nouvel Ambassadeur Pays"}
+          </Btn>
+        }
       />
+
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <RegisterRoleForm targetRole="AMBASSADEUR_PAYS" targetLabel="l'Ambassadeur Pays" onSuccess={(c, l) => { setCreds(c); setCredsLabel(l); }} />
+          <AdhesionForm targetRole="AMBASSADEUR_PAYS" onSuccess={handleSuccess} />
         </div>
       )}
+
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="🗺️" title="Aucun Ambassadeur Pays" desc="Créez votre premier Ambassadeur Pays" />
       ) : (
@@ -246,7 +221,14 @@ export function DiasporaRegisterPays() {
                 <div style={{ width:40, height:40, borderRadius:10, background:C.greenL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🗺️</div>
                 <div>
                   <p style={{ margin:0, fontWeight:700, color:C.dark }}>{a.name}</p>
-                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{a.email} • {a.country} • {fmtDate(a.created_at)}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+                    {a.email} • {a.country} • {fmtDate(a.created_at)}
+                  </p>
+                  {a.plan && (
+                    <span style={{ fontSize:10, fontWeight:700, color:C.green, background:C.greenL, padding:"1px 8px", borderRadius:999 }}>
+                      {a.plan}
+                    </span>
+                  )}
                 </div>
               </div>
               <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
@@ -264,10 +246,10 @@ export function DiasporaRegisterPays() {
 // PAGE : ENREGISTRER RECRUTEUR (AMBASSADEUR_PAYS uniquement)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterRecruiter() {
-  const [list, setList]     = useState([]);
+  const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]   = useState(null);
+  const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
@@ -276,19 +258,34 @@ export function DiasporaRegisterRecruiter() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => { setCreds(null); setShowForm(false); }} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+
       <PageHeader
         title="🤝 Mes Recruteurs"
         subtitle={`${list.length} recruteur(s) enregistré(s)`}
-        action={<Btn onClick={() => setShowForm(!showForm)}>{showForm ? "✕ Annuler" : "➕ Nouveau Recruteur"}</Btn>}
+        action={
+          <Btn onClick={() => setShowForm(!showForm)}>
+            {showForm ? "✕ Annuler" : "➕ Nouveau Recruteur"}
+          </Btn>
+        }
       />
+
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <RegisterRoleForm targetRole="RECRUTEUR" targetLabel="le Recruteur" onSuccess={(c, l) => { setCreds(c); setCredsLabel(l); }} />
+          <AdhesionForm targetRole="RECRUTEUR" onSuccess={handleSuccess} />
         </div>
       )}
+
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="🤝" title="Aucun Recruteur" desc="Créez votre premier Recruteur" />
       ) : (
@@ -299,7 +296,14 @@ export function DiasporaRegisterRecruiter() {
                 <div style={{ width:40, height:40, borderRadius:10, background:C.goldL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🤝</div>
                 <div>
                   <p style={{ margin:0, fontWeight:700, color:C.dark }}>{a.name}</p>
-                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{a.email} • {a.country} • {fmtDate(a.created_at)}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+                    {a.email} • {a.country} • {fmtDate(a.created_at)}
+                  </p>
+                  {a.plan && (
+                    <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>
+                      {a.plan}
+                    </span>
+                  )}
                 </div>
               </div>
               <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>

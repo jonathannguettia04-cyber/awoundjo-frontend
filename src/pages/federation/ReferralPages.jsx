@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDiasporaData } from "../../diasporaApi";
 import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI } from "../../federationApi";
+import AdhesionForm from "../../components/AdhesionForm";
 
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF",
@@ -147,61 +148,16 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
   );
 }
 
-// ── Formulaire générique d'enregistrement de rôle ─────────────
-function RegisterRoleForm({ targetRole, onSuccess }) {
-  const rc = ROLE_CONFIG[targetRole] || {};
-  const [form, setForm] = useState({ name:"", email:"", phone:"", country:"Côte d'Ivoire" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-
-  async function submit(e) {
-    e.preventDefault(); setError(""); setLoading(true);
-    try {
-      const { data } = await federationMemberAPI.create({ ...form, role: targetRole });
-      onSuccess(data.credentials, rc.label);
-    } catch(err) {
-      setError(err.response?.data?.error || "Erreur lors de la création");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <Card>
-      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
-      <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
-        {[
-          { key:"name",    label:"Nom complet *",      type:"text",  placeholder:"Jean Kofi" },
-          { key:"email",   label:"Email *",             type:"email", placeholder:"jean@email.com" },
-          { key:"phone",   label:"Téléphone WhatsApp",  type:"tel",   placeholder:"+225 07 00 00 00 00" },
-          { key:"country", label:"Pays",                type:"text",  placeholder:"Côte d'Ivoire" },
-        ].map(f => (
-          <div key={f.key}>
-            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
-            <input required={f.key==="name"||f.key==="email"} type={f.type} placeholder={f.placeholder}
-              value={form[f.key]}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
-          </div>
-        ))}
-        <div style={{ background:C.purpleL, borderRadius:10, padding:"12px 14px", fontSize:13, color:C.purple, fontWeight:600 }}>
-          🔐 Des identifiants de connexion seront générés automatiquement et affichés après la création.
-        </div>
-        <Btn disabled={loading} style={{ alignSelf:"flex-start" }}>
-          {loading ? "Création en cours…" : `✅ Créer le ${rc.label}`}
-        </Btn>
-      </form>
-    </Card>
-  );
-}
+// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN LEADER (RUM uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterLeader() {
-  const navigate  = useNavigate();
-  const [list, setList]     = useState([]);
+  const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]   = useState(null);
+  const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
@@ -210,9 +166,17 @@ export function ReferralRegisterLeader() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    federationMemberAPI.getAll({ role:"LEADER" })
+      .then(r => setList(r.data.members || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => { setCreds(null); setShowForm(false); }} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
       <PageHeader
         title="⭐ Mes Leaders"
@@ -222,8 +186,7 @@ export function ReferralRegisterLeader() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <p style={{ margin:"0 0 12px", fontWeight:700, color:C.dark }}>Créer un nouveau Leader :</p>
-          <RegisterRoleForm targetRole="LEADER" onSuccess={(c, l) => { setCreds(c); setCredsLabel(l); setList(prev => [...prev, { id:Date.now(), name:c.name, role:"LEADER", status:"ACTIVE", createdAt:new Date().toISOString() }]); }} />
+          <AdhesionForm targetRole="LEADER" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -238,6 +201,7 @@ export function ReferralRegisterLeader() {
                 <div>
                   <p style={{ margin:0, fontWeight:700, color:C.dark }}>{m.name}</p>
                   <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{m.email} • Depuis {fmtDate(m.createdAt||m.created_at)}</p>
+                  {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:C.blueL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
                 </div>
               </div>
               <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
@@ -255,10 +219,10 @@ export function ReferralRegisterLeader() {
 // PAGE : ENREGISTRER UN PASTEUR (LEADER uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterPasteur() {
-  const [list, setList]     = useState([]);
+  const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]   = useState(null);
+  const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
@@ -267,9 +231,17 @@ export function ReferralRegisterPasteur() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    federationMemberAPI.getAll({ role:"PASTEUR" })
+      .then(r => setList(r.data.members || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => { setCreds(null); setShowForm(false); }} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
       <PageHeader
         title="⛪ Mes Pasteurs"
@@ -279,7 +251,7 @@ export function ReferralRegisterPasteur() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <RegisterRoleForm targetRole="PASTEUR" onSuccess={(c, l) => { setCreds(c); setCredsLabel(l); }} />
+          <AdhesionForm targetRole="PASTEUR" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -294,6 +266,7 @@ export function ReferralRegisterPasteur() {
                 <div>
                   <p style={{ margin:0, fontWeight:700, color:C.dark }}>{m.name}</p>
                   <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{m.email} • {fmtDate(m.createdAt||m.created_at)}</p>
+                  {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.teal, background:C.tealL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
                 </div>
               </div>
               <span style={{ background:C.tealL, color:C.teal, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>⛪ Pasteur</span>
@@ -309,10 +282,10 @@ export function ReferralRegisterPasteur() {
 // PAGE : ENREGISTRER UN RESPONSABLE (PASTEUR uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterResponsable() {
-  const [list, setList]     = useState([]);
+  const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]   = useState(null);
+  const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
@@ -321,9 +294,17 @@ export function ReferralRegisterResponsable() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    federationMemberAPI.getAll({ role:"RESPONSABLE" })
+      .then(r => setList(r.data.members || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => { setCreds(null); setShowForm(false); }} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
       <PageHeader
         title="🤝 Mes Responsables"
@@ -333,7 +314,7 @@ export function ReferralRegisterResponsable() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <RegisterRoleForm targetRole="RESPONSABLE" onSuccess={(c, l) => { setCreds(c); setCredsLabel(l); }} />
+          <AdhesionForm targetRole="RESPONSABLE" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -346,6 +327,7 @@ export function ReferralRegisterResponsable() {
               <div>
                 <p style={{ margin:0, fontWeight:700, color:C.dark }}>{m.name}</p>
                 <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{m.email} • {fmtDate(m.createdAt||m.created_at)}</p>
+                {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
               </div>
               <span style={{ background:C.goldL, color:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>🤝 Responsable</span>
             </Card>
