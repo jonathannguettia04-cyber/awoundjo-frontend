@@ -89,10 +89,14 @@ export default function ClientDetails() {
 
       // 2. Ouvrir le popup CinetPay
       payWithCinetPay({
-        user: { name: c.name, phone: c.phone, email: "" },
-        amount,
-        description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${c.name}`,
-        transactionId: txRef,
+  user: {
+    name:  client?.client?.name  || "",   // ✅
+    phone: client?.client?.phone || "",   // ✅
+    email: ""
+  },
+  amount,
+  description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${client?.client?.name || ""}`,
+  transactionId: txRef,
 
         onSuccess: async (_, usedTxId) => {
           setPaySaving(false);
