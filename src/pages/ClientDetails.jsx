@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
-import { clientAPI, paymentAPI } from "../services/api";
+
+import { clientAPI, paymentsAPI } from "../services/api";
+import { payWithCinetPay } from "../services/cinetpay";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import Modal from "../components/Modal";
@@ -25,11 +26,11 @@ export default function ClientDetails() {
   const [editError,  setEditError]  = useState("");
 
   // Payment modal
-  const [showPay,   setShowPay]   = useState(false);
-  const [payForm,   setPayForm]   = useState({ amount: "", type: "mensualite", payment_method: "cash" });
-  const [paySaving, setPaySaving] = useState(false);
-  const [payError,  setPayError]  = useState("");
-  const [waveLink,  setWaveLink]  = useState("");
+  const [showPay,    setShowPay]    = useState(false);
+  const [payForm,    setPayForm]    = useState({ amount: "", type: "mensualite", payment_method: "cash" });
+  const [paySaving,  setPaySaving]  = useState(false);
+  const [payError,   setPayError]   = useState("");
+  const [paySuccess, setPaySuccess] = useState("");
 
   async function loadClient() {
     setLoading(true);
@@ -66,35 +67,70 @@ export default function ClientDetails() {
 
   async function handlePay(e) {
     e.preventDefault();
-    setPayError(""); setWaveLink(""); setPaySaving(true);
-    try {
-      if (payForm.payment_method === "wave") {
-        const { data } = await paymentAPI.getWaveLink({
-          amount: Number(payForm.amount),
-          clientName: c.name,
-          type: payForm.type,
-          mutualNumber: c.mutual_number
-        });
-        setWaveLink(data.payment_link);
-      } else {
-        await paymentAPI.create({
+    setPayError(""); setPaySuccess(""); setPaySaving(true);
+
+    const amount = Number(payForm.amount);
+
+    if (payForm.payment_method === "cinetpay") {
+      // 1. Pré-enregistrer la transaction
+      let txRef;
+      try {
+        const { data } = await paymentsAPI.initPayment({
           client_id: id,
-          amount: Number(payForm.amount),
+          amount,
           type: payForm.type,
-          payment_method: "cash"
+        });
+        txRef = data.transaction_reference;
+      } catch (err) {
+        setPayError(err.response?.data?.error || "Erreur initialisation paiement");
+        setPaySaving(false);
+        return;
+      }
+
+      // 2. Ouvrir le popup CinetPay
+      payWithCinetPay({
+        user: { name: c.name, phone: c.phone, email: "" },
+        amount,
+        description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${c.name}`,
+        transactionId: txRef,
+
+        onSuccess: async (_, usedTxId) => {
+          setPaySaving(false);
+          try {
+            await paymentsAPI.confirmPayment({ transaction_reference: usedTxId });
+          } catch { /* webhook prendra le relais */ }
+          setPaySuccess(`✅ Paiement confirmé — Réf : ${usedTxId}`);
+          loadClient();
+        },
+
+        onError: ({ message }) => {
+          setPaySaving(false);
+          setPayError(message || "Paiement refusé ou annulé.");
+        },
+      });
+
+    } else {
+      // Cash — enregistrement direct
+      try {
+        await paymentsAPI.create({
+          client_id: id,
+          amount,
+          type: payForm.type,
+          payment_method: "cash",
         });
         setShowPay(false);
         setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
         loadClient();
-      }
-    } catch (err) {
-      setPayError(err.response?.data?.error || "Erreur lors du paiement");
-    } finally { setPaySaving(false); }
+      } catch (err) {
+        setPayError(err.response?.data?.error || "Erreur lors du paiement");
+      } finally { setPaySaving(false); }
+    }
   }
 
   function handleClosePayModal() {
     setShowPay(false);
-    setWaveLink("");
+    setPaySuccess("");
+    setPayError("");
     setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
     loadClient();
   }
@@ -134,7 +170,7 @@ export default function ClientDetails() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setShowPay(true); setPayError(""); setWaveLink(""); }}
+              onClick={() => { setShowPay(true); setPayError(""); setPaySuccess(""); }}
               className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               💳 Paiement
@@ -263,75 +299,76 @@ export default function ClientDetails() {
 
       {/* Modal paiement */}
       <Modal open={showPay} onClose={handleClosePayModal} title="Enregistrer un paiement">
-        {waveLink ? (
-          /* ── QR Code Wave ── */
-          <div className="flex flex-col items-center space-y-5 py-2">
-            <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
-              <QRCodeSVG
-                value={waveLink}
-                size={220}
-                bgColor="#fff7ed"
-                fgColor="#c2410c"
-                level="H"
-                includeMargin={true}
-              />
+        <form onSubmit={handlePay} className="space-y-4">
+
+          {/* Succès */}
+          {paySuccess && (
+            <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg font-medium">
+              {paySuccess}
             </div>
-            <div className="text-center">
-              <p className="font-semibold text-slate-800 text-lg">📱 Scanner avec Wave</p>
-              <p className="text-slate-500 text-sm mt-1">{c.name} · {fmt(payForm.amount)}</p>
-              <p className="text-slate-400 text-xs mt-1 capitalize">{payForm.type}</p>
-            </div>
-            <div className="w-full bg-orange-50 rounded-lg p-3 text-center">
-              <p className="text-xs text-orange-700 font-medium">
-                Le client scanne ce QR code avec l'application Wave pour payer
-              </p>
-            </div>
-            <button
-              onClick={handleClosePayModal}
-              className="w-full py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              ✅ Paiement confirmé — Fermer
-            </button>
+          )}
+
+          {/* Erreur */}
+          {payError && (
+            <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{payError}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Montant (FCFA) *</label>
+            <input
+              required type="number" min="1" value={payForm.amount}
+              onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
+              placeholder="Ex : 5000"
+              disabled={paySaving}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
           </div>
-        ) : (
-          /* ── Formulaire paiement ── */
-          <form onSubmit={handlePay} className="space-y-4">
-            {payError && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{payError}</div>}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Montant (FCFA) *</label>
-              <input
-                required type="number" min="1" value={payForm.amount}
-                onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
-                placeholder="Ex : 5000"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+            <select value={payForm.type} onChange={(e) => setPayForm({ ...payForm, type: e.target.value })}
+              disabled={paySaving}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="mensualite">Mensualité</option>
+              <option value="adhesion">Adhésion</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Méthode</label>
+            <select value={payForm.payment_method} onChange={(e) => setPayForm({ ...payForm, payment_method: e.target.value })}
+              disabled={paySaving}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="cash">💵 Cash</option>
+              <option value="cinetpay">💳 CinetPay (Orange Money, Wave, MTN…)</option>
+            </select>
+          </div>
+
+          {/* Info CinetPay */}
+          {payForm.payment_method === "cinetpay" && (
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-blue-700">
+              <span className="text-base">💳</span>
+              Un popup de paiement sécurisé s'ouvrira — Orange Money, Wave, MTN MoMo, carte bancaire acceptés.
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-              <select value={payForm.type} onChange={(e) => setPayForm({ ...payForm, type: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="mensualite">Mensualité</option>
-                <option value="adhesion">Adhésion</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Méthode</label>
-              <select value={payForm.payment_method} onChange={(e) => setPayForm({ ...payForm, payment_method: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="cash">💵 Cash</option>
-                <option value="wave">📱 Wave (QR Code)</option>
-              </select>
-            </div>
-            <div className="flex gap-3 justify-end pt-2">
-              <button type="button" onClick={handleClosePayModal}
-                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Annuler</button>
+          )}
+
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" onClick={handleClosePayModal} disabled={paySaving}
+              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+              {paySuccess ? "Fermer" : "Annuler"}
+            </button>
+            {!paySuccess && (
               <button type="submit" disabled={paySaving}
-                className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-60 font-medium">
-                {paySaving ? "Traitement…" : payForm.payment_method === "wave" ? "📱 Générer QR Code" : "✅ Valider le paiement"}
+                className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-60 font-medium transition-colors">
+                {paySaving
+                  ? "⏳ Ouverture…"
+                  : payForm.payment_method === "cinetpay"
+                    ? "💳 Payer via CinetPay"
+                    : "✅ Valider le paiement"}
               </button>
-            </div>
-          </form>
-        )}
+            )}
+          </div>
+        </form>
       </Modal>
     </div>
   );
