@@ -1,145 +1,170 @@
 // src/pages/admin/AdminFederation.jsx
 // ─────────────────────────────────────────────────────────────
-//  Administration du réseau Fédération Awoundjô
-//  Vue : liste ambassadeurs, hiérarchie MLM, commissions
+//  Vue admin : réseau FÉDÉRATION (Parrainage)
+//  Rôles réels : RUM → LEADER → PASTEUR → RESPONSABLE → CLIENT
+//  API réelle (federationMemberAPI) — plus de données mock
+//  Affiche : plan, membership_fee, membership_payment_method
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-// ── Palette ──────────────────────────────────────────────────
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const agentToken = () => localStorage.getItem("token") || localStorage.getItem("agent_token");
+
 const C = {
-  purple:  "#7C3AED", purpleL: "#F5F3FF", purpleM: "#DDD6FE",
+  purple:  "#7C3AED", purpleL: "#F5F3FF",
   green:   "#059669", greenL:  "#ECFDF5",
   gold:    "#D97706", goldL:   "#FFFBEB",
   blue:    "#1B4FD8", blueL:   "#EEF2FF",
+  teal:    "#0D9488", tealL:   "#F0FDFA",
   red:     "#DC2626", redL:    "#FEF2F2",
   slate:   "#64748B", dark:    "#0F172A",
   border:  "#E2E8F0", bg:      "#F8FAFC",
 };
 
-const fmt = (n) => Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
+const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" }) : "—";
 
+// ── Rôles réels réseau Fédération (depuis ReferralPages.jsx) ──
 const ROLE_CONFIG = {
-  AMBASSADEUR_LEADER:    { label: "Leader",      icon: "👑", color: C.purple, bg: C.purpleL },
-  AMBASSADEUR_EGLISE:    { label: "Église",       icon: "⛪", color: C.blue,   bg: C.blueL   },
-  AMBASSADEUR_SUPERV:    { label: "Superviseur",  icon: "📋", color: C.green,  bg: C.greenL  },
-  AMBASSADEUR_RECRUTEUR: { label: "Recruteur",    icon: "🤝", color: C.gold,   bg: C.goldL   },
+  RUM:         { label:"RUM",         icon:"👑", color:C.purple, bg:C.purpleL },
+  LEADER:      { label:"Leader",      icon:"⭐", color:C.blue,   bg:C.blueL   },
+  PASTEUR:     { label:"Pasteur",     icon:"⛪", color:C.teal,   bg:C.tealL   },
+  RESPONSABLE: { label:"Responsable", icon:"🤝", color:C.gold,   bg:C.goldL   },
 };
 
-// ── Taux de commission ────────────────────────────────────────
+const PLAN_CONFIG = {
+  ESSENTIELLE: { label:"🌿 Essentielle", color:C.teal,   bg:C.tealL   },
+  IVOIRIENNE:  { label:"🌍 Ivoirienne",  color:C.blue,   bg:C.blueL   },
+  TURQUOISE:   { label:"💎 Turquoise",   color:C.purple, bg:C.purpleL },
+};
+
+const STATUS_CONFIG = {
+  ACTIVE:    { label:"Actif",      color:C.green, bg:C.greenL },
+  SUSPENDED: { label:"Suspendu",   color:C.red,   bg:C.redL   },
+  PENDING:   { label:"En attente", color:C.gold,  bg:C.goldL  },
+};
+
+// Taux de commission réseau Fédération
 const COMMISSION_RATES = [
-  { type: "DIRECT",    label: "Recruteur direct",       rate: 12, color: C.gold   },
-  { type: "SUPERIEUR", label: "Supérieur hiérarchique", rate: 10, color: C.green  },
-  { type: "DIRECTION", label: "Direction",              rate:  5, color: C.purple },
+  { type:"DIRECT",    label:"Recruteur direct",       rate:12, color:C.gold   },
+  { type:"SUPERIEUR", label:"Supérieur hiérarchique", rate:10, color:C.green  },
+  { type:"DIRECTION", label:"Direction",              rate: 5, color:C.purple },
 ];
 
-// ── Données mock (à remplacer par appels API) ─────────────────
-const MOCK_AMBASSADORS = [
-  { id: 1, name: "Pastor Koné Aimé",     email: "kone@eglise.ci",    role: "AMBASSADEUR_LEADER",    members: 48, commissions_month: 240, commissions_total: 1850, is_active: true,  referral_code: "AWJ-FED-00001", parent: null },
-  { id: 2, name: "Marie Bamba",          email: "bamba@eglise.ci",   role: "AMBASSADEUR_EGLISE",    members: 22, commissions_month: 110, commissions_total: 780,  is_active: true,  referral_code: "AWJ-FED-00002", parent: "Pastor Koné Aimé" },
-  { id: 3, name: "Jean Kouassi",         email: "kouassi@eglise.ci", role: "AMBASSADEUR_SUPERV",    members: 14, commissions_month: 75,  commissions_total: 430,  is_active: true,  referral_code: "AWJ-FED-00003", parent: "Marie Bamba" },
-  { id: 4, name: "Fatou Diallo",         email: "diallo@eglise.ci",  role: "AMBASSADEUR_RECRUTEUR", members: 6,  commissions_month: 32,  commissions_total: 198,  is_active: true,  referral_code: "AWJ-FED-00004", parent: "Jean Kouassi" },
-  { id: 5, name: "Ange Yao",             email: "yao@eglise.ci",     role: "AMBASSADEUR_RECRUTEUR", members: 3,  commissions_month: 18,  commissions_total: 95,   is_active: false, referral_code: "AWJ-FED-00005", parent: "Jean Kouassi" },
-];
-
-const MOCK_STATS = {
-  total_ambassadors: 5,
-  active_ambassadors: 4,
-  total_members: 93,
-  commissions_month: 475,
-  commissions_total: 3353,
-  new_recruits_month: 8,
-};
-
-// ── Composant Badge rôle ──────────────────────────────────────
 function RoleBadge({ role }) {
-  const rc = ROLE_CONFIG[role];
-  if (!rc) return null;
+  const r = ROLE_CONFIG[role];
+  if (!r) return null;
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999,
-      background: rc.bg, color: rc.color,
-    }}>
-      {rc.icon} {rc.label}
+    <span style={{ background:r.bg, color:r.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700, display:"inline-flex", alignItems:"center", gap:4 }}>
+      {r.icon} {r.label}
     </span>
   );
 }
 
-// ── Composant Modal détail ambassadeur ────────────────────────
-function AmbassadorModal({ amb, onClose }) {
-  if (!amb) return null;
-  const rc = ROLE_CONFIG[amb.role];
-  const base_month = amb.commissions_month * 2; // prime estimée (comm = 50% prime * taux)
-
+function PlanBadge({ plan }) {
+  if (!plan) return <span style={{ color:C.slate, fontSize:11 }}>—</span>;
+  const p = PLAN_CONFIG[plan] || { label:plan, color:C.slate, bg:C.bg };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    <span style={{ background:p.bg, color:p.color, padding:"2px 9px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+      {p.label}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const s = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
+  return (
+    <span style={{ background:s.bg, color:s.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+      {s.label}
+    </span>
+  );
+}
+
+// Modal détail ambassadeur
+function DetailModal({ amb, onClose, onToggleStatus }) {
+  if (!amb) return null;
+  const rc = ROLE_CONFIG[amb.role] || { icon:"👤", color:C.slate, bg:C.bg };
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: "28px 28px", maxWidth: 500, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.15)" }}
+      <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:500, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.15)" }}
         onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: rc?.color || C.purple, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-            {rc?.icon || "👤"}
+        <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
+          <div style={{ width:48, height:48, borderRadius:14, background:rc.bg, color:rc.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>
+            {rc.icon}
           </div>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: C.dark }}>{amb.name}</h3>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{amb.email}</p>
+          <div style={{ flex:1 }}>
+            <h3 style={{ margin:0, fontSize:17, fontWeight:900, color:C.dark }}>{amb.name}</h3>
+            <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{amb.email}</p>
           </div>
-          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: C.slate }}>✕</button>
+          <button onClick={onClose} style={{ border:"none", background:"none", fontSize:20, cursor:"pointer", color:C.slate }}>✕</button>
         </div>
 
-        <RoleBadge role={amb.role} />
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
+          <RoleBadge role={amb.role} />
+          <StatusBadge status={amb.status} />
+          <PlanBadge plan={amb.plan} />
+        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16, marginBottom: 16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
           {[
-            { label: "Membres recrutés",   value: amb.members,             color: C.purple },
-            { label: "Commissions/mois",   value: `${fmt(amb.commissions_month)} €`, color: C.gold, isText: true },
-            { label: "Total commissions",  value: `${fmt(amb.commissions_total)} €`, color: C.green, isText: true },
-            { label: "Statut",             value: amb.is_active ? "✅ Actif" : "⏸ Inactif", color: amb.is_active ? C.green : C.slate, isText: true },
+            { label:"Membres recrutés",   value: fmt(amb.recruit_count || amb.members || 0),  color:C.purple },
+            { label:"Cartes vendues",     value: fmt(amb.beneficiary_count || 0),              color:C.teal   },
+            { label:"Adhésion payée",     value: amb.membership_fee ? `${fmt(amb.membership_fee)} FCFA` : "—", color:C.green, isText:true },
+            { label:"Statut",             value: amb.status === "ACTIVE" ? "✅ Actif" : "⏸ Inactif", color:amb.status==="ACTIVE"?C.green:C.slate, isText:true },
           ].map(item => (
-            <div key={item.label} style={{ background: C.bg, borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 11, color: C.slate, fontWeight: 600 }}>{item.label}</p>
-              <p style={{ margin: 0, fontSize: item.isText ? 14 : 22, fontWeight: 800, color: item.color }}>
+            <div key={item.label} style={{ background:C.bg, borderRadius:10, padding:"12px 14px" }}>
+              <p style={{ margin:"0 0 4px", fontSize:11, color:C.slate, fontWeight:600 }}>{item.label}</p>
+              <p style={{ margin:0, fontSize:item.isText?14:22, fontWeight:800, color:item.color }}>
                 {item.isText ? item.value : fmt(item.value)}
               </p>
             </div>
           ))}
         </div>
 
-        <div style={{ background: C.bg, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
-          <p style={{ margin: "0 0 4px", fontSize: 11, color: C.slate, fontWeight: 600 }}>SUPÉRIEUR HIÉRARCHIQUE</p>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.dark }}>{amb.parent || "— Direction"}</p>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
+          {[
+            { label:"Code ambassadeur",   value: amb.referral_code || "—"             },
+            { label:"Username",           value: amb.username || "—"                  },
+            { label:"Mode paiement",      value: amb.membership_payment_method || "—" },
+            { label:"Transaction ID",     value: amb.membership_transaction_id || "—" },
+            { label:"Supérieur",          value: amb.parent_name || "— Direction"     },
+            { label:"Inscrit le",         value: fmtDate(amb.created_at)              },
+          ].map(item => (
+            <div key={item.label} style={{ background:C.bg, borderRadius:8, padding:"10px 12px" }}>
+              <p style={{ margin:0, fontSize:10, color:C.slate, fontWeight:600 }}>{item.label}</p>
+              <p style={{ margin:"3px 0 0", fontSize:12, fontWeight:700, color:C.dark, wordBreak:"break-all" }}>{item.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div style={{ background: C.bg, borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
-          <p style={{ margin: "0 0 4px", fontSize: 11, color: C.slate, fontWeight: 600 }}>CODE DE PARRAINAGE</p>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: C.purple, letterSpacing: 1 }}>{amb.referral_code}</p>
-        </div>
+        {/* Commissions estimées */}
+        {amb.commissions_month > 0 && (
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginBottom:16 }}>
+            <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate }}>COMMISSIONS CE MOIS</p>
+            {COMMISSION_RATES.map(r => {
+              const base = Number(amb.commissions_month || 0) * 2 * 0.5;
+              const amount = base * r.rate / 100;
+              return (
+                <div key={r.type} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                  <span style={{ fontSize:12, color:C.slate }}>{r.label} ({r.rate}%)</span>
+                  <span style={{ fontSize:13, fontWeight:700, color:r.color }}>{amount.toFixed(2)} €</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Détail commission */}
-        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: C.slate }}>RÉPARTITION DES COMMISSIONS (ce mois)</p>
-          {COMMISSION_RATES.map(r => {
-            const base = base_month * 0.5;
-            const amount = base * r.rate / 100;
-            return (
-              <div key={r.type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: C.slate }}>{r.label} ({r.rate}%)</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: r.color }}>{amount.toFixed(2)} €</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1.5px solid ${C.border}`, background: "#fff", color: amb.is_active ? C.red : C.green, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            {amb.is_active ? "⏸ Suspendre" : "✅ Réactiver"}
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={() => onToggleStatus(amb)}
+            style={{ flex:1, padding:"10px 0", borderRadius:10, border:`1.5px solid ${C.border}`, background:"#fff", color:amb.status==="ACTIVE"?C.red:C.green, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+            {amb.status === "ACTIVE" ? "🚫 Suspendre" : "✅ Réactiver"}
           </button>
-          <button style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: C.purple, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            ✏️ Modifier le rôle
+          <button onClick={onClose}
+            style={{ flex:1, padding:"10px 0", borderRadius:10, border:"none", background:C.purple, color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+            Fermer
           </button>
         </div>
       </div>
@@ -147,283 +172,358 @@ function AmbassadorModal({ amb, onClose }) {
   );
 }
 
-// ── AdminFederation ───────────────────────────────────────────
 export default function AdminFederation() {
-  const navigate = useNavigate();
-  const [tab, setTab]             = useState("ambassadors");
-  const [search, setSearch]       = useState("");
-  const [filterRole, setFilterRole] = useState("ALL");
-  const [filterStatus, setFilterStatus] = useState("ALL");
-  const [selected, setSelected]   = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const [members, setMembers]         = useState([]);
+  const [filtered, setFiltered]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+  const [tab, setTab]                 = useState("members");
+  const [search, setSearch]           = useState("");
+  const [roleFilter, setRoleFilter]   = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selected, setSelected]       = useState(null);
 
-  // Données (remplacer par appels API réels)
-  const stats       = MOCK_STATS;
-  const ambassadors = MOCK_AMBASSADORS;
+  const stats = {
+    total:      members.length,
+    actifs:     members.filter(m => m.status === "ACTIVE").length,
+    rum:        members.filter(m => m.role === "RUM").length,
+    leaders:    members.filter(m => m.role === "LEADER").length,
+    pasteurs:   members.filter(m => m.role === "PASTEUR").length,
+    responsables: members.filter(m => m.role === "RESPONSABLE").length,
+    cartes:     members.reduce((s, m) => s + Number(m.beneficiary_count || 0), 0),
+    adhesions:  members.reduce((s, m) => s + Number(m.membership_fee || 0), 0),
+    commissions: members.reduce((s, m) => s + Number(m.commissions_total || m.total_payments_eur || 0), 0),
+  };
 
-  // Filtrage
-  const filtered = ambassadors.filter(a => {
-    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole   = filterRole === "ALL" || a.role === filterRole;
-    const matchStatus = filterStatus === "ALL" || (filterStatus === "ACTIVE" ? a.is_active : !a.is_active);
-    return matchSearch && matchRole && matchStatus;
-  });
+  useEffect(() => { fetchMembers(); }, []);
+
+  useEffect(() => {
+    let list = members;
+    if (roleFilter !== "ALL")   list = list.filter(m => m.role === roleFilter);
+    if (statusFilter !== "ALL") list = list.filter(m => m.status === statusFilter);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(m =>
+        m.name?.toLowerCase().includes(q) ||
+        m.email?.toLowerCase().includes(q) ||
+        m.username?.toLowerCase().includes(q) ||
+        m.referral_code?.toLowerCase().includes(q)
+      );
+    }
+    setFiltered(list);
+  }, [members, search, roleFilter, statusFilter]);
+
+  async function fetchMembers() {
+    setLoading(true); setError("");
+    try {
+      const { data } = await axios.get(`${API}/api/federation/admin/members`, {
+        headers: { Authorization: `Bearer ${agentToken()}` },
+      });
+      setMembers(data.members || []);
+    } catch (e) {
+      setError(e.response?.data?.error || "Erreur lors du chargement des membres");
+    } finally { setLoading(false); }
+  }
+
+  async function toggleStatus(amb) {
+    const newStatus = amb.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    try {
+      await axios.put(`${API}/api/federation/admin/members/${amb.id}/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      fetchMembers();
+      setSelected(null);
+    } catch (err) {
+      alert(err.response?.data?.error || "Erreur mise à jour statut");
+    }
+  }
 
   const TABS = [
-    { id: "ambassadors", label: "👥 Ambassadeurs", count: stats.total_ambassadors },
-    { id: "commissions", label: "💰 Commissions",  count: null },
-    { id: "hierarchy",   label: "🏛️ Hiérarchie",   count: null },
+    { id:"members",    label:"👥 Membres",       count:stats.total   },
+    { id:"hierarchy",  label:"🏛️ Hiérarchie",    count:null          },
+    { id:"commissions",label:"💰 Commissions",   count:null          },
   ];
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px", fontFamily: "'DM Sans',system-ui,sans-serif" }}>
+    <div style={{ padding:"24px 20px", maxWidth:1100, margin:"0 auto" }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <button onClick={() => navigate(-1)} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer", color: C.slate }}>←</button>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: C.dark }}>⛪ Réseau Fédération</h1>
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: C.slate }}>Gestion des ambassadeurs et commissions du réseau fédération</p>
-        </div>
-        <button style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: C.purple, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-          ➕ Ajouter un ambassadeur
-        </button>
+      {/* En-tête */}
+      <div style={{ marginBottom:24 }}>
+        <h1 style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark }}>⛪ Réseau Fédération</h1>
+        <p style={{ margin:"4px 0 0", color:C.slate, fontSize:14 }}>
+          RUM → Leader → Pasteur → Responsable → Client
+        </p>
       </div>
 
-      {/* ── KPIs ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+      {/* Stats */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { icon: "👥", label: "Ambassadeurs",  value: stats.total_ambassadors, sub: `${stats.active_ambassadors} actifs`,   color: C.purple, bg: C.purpleL },
-          { icon: "🤝", label: "Membres total", value: stats.total_members,     sub: "membres recrutés",                      color: C.blue,   bg: C.blueL   },
-          { icon: "💰", label: "Comm. ce mois", value: `${fmt(stats.commissions_month)} €`, sub: "distribuées", color: C.gold, bg: C.goldL, isText: true },
-          { icon: "📈", label: "Comm. totales", value: `${fmt(stats.commissions_total)} €`, sub: "depuis le début", color: C.green, bg: C.greenL, isText: true },
-          { icon: "🆕", label: "Nouveaux/mois", value: stats.new_recruits_month, sub: "ce mois",                             color: C.blue,   bg: C.blueL   },
-        ].map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: 12, border: `1px solid ${k.color}22`, padding: "14px 16px" }}>
-            <span style={{ fontSize: 22 }}>{k.icon}</span>
-            <p style={{ margin: "8px 0 2px", fontSize: k.isText ? 16 : 24, fontWeight: 900, color: k.color }}>
-              {k.isText ? k.value : fmt(k.value)}
+          { icon:"👥", label:"Total",         value:stats.total,        color:C.purple, bg:C.purpleL, isText:false },
+          { icon:"✅", label:"Actifs",        value:stats.actifs,       color:C.green,  bg:C.greenL,  isText:false },
+          { icon:"👑", label:"RUM",           value:stats.rum,          color:C.purple, bg:C.purpleL, isText:false },
+          { icon:"⭐", label:"Leaders",       value:stats.leaders,      color:C.blue,   bg:C.blueL,   isText:false },
+          { icon:"⛪", label:"Pasteurs",      value:stats.pasteurs,     color:C.teal,   bg:C.tealL,   isText:false },
+          { icon:"🤝", label:"Responsables",  value:stats.responsables, color:C.gold,   bg:C.goldL,   isText:false },
+          { icon:"🎴", label:"Cartes",        value:stats.cartes,       color:C.teal,   bg:C.tealL,   isText:false },
+          { icon:"💳", label:"Adhésions FCFA",value:`${fmt(stats.adhesions)} FCFA`, color:C.purple, bg:C.purpleL, isText:true },
+        ].map(s => (
+          <div key={s.label} style={{ background:s.bg, borderRadius:12, padding:"14px 16px", border:`1px solid ${s.color}22` }}>
+            <span style={{ fontSize:20 }}>{s.icon}</span>
+            <p style={{ margin:"8px 0 2px", fontSize:s.isText?12:22, fontWeight:900, color:s.color }}>
+              {s.isText ? s.value : fmt(s.value)}
             </p>
-            <p style={{ margin: "0 0 2px", fontSize: 11, fontWeight: 700, color: C.dark }}>{k.label}</p>
-            <p style={{ margin: 0, fontSize: 10, color: C.slate }}>{k.sub}</p>
+            <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: "flex", gap: 4, background: C.bg, borderRadius: 12, padding: 4, marginBottom: 20, width: "fit-content" }}>
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:4, background:C.bg, borderRadius:12, padding:4, marginBottom:20, width:"fit-content" }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            style={{
-              padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
-              fontFamily: "inherit", fontSize: 13, fontWeight: 600, transition: "all .2s",
-              background: tab === t.id ? "#fff" : "transparent",
-              color:      tab === t.id ? C.purple : C.slate,
-              boxShadow:  tab === t.id ? "0 1px 4px rgba(0,0,0,.08)" : "none",
-            }}>
+            style={{ padding:"8px 18px", borderRadius:8, border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600, transition:"all .2s",
+              background:tab===t.id?"#fff":"transparent", color:tab===t.id?C.purple:C.slate,
+              boxShadow:tab===t.id?"0 1px 4px rgba(0,0,0,.08)":"none" }}>
             {t.label}{t.count !== null ? ` (${t.count})` : ""}
           </button>
         ))}
       </div>
 
-      {/* ══ TAB : Ambassadeurs ══ */}
-      {tab === "ambassadors" && (
-        <div style={{ background: "#fff", borderRadius: 16, border: `1px solid ${C.border}`, padding: "20px 20px" }}>
+      {error && (
+        <div style={{ background:C.redL, color:C.red, padding:"12px 16px", borderRadius:10, marginBottom:16 }}>⚠️ {error}</div>
+      )}
 
+      {/* ══ TAB : Membres ══ */}
+      {tab === "members" && (
+        <>
           {/* Filtres */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-            <input
-              placeholder="🔍 Rechercher un ambassadeur…"
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, minWidth: 200, padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 13, outline: "none", fontFamily: "inherit", color: C.dark }}
+          <div style={{ background:"#fff", borderRadius:12, border:`1px solid ${C.border}`, padding:"14px 16px", marginBottom:16, display:"flex", gap:10, flexWrap:"wrap" }}>
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="🔍 Nom, email, username, code…"
+              style={{ flex:1, minWidth:200, padding:"8px 14px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, outline:"none" }}
             />
-            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-              style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 13, outline: "none", fontFamily: "inherit", color: C.dark, background: "#fff" }}>
+            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
+              style={{ padding:"8px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, outline:"none", background:"#fff", color:C.dark }}>
               <option value="ALL">Tous les rôles</option>
-              {Object.entries(ROLE_CONFIG).map(([k, v]) => (
+              {Object.entries(ROLE_CONFIG).map(([k,v]) => (
                 <option key={k} value={k}>{v.icon} {v.label}</option>
               ))}
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 13, outline: "none", fontFamily: "inherit", color: C.dark, background: "#fff" }}>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              style={{ padding:"8px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, outline:"none", background:"#fff", color:C.dark }}>
               <option value="ALL">Tous les statuts</option>
               <option value="ACTIVE">✅ Actifs</option>
-              <option value="INACTIVE">⏸ Inactifs</option>
+              <option value="PENDING">⏳ En attente</option>
+              <option value="SUSPENDED">🚫 Suspendus</option>
             </select>
+            <button onClick={fetchMembers}
+              style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontWeight:700, fontSize:12, cursor:"pointer" }}>
+              🔄 Actualiser
+            </button>
           </div>
 
-          {/* Tableau */}
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: C.bg }}>
-                  {["Ambassadeur", "Rôle", "Supérieur", "Membres", "Comm./mois", "Total", "Statut", "Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700, color: C.slate, fontSize: 11, textTransform: "uppercase", letterSpacing: .6, whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((amb, i) => (
-                  <tr key={amb.id} style={{ borderTop: `1px solid ${C.border}`, transition: "background .1s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = C.bg}
-                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
-                    <td style={{ padding: "12px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: ROLE_CONFIG[amb.role]?.color || C.purple, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
-                          {ROLE_CONFIG[amb.role]?.icon || "👤"}
-                        </div>
-                        <div>
-                          <p style={{ margin: 0, fontWeight: 700, color: C.dark }}>{amb.name}</p>
-                          <p style={{ margin: 0, fontSize: 11, color: C.slate }}>{amb.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}><RoleBadge role={amb.role} /></td>
-                    <td style={{ padding: "12px 12px", color: C.slate, fontSize: 12 }}>{amb.parent || "— Direction"}</td>
-                    <td style={{ padding: "12px 12px", fontWeight: 700, color: C.purple }}>{fmt(amb.members)}</td>
-                    <td style={{ padding: "12px 12px", fontWeight: 700, color: C.gold }}>{fmt(amb.commissions_month)} €</td>
-                    <td style={{ padding: "12px 12px", fontWeight: 700, color: C.green }}>{fmt(amb.commissions_total)} €</td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: amb.is_active ? C.greenL : C.bg, color: amb.is_active ? C.green : C.slate }}>
-                        {amb.is_active ? "✅ Actif" : "⏸ Inactif"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <button onClick={() => setSelected(amb)}
-                        style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.purpleM}`, background: C.purpleL, color: C.purple, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                        Détail
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filtered.length === 0 && (
-              <div style={{ textAlign: "center", padding: "32px", color: C.slate, fontSize: 13 }}>
-                Aucun ambassadeur trouvé avec ces critères.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ══ TAB : Commissions ══ */}
-      {tab === "commissions" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* Explication du système */}
-          <div style={{ background: "#fff", borderRadius: 16, border: `1px solid ${C.border}`, padding: "20px 24px" }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: C.dark }}>📐 Règles de calcul</h3>
-            <div style={{ background: C.purpleL, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
-              <p style={{ margin: 0, fontSize: 13, color: C.purple, fontWeight: 700 }}>
-                Base de calcul = 50% de la prime encaissée
-              </p>
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.slate }}>
-                Exemple : prime de 100 € → base de 50 €
-              </p>
+          {loading ? (
+            <div style={{ display:"flex", justifyContent:"center", padding:60 }}>
+              <div style={{ width:40, height:40, border:`3px solid ${C.purpleL}`, borderTop:`3px solid ${C.purple}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 12 }}>
-              {COMMISSION_RATES.map(r => (
-                <div key={r.type} style={{ background: C.bg, borderRadius: 10, padding: "14px 16px", border: `1px solid ${r.color}22` }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.slate, textTransform: "uppercase", letterSpacing: .6 }}>{r.type}</p>
-                  <p style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 900, color: r.color }}>{r.rate}%</p>
-                  <p style={{ margin: 0, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.label}</p>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: C.slate }}>Exemple 100€ prime → {(50 * r.rate / 100).toFixed(2)} €</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tableau commissions par ambassadeur */}
-          <div style={{ background: "#fff", borderRadius: 16, border: `1px solid ${C.border}`, padding: "20px 24px" }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: C.dark }}>💰 Commissions par ambassadeur</h3>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: C.bg }}>
-                    {["Ambassadeur", "Rôle", "Ce mois", "Total", "En attente"].map(h => (
-                      <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700, color: C.slate, fontSize: 11, textTransform: "uppercase", letterSpacing: .6 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ambassadors.sort((a,b) => b.commissions_month - a.commissions_month).map(amb => (
-                    <tr key={amb.id} style={{ borderTop: `1px solid ${C.border}` }}>
-                      <td style={{ padding: "12px 12px", fontWeight: 700, color: C.dark }}>{amb.name}</td>
-                      <td style={{ padding: "12px 12px" }}><RoleBadge role={amb.role} /></td>
-                      <td style={{ padding: "12px 12px", fontWeight: 800, color: C.gold }}>{fmt(amb.commissions_month)} €</td>
-                      <td style={{ padding: "12px 12px", fontWeight: 700, color: C.green }}>{fmt(amb.commissions_total)} €</td>
-                      <td style={{ padding: "12px 12px" }}>
-                        <span style={{ background: C.goldL, color: C.gold, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
-                          {fmt(Math.round(amb.commissions_month * 0.3))} €
-                        </span>
-                      </td>
+          ) : (
+            <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                  <thead>
+                    <tr style={{ background:C.bg }}>
+                      {["Membre","Rôle","Plan","Statut","Cartes","Adhésion","Paiement","Inscrit le","Actions"].map(h => (
+                        <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:700, color:C.slate, fontSize:11, textTransform:"uppercase", letterSpacing:.5, whiteSpace:"nowrap" }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filtered.map(m => (
+                      <tr key={m.id} style={{ borderTop:`1px solid ${C.border}` }}
+                        onMouseEnter={e => e.currentTarget.style.background=C.bg}
+                        onMouseLeave={e => e.currentTarget.style.background="#fff"}>
+                        <td style={{ padding:"12px 12px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <div style={{ width:32, height:32, borderRadius:8, background:ROLE_CONFIG[m.role]?.bg||C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>
+                              {ROLE_CONFIG[m.role]?.icon||"👤"}
+                            </div>
+                            <div>
+                              <p style={{ margin:0, fontWeight:700, color:C.dark }}>{m.name}</p>
+                              <p style={{ margin:0, fontSize:11, color:C.slate }}>@{m.username||"—"} • {m.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding:"12px 12px" }}><RoleBadge role={m.role} /></td>
+                        <td style={{ padding:"12px 12px" }}><PlanBadge plan={m.plan} /></td>
+                        <td style={{ padding:"12px 12px" }}><StatusBadge status={m.status} /></td>
+                        <td style={{ padding:"12px 12px", fontWeight:700, color:C.teal }}>{m.beneficiary_count||0}</td>
+                        <td style={{ padding:"12px 12px", fontWeight:700, color:C.purple }}>{m.membership_fee ? `${fmt(m.membership_fee)} F` : "—"}</td>
+                        <td style={{ padding:"12px 12px", fontSize:11, color:C.slate }}>{m.membership_payment_method||"—"}</td>
+                        <td style={{ padding:"12px 12px", fontSize:11, color:C.slate }}>{fmtDate(m.created_at)}</td>
+                        <td style={{ padding:"12px 12px" }}>
+                          <button onClick={() => setSelected(m)}
+                            style={{ padding:"6px 14px", borderRadius:8, border:`1.5px solid ${C.purpleL}`, background:C.purpleL, color:C.purple, fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                            Détail
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign:"center", padding:40, color:C.slate }}>
+                          Aucun membre trouvé avec ces critères.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+          {!loading && (
+            <p style={{ marginTop:12, textAlign:"center", color:C.slate, fontSize:12 }}>
+              {filtered.length} membre(s) sur {members.length} au total
+            </p>
+          )}
+        </>
       )}
 
       {/* ══ TAB : Hiérarchie ══ */}
       {tab === "hierarchy" && (
-        <div style={{ background: "#fff", borderRadius: 16, border: `1px solid ${C.border}`, padding: "24px 24px" }}>
-          <h3 style={{ margin: "0 0 20px", fontSize: 15, fontWeight: 800, color: C.dark }}>🏛️ Organigramme Fédération</h3>
+        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"24px 20px" }}>
+          <p style={{ margin:"0 0 20px", fontWeight:800, color:C.dark, fontSize:15 }}>🏛️ Organigramme Fédération</p>
 
-          {/* Schéma hiérarchique visuel */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 0, alignItems: "center", marginBottom: 24 }}>
+          {/* Schéma visuel */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:0, marginBottom:28 }}>
             {Object.entries(ROLE_CONFIG).map(([key, cfg], i) => {
-              const ambs = ambassadors.filter(a => a.role === key);
+              const ambs = members.filter(m => m.role === key);
               return (
-                <div key={key} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-                  {i > 0 && <div style={{ width: 2, height: 20, background: C.border }} />}
-                  <div style={{ background: cfg.bg, border: `2px solid ${cfg.color}44`, borderRadius: 12, padding: "12px 20px", width: "fit-content", textAlign: "center", minWidth: 200 }}>
-                    <span style={{ fontSize: 22 }}>{cfg.icon}</span>
-                    <p style={{ margin: "4px 0 2px", fontWeight: 800, fontSize: 14, color: cfg.color }}>{cfg.label}</p>
-                    <p style={{ margin: 0, fontSize: 12, color: C.slate }}>{ambs.length} ambassadeur{ambs.length > 1 ? "s" : ""}</p>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
-                      {ambs.map(a => (
-                        <span key={a.id} onClick={() => setSelected(a)}
-                          style={{ fontSize: 11, background: cfg.color, color: "#fff", padding: "2px 10px", borderRadius: 999, cursor: "pointer", fontWeight: 600 }}>
-                          {a.name.split(" ")[0]}
+                <div key={key} style={{ display:"flex", flexDirection:"column", alignItems:"center", width:"100%" }}>
+                  {i > 0 && <div style={{ width:2, height:20, background:C.border }} />}
+                  <div style={{ background:cfg.bg, border:`2px solid ${cfg.color}44`, borderRadius:12, padding:"12px 20px", textAlign:"center", minWidth:220 }}>
+                    <span style={{ fontSize:22 }}>{cfg.icon}</span>
+                    <p style={{ margin:"4px 0 2px", fontWeight:800, fontSize:14, color:cfg.color }}>{cfg.label}</p>
+                    <p style={{ margin:0, fontSize:12, color:C.slate }}>{ambs.length} membre(s)</p>
+                    <div style={{ display:"flex", gap:6, justifyContent:"center", flexWrap:"wrap", marginTop:8 }}>
+                      {ambs.slice(0,6).map(m => (
+                        <span key={m.id} onClick={() => setSelected(m)}
+                          style={{ fontSize:11, background:cfg.color, color:"#fff", padding:"2px 10px", borderRadius:999, cursor:"pointer", fontWeight:600 }}>
+                          {m.name.split(" ")[0]}
                         </span>
                       ))}
+                      {ambs.length > 6 && (
+                        <span style={{ fontSize:11, color:cfg.color, fontWeight:600 }}>+{ambs.length-6}</span>
+                      )}
                     </div>
                   </div>
                 </div>
               );
             })}
+            <div style={{ width:2, height:20, background:C.border }} />
+            <div style={{ background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:"10px 20px", textAlign:"center", minWidth:180 }}>
+              <p style={{ margin:0, fontSize:20 }}>👤</p>
+              <p style={{ margin:"4px 0 2px", fontWeight:800, fontSize:13, color:C.slate }}>Clients</p>
+              <p style={{ margin:0, fontSize:12, color:C.slate }}>{fmt(stats.cartes)} carte(s)</p>
+            </div>
           </div>
 
-          {/* Tableau arborescent */}
-          <h4 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: C.slate, textTransform: "uppercase", letterSpacing: .6 }}>Vue détaillée</h4>
-          {ambassadors.map(amb => {
-            const rc = ROLE_CONFIG[amb.role];
-            const indent = { AMBASSADEUR_LEADER: 0, AMBASSADEUR_EGLISE: 1, AMBASSADEUR_SUPERV: 2, AMBASSADEUR_RECRUTEUR: 3 }[amb.role] || 0;
+          {/* Vue arborescente */}
+          <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.5 }}>Vue arborescente</p>
+          {members.map(m => {
+            const rc = ROLE_CONFIG[m.role];
+            const indent = { RUM:0, LEADER:1, PASTEUR:2, RESPONSABLE:3 }[m.role] || 0;
             return (
-              <div key={amb.id} onClick={() => setSelected(amb)}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", marginLeft: indent * 24, borderRadius: 10, cursor: "pointer", transition: "background .15s", marginBottom: 4, border: `1px solid ${rc?.color}22`, background: rc?.bg }}
-                onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
-                onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
-                {indent > 0 && <span style={{ color: C.border, fontSize: 16, flexShrink: 0 }}>└─</span>}
-                <span style={{ fontSize: 18 }}>{rc?.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: C.dark }}>{amb.name}</p>
-                  {amb.parent && <p style={{ margin: 0, fontSize: 11, color: C.slate }}>↳ {amb.parent}</p>}
+              <div key={m.id} onClick={() => setSelected(m)}
+                style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", marginLeft:indent*24, borderRadius:10, cursor:"pointer", marginBottom:4, border:`1px solid ${rc?.color||C.border}22`, background:rc?.bg||C.bg }}
+                onMouseEnter={e => e.currentTarget.style.opacity=".85"}
+                onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+                {indent > 0 && <span style={{ color:C.border, fontSize:16, flexShrink:0 }}>└─</span>}
+                <span style={{ fontSize:16 }}>{rc?.icon||"👤"}</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ margin:0, fontWeight:700, fontSize:13, color:C.dark }}>{m.name}</p>
+                  <p style={{ margin:0, fontSize:11, color:C.slate }}>@{m.username||"—"}{m.parent_name ? ` ↳ ${m.parent_name}` : ""}</p>
                 </div>
-                <span style={{ fontSize: 11, color: C.slate }}>{amb.members} membres →</span>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <PlanBadge plan={m.plan} />
+                  <StatusBadge status={m.status} />
+                  <span style={{ fontSize:11, color:C.slate }}>{m.recruit_count||0} recrutés →</span>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* ── Modal détail ── */}
-      <AmbassadorModal amb={selected} onClose={() => setSelected(null)} />
+      {/* ══ TAB : Commissions ══ */}
+      {tab === "commissions" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {/* Règles */}
+          <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"20px 24px" }}>
+            <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark, fontSize:15 }}>📐 Règles de calcul</p>
+            <div style={{ background:C.purpleL, borderRadius:10, padding:"14px 16px", marginBottom:14 }}>
+              <p style={{ margin:0, fontSize:13, color:C.purple, fontWeight:700 }}>Base = 50% de la prime encaissée</p>
+              <p style={{ margin:"4px 0 0", fontSize:12, color:C.slate }}>Exemple : prime de 100 € → base de 50 €</p>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px,1fr))", gap:12 }}>
+              {COMMISSION_RATES.map(r => (
+                <div key={r.type} style={{ background:C.bg, borderRadius:10, padding:"14px 16px", border:`1px solid ${r.color}22` }}>
+                  <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.5 }}>{r.type}</p>
+                  <p style={{ margin:"0 0 4px", fontSize:18, fontWeight:900, color:r.color }}>{r.rate}%</p>
+                  <p style={{ margin:0, fontSize:12, color:C.dark, fontWeight:600 }}>{r.label}</p>
+                  <p style={{ margin:"4px 0 0", fontSize:11, color:C.slate }}>100€ prime → {(50*r.rate/100).toFixed(2)} €</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tableau commissions */}
+          <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"20px 24px" }}>
+            <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark, fontSize:15 }}>💰 Commissions par membre</p>
+            {loading ? (
+              <div style={{ textAlign:"center", padding:30, color:C.slate }}>Chargement…</div>
+            ) : (
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                  <thead>
+                    <tr style={{ background:C.bg }}>
+                      {["Membre","Rôle","Plan","Ce mois (€)","Total (€)","En attente"].map(h => (
+                        <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:700, color:C.slate, fontSize:11, textTransform:"uppercase", letterSpacing:.5 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members
+                      .filter(m => m.commissions_month > 0 || m.commissions_total > 0)
+                      .sort((a,b) => Number(b.commissions_month||0) - Number(a.commissions_month||0))
+                      .map(m => (
+                        <tr key={m.id} style={{ borderTop:`1px solid ${C.border}` }}>
+                          <td style={{ padding:"12px 12px", fontWeight:700, color:C.dark }}>{m.name}</td>
+                          <td style={{ padding:"12px 12px" }}><RoleBadge role={m.role} /></td>
+                          <td style={{ padding:"12px 12px" }}><PlanBadge plan={m.plan} /></td>
+                          <td style={{ padding:"12px 12px", fontWeight:800, color:C.gold }}>{fmt(m.commissions_month || 0)} €</td>
+                          <td style={{ padding:"12px 12px", fontWeight:700, color:C.green }}>{fmt(m.commissions_total || 0)} €</td>
+                          <td style={{ padding:"12px 12px" }}>
+                            <span style={{ background:C.goldL, color:C.gold, padding:"3px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                              {fmt(Math.round(Number(m.commissions_month||0) * 0.3))} €
+                            </span>
+                          </td>
+                        </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {members.filter(m => m.commissions_month > 0 || m.commissions_total > 0).length === 0 && (
+                  <p style={{ textAlign:"center", padding:"32px", color:C.slate, fontSize:13 }}>Aucune commission enregistrée pour le moment.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail */}
+      <DetailModal amb={selected} onClose={() => setSelected(null)} onToggleStatus={toggleStatus} />
     </div>
   );
 }
