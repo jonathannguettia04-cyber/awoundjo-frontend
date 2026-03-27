@@ -13,15 +13,27 @@ const CINETPAY_CONFIG = {
   mode:       "TEST", // ← changer en "PRODUCTION" au lancement
 };
 
+const SDK_URL = "https://cdn.cinetpay.com/seamless/main.js";
+
 /**
- * Attend que window.CinetPay soit disponible (max 10 secondes).
- * Résout si OK, rejette si timeout.
+ * Injecte le script CinetPay dans le DOM puis attend que
+ * window.CinetPay soit disponible (max 10 secondes).
  */
-function waitForSDK(timeoutMs = 10000) {
+function loadCinetPaySDK() {
   return new Promise((resolve, reject) => {
+    // Déjà prêt ?
     if (window.CinetPay) {
       resolve();
       return;
+    }
+
+    // Script déjà en cours d'injection → attendre seulement
+    const existing = document.getElementById("cinetpay-sdk");
+    if (!existing) {
+      const script = document.createElement("script");
+      script.id  = "cinetpay-sdk";
+      script.src = SDK_URL;
+      document.head.appendChild(script);
     }
 
     const start = Date.now();
@@ -29,9 +41,12 @@ function waitForSDK(timeoutMs = 10000) {
       if (window.CinetPay) {
         clearInterval(interval);
         resolve();
-      } else if (Date.now() - start > timeoutMs) {
+      } else if (Date.now() - start > 10000) {
         clearInterval(interval);
-        reject(new Error("SDK CinetPay introuvable après 10 secondes. Vérifiez index.html."));
+        reject(new Error(
+          "Le SDK CinetPay n'a pas pu se charger. " +
+          "Vérifiez votre connexion ou les paramètres CSP de Vercel."
+        ));
       }
     }, 100);
   });
@@ -44,8 +59,8 @@ function waitForSDK(timeoutMs = 10000) {
  * @param {number}   amount        - Montant en XOF (ex: 15000)
  * @param {string}   description   - Description affichée dans le popup
  * @param {string}   transactionId - Identifiant unique (ex: `AWJ-${Date.now()}`)
- * @param {Function} onSuccess     - Callback appelé si paiement accepté
- * @param {Function} onError       - Callback appelé en cas d'erreur
+ * @param {Function} onSuccess     - Callback appelé si paiement accepté → (data, txId)
+ * @param {Function} onError       - Callback appelé en cas d'erreur → ({ message, data? })
  */
 export async function payWithCinetPay({
   user,
@@ -56,7 +71,7 @@ export async function payWithCinetPay({
   onError,
 }) {
   try {
-    await waitForSDK();
+    await loadCinetPaySDK();
   } catch (err) {
     console.error("[CinetPay]", err.message);
     onError?.({ message: err.message });
@@ -78,11 +93,11 @@ export async function payWithCinetPay({
     transaction_id:        txId,
     amount:                amount,
     currency:              "XOF",
-    channels:              "ALL",       // Mobile Money + Wave + CB
+    channels:              "ALL",
     description:           description,
-    customer_name:         user.name   || "",
-    customer_email:        user.email  || "",
-    customer_phone_number: user.phone  || "",
+    customer_name:         user.name  || "",
+    customer_email:        user.email || "",
+    customer_phone_number: user.phone || "",
     customer_country:      "CI",
     customer_state:        "CI",
     customer_city:         "Abidjan",
