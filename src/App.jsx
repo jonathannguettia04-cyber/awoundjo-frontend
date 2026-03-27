@@ -198,13 +198,13 @@ export default function App() {
               <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
             } />
             <Route path="/payments" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Payments /></ProtectedRoute>
             } />
             <Route path="/commissions" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Commissions /></ProtectedRoute>
             } />
             <Route path="/groups" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
             } />
             <Route path="/agents" element={
               <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
@@ -213,7 +213,7 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}

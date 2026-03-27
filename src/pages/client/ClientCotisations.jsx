@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientContribAPI } from "../../clientApi";
+import { payWithCinetPay } from "../../services/cinetpay";
 
 const MONTHS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
@@ -10,19 +11,19 @@ const STATUS_STYLE = {
   upcoming: { icon: "⏳", label: "À venir", color: "#94A3B8", bg: "#F8FAFC",                                 border: "#E2E8F0" },
 };
 
-const METHOD_ICON = { "Wave": "🌊" };
+const METHOD_ICON = { "CinetPay": "💳", "Wave": "🌊" };
 
 export default function ClientCotisations() {
   const navigate = useNavigate();
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(false);
-  const [amount,  setAmount]  = useState("");
-  const [paying,  setPaying]  = useState(false);
-  const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState("");
-  const [visible, setVis]     = useState(false);
-  const [tab,     setTab]     = useState("calendar");
+  const [data,       setData]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [modal,      setModal]      = useState(false);
+  const [amount,     setAmount]     = useState("");
+  const [paying,     setPaying]     = useState(false);
+  const [error,      setError]      = useState("");
+  const [success,    setSuccess]    = useState("");
+  const [visible,    setVis]        = useState(false);
+  const [tab,        setTab]        = useState("calendar");
 
   const load = () => {
     clientContribAPI.get()
@@ -34,40 +35,57 @@ export default function ClientCotisations() {
   useEffect(() => { load(); }, []);
 
   const handlePay = async () => {
-    if (!amount || parseInt(amount) < 10000) return setError("Montant minimum : 10 000 FCFA");
+    const parsedAmount = parseInt(amount);
+    if (!amount || parsedAmount < 10000) return setError("Montant minimum : 10 000 FCFA");
     setError(""); setPaying(true);
 
     try {
-      const res = await clientContribAPI.pay({ amount: parseInt(amount), payment_method: "Wave" });
-      const data = res.data.data;
+      // 1. Créer la transaction côté serveur pour obtenir la référence
+      const res = await clientContribAPI.pay({
+        amount: parsedAmount,
+        payment_method: "CinetPay",
+      });
+      const txData = res.data.data;
+      const txRef  = txData.transaction_reference || `AWJ-${Date.now()}`;
 
-      if (data.wave_link) {
-        setModal(false);
+      // 2. Ouvrir le popup CinetPay
+      payWithCinetPay({
+        user: {
+          name:  data?.client?.name  || "",
+          email: data?.client?.email || "",
+          phone: data?.client?.phone || "",
+        },
+        amount:        parsedAmount,
+        description:   "Cotisation mensuelle Awoundjô",
+        transactionId: txRef,
 
-        // Ouvre dans un nouvel onglet — Wave gère l'ouverture de l'app
-        window.open(data.wave_link, "_blank", "noopener");
-
-        // Confirme le paiement après retour
-        setTimeout(async () => {
+        onSuccess: async (cinetData, usedTxId) => {
+          setModal(false);
+          setPaying(false);
           try {
             await clientContribAPI.confirm({
-              amount: parseInt(amount),
-              payment_method: "Wave",
-              transaction_reference: data.transaction_reference,
+              amount:                parsedAmount,
+              payment_method:        "CinetPay",
+              transaction_reference: usedTxId,
             });
-            setSuccess(`✅ Paiement Wave confirmé — Réf: ${data.transaction_reference}`);
+            setSuccess(`✅ Paiement confirmé — Réf: ${usedTxId}`);
             load();
-            setTimeout(() => setSuccess(""), 6000);
-          } catch {}
-        }, 10000);
+            setTimeout(() => setSuccess(""), 7000);
+          } catch {
+            setSuccess(`✅ Paiement accepté — Réf: ${usedTxId}. Synchronisation en attente.`);
+            setTimeout(() => setSuccess(""), 7000);
+          }
+        },
 
-        setSuccess("🌊 Page Wave ouverte — Complétez le paiement puis revenez");
-        setTimeout(() => setSuccess(""), 15000);
-      }
+        onError: ({ message }) => {
+          setPaying(false);
+          setError(message || "Le paiement a échoué ou a été annulé.");
+        },
+      });
+
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur paiement");
-    } finally {
       setPaying(false);
+      setError(err.response?.data?.error || "Erreur lors de l'initialisation du paiement.");
     }
   };
 
@@ -98,7 +116,7 @@ export default function ClientCotisations() {
             <p style={{ fontWeight: 700, color: "#92400E", margin: "0 0 2px", fontSize: 13 }}>{late} cotisation{late > 1 ? "s" : ""} en retard</p>
             <p style={{ color: "#B45309", margin: 0, fontSize: 12 }}>Régularisez pour maintenir vos droits</p>
           </div>
-          <button onClick={() => setModal(true)} style={{ background: "#F59E0B", color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
+          <button onClick={() => { setError(""); setModal(true); }} style={{ background: "#F59E0B", color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
             Payer →
           </button>
         </div>
@@ -147,38 +165,39 @@ export default function ClientCotisations() {
 
       {/* Bouton payer */}
       <button onClick={() => { setError(""); setModal(true); }} style={{
-        width: "100%", background: "linear-gradient(135deg,#059669,#065F46)",
-        color: "#fff", border: "none", borderRadius: 16, padding: 16,
+        width: "100%", background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
+        color: "#fff", border: "none", borderRadius: 16, padding: "16px",
         fontSize: 15, fontWeight: 700, cursor: "pointer",
         fontFamily: "'Poppins',sans-serif",
-        boxShadow: "0 6px 20px rgba(5,150,105,.35)",
+        boxShadow: "0 6px 20px rgba(26,86,219,.35)",
         marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-        opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(10px)",
-        transition: "all .5s .1s cubic-bezier(.34,1.56,.64,1)",
       }}>
-        💰 Payer une cotisation
+        <span style={{ fontSize: 20 }}>💳</span>
+        Payer une cotisation via CinetPay
       </button>
 
-      {/* Onglets */}
-      <div style={{ display: "flex", background: "#F1F5F9", borderRadius: 14, padding: 4, marginBottom: 16, opacity: visible ? 1 : 0, transition: "all .5s .15s" }}>
-        {[
-          { id: "calendar", label: "📅 Calendrier" },
-          { id: "history",  label: "📋 Historique" },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flex: 1, padding: "10px", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", transition: "all .2s",
-            background: tab === t.id ? "#fff" : "transparent",
-            color: tab === t.id ? "#1a56db" : "#64748B",
-            boxShadow: tab === t.id ? "0 2px 8px rgba(0,0,0,.08)" : "none",
-          }}>{t.label}</button>
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, background: "#F1F5F9", borderRadius: 14, padding: 4, marginBottom: 16 }}>
+        {[["calendar","📅 Calendrier"],["history","🧾 Historique"]].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)} style={{
+            flex: 1, padding: "9px 0", border: "none", borderRadius: 11,
+            fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif",
+            background: tab === key ? "#fff" : "transparent",
+            color: tab === key ? "#1a56db" : "#94A3B8",
+            boxShadow: tab === key ? "0 2px 8px rgba(0,0,0,.08)" : "none",
+            transition: "all .2s",
+          }}>{label}</button>
         ))}
       </div>
 
       {/* Calendrier */}
       {tab === "calendar" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, opacity: visible ? 1 : 0, transition: "all .5s .2s" }}>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
+          opacity: visible ? 1 : 0, transition: "all .5s .2s",
+        }}>
           {data.monthly_status.map((m, i) => {
-            const st = STATUS_STYLE[m.status];
+            const st = STATUS_STYLE[m.status] || STATUS_STYLE.upcoming;
             return (
               <div key={m.month} style={{
                 background: st.bg, borderRadius: 14, padding: "12px 8px",
@@ -247,65 +266,91 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* Modal paiement */}
+      {/* ── Modal paiement CinetPay ─────────────────────────────── */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
-          onClick={() => setModal(false)}>
+          onClick={() => !paying && setModal(false)}>
           <div style={{ background: "#fff", borderRadius: "28px 28px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>🌊 Payer via Wave</h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 10 000 FCFA</p>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>💳 Payer via CinetPay</h3>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 10 000 FCFA · Orange Money, Wave, MTN…</p>
               </div>
-              <button onClick={() => setModal(false)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              <button onClick={() => !paying && setModal(false)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
 
-            {error && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
+            {error && (
+              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>
+                ⚠️ {error}
+              </div>
+            )}
 
             {/* Montant */}
             <label style={ls.label}>Montant (FCFA)</label>
             <div style={{ position: "relative", marginBottom: 20 }}>
-              <input type="number" placeholder="10 000" value={amount} onChange={e => setAmount(e.target.value)}
-                style={{ width: "100%", border: "2px solid #E2E8F0", borderRadius: 14, padding: "14px 60px 14px 16px", fontSize: 20, fontWeight: 700, color: "#0F172A", fontFamily: "'Poppins',sans-serif", boxSizing: "border-box", outline: "none" }} />
+              <input
+                type="number"
+                placeholder="10 000"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                disabled={paying}
+                style={{ width: "100%", border: "2px solid #E2E8F0", borderRadius: 14, padding: "14px 60px 14px 16px", fontSize: 20, fontWeight: 700, color: "#0F172A", fontFamily: "'Poppins',sans-serif", boxSizing: "border-box", outline: "none" }}
+              />
               <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#94A3B8" }}>FCFA</span>
             </div>
 
             {/* Montants rapides */}
             <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
               {[10000, 15000, 20000, 25000].map(v => (
-                <button key={v} onClick={() => setAmount(String(v))} style={{
-                  flex: 1, padding: "10px 4px", border: `2px solid ${amount === String(v) ? "#1a56db" : "#E2E8F0"}`,
+                <button key={v} onClick={() => setAmount(String(v))} disabled={paying} style={{
+                  flex: 1, padding: "10px 4px",
+                  border: `2px solid ${amount === String(v) ? "#1a56db" : "#E2E8F0"}`,
                   borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: "pointer",
                   background: amount === String(v) ? "#EFF6FF" : "#fff",
                   color: amount === String(v) ? "#1a56db" : "#64748B",
                   fontFamily: "'Poppins',sans-serif", transition: "all .15s",
                 }}>
-                  {(v / 1000)}k
+                  {v / 1000}k
                 </button>
               ))}
             </div>
 
-            {/* Info Wave */}
-            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 14, padding: "14px 16px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 28 }}>🌊</span>
-              <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1e3a8a" }}>Paiement Wave</p>
-                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#3B82F6" }}>Vous serez redirigé vers la page Wave pour finaliser</p>
+            {/* Moyens de paiement acceptés */}
+            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: "14px 16px", marginBottom: 24 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8 }}>Moyens acceptés</p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[
+                  { icon: "🟠", label: "Orange Money" },
+                  { icon: "💛", label: "MTN MoMo" },
+                  { icon: "🌊", label: "Wave" },
+                  { icon: "💳", label: "Carte bancaire" },
+                ].map(({ icon, label }) => (
+                  <span key={label} style={{ display: "flex", alignItems: "center", gap: 5, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                    {icon} {label}
+                  </span>
+                ))}
               </div>
             </div>
 
             <button onClick={handlePay} disabled={paying} style={{
-              width: "100%", background: paying ? "#94A3B8" : "linear-gradient(135deg,#1a56db,#1e3a8a)",
+              width: "100%",
+              background: paying ? "#94A3B8" : "linear-gradient(135deg,#1a56db,#1e3a8a)",
               color: "#fff", border: "none", borderRadius: 16, padding: 16,
               fontSize: 15, fontWeight: 700, cursor: paying ? "not-allowed" : "pointer",
               fontFamily: "'Poppins',sans-serif",
               boxShadow: paying ? "none" : "0 6px 20px rgba(26,86,219,.35)",
               transition: "all .2s",
             }}>
-              {paying ? "⏳ Traitement en cours..." : `🌊 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via Wave`}
+              {paying
+                ? "⏳ Ouverture du paiement…"
+                : `💳 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via CinetPay`}
             </button>
+
+            <p style={{ textAlign: "center", fontSize: 11, color: "#94A3B8", marginTop: 12 }}>
+              🔒 Paiement sécurisé par CinetPay
+            </p>
           </div>
         </div>
       )}

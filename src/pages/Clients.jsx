@@ -3,10 +3,14 @@ import { Link } from "react-router-dom";
 import { clientAPI } from "../services/api";
 import { StatusBadge, PlanBadge } from "../components/Badge";
 import Modal from "../components/Modal";
+import { payWithCinetPay } from "../services/cinetpay";
 
 const PLANS    = ["ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
 const STATUSES = ["actif", "attente", "suspendu"];
 const EMPTY    = { name: "", phone: "", city: "", plan: "ESSENTIELLE", status: "attente" };
+
+// Frais d'adhésion : 15 000 FCFA pour toutes les formules
+const ADHESION_FEE = 15000;
 
 function parseCSV(text) {
   const lines = text.trim().split("\n").filter(Boolean);
@@ -54,6 +58,13 @@ export default function Clients() {
   const [accessCode, setAccessCode] = useState("");
   const [showCode,   setShowCode]   = useState(false);
 
+  // États pour le paiement CinetPay après création
+  const [pendingPayment, setPendingPayment] = useState(null); // { client, accessCode }
+  const [showPayModal,   setShowPayModal]   = useState(false);
+  const [payError,       setPayError]       = useState("");
+  const [paySuccess,     setPaySuccess]     = useState("");
+  const [paying,         setPaying]         = useState(false);
+
   const [showImport,   setShowImport]   = useState(false);
   const [csvRows,      setCsvRows]      = useState([]);
   const [csvErrors,    setCsvErrors]    = useState([]);
@@ -78,21 +89,80 @@ export default function Clients() {
 
   useEffect(() => { load(1); }, [load]);
 
+  // ── Création client + ouverture du modal de paiement ───────────
   async function handleCreate(e) {
     e.preventDefault();
     setFormError(""); setSaving(true);
     try {
       const { data } = await clientAPI.create(form);
       setShowModal(false);
+
+      // Identifiants temporaires retournés par l'API
+      const createdClient = data.client || data;
+      const accessCode    = createdClient.access_code  || data.access_code  || null;
+      const mutualNumber  = createdClient.mutual_number || data.mutual_number || null;
+
+      // Préparer les infos pour le paiement CinetPay
+      setPendingPayment({
+        client:       { name: form.name, phone: form.phone, email: "" },
+        plan:         form.plan,
+        accessCode,
+        mutualNumber,
+        clientId:     createdClient.id || data.id,
+      });
+      setPayError("");
+      setPaySuccess("");
+      setShowPayModal(true);
       setForm(EMPTY);
-      if (data.access_code) {
-        setAccessCode(data.access_code);
-        setShowCode(true);
-      }
       load(1);
     } catch (err) {
       setFormError(err.response?.data?.error || "Erreur lors de la création");
     } finally { setSaving(false); }
+  }
+
+  // ── Lancement du paiement d'adhésion CinetPay ──────────────────
+  function handlePayAdhesion() {
+    if (!pendingPayment) return;
+    const amount = ADHESION_FEE;
+    setPayError(""); setPaying(true);
+
+    payWithCinetPay({
+      user:          pendingPayment.client,
+      amount,
+      description:   `Adhésion Awoundjô — Formule ${pendingPayment.plan}`,
+      transactionId: `AWJ-ADH-${Date.now()}`,
+
+      onSuccess: async (cinetData, txId) => {
+        setPaying(false);
+        try {
+          // Enregistrer le paiement d'adhésion côté serveur
+          await clientAPI.recordPayment?.({
+            clientId:              pendingPayment.clientId,
+            amount,
+            payment_method:        "CinetPay",
+            transaction_reference: txId,
+            payment_type:          "adhesion",
+          });
+        } catch { /* paiement accepté côté CinetPay, sync sera faite via webhook */ }
+
+        setPaySuccess(`✅ Adhésion confirmée — Réf: ${txId}`);
+        // Afficher le code d'accès si disponible
+        if (pendingPayment.accessCode) {
+          setAccessCode(pendingPayment.accessCode);
+          setTimeout(() => {
+            setShowPayModal(false);
+            setPaySuccess("");
+            setShowCode(true);
+          }, 1500);
+        }
+        load(1);
+      },
+
+      onError: ({ message }) => {
+        setPaying(false);
+        setPayError(message || "Le paiement a été refusé ou annulé.");
+      },
+    });
   }
 
   function handleFileChange(e) {
@@ -260,22 +330,18 @@ export default function Clients() {
             {clients.map((c) => (
               <Link key={c.id} to={`/clients/${c.id}`}
                 className="block bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow active:scale-[.99]">
-                {/* Ligne 1 — Nom + Statut */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="font-bold text-slate-800 text-base leading-tight">{c.name}</p>
                   <StatusBadge status={c.status} />
                 </div>
-                {/* Ligne 2 — Plan + N° mutuel */}
                 <div className="flex items-center gap-2 mb-3">
                   <PlanBadge plan={c.plan} />
                   <span className="font-mono text-xs text-slate-400">{c.mutual_number}</span>
                 </div>
-                {/* Ligne 3 — Téléphone + Ville */}
                 <div className="flex items-center justify-between text-sm text-slate-500">
                   <span>📞 {c.phone}</span>
                   {c.city && <span>📍 {c.city}</span>}
                 </div>
-                {/* Ligne 4 — Total payé */}
                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
                   <span className="text-xs text-slate-400">Total payé</span>
                   <span className="font-bold text-slate-700 text-sm">
@@ -285,7 +351,6 @@ export default function Clients() {
               </Link>
             ))}
 
-            {/* Pagination mobile */}
             {pagination.pages > 1 && (
               <div className="flex items-center justify-between pt-2">
                 <p className="text-xs text-slate-500">
@@ -349,6 +414,16 @@ export default function Clients() {
               </select>
             </div>
           </div>
+
+          {/* Aperçu frais d'adhésion */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-xl">💳</span>
+            <div>
+              <p className="text-sm font-semibold text-blue-800">Frais d'adhésion : {ADHESION_FEE.toLocaleString("fr-FR")} FCFA</p>
+              <p className="text-xs text-blue-500">Un paiement CinetPay sera proposé après la création · Identifiants générés automatiquement</p>
+            </div>
+          </div>
+
           <div className="pt-2 flex gap-3 justify-end">
             <button type="button" onClick={() => setShowModal(false)}
               className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Annuler</button>
@@ -360,11 +435,93 @@ export default function Clients() {
         </form>
       </Modal>
 
+      {/* ── Modal paiement adhésion CinetPay ─────────────────── */}
+      <Modal open={showPayModal} onClose={() => !paying && setShowPayModal(false)} title="💳 Paiement de l'adhésion">
+        <div className="space-y-4">
+          {paySuccess ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-4 text-center">
+              <p className="text-2xl mb-2">✅</p>
+              <p className="text-green-700 font-bold text-sm">{paySuccess}</p>
+            </div>
+          ) : (
+            <>
+              {payError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                  ⚠️ {payError}
+                </div>
+              )}
+
+              {pendingPayment && (
+                <div className="bg-slate-50 rounded-xl px-4 py-3 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Client</span>
+                    <span className="font-semibold text-slate-800">{pendingPayment.client.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Formule</span>
+                    <span className="font-semibold text-slate-800">{pendingPayment.plan}</span>
+                  </div>
+                  {pendingPayment.mutualNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">N° Mutuel</span>
+                      <span className="font-mono text-xs font-bold text-slate-700">{pendingPayment.mutualNumber}</span>
+                    </div>
+                  )}
+                  {pendingPayment.accessCode && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Code d'accès</span>
+                      <span className="font-mono text-sm font-bold text-brand-600 tracking-widest">{pendingPayment.accessCode}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
+                    <span className="text-slate-600 font-semibold">Adhésion (toutes formules)</span>
+                    <span className="font-bold text-brand-600 text-base">
+                      {ADHESION_FEE.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Moyens acceptés</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["🟠 Orange Money","💛 MTN MoMo","🌊 Wave","💳 Carte"].map(m => (
+                    <span key={m} className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">{m}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setShowPayModal(false)} disabled={paying}
+                  className="flex-1 px-4 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-50">
+                  Payer plus tard
+                </button>
+                <button onClick={handlePayAdhesion} disabled={paying}
+                  className="flex-1 px-4 py-2.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold disabled:opacity-60 transition-all">
+                  {paying ? "⏳ Ouverture…" : "💳 Payer maintenant"}
+                </button>
+              </div>
+
+              <p className="text-center text-xs text-slate-400">🔒 Paiement sécurisé par CinetPay</p>
+            </>
+          )}
+        </div>
+      </Modal>
+
       {/* ── Modal code d'accès ───────────────────────────────── */}
-      <Modal open={showCode} onClose={() => setShowCode(false)} title="🔑 Code d'accès client">
+      <Modal open={showCode} onClose={() => setShowCode(false)} title="🔑 Identifiants du client">
         <div className="text-center space-y-4 py-2">
-          <p className="text-slate-600 text-sm">Communiquez ce code au client pour sa première connexion sur le portail :</p>
+          <p className="text-slate-600 text-sm">Communiquez ces identifiants au client pour sa première connexion :</p>
+
+          {pendingPayment?.mutualNumber && (
+            <div className="bg-slate-100 rounded-xl px-6 py-3">
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Numéro Mutuel</p>
+              <p className="text-xl font-mono font-bold text-slate-700">{pendingPayment.mutualNumber}</p>
+            </div>
+          )}
+
           <div className="bg-slate-100 rounded-xl px-6 py-5">
+            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Code d'accès temporaire</p>
             <p className="text-3xl font-mono font-bold tracking-widest text-brand-600">{accessCode}</p>
           </div>
           <p className="text-xs text-red-500 font-medium">⚠️ Ce code ne sera plus affiché après fermeture</p>

@@ -12,6 +12,7 @@
 //    [4] Mode de paiement
 //    [5] → CinetPay popup (15 000 FCFA frais d'adhésion)
 //    [6] → Paiement ACCEPTED → création compte + credentials
+//    [7] → Écran de succès : identifiants affichés selon hiérarchie du rôle
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { payWithCinetPay } from "../services/cinetpay";
@@ -53,6 +54,131 @@ const ROLE_CONFIG = {
   LEADER:           { title:"Adhésion Leader",           icon:"⭐", color:C.blue,   bg:C.blueL,   art:"le Leader"           },
   PASTEUR:          { title:"Adhésion Pasteur",          icon:"⛪", color:C.teal,   bg:C.tealL,   art:"le Pasteur"          },
   RESPONSABLE:      { title:"Adhésion Responsable",      icon:"🤝", color:C.purple, bg:C.purpleL, art:"le Responsable"      },
+};
+
+// ── Hiérarchie des identifiants par rôle ─────────────────────
+//  Définit quels champs de `credentials` afficher et dans quel ordre,
+//  selon la position du rôle dans l'organigramme Awoundjô.
+//
+//  Structure attendue de `credentials` (retournée par le backend) :
+//  {
+//    membre_id, login, password, qr_code?,
+//    recruteur_id?, ambassadeur_id?,
+//    leader_id?, pasteur_id?, responsable_id?,
+//    parrain_code?, lien_parrainage?,
+//    dashboard_url,
+//  }
+const ROLE_CREDENTIALS_HIERARCHY = {
+
+  // ─── Réseau Diaspora ──────────────────────────────────────
+  AMBASSADEUR_PAYS: [
+    {
+      section: "Compte Ambassadeur Pays",
+      icon: "🗺️",
+      fields: [
+        { key: "ambassadeur_id", label: "ID Ambassadeur",    copy: true, highlight: true },
+        { key: "membre_id",      label: "ID Membre",          copy: true },
+        { key: "login",          label: "Identifiant",        copy: true },
+        { key: "password",       label: "Mot de passe",       copy: true, secret: true },
+      ],
+    },
+    {
+      section: "Accès & Gestion",
+      icon: "🔗",
+      fields: [
+        { key: "dashboard_url",  label: "Tableau de bord",   link: true },
+        { key: "qr_code",        label: "QR Code d'accès",   qr:   true },
+      ],
+    },
+  ],
+
+  RECRUTEUR: [
+    {
+      section: "Compte Recruteur",
+      icon: "🤝",
+      fields: [
+        { key: "recruteur_id",   label: "ID Recruteur",       copy: true, highlight: true },
+        { key: "membre_id",      label: "ID Membre",           copy: true },
+        { key: "login",          label: "Identifiant",         copy: true },
+        { key: "password",       label: "Mot de passe",        copy: true, secret: true },
+      ],
+    },
+    {
+      section: "Lien & Parrainage",
+      icon: "🔗",
+      fields: [
+        { key: "lien_parrainage", label: "Lien de recrutement", copy: true, link: true },
+        { key: "dashboard_url",   label: "Tableau de bord",     link: true },
+      ],
+    },
+  ],
+
+  // ─── Réseau Parrainage ────────────────────────────────────
+  LEADER: [
+    {
+      section: "Compte Leader",
+      icon: "⭐",
+      fields: [
+        { key: "leader_id",    label: "ID Leader",         copy: true, highlight: true },
+        { key: "membre_id",    label: "ID Membre",          copy: true },
+        { key: "login",        label: "Identifiant",        copy: true },
+        { key: "password",     label: "Mot de passe",       copy: true, secret: true },
+      ],
+    },
+    {
+      section: "Parrainage & Accès",
+      icon: "🔗",
+      fields: [
+        { key: "parrain_code",    label: "Code Parrain",          copy: true },
+        { key: "lien_parrainage", label: "Lien de parrainage",    copy: true, link: true },
+        { key: "dashboard_url",   label: "Tableau de bord",       link: true },
+      ],
+    },
+  ],
+
+  PASTEUR: [
+    {
+      section: "Compte Pasteur",
+      icon: "⛪",
+      fields: [
+        { key: "pasteur_id",   label: "ID Pasteur",        copy: true, highlight: true },
+        { key: "membre_id",    label: "ID Membre",          copy: true },
+        { key: "login",        label: "Identifiant",        copy: true },
+        { key: "password",     label: "Mot de passe",       copy: true, secret: true },
+      ],
+    },
+    {
+      section: "Parrainage & Accès",
+      icon: "🔗",
+      fields: [
+        { key: "parrain_code",    label: "Code Parrain",          copy: true },
+        { key: "lien_parrainage", label: "Lien de parrainage",    copy: true, link: true },
+        { key: "dashboard_url",   label: "Tableau de bord",       link: true },
+      ],
+    },
+  ],
+
+  RESPONSABLE: [
+    {
+      section: "Compte Responsable",
+      icon: "🤝",
+      fields: [
+        { key: "responsable_id", label: "ID Responsable",   copy: true, highlight: true },
+        { key: "membre_id",      label: "ID Membre",         copy: true },
+        { key: "login",          label: "Identifiant",       copy: true },
+        { key: "password",       label: "Mot de passe",      copy: true, secret: true },
+      ],
+    },
+    {
+      section: "Parrainage & Accès",
+      icon: "🔗",
+      fields: [
+        { key: "parrain_code",    label: "Code Parrain",          copy: true },
+        { key: "lien_parrainage", label: "Lien de parrainage",    copy: true, link: true },
+        { key: "dashboard_url",   label: "Tableau de bord",       link: true },
+      ],
+    },
+  ],
 };
 
 const COUNTRIES = [
@@ -105,18 +231,209 @@ function InputField({ label, type="text", placeholder, value, onChange, required
   );
 }
 
+// ── Écran de succès : affiche les identifiants selon la hiérarchie ──
+function SuccessScreen({ credentials, roleLabel, rc, targetRole, onDone }) {
+  const [copied, setCopied]     = useState({});
+  const [revealed, setRevealed] = useState({});
+
+  const hierarchy = ROLE_CREDENTIALS_HIERARCHY[targetRole] || [];
+
+  function copyToClipboard(key, value) {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(prev => ({ ...prev, [key]: true }));
+      setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
+    });
+  }
+
+  function toggleReveal(key) {
+    setRevealed(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  return (
+    <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+
+      {/* Bandeau succès */}
+      <div style={{
+        background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
+        padding:"24px 22px", textAlign:"center",
+      }}>
+        <div style={{
+          width:56, height:56, borderRadius:"50%",
+          background:"rgba(255,255,255,.2)", border:"2px solid rgba(255,255,255,.4)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:28, margin:"0 auto 12px",
+        }}>✅</div>
+        <p style={{ margin:0, color:"#fff", fontWeight:900, fontSize:18 }}>
+          Compte créé avec succès !
+        </p>
+        <p style={{ margin:"6px 0 0", color:"rgba(255,255,255,.8)", fontSize:13 }}>
+          Bienvenue en tant que {roleLabel}
+        </p>
+      </div>
+
+      {/* Avertissement sécurité */}
+      <div style={{
+        background:"#FFFBEB", border:"none", borderBottom:`1px solid ${C.border}`,
+        padding:"12px 20px", display:"flex", alignItems:"flex-start", gap:10,
+      }}>
+        <span style={{ fontSize:18, flexShrink:0 }}>⚠️</span>
+        <p style={{ margin:0, fontSize:12, color:"#92400E", fontWeight:600, lineHeight:1.5 }}>
+          Notez et conservez ces identifiants en lieu sûr. Le mot de passe ne sera plus affiché après la fermeture de cette page.
+        </p>
+      </div>
+
+      {/* Sections hiérarchisées */}
+      <div style={{ padding:"20px 22px", display:"flex", flexDirection:"column", gap:20 }}>
+        {hierarchy.map((section, si) => {
+          // Filtrer les champs qui ont une valeur dans credentials
+          const visibleFields = section.fields.filter(f => credentials?.[f.key]);
+          if (visibleFields.length === 0) return null;
+
+          return (
+            <div key={si}>
+              {/* Titre de section */}
+              <div style={{
+                display:"flex", alignItems:"center", gap:8, marginBottom:12,
+                paddingBottom:8, borderBottom:`2px solid ${rc.color}22`,
+              }}>
+                <span style={{ fontSize:16 }}>{section.icon}</span>
+                <p style={{ margin:0, fontSize:13, fontWeight:800, color:rc.color, textTransform:"uppercase", letterSpacing:".5px" }}>
+                  {section.section}
+                </p>
+              </div>
+
+              {/* Champs */}
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {visibleFields.map((field) => {
+                  const value = credentials[field.key];
+                  const isRevealed = revealed[field.key];
+                  const isCopied   = copied[field.key];
+
+                  return (
+                    <div
+                      key={field.key}
+                      style={{
+                        borderRadius:10,
+                        border:`1.5px solid ${field.highlight ? rc.color : C.border}`,
+                        background: field.highlight ? rc.bg : C.bg,
+                        overflow:"hidden",
+                      }}
+                    >
+                      <div style={{ padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <p style={{
+                            margin:"0 0 3px",
+                            fontSize:11, fontWeight:700,
+                            color: field.highlight ? rc.color : C.slate,
+                            textTransform:"uppercase", letterSpacing:".4px",
+                          }}>
+                            {field.label}
+                          </p>
+
+                          {/* Valeur selon le type de champ */}
+                          {field.link ? (
+                            <a
+                              href={value} target="_blank" rel="noreferrer"
+                              style={{ fontSize:13, color:rc.color, fontWeight:600, wordBreak:"break-all", textDecoration:"none" }}
+                            >
+                              {value} ↗
+                            </a>
+                          ) : field.secret ? (
+                            <p style={{
+                              margin:0, fontSize:13, fontWeight:700,
+                              color:C.dark, letterSpacing: isRevealed ? 0 : "3px",
+                              fontFamily: isRevealed ? "inherit" : "monospace",
+                              wordBreak:"break-all",
+                            }}>
+                              {isRevealed ? value : "•".repeat(Math.min(value.length, 12))}
+                            </p>
+                          ) : (
+                            <p style={{
+                              margin:0, fontSize:13, fontWeight:field.highlight ? 800 : 600,
+                              color: field.highlight ? rc.color : C.dark,
+                              fontFamily:"monospace", wordBreak:"break-all",
+                            }}>
+                              {value}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Boutons d'action */}
+                        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                          {field.secret && (
+                            <button
+                              type="button"
+                              onClick={() => toggleReveal(field.key)}
+                              style={{
+                                padding:"5px 10px", borderRadius:6, border:`1px solid ${C.border}`,
+                                background:"#fff", cursor:"pointer", fontSize:12, color:C.slate,
+                                fontFamily:"inherit",
+                              }}
+                            >
+                              {isRevealed ? "🙈 Masquer" : "👁 Voir"}
+                            </button>
+                          )}
+                          {field.copy && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(field.key, value)}
+                              style={{
+                                padding:"5px 10px", borderRadius:6, border:"none",
+                                background: isCopied ? C.greenL : rc.bg,
+                                color: isCopied ? C.green : rc.color,
+                                cursor:"pointer", fontSize:12, fontWeight:700,
+                                fontFamily:"inherit", transition:"all .15s",
+                              }}
+                            >
+                              {isCopied ? "✓ Copié" : "📋 Copier"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Bouton finaliser */}
+        <button
+          type="button"
+          onClick={() => onDone?.(credentials, roleLabel)}
+          style={{
+            width:"100%", padding:"14px 20px", borderRadius:12, border:"none",
+            fontSize:15, fontWeight:900, cursor:"pointer",
+            background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
+            color:"#fff", boxShadow:`0 6px 20px ${rc.color}44`,
+            fontFamily:"inherit", marginTop:4,
+          }}
+        >
+          {rc.icon} Accéder à mon espace {roleLabel}
+        </button>
+
+        <p style={{ margin:"-8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
+          Ces identifiants vous ont également été envoyés par email.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Composant principal ───────────────────────────────────────
 /**
  * AdhesionForm
  * @param {string}   targetRole   - Rôle à créer (AMBASSADEUR_PAYS, RECRUTEUR, LEADER, PASTEUR, RESPONSABLE)
- * @param {function} onSuccess    - Appelé avec (credentials, roleLabel) après paiement + création
+ * @param {function} onSuccess    - Appelé avec (credentials, roleLabel) après que l'utilisateur clique "Accéder"
  */
 export default function AdhesionForm({ targetRole, onSuccess }) {
   const rc = ROLE_CONFIG[targetRole] || ROLE_CONFIG.RECRUTEUR;
 
   // Étapes : "form" → "payment" → "processing" → "done"
-  const [step, setStep]     = useState("form");
-  const [error, setError]   = useState("");
+  const [step, setStep]               = useState("form");
+  const [error, setError]             = useState("");
+  const [credentials, setCredentials] = useState(null);
 
   // Données du formulaire
   const [form, setForm] = useState({
@@ -174,8 +491,9 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
             transaction_id: finalTxId,
             membership_fee: MEMBERSHIP_FEE,
           });
+          // ✅ Stocker les credentials et passer à l'écran de succès
+          setCredentials(data.credentials);
           setStep("done");
-          onSuccess?.(data.credentials, rc.art);
         } catch (err) {
           setError(err.response?.data?.error || "Paiement reçu mais erreur lors de la création du compte. Contactez le support.");
           setStep("form");
@@ -202,6 +520,19 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
         <p style={{ margin:0, fontWeight:800, fontSize:16, color:C.dark }}>Création du compte en cours…</p>
         <p style={{ margin:"6px 0 0", fontSize:13, color:C.slate }}>Paiement confirmé. Génération des identifiants…</p>
       </div>
+    );
+  }
+
+  // ── Écran "Succès" : identifiants par hiérarchie ──────────
+  if (step === "done" && credentials) {
+    return (
+      <SuccessScreen
+        credentials={credentials}
+        roleLabel={rc.art}
+        rc={rc}
+        targetRole={targetRole}
+        onDone={onSuccess}
+      />
     );
   }
 

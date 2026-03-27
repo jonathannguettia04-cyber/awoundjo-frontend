@@ -52,7 +52,8 @@ export const clientCardAPI = {
 // ── COTISATIONS ──────────────────────────────────────────────────
 export const clientContribAPI = {
   get:     ()     => clientApi.get("/contributions"),
-  pay:     (data) => clientApi.post("/contributions/pay", data),
+  pay:     (data) => clientApi.post("/contributions/pay", { ...data, payment_method: "CinetPay" }),
+  init:    (data) => clientApi.post("/contributions/init", data),
   confirm: (data) => clientApi.post("/contributions/confirm", data), // ← ajoute ça
 };
 // ── DÉPENDANTS ───────────────────────────────────────────────────

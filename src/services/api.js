@@ -52,11 +52,13 @@ export const clientAPI = {
   create:  (data)     => api.post("/clients", data),
   update:  (id, data) => api.put(`/clients/${id}`, data),
   delete:  (id)       => api.delete(`/clients/${id}`),
-  search:  (q)        => api.get("/clients/search", { params: { q } }),
+  search:        (q)        => api.get("/clients/search", { params: { q } }),
 };
 
 // ── PAIEMENTS ────────────────────────────────────────────────────
 export const paymentsAPI = {
+  initPayment:   (data)     => api.post("/payments/init", data),
+  confirmPayment:(data)     => api.post("/payments/confirm", data),
   getAll:      (params)   => api.get("/payments", { params }),
   getByClient: (id)       => api.get(`/payments/client/${id}`),
   create:      (data)     => api.post("/payments", data),
