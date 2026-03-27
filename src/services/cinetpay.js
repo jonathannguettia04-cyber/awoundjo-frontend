@@ -1,14 +1,13 @@
 // src/services/cinetpay.js
 // ─────────────────────────────────────────────────────────────
 //  Service paiement CinetPay — Awoundjô
-//  API KEY : 12662532135d276e2265ca35.50646383
-//  SITE ID : 622448
-//  Mode    : TEST (changer en PRODUCTION au déploiement)
+//  Les clés sont lues depuis les variables d'environnement Vercel
+//  VITE_CINETPAY_API_KEY, VITE_CINETPAY_SITE_ID, VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
 const CINETPAY_CONFIG = {
-  apikey:     "12662532135d276e2265ca35.50646383",
-  site_id:    622448,   // ← nombre, pas string
+  apikey:     import.meta.env.VITE_CINETPAY_API_KEY,
+  site_id:    Number(import.meta.env.VITE_CINETPAY_SITE_ID),
   notify_url: `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/payments/cinetpay/notify`,
   mode:       "PRODUCTION",
 };
