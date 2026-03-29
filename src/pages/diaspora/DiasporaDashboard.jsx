@@ -51,9 +51,11 @@ function getNavItems(role) {
     base.push({ path:"/diaspora/register-recruiter",     icon:"👤", label:"Mes Recruteurs" });
     base.push({ path:"/diaspora/register-recruiter/new", icon:"➕", label:"Enregistrer Recruteur" });
   } else {
-    // AMBASSADEUR_DIASPORA
-    base.push({ path:"/diaspora/register-pays",     icon:"👤", label:"Mes Ambassadeurs Pays" });
-    base.push({ path:"/diaspora/register-pays/new", icon:"➕", label:"Enregistrer Amb. Pays" });
+    // AMBASSADEUR_DIASPORA — peut créer Ambassadeurs Pays ET RUM
+    base.push({ path:"/diaspora/register-pays",     icon:"🗺️", label:"Mes Ambassadeurs Pays" });
+    base.push({ path:"/diaspora/register-pays/new", icon:"➕", label:"Enregistrer Amb. Pays"  });
+    base.push({ path:"/diaspora/register-rum",      icon:"👑", label:"Mes RUM"                });
+    base.push({ path:"/diaspora/register-rum/new",  icon:"➕", label:"Enregistrer RUM"         });
   }
 
   base.push(
@@ -278,9 +280,10 @@ export default function DiasporaDashboard() {
       { icon:"🤝", label:"Mes Recruteurs",      value:stats.referrals || 0,       sub:"Recruteurs directs",                 color:C.blue,  bg:C.blueL,  path:"/diaspora/register-recruiter" },
       { icon:"👥", label:"Total réseau",        value:stats.network_size || 0,    sub:"Tous niveaux",                       color:C.green, bg:C.greenL, path:"/diaspora/network" },
     ] : [
-      // AMBASSADEUR_DIASPORA
-      { icon:"🗺️", label:"Ambassadeurs Pays",  value:stats.referrals || 0,       sub:"Recrutés directs",                   color:C.blue,  bg:C.blueL,  path:"/diaspora/register-pays" },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size || 0,    sub:"Tous niveaux confondus",             color:C.green, bg:C.greenL, path:"/diaspora/network" },
+      // AMBASSADEUR_DIASPORA — crée Ambassadeurs Pays + RUM
+      { icon:"🗺️", label:"Ambassadeurs Pays",  value:stats.referrals_pays  || 0, sub:"Recrutés directs",     color:C.blue,   bg:C.blueL,   path:"/diaspora/register-pays" },
+      { icon:"👑", label:"RUM créés",           value:stats.referrals_rum   || 0, sub:"Réseau Parrainage",    color:C.purple, bg:C.purpleL, path:"/diaspora/register-rum"  },
+      { icon:"🌐", label:"Total réseau",        value:stats.network_size    || 0, sub:"Tous niveaux",         color:C.green,  bg:C.greenL,  path:"/diaspora/network"       },
     ]),
     { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned || 0, sub:`${fmt(stats.commissions?.pending||0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/diaspora/earnings", isAmount:true },
     { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level || "—",  sub:stats.rewards?.unlocked || "Continuez !",   color:C.purple, bg:C.purpleL, path:"/diaspora/rewards", isText:true },
@@ -298,10 +301,11 @@ export default function DiasporaDashboard() {
     { icon:"📊", label:"Mes gains",           path:"/diaspora/earnings",               color:C.gold   },
     { icon:"🏆", label:"Récompenses",         path:"/diaspora/rewards",                color:C.purple },
   ] : [
-    { icon:"➕", label:"Nouveau Amb. Pays",   path:"/diaspora/register-pays/new", color:C.blue   },
-    { icon:"🌐", label:"Mon réseau",          path:"/diaspora/network",            color:C.green  },
-    { icon:"📊", label:"Mes gains",           path:"/diaspora/earnings",           color:C.gold   },
-    { icon:"🏆", label:"Récompenses",         path:"/diaspora/rewards",            color:C.purple },
+    // AMBASSADEUR_DIASPORA
+    { icon:"🗺️", label:"Nouveau Amb. Pays", path:"/diaspora/register-pays/new", color:C.blue   },
+    { icon:"👑", label:"Nouveau RUM",        path:"/diaspora/register-rum/new",  color:C.purple },
+    { icon:"📊", label:"Mes gains",          path:"/diaspora/earnings",           color:C.gold   },
+    { icon:"🌐", label:"Mon réseau",         path:"/diaspora/network",            color:C.green  },
   ];
 
   if (loading) {

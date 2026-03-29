@@ -77,6 +77,7 @@ const DiasporaRewards           = diasporaPage("DiasporaRewards");
 
 // Pages spécifiques AMBASSADEUR_DIASPORA
 const DiasporaRegisterPays      = diasporaPage("DiasporaRegisterPays");
+const DiasporaRegisterRUM       = diasporaPage("DiasporaRegisterRUM");
 
 // Pages spécifiques AMBASSADEUR_PAYS
 const DiasporaRegisterRecruiter = diasporaPage("DiasporaRegisterRecruiter");
@@ -198,13 +199,13 @@ export default function App() {
               <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
             } />
             <Route path="/payments" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Payments /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
             } />
             <Route path="/commissions" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Commissions /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
             } />
             <Route path="/groups" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
             } />
             <Route path="/agents" element={
               <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
@@ -213,7 +214,7 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}
@@ -271,6 +272,10 @@ export default function App() {
               {/* ── AMBASSADEUR_DIASPORA : enregistre Ambassadeurs Pays ── */}
               <Route path="register-pays"     element={<DiasporaRegisterPays />} />
               <Route path="register-pays/new" element={<DiasporaRegisterPays />} />
+
+              {/* ── AMBASSADEUR_DIASPORA : enregistre RUM (tête du réseau Parrainage) ── */}
+              <Route path="register-rum"      element={<DiasporaRegisterRUM />} />
+              <Route path="register-rum/new"  element={<DiasporaRegisterRUM />} />
 
               {/* ── AMBASSADEUR_PAYS : enregistre Recruteurs ── */}
               <Route path="register-recruiter"     element={<DiasporaRegisterRecruiter />} />

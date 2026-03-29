@@ -318,6 +318,109 @@ export function DiasporaRegisterRecruiter() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// PAGE : ENREGISTRER UN RUM (AMBASSADEUR_DIASPORA uniquement)
+// Le RUM est la tête du réseau Parrainage — créé par l'Amb. Diaspora
+// ─────────────────────────────────────────────────────────────
+export function DiasporaRegisterRUM() {
+  const [list, setList]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [creds, setCreds]     = useState(null);
+  const [credsLabel, setCredsLabel] = useState("");
+
+  useEffect(() => {
+    diasporaBeneAPI.getAmbassadors({ role:"RUM" })
+      .then(r => setList(r.data.ambassadors || []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    diasporaBeneAPI.getAmbassadors({ role:"RUM" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+
+      <PageHeader
+        title="👑 Mes RUM"
+        subtitle={`${list.length} RUM enregistré(s) — Réseau Parrainage`}
+        action={
+          <Btn onClick={() => setShowForm(!showForm)}>
+            {showForm ? "✕ Annuler" : "➕ Nouveau RUM"}
+          </Btn>
+        }
+      />
+
+      {/* Info contextuelle */}
+      {!showForm && (
+        <div style={{ background:"#F5F3FF", border:"1px solid #DDD6FE", borderRadius:12, padding:"12px 16px", marginBottom:20, display:"flex", gap:12, alignItems:"flex-start" }}>
+          <span style={{ fontSize:20 }}>👑</span>
+          <div>
+            <p style={{ margin:0, fontWeight:700, fontSize:13, color:"#7C3AED" }}>Qu'est-ce qu'un RUM ?</p>
+            <p style={{ margin:"3px 0 0", fontSize:12, color:C.slate }}>
+              Le RUM (Responsable Unifié de Mission) est le sommet du <strong>Réseau Parrainage</strong>.
+              Il recrute des Leaders, qui recrutent des Pasteurs, etc.
+              Son dashboard sera accessible sur <strong>/referral/dashboard</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <div style={{ marginBottom:24 }}>
+          <AdhesionForm targetRole="RUM" onSuccess={handleSuccess} />
+        </div>
+      )}
+
+      {loading ? <Loader /> : list.length === 0 ? (
+        <EmptyState icon="👑" title="Aucun RUM enregistré" desc="Créez votre premier RUM pour lancer le réseau Parrainage" />
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {list.map(a => (
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:12, background:"#F5F3FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👑</div>
+                <div>
+                  <p style={{ margin:0, fontWeight:800, color:C.dark }}>{a.name}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+                    {a.email} • {a.country} • {fmtDate(a.created_at)}
+                  </p>
+                  <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                    {a.plan && (
+                      <span style={{ fontSize:10, fontWeight:700, color:"#7C3AED", background:"#F5F3FF", padding:"1px 8px", borderRadius:999 }}>
+                        {a.plan}
+                      </span>
+                    )}
+                    <span style={{ fontSize:10, fontWeight:700, color:C.slate, background:C.bg, padding:"1px 8px", borderRadius:999 }}>
+                      Réseau Parrainage
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+                {a.username && (
+                  <span style={{ fontSize:10, color:C.slate, fontFamily:"monospace" }}>
+                    @{a.username}
+                  </span>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER CLIENT (RECRUTEUR uniquement)
 // Génère numéro mutualiste AWJ-YYYY-XXXX
 // ─────────────────────────────────────────────────────────────
