@@ -58,7 +58,7 @@ export default function ClientCotisations() {
     setPaying(true);
 
     try {
-      const res = await clientContribAPI.initiate({ amount: parsedAmount });
+      const res = await clientContribAPI.init({ amount: parsedAmount }); // ✅ CORRECTION : .initiate() → .init()
       const { payment_url, transaction_reference } = res.data.data;
 
       // ✅ Ouvrir la page CinetPay dans un nouvel onglet
