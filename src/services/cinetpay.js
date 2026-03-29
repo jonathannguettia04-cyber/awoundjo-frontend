@@ -1,118 +1,89 @@
 // src/services/cinetpay.js
 // ─────────────────────────────────────────────────────────────
 //  Service paiement CinetPay — Awoundjô
-//  Les clés sont lues depuis les variables d'environnement Vercel
-//  VITE_CINETPAY_API_KEY, VITE_CINETPAY_SITE_ID, VITE_API_URL
+//  Ouvre la page de paiement dans un NOUVEL ONGLET
+//  via l'API REST CinetPay (pas le SDK popup)
 // ─────────────────────────────────────────────────────────────
 
-const CINETPAY_CONFIG = {
-  apikey:     import.meta.env.VITE_CINETPAY_API_KEY,
-  site_id:    Number(import.meta.env.VITE_CINETPAY_SITE_ID),
-  notify_url: `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/payments/cinetpay/notify`,
-  mode:       "PRODUCTION",
-};
-
-const SDK_URL = "https://cdn.cinetpay.com/seamless/main.js";
+const API_URL     = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const APIKEY      = import.meta.env.VITE_CINETPAY_API_KEY;
+const SITE_ID     = import.meta.env.VITE_CINETPAY_SITE_ID;
+const NOTIFY_URL  = `${API_URL}/api/payments/cinetpay/notify`;
+const RETURN_URL  = `${window.location.origin}/client/cotisations?payment=success`;
+const CANCEL_URL  = `${window.location.origin}/client/cotisations?payment=cancelled`;
 
 /**
- * Injecte le script CinetPay dans le DOM puis attend que
- * window.CinetPay soit disponible (max 10 secondes).
- */
-function loadCinetPaySDK() {
-  return new Promise((resolve, reject) => {
-    // Déjà prêt ?
-    if (window.CinetPay) {
-      resolve();
-      return;
-    }
-
-    // Script déjà en cours d'injection → attendre seulement
-    const existing = document.getElementById("cinetpay-sdk");
-    if (!existing) {
-      const script = document.createElement("script");
-      script.id  = "cinetpay-sdk";
-      script.src = SDK_URL;
-      document.head.appendChild(script);
-    }
-
-    const start = Date.now();
-    const interval = setInterval(() => {
-      if (window.CinetPay) {
-        clearInterval(interval);
-        resolve();
-      } else if (Date.now() - start > 10000) {
-        clearInterval(interval);
-        reject(new Error(
-          "Le SDK CinetPay n'a pas pu se charger. " +
-          "Vérifiez votre connexion ou les paramètres CSP de Vercel."
-        ));
-      }
-    }, 100);
-  });
-}
-
-/**
- * Lance le popup de paiement CinetPay.
+ * Génère un lien de paiement CinetPay et l'ouvre dans un nouvel onglet.
  *
  * @param {Object}   user          - { name, email, phone }
  * @param {number}   amount        - Montant en XOF (ex: 15000)
- * @param {string}   description   - Description affichée dans le popup
+ * @param {string}   description   - Description affichée sur la page de paiement
  * @param {string}   transactionId - Identifiant unique (ex: `AWJ-${Date.now()}`)
- * @param {Function} onSuccess     - Callback appelé si paiement accepté → (data, txId)
- * @param {Function} onError       - Callback appelé en cas d'erreur → ({ message, data? })
+ * @param {Function} onSuccess     - Callback appelé après génération du lien → (txId)
+ * @param {Function} onError       - Callback appelé en cas d'erreur → ({ message })
  */
 export async function payWithCinetPay({
   user,
   amount = 15000,
-  description = "Adhésion Awoundjô",
+  description = "Cotisation mensuelle Awoundjô",
   transactionId,
   onSuccess,
   onError,
 }) {
-  try {
-    await loadCinetPaySDK();
-  } catch (err) {
-    console.error("[CinetPay]", err.message);
-    onError?.({ message: err.message });
-    return;
-  }
-
   const txId =
     transactionId ||
     `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-  window.CinetPay.setConfig({
-    apikey:     CINETPAY_CONFIG.apikey,
-    site_id:    CINETPAY_CONFIG.site_id,
-    notify_url: CINETPAY_CONFIG.notify_url,
-    mode:       CINETPAY_CONFIG.mode,
-  });
+  try {
+    // ── 1. Appel API CinetPay pour générer le lien de paiement ──────────────
+    const res = await fetch("https://api-checkout.cinetpay.com/v2/payment", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apikey:                APIKEY,
+        site_id:               SITE_ID,
+        transaction_id:        txId,
+        amount:                amount,
+        currency:              "XOF",
+        channels:              "ALL",
+        description:           description,
+        notify_url:            NOTIFY_URL,
+        return_url:            RETURN_URL,
+        cancel_url:            CANCEL_URL,
+        customer_name:         user.name  || "",
+        customer_email:        user.email || "client@awoundjo.ci",
+        customer_phone_number: user.phone || "",
+        customer_country:      "CI",
+        customer_state:        "CI",
+        customer_city:         "Abidjan",
+        customer_zip_code:     "00225",
+      }),
+    });
 
-  window.CinetPay.getCheckout({
-    transaction_id:        txId,
-    amount:                amount,
-    currency:              "XOF",
-    channels:              "ALL",
-    description:           description,
-    customer_name:         user.name  || "",
-    customer_email:        user.email || "",
-    customer_phone_number: user.phone || "",
-    customer_country:      "CI",
-    customer_state:        "CI",
-    customer_city:         "Abidjan",
-    customer_zip_code:     "00225",
-  });
+    const data = await res.json();
+    console.log("[CinetPay] réponse API :", data);
 
-  window.CinetPay.waitResponse(function (data) {
-    if (data.status === "ACCEPTED") {
-      onSuccess?.(data, txId);
-    } else {
-      onError?.({ message: "Paiement refusé ou annulé.", data });
+    // ── 2. Vérifier la réponse ───────────────────────────────────────────────
+    if (data.code !== "201" && data.code !== 201) {
+      console.error("[CinetPay] Erreur API :", data);
+      onError?.({ message: data.message || "Erreur lors de la création du paiement." });
+      return;
     }
-  });
 
-  window.CinetPay.onError(function (data) {
-    console.error("[CinetPay] Erreur :", data);
-    onError?.({ message: "Une erreur est survenue lors du paiement.", data });
-  });
+    const paymentUrl = data.data?.payment_url;
+    if (!paymentUrl) {
+      onError?.({ message: "Lien de paiement introuvable dans la réponse CinetPay." });
+      return;
+    }
+
+    // ── 3. Ouvrir la page de paiement dans un nouvel onglet ─────────────────
+    window.open(paymentUrl, "_blank");
+
+    // ── 4. Notifier le composant que le lien a bien été ouvert ──────────────
+    onSuccess?.(data, txId);
+
+  } catch (err) {
+    console.error("[CinetPay] Erreur réseau :", err.message);
+    onError?.({ message: "Impossible de contacter CinetPay. Vérifiez votre connexion." });
+  }
 }

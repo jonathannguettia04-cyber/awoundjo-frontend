@@ -11,7 +11,7 @@ const STATUS_STYLE = {
   upcoming: { icon: "⏳", label: "À venir", color: "#94A3B8", bg: "#F8FAFC",                                 border: "#E2E8F0" },
 };
 
-const METHOD_ICON = { "CinetPay": "💳", "Wave": "🌊" };
+const METHOD_ICON = { "cinetpay": "💳", "wave": "🌊", "cash": "💵" };
 
 export default function ClientCotisations() {
   const navigate = useNavigate();
@@ -34,59 +34,52 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
+  // ── Détecter le retour depuis la page CinetPay ─────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("payment");
+    if (status === "success") {
+      setSuccess("✅ Paiement effectué ! Votre cotisation sera confirmée sous peu.");
+      setTimeout(() => setSuccess(""), 8000);
+      window.history.replaceState({}, "", window.location.pathname);
+      load();
+    } else if (status === "cancelled") {
+      setError("Paiement annulé.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const handlePay = async () => {
     const parsedAmount = parseInt(amount);
     if (!amount || parsedAmount < 10000) return setError("Montant minimum : 10 000 FCFA");
-    setError(""); setPaying(true);
+    setError("");
+    setPaying(true);
 
-    try {
-      // 1. Créer la transaction côté serveur pour obtenir la référence
-      const res = await clientContribAPI.pay({
-        amount: parsedAmount,
-        payment_method: "CinetPay",
-      });
-      const txData = res.data.data;
-      const txRef  = txData.transaction_reference || `AWJ-${Date.now()}`;
+    const txId = `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-      // 2. Ouvrir le popup CinetPay
-      payWithCinetPay({
-        user: {
-          name:  data?.client?.name  || "",
-          email: data?.client?.email || "",
-          phone: data?.client?.phone || "",
-        },
-        amount:        parsedAmount,
-        description:   "Cotisation mensuelle Awoundjô",
-        transactionId: txRef,
+    payWithCinetPay({
+      user: {
+        name:  data?.client?.name  || "",
+        email: data?.client?.email || "client@awoundjo.ci",
+        phone: data?.client?.phone || "",
+      },
+      amount:        parsedAmount,
+      description:   "Cotisation mensuelle Awoundjô",
+      transactionId: txId,
 
-        onSuccess: async (cinetData, usedTxId) => {
-          setModal(false);
-          setPaying(false);
-          try {
-            await clientContribAPI.confirm({
-              amount:                parsedAmount,
-              payment_method:        "CinetPay",
-              transaction_reference: usedTxId,
-            });
-            setSuccess(`✅ Paiement confirmé — Réf: ${usedTxId}`);
-            load();
-            setTimeout(() => setSuccess(""), 7000);
-          } catch {
-            setSuccess(`✅ Paiement accepté — Réf: ${usedTxId}. Synchronisation en attente.`);
-            setTimeout(() => setSuccess(""), 7000);
-          }
-        },
+      onSuccess: (_cinetData, _usedTxId) => {
+        // Nouvel onglet ouvert → fermer le modal et informer l'utilisateur
+        setModal(false);
+        setPaying(false);
+        setSuccess("🔗 Page de paiement ouverte dans un nouvel onglet. Revenez ici une fois le paiement effectué.");
+        setTimeout(() => setSuccess(""), 15000);
+      },
 
-        onError: ({ message }) => {
-          setPaying(false);
-          setError(message || "Le paiement a échoué ou a été annulé.");
-        },
-      });
-
-    } catch (err) {
-      setPaying(false);
-      setError(err.response?.data?.error || "Erreur lors de l'initialisation du paiement.");
-    }
+      onError: ({ message }) => {
+        setPaying(false);
+        setError(message || "Impossible d'ouvrir la page de paiement.");
+      },
+    });
   };
 
   if (loading) return <Skeleton />;
@@ -153,67 +146,63 @@ export default function ClientCotisations() {
           {[
             { label: "Mois payés",  val: paid,  color: "#34D399" },
             { label: "En retard",   val: late,  color: late > 0 ? "#F87171" : "rgba(255,255,255,.5)" },
-            { label: "Total FCFA",  val: total.toLocaleString("fr-FR"), color: "#fff" },
-          ].map((st, i) => (
-            <div key={i} style={{ flex: 1, padding: "14px 10px", borderRight: i < 2 ? "1px solid rgba(255,255,255,.15)" : "none", textAlign: "center" }}>
-              <p style={{ fontSize: 10, opacity: .7, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: .8 }}>{st.label}</p>
-              <p style={{ fontSize: 16, fontWeight: 800, margin: 0, color: st.color }}>{st.val}</p>
+            { label: "Total payé",  val: `${(total/1000).toFixed(0)}k`, color: "#fff" },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{ flex: 1, padding: "12px 8px", textAlign: "center", borderRight: "1px solid rgba(255,255,255,.1)" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color }}>{val}</div>
+              <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{label}</div>
             </div>
           ))}
         </div>
+
+        <button
+          onClick={() => { setError(""); setModal(true); }}
+          style={{
+            marginTop: 16, width: "100%", background: "rgba(255,255,255,.15)",
+            border: "1.5px solid rgba(255,255,255,.3)", borderRadius: 14, padding: "12px 0",
+            color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
+            fontFamily: "'Poppins',sans-serif", backdropFilter: "blur(8px)",
+            transition: "all .2s",
+          }}>
+          💳 Payer une cotisation
+        </button>
       </div>
 
-      {/* Bouton payer */}
-      <button onClick={() => { setError(""); setModal(true); }} style={{
-        width: "100%", background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
-        color: "#fff", border: "none", borderRadius: 16, padding: "16px",
-        fontSize: 15, fontWeight: 700, cursor: "pointer",
-        fontFamily: "'Poppins',sans-serif",
-        boxShadow: "0 6px 20px rgba(26,86,219,.35)",
-        marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-      }}>
-        <span style={{ fontSize: 20 }}>💳</span>
-        Payer une cotisation via CinetPay
-      </button>
-
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, background: "#F1F5F9", borderRadius: 14, padding: 4, marginBottom: 16 }}>
-        {[["calendar","📅 Calendrier"],["history","🧾 Historique"]].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{
-            flex: 1, padding: "9px 0", border: "none", borderRadius: 11,
-            fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif",
-            background: tab === key ? "#fff" : "transparent",
-            color: tab === key ? "#1a56db" : "#94A3B8",
-            boxShadow: tab === key ? "0 2px 8px rgba(0,0,0,.08)" : "none",
-            transition: "all .2s",
-          }}>{label}</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[{ id: "calendar", label: "📅 Calendrier" }, { id: "history", label: "📋 Historique" }].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            flex: 1, padding: "10px 0", border: "none", borderRadius: 12, fontSize: 12, fontWeight: 700,
+            cursor: "pointer", fontFamily: "'Poppins',sans-serif", transition: "all .2s",
+            background: tab === t.id ? "#1a56db" : "#fff",
+            color: tab === t.id ? "#fff" : "#64748B",
+            boxShadow: tab === t.id ? "0 4px 12px rgba(26,86,219,.3)" : "0 2px 8px rgba(0,0,0,.05)",
+          }}>
+            {t.label}
+          </button>
         ))}
       </div>
 
-      {/* Calendrier */}
+      {/* Calendrier mensuel */}
       {tab === "calendar" && (
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
-          opacity: visible ? 1 : 0, transition: "all .5s .2s",
-        }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, opacity: visible ? 1 : 0, transition: "all .5s .1s" }}>
           {data.monthly_status.map((m, i) => {
-            const st = STATUS_STYLE[m.status] || STATUS_STYLE.upcoming;
+            const s = STATUS_STYLE[m.status] || STATUS_STYLE.upcoming;
             return (
               <div key={m.month} style={{
-                background: st.bg, borderRadius: 14, padding: "12px 8px",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                border: `1.5px solid ${st.border}`,
+                background: s.bg, border: `1.5px solid ${s.border}`,
+                borderRadius: 16, padding: "14px 10px", textAlign: "center",
                 opacity: visible ? 1 : 0,
-                transform: visible ? "scale(1)" : "scale(.9)",
-                transition: `all .4s ${.2 + i * .03}s cubic-bezier(.34,1.56,.64,1)`,
+                transform: visible ? "scale(1)" : "scale(.95)",
+                transition: `all .4s ${i * .04}s`,
               }}>
-                <span style={{ fontSize: 16 }}>{st.icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{MONTHS[i]}</span>
-                <span style={{ fontSize: 9, fontWeight: 700, color: st.color, textTransform: "uppercase", letterSpacing: .5 }}>{st.label}</span>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{MONTHS[i]}</div>
+                <div style={{ fontSize: 10, color: s.color, fontWeight: 600, marginTop: 2 }}>{s.label}</div>
                 {m.payment && (
-                  <span style={{ fontSize: 9, color: st.color, fontWeight: 600 }}>
+                  <div style={{ fontSize: 10, color: "#64748B", marginTop: 4, fontWeight: 600 }}>
                     {parseInt(m.payment.amount).toLocaleString("fr-FR")} F
-                  </span>
+                  </div>
                 )}
               </div>
             );
@@ -245,7 +234,7 @@ export default function ClientCotisations() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: "0 0 2px" }}>
-                    {p.payment_type === "monthly_fee" ? "Cotisation mensuelle" : "Adhésion"}
+                    {p.payment_type === "mensualite" ? "Cotisation mensuelle" : "Adhésion"}
                   </p>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px" }}>
                     {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
