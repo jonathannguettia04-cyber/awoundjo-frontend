@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientContribAPI } from "../../clientApi";
-import { payWithCinetPay } from "../../services/cinetpay";
 
 const MONTHS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
@@ -15,15 +14,15 @@ const METHOD_ICON = { "cinetpay": "💳", "wave": "🌊", "cash": "💵" };
 
 export default function ClientCotisations() {
   const navigate = useNavigate();
-  const [data,       setData]       = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [modal,      setModal]      = useState(false);
-  const [amount,     setAmount]     = useState("");
-  const [paying,     setPaying]     = useState(false);
-  const [error,      setError]      = useState("");
-  const [success,    setSuccess]    = useState("");
-  const [visible,    setVis]        = useState(false);
-  const [tab,        setTab]        = useState("calendar");
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [modal,   setModal]   = useState(false);
+  const [amount,  setAmount]  = useState("");
+  const [paying,  setPaying]  = useState(false);
+  const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState("");
+  const [visible, setVis]     = useState(false);
+  const [tab,     setTab]     = useState("calendar");
 
   const load = () => {
     clientContribAPI.get()
@@ -34,7 +33,7 @@ export default function ClientCotisations() {
 
   useEffect(() => { load(); }, []);
 
-  // ── Détecter le retour depuis la page CinetPay ─────────────────────────────
+  // ── Détecter le retour depuis la page CinetPay ──────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("payment");
@@ -49,37 +48,32 @@ export default function ClientCotisations() {
     }
   }, []);
 
+  // ── Lancer le paiement via le backend ───────────────────────────────────
+  // Le backend (Railway) appelle CinetPay avec ses propres clés d'environnement
+  // et retourne le lien de paiement → on ouvre ce lien dans un nouvel onglet
   const handlePay = async () => {
     const parsedAmount = parseInt(amount);
     if (!amount || parsedAmount < 10000) return setError("Montant minimum : 10 000 FCFA");
     setError("");
     setPaying(true);
 
-    const txId = `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    try {
+      const res = await clientContribAPI.initiate({ amount: parsedAmount });
+      const { payment_url, transaction_reference } = res.data.data;
 
-    payWithCinetPay({
-      user: {
-        name:  data?.client?.name  || "",
-        email: data?.client?.email || "client@awoundjo.ci",
-        phone: data?.client?.phone || "",
-      },
-      amount:        parsedAmount,
-      description:   "Cotisation mensuelle Awoundjô",
-      transactionId: txId,
+      // ✅ Ouvrir la page CinetPay dans un nouvel onglet
+      window.open(payment_url, "_blank");
 
-      onSuccess: (_cinetData, _usedTxId) => {
-        // Nouvel onglet ouvert → fermer le modal et informer l'utilisateur
-        setModal(false);
-        setPaying(false);
-        setSuccess("🔗 Page de paiement ouverte dans un nouvel onglet. Revenez ici une fois le paiement effectué.");
-        setTimeout(() => setSuccess(""), 15000);
-      },
+      setModal(false);
+      setPaying(false);
+      setSuccess(`🔗 Page de paiement ouverte dans un nouvel onglet (réf: ${transaction_reference}). Revenez ici une fois le paiement effectué.`);
+      setTimeout(() => setSuccess(""), 15000);
 
-      onError: ({ message }) => {
-        setPaying(false);
-        setError(message || "Impossible d'ouvrir la page de paiement.");
-      },
-    });
+    } catch (e) {
+      setPaying(false);
+      const msg = e.response?.data?.error || e.response?.data?.detail || "Impossible d'initialiser le paiement.";
+      setError(msg);
+    }
   };
 
   if (loading) return <Skeleton />;
@@ -96,12 +90,12 @@ export default function ClientCotisations() {
       <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Mes Cotisations</h1>
       <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Suivi {new Date().getFullYear()}</p>
 
-      {/* Bannières */}
       {success && (
         <div style={{ background: "linear-gradient(135deg,#ECFDF5,#D1FAE5)", border: "1px solid #6EE7B7", borderRadius: 14, padding: "14px 16px", color: "#065F46", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
           {success}
         </div>
       )}
+
       {late > 0 && (
         <div style={{ background: "linear-gradient(135deg,#FFFBEB,#FEF3C7)", border: "1px solid #FCD34D", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 14, boxShadow: "0 4px 12px rgba(245,158,11,.15)" }}>
           <span style={{ fontSize: 24 }}>⚠️</span>
@@ -115,7 +109,7 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* Hero stats card */}
+      {/* Hero stats */}
       <div style={{
         background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
         borderRadius: 24, padding: "22px 20px", color: "#fff",
@@ -144,9 +138,9 @@ export default function ClientCotisations() {
 
         <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,.12)", borderRadius: 14, overflow: "hidden", backdropFilter: "blur(8px)" }}>
           {[
-            { label: "Mois payés",  val: paid,  color: "#34D399" },
-            { label: "En retard",   val: late,  color: late > 0 ? "#F87171" : "rgba(255,255,255,.5)" },
-            { label: "Total payé",  val: `${(total/1000).toFixed(0)}k`, color: "#fff" },
+            { label: "Mois payés", val: paid,  color: "#34D399" },
+            { label: "En retard",  val: late,  color: late > 0 ? "#F87171" : "rgba(255,255,255,.5)" },
+            { label: "Total payé", val: `${(total/1000).toFixed(0)}k`, color: "#fff" },
           ].map(({ label, val, color }) => (
             <div key={label} style={{ flex: 1, padding: "12px 8px", textAlign: "center", borderRight: "1px solid rgba(255,255,255,.1)" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color }}>{val}</div>
@@ -161,8 +155,7 @@ export default function ClientCotisations() {
             marginTop: 16, width: "100%", background: "rgba(255,255,255,.15)",
             border: "1.5px solid rgba(255,255,255,.3)", borderRadius: 14, padding: "12px 0",
             color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-            fontFamily: "'Poppins',sans-serif", backdropFilter: "blur(8px)",
-            transition: "all .2s",
+            fontFamily: "'Poppins',sans-serif", backdropFilter: "blur(8px)", transition: "all .2s",
           }}>
           💳 Payer une cotisation
         </button>
@@ -183,7 +176,7 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* Calendrier mensuel */}
+      {/* Calendrier */}
       {tab === "calendar" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, opacity: visible ? 1 : 0, transition: "all .5s .1s" }}>
           {data.monthly_status.map((m, i) => {
@@ -255,7 +248,7 @@ export default function ClientCotisations() {
         </div>
       )}
 
-      {/* ── Modal paiement CinetPay ─────────────────────────────── */}
+      {/* ── Modal paiement ──────────────────────────────────────────── */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
           onClick={() => !paying && setModal(false)}>
@@ -276,21 +269,16 @@ export default function ClientCotisations() {
               </div>
             )}
 
-            {/* Montant */}
             <label style={ls.label}>Montant (FCFA)</label>
             <div style={{ position: "relative", marginBottom: 20 }}>
               <input
-                type="number"
-                placeholder="10 000"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                disabled={paying}
+                type="number" placeholder="10 000" value={amount}
+                onChange={e => setAmount(e.target.value)} disabled={paying}
                 style={{ width: "100%", border: "2px solid #E2E8F0", borderRadius: 14, padding: "14px 60px 14px 16px", fontSize: 20, fontWeight: 700, color: "#0F172A", fontFamily: "'Poppins',sans-serif", boxSizing: "border-box", outline: "none" }}
               />
               <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#94A3B8" }}>FCFA</span>
             </div>
 
-            {/* Montants rapides */}
             <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
               {[10000, 15000, 20000, 25000].map(v => (
                 <button key={v} onClick={() => setAmount(String(v))} disabled={paying} style={{
@@ -306,7 +294,6 @@ export default function ClientCotisations() {
               ))}
             </div>
 
-            {/* Moyens de paiement acceptés */}
             <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: "14px 16px", marginBottom: 24 }}>
               <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8 }}>Moyens acceptés</p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -332,9 +319,7 @@ export default function ClientCotisations() {
               boxShadow: paying ? "none" : "0 6px 20px rgba(26,86,219,.35)",
               transition: "all .2s",
             }}>
-              {paying
-                ? "⏳ Ouverture du paiement…"
-                : `💳 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via CinetPay`}
+              {paying ? "⏳ Génération du lien…" : `💳 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via CinetPay`}
             </button>
 
             <p style={{ textAlign: "center", fontSize: 11, color: "#94A3B8", marginTop: 12 }}>
