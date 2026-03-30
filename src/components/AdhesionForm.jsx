@@ -286,7 +286,7 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
             </div>
           </div>
 
-          {/* Bouton Wave + fallback copier-coller */}
+          {/* Bouton Wave + fallback */}
           <WavePayButton
             amount={MEMBERSHIP_FEE}
             message={`Adhesion Awoundjo - ${form.name || "Nouveau membre"} - ${rc.title}`}
@@ -476,17 +476,17 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
               <p style={{ margin:"0 0 10px", fontSize:12, color:C.slate }}>
                 Cliquez sur le bouton ci-dessous → Wave s'ouvre → payez {fmt(MEMBERSHIP_FEE)} → revenez confirmer.
               </p>
-              {form.name ? (
+              {!form.name ? (
+                <p style={{ margin:0, fontSize:11, color:C.red, fontWeight:600 }}>
+                  ⚠️ Renseignez d'abord votre nom complet pour activer le lien.
+                </p>
+              ) : (
                 <WavePayButton
                   amount={MEMBERSHIP_FEE}
                   message={`Adhesion Awoundjo - ${form.name} - ${rc.title}`}
                   label={`Ouvrir Wave — ${fmt(MEMBERSHIP_FEE)}`}
                   size="sm"
                 />
-              ) : (
-                <p style={{ margin:0, fontSize:11, color:C.red }}>
-                  ⚠️ Renseignez d'abord votre nom complet pour activer le lien.
-                </p>
               )}
             </div>
           )}

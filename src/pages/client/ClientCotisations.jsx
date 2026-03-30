@@ -248,7 +248,7 @@ export default function ClientCotisations() {
                   ))}
                 </div>
 
-                {/* Bouton Wave + fallback copier-coller */}
+                {/* Bouton Wave + fallback */}
                 <WavePayButton
                   amount={monthly}
                   message={`Mensualite Awoundjo - ${client?.name || ""} (${client?.mutual_number || ""})`}
