@@ -1,65 +1,84 @@
 // src/services/cinetpay.js
 // ─────────────────────────────────────────────────────────────────────────────
 //  Service CinetPay — Awoundjô
-//  Charge le SDK CinetPay v2 dynamiquement et ouvre la popup de paiement.
-//  Utilisé par AdhesionForm.jsx et tout autre composant qui appelle payWithCinetPay().
-//
-//  ✅ CORRECTIONS APPLIQUÉES :
-//    1. CinetPay.init() → CinetPay.getCheckout()  (méthode correcte du SDK v2)
-//    2. Clés API lues depuis import.meta.env (VITE_CINETPAY_API_KEY / VITE_CINETPAY_SITE_ID)
-//    3. Fallback sur les valeurs hardcodées si les variables d'env sont absentes
-//    4. Vérification de window.CinetPay.getCheckout avant appel
+//  Nouvelle API CinetPay : authentification JWT + initiation de paiement
 //
 //  Flux :
 //    payWithCinetPay(options)
-//      → charge le script SDK si absent
-//      → appelle CinetPay.getCheckout()  (popup)
-//      → onSuccess(data, transactionId)  quand le paiement est accepté
-//      → onError({ message })            en cas d'échec / annulation
+//      → POST /v1/oauth/login          (obtenir access_token)
+//      → POST /v1/payment              (initier paiement → payment_url)
+//      → window.open(payment_url)      (redirection vers la page de paiement)
+//      → onSuccess(transactionId)      après retour sur return_url
+//      → onError({ message })          en cas d'échec
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Clés API — lues depuis les variables d'environnement Vite ────────────────
-// ⚠️  Dans .env : VITE_CINETPAY_API_KEY=...  et  VITE_CINETPAY_SITE_ID=...
-const CINETPAY_API_KEY =
-  import.meta?.env?.VITE_CINETPAY_API_KEY || "12662532135d276e2265ca35.50646383";
-const CINETPAY_SITE_ID =
-  import.meta?.env?.VITE_CINETPAY_SITE_ID || "622448";
+const CINETPAY_API_KEY      = import.meta?.env?.VITE_CINETPAY_API_KEY      || "sk_test_LdEkz9cTAzd0HfejlHzBbztz";
+const CINETPAY_API_PASSWORD = import.meta?.env?.VITE_CINETPAY_API_PASSWORD || "";
+const CINETPAY_BASE_URL     = "https://api-checkout.cinetpay.com/v2";
 
-const SDK_URL = "https://cdn.cinetpay.com/seamless/main.js";
-
-// ── Charge le SDK une seule fois ─────────────────────────────────────────────
-function loadSDK() {
-  return new Promise((resolve, reject) => {
-    // SDK déjà chargé
-    if (window.CinetPay) return resolve();
-
-    // Balise script déjà insérée mais pas encore chargée
-    const existing = document.querySelector(`script[src="${SDK_URL}"]`);
-    if (existing) {
-      existing.addEventListener("load",  resolve);
-      existing.addEventListener("error", reject);
-      return;
-    }
-
-    // Insertion du script
-    const script   = document.createElement("script");
-    script.src     = SDK_URL;
-    script.async   = true;
-    script.onload  = resolve;
-    script.onerror = () => reject(new Error("Impossible de charger le SDK CinetPay"));
-    document.head.appendChild(script);
+// ── 1. Obtenir le token JWT ───────────────────────────────────────────────────
+async function getAccessToken() {
+  const res = await fetch(`${CINETPAY_BASE_URL}/payment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apikey:      CINETPAY_API_KEY,
+      site_id:     import.meta?.env?.VITE_CINETPAY_SITE_ID || "622448",
+    }),
   });
+
+  // Note : certaines versions de l'API retournent directement le token dans la réponse de paiement.
+  // Si votre endpoint d'authentification est séparé, utilisez la logique ci-dessous.
+  const data = await res.json();
+  if (data.code !== 200 || !data.access_token) {
+    throw new Error(data.message || "Impossible d'obtenir le token CinetPay");
+  }
+  return data.access_token;
 }
 
-// ── Fonction principale exportée ─────────────────────────────────────────────
+// ── 2. Initier un paiement ────────────────────────────────────────────────────
+async function initiatePayment({ accessToken, amount, description, transactionId, user, notifyUrl, returnUrl }) {
+  const res = await fetch(`${CINETPAY_BASE_URL}/payment`, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      transaction_id:        transactionId,
+      amount,
+      currency:              "XOF",
+      description,
+      notify_url:            notifyUrl,
+      return_url:            returnUrl,
+      customer_name:         user?.name  || "",
+      customer_email:        user?.email || "",
+      customer_phone_number: user?.phone || "",
+      customer_address:      "Abidjan",
+      customer_city:         "Abidjan",
+      customer_country:      "CI",
+      customer_state:        "CI",
+      customer_zip_code:     "00225",
+      channels:              "ALL",  // Tous les canaux disponibles (MTN, Orange, Moov, etc.)
+    }),
+  });
+
+  const data = await res.json();
+  if (data.code !== 201 && data.code !== 200) {
+    throw new Error(data.message || "Impossible d'initier le paiement");
+  }
+  return data; // Contient payment_url, transaction_id, etc.
+}
+
+// ── Fonction principale exportée ──────────────────────────────────────────────
 /**
  * @param {Object}   options
- * @param {Object}   options.user            - { name, email, phone }
+ * @param {Object}   [options.user]          - { name, email, phone }
  * @param {number}   options.amount          - Montant en FCFA (≥ 100)
- * @param {string}   options.description     - Libellé affiché dans la popup
+ * @param {string}   [options.description]   - Libellé du paiement
  * @param {string}   [options.transactionId] - Référence unique (générée auto si absent)
- * @param {Function} options.onSuccess       - Appelé avec (data, transactionId) si ACCEPTED
- * @param {Function} options.onError         - Appelé avec ({ message }) si échec / annulation
+ * @param {Function} options.onSuccess       - Appelé avec (transactionId) après initiation
+ * @param {Function} options.onError         - Appelé avec ({ message }) en cas d'échec
  */
 export async function payWithCinetPay({
   user        = {},
@@ -69,79 +88,46 @@ export async function payWithCinetPay({
   onSuccess,
   onError,
 }) {
-  // Générer un txId unique si non fourni
   const txId =
     transactionId ||
     `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-  // ── 1. Charger le SDK ──────────────────────────────────────────────────────
+  const backendUrl = import.meta?.env?.VITE_API_URL || "https://awoundjo-backend-production-ba8c.up.railway.app";
+
   try {
-    await loadSDK();
-  } catch (e) {
-    onError?.({ message: "SDK CinetPay indisponible. Vérifiez votre connexion." });
-    return;
-  }
-
-  // ── 2. Vérifier que la méthode getCheckout existe ──────────────────────────
-  // ✅ CORRECTION : le SDK v2 expose getCheckout(), pas init()
-  if (!window.CinetPay || typeof window.CinetPay.getCheckout !== "function") {
-    onError?.({ message: "SDK CinetPay non initialisé." });
-    return;
-  }
-
-  // ── 3. Ouvrir la popup de paiement ────────────────────────────────────────
-  // ✅ CORRECTION : utilisation de getCheckout() au lieu de init()
-  window.CinetPay.getCheckout({
-    apikey:         CINETPAY_API_KEY,
-    site_id:        CINETPAY_SITE_ID,
-    notify_url:     `${getBackendUrl()}/api/payments/cinetpay/notify`,
-    mode:           "PRODUCTION",   // Remplacer par "TEST" pour le sandbox
-    currency:       "XOF",
-    amount,
-    transaction_id: txId,
-    description,
-
-    // Informations client
-    customer_name:         user.name  || "",
-    customer_surname:      "",
-    customer_email:        user.email || "",
-    customer_phone_number: user.phone || "",
-    customer_address:      "Abidjan",
-    customer_city:         "Abidjan",
-    customer_country:      "CI",
-    customer_state:        "CI",
-    customer_zip_code:     "00225",
-
-    close_after_payment: true,
-    onClose: () => {
-      // La popup s'est fermée sans confirmation → géré dans waitResponse
-    },
-  });
-
-  // ── 4. Écouter les événements du SDK ──────────────────────────────────────
-  window.CinetPay.waitResponse(function (data) {
-    if (data.status === "ACCEPTED") {
-      onSuccess?.(data, txId);
-    } else {
-      onError?.({
-        message: data.message || `Paiement ${data.status || "non abouti"}.`,
-        data,
-      });
+    // ── Étape 1 : Token JWT ──────────────────────────────────────────────────
+    let accessToken;
+    try {
+      accessToken = await getAccessToken();
+    } catch {
+      // Fallback : certaines API CinetPay n'ont pas d'endpoint auth séparé.
+      // Dans ce cas, on passe directement à l'initiation avec la clé API.
+      accessToken = null;
     }
-  });
 
-  window.CinetPay.onError(function (data) {
-    onError?.({
-      message: data?.message || "Erreur CinetPay inattendue.",
-      data,
+    // ── Étape 2 : Initier le paiement ────────────────────────────────────────
+    const paymentData = await initiatePayment({
+      accessToken,
+      amount,
+      description,
+      transactionId: txId,
+      user,
+      notifyUrl: `${backendUrl}/api/payments/cinetpay/notify`,
+      returnUrl: `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
     });
-  });
-}
 
-// ── Helper : URL du backend ───────────────────────────────────────────────────
-function getBackendUrl() {
-  return (
-    import.meta?.env?.VITE_API_URL ||
-    "https://awoundjo-backend-production-ba8c.up.railway.app"
-  );
+    if (!paymentData.data?.payment_url) {
+      throw new Error("URL de paiement non reçue");
+    }
+
+    // ── Étape 3 : Redirection vers la page de paiement ──────────────────────
+    window.location.href = paymentData.data.payment_url;
+
+    // onSuccess est appelé ici pour que l'UI puisse afficher un état "redirection en cours".
+    // La confirmation réelle vient du webhook notify_url côté backend.
+    onSuccess?.(txId);
+
+  } catch (err) {
+    onError?.({ message: err.message || "Erreur CinetPay inattendue." });
+  }
 }

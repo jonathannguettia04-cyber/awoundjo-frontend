@@ -5,19 +5,19 @@ import { TypeBadge, MethodBadge } from "../components/Badge";
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
 export default function Payments() {
-  const [payments,   setPayments]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [search,     setSearch]     = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterMethod, setFilterMethod] = useState("");
-  const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
+  const [payments,      setPayments]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [search,        setSearch]        = useState("");
+  const [filterType,    setFilterType]    = useState("");
+  const [filterMethod,  setFilterMethod]  = useState("");
+  const [pagination,    setPagination]    = useState({ total: 0, page: 1, pages: 1 });
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = { page, limit: 20 };
-      if (search)       params.search = search;
-      if (filterType)   params.type   = filterType;
+      if (search)       params.search         = search;
+      if (filterType)   params.type           = filterType;
       if (filterMethod) params.payment_method = filterMethod;
       const { data } = await paymentAPI.getAll(params);
       setPayments(data.payments);
@@ -61,7 +61,7 @@ export default function Payments() {
           className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
           <option value="">Toutes les méthodes</option>
-          <option value="wave">Wave</option>
+          <option value="cinetpay">CinetPay</option>
           <option value="cash">Cash</option>
         </select>
       </div>

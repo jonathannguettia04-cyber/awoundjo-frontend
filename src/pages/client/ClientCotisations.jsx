@@ -1,6 +1,7 @@
 // src/pages/client/ClientCotisations.jsx
 import { useState, useEffect } from "react";
-import WavePayButton from "../../components/WavePayButton";
+import { payWithCinetPay } from "../../services/cinetpay";
+import { clientContribAPI } from "../../clientApi";
 
 const C = {
   primary: "#059669", primaryL: "#ECFDF5",
@@ -9,7 +10,7 @@ const C = {
   red:     "#DC2626", redL:     "#FEF2F2",
   slate:   "#64748B", dark:     "#0F172A",
   border:  "#E2E8F0", bg:       "#F8FAFC",
-  wave:    "#1DC9A4", waveL:    "#F0FDF9",
+  cinet:   "#0072C6", cinetL:   "#EFF6FF",  // Couleur CinetPay
 };
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
@@ -22,13 +23,6 @@ const PLAN_PRICES = {
   IVOIRIENNE:  15000,
   TURQUOISE:   35000,
 };
-
-const WAVE_BASE = "https://pay.wave.com/m/M_Sh7TOpfh6ALd/c/ci/";
-
-function buildWaveLink(amount, clientName, mutualNumber) {
-  const msg = `Mensualite Awoundjo - ${clientName} (${mutualNumber})`;
-  return `${WAVE_BASE}?amount=${amount}&message=${encodeURIComponent(msg)}`;
-}
 
 function Card({ children, style = {} }) {
   return (
@@ -80,10 +74,22 @@ export default function ClientCotisations() {
   const [client,      setClient]      = useState(null);
   const [cotisations, setCotisations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [waveOpen,    setWaveOpen]    = useState(false);
-  const [wavePaid,    setWavePaid]    = useState(false);
+  const [payLoading,  setPayLoading]  = useState(false);
+  const [payError,    setPayError]    = useState("");
 
   useEffect(() => {
+    // Vérifier si retour de CinetPay (payment=success dans l'URL)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success") {
+      const tx = params.get("tx");
+      if (tx) {
+        // Confirmer le paiement côté backend
+        clientContribAPI.confirm({ transaction_id: tx }).catch(() => {});
+      }
+      // Nettoyer l'URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
     const token = localStorage.getItem("client_token");
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
     const base = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -102,19 +108,18 @@ export default function ClientCotisations() {
         status:        "actif",
       });
       setCotisations([
-        { id:1, month:"Décembre 2024", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"wave" },
-        { id:2, month:"Janvier 2025",  amount:15000, status:"payé",    paid_at:"2025-01-07", method:"wave" },
-        { id:3, month:"Février 2025",  amount:15000, status:"payé",    paid_at:"2025-02-04", method:"wave" },
-        { id:4, month:"Mars 2025",     amount:15000, status:"payé",    paid_at:"2025-03-01", method:"wave" },
+        { id:1, month:"Décembre 2024", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"cinetpay" },
+        { id:2, month:"Janvier 2025",  amount:15000, status:"payé",    paid_at:"2025-01-07", method:"cinetpay" },
+        { id:3, month:"Février 2025",  amount:15000, status:"payé",    paid_at:"2025-02-04", method:"cinetpay" },
+        { id:4, month:"Mars 2025",     amount:15000, status:"attente", paid_at: null,        method:null       },
       ]);
     }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loader />;
 
-  const plan     = client?.plan || "IVOIRIENNE";
-  const monthly  = PLAN_PRICES[plan] || 15000;
-  const waveLink = buildWaveLink(monthly, client?.name || "", client?.mutual_number || "");
+  const plan    = client?.plan || "IVOIRIENNE";
+  const monthly = PLAN_PRICES[plan] || 15000;
 
   const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
@@ -122,14 +127,10 @@ export default function ClientCotisations() {
     .filter(c => c.status === "payé" || c.status === "paid")
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-  // ── Calcul mois d'avance ────────────────────────────────────
-  // On considère que chaque paiement "payé" couvre 1 mois.
-  // Le mois courant = mois actuel de l'année en cours.
   const now = new Date();
-  const currentMonth = now.getMonth(); // 0-11
+  const currentMonth = now.getMonth();
   const currentYear  = now.getFullYear();
 
-  // On estime le nombre de mois attendus depuis le début (premier paiement)
   const firstPaid = cotisations
     .filter(c => c.status === "payé" || c.status === "paid")
     .sort((a, b) => new Date(a.paid_at) - new Date(b.paid_at))[0];
@@ -144,129 +145,37 @@ export default function ClientCotisations() {
 
   const isUpToDate = !pending && paidCount > 0;
 
-  const handleWaveClick = () => { setWaveOpen(true); setWavePaid(false); };
+  // ── Déclencheur paiement CinetPay ─────────────────────────────────────────
+  const handleCinetPay = () => {
+    setPayError("");
+    setPayLoading(true);
 
-  const handleWaveConfirm = () => {
-    setWavePaid(true);
-    setCotisations(prev => prev.map(c =>
-      (c.status === "attente" || c.status === "pending")
-        ? { ...c, status:"payé", paid_at: new Date().toISOString(), method:"wave" }
-        : c
-    ));
-    setTimeout(() => setWaveOpen(false), 2000);
+    payWithCinetPay({
+      user: {
+        name:  client?.name  || "",
+        email: client?.email || "",
+        phone: client?.phone || "",
+      },
+      amount:      pending?.amount || monthly,
+      description: `Mensualité Awoundjô - ${client?.name || ""} (${client?.mutual_number || ""})`,
+      onSuccess: (txId) => {
+        // La redirection est déjà faite dans cinetpay.js
+        // onSuccess est appelé avant la redirection pour permettre un état de chargement
+        setPayLoading(true); // Garde le spinner pendant la redirection
+      },
+      onError: ({ message }) => {
+        setPayError(message || "Le paiement a échoué. Veuillez réessayer.");
+        setPayLoading(false);
+      },
+    });
   };
 
   return (
     <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Modal Wave ─────────────────────────────────────── */}
-      {waveOpen && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 20,
-        }}>
-          <div style={{
-            background: "#fff", borderRadius: 20, padding: 28,
-            maxWidth: 420, width: "100%",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-          }}>
-            {wavePaid ? (
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
-                <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 900, color: C.dark }}>
-                  Paiement confirmé !
-                </h2>
-                <p style={{ margin: 0, fontSize: 13, color: C.slate }}>
-                  Votre cotisation de {fmt(monthly)} a été enregistrée.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: 12,
-                    background: "linear-gradient(135deg,#1DC9A4,#15A882)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 24,
-                  }}>🌊</div>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 900, fontSize: 17, color: C.dark }}>Payer avec Wave</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
-                      {fmt(monthly)} · Mensualité Awoundjô
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ background: C.waveL, borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
-                  <p style={{ margin: "0 0 6px", fontSize: 12, color: C.slate, fontWeight: 600 }}>
-                    Instructions :
-                  </p>
-                  <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.dark, lineHeight: 1.8 }}>
-                    <li>Cliquez sur <strong>"Ouvrir Wave"</strong></li>
-                    <li>Payez exactement <strong>{fmt(monthly)}</strong></li>
-                    <li>Revenez et cliquez <strong>"J'ai payé"</strong></li>
-                  </ol>
-                </div>
-
-                <a
-                  href={waveLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "block", width: "100%", textAlign: "center",
-                    background: "linear-gradient(135deg,#1DC9A4,#15A882)",
-                    color: "#fff", fontWeight: 900, fontSize: 15,
-                    padding: "14px 0", borderRadius: 12,
-                    textDecoration: "none", marginBottom: 12,
-                    boxShadow: "0 4px 16px rgba(29,201,164,.4)",
-                  }}
-                >
-                  🌊 Ouvrir Wave — {fmt(monthly)}
-                </a>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button
-                    onClick={() => setWaveOpen(false)}
-                    style={{
-                      flex: 1, padding: "12px 0", border: `1px solid ${C.border}`,
-                      borderRadius: 12, background: "#fff", color: C.slate,
-                      fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handleWaveConfirm}
-                    style={{
-                      flex: 2, padding: "12px 0",
-                      background: "linear-gradient(135deg,#059669,#047857)",
-                      border: "none", borderRadius: 12, color: "#fff",
-                      fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    ✅ J'ai payé
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Titre ──────────────────────────────────────────── */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: C.dark, letterSpacing: -.3 }}>
-          💳 Mes cotisations
-        </h1>
-        <p style={{ margin: "4px 0 0", fontSize: 14, color: C.slate }}>
-          Suivi de vos paiements mensuels Awoundjô
-        </p>
-      </div>
-
-      {/* ── Carte info client ───────────────────────────────── */}
-      <Card style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      {/* ── Carte identité client ───────────────────────────────── */}
+      <Card style={{ marginBottom: 20, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
         <div>
           <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>{client?.name}</p>
           <p style={{ margin: "3px 0 0", fontSize: 12, color: C.slate, fontFamily: "monospace" }}>
@@ -282,10 +191,10 @@ export default function ClientCotisations() {
       {/* ── Cartes résumé ───────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
-          { icon: "✅", label: "Total payé",   value: fmt(totalPaid),                                              color: C.primary, bg: C.primaryL },
-          { icon: "📅", label: "Mensualité",   value: fmt(monthly),                                                color: C.blue,    bg: C.blueL    },
-          { icon: "🧾", label: "Paiements",    value: `${paidCount} / ${cotisations.length}`,                     color: C.gold,    bg: C.goldL    },
-          { icon: "⏩", label: "Mois d'avance",value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",       color: monthsAhead > 0 ? C.primary : C.slate, bg: monthsAhead > 0 ? C.primaryL : C.bg },
+          { icon: "✅", label: "Total payé",    value: fmt(totalPaid),                                                    color: C.primary, bg: C.primaryL },
+          { icon: "📅", label: "Mensualité",    value: fmt(monthly),                                                      color: C.blue,    bg: C.blueL    },
+          { icon: "🧾", label: "Paiements",     value: `${paidCount} / ${cotisations.length}`,                           color: C.gold,    bg: C.goldL    },
+          { icon: "⏩", label: "Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",             color: monthsAhead > 0 ? C.primary : C.slate, bg: monthsAhead > 0 ? C.primaryL : C.bg },
         ].map(s => (
           <Card key={s.label} style={{ textAlign: "center", padding: "16px 12px" }}>
             <p style={{ margin: "0 0 4px", fontSize: 28 }}>{s.icon}</p>
@@ -295,11 +204,11 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* ── Bloc paiement — TOUJOURS VISIBLE ────────────────── */}
+      {/* ── Bloc paiement CinetPay ───────────────────────────────── */}
       <Card style={{
         marginBottom: 20,
-        border: `2px solid ${isUpToDate ? C.primary : C.wave}`,
-        background: isUpToDate ? C.primaryL : C.waveL,
+        border: `2px solid ${isUpToDate ? C.primary : C.cinet}`,
+        background: isUpToDate ? C.primaryL : C.cinetL,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
           <div>
@@ -307,7 +216,6 @@ export default function ClientCotisations() {
               {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "COTISATION EN COURS"}
             </p>
 
-            {/* Badge "À jour" si pas de pending */}
             {isUpToDate && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, borderRadius: 20, padding: "4px 12px", marginBottom: 8 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
@@ -321,7 +229,7 @@ export default function ClientCotisations() {
               </p>
             )}
 
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: isUpToDate ? C.primary : C.wave }}>
+            <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: isUpToDate ? C.primary : C.cinet }}>
               {fmt(pending?.amount || monthly)}
             </p>
 
@@ -332,38 +240,54 @@ export default function ClientCotisations() {
             )}
           </div>
 
-          {/* Bouton Wave — toujours visible */}
+          {/* Bouton CinetPay */}
           <button
-            onClick={handleWaveClick}
+            onClick={handleCinetPay}
+            disabled={payLoading}
             style={{
               padding: "12px 22px",
-              background: isUpToDate
-                ? "linear-gradient(135deg,#059669,#047857)"
-                : "linear-gradient(135deg,#1DC9A4,#15A882)",
+              background: payLoading
+                ? "#94a3b8"
+                : isUpToDate
+                  ? "linear-gradient(135deg,#059669,#047857)"
+                  : "linear-gradient(135deg,#0072C6,#005A9E)",
               color: "#fff", fontWeight: 900, fontSize: 14,
               border: "none", borderRadius: 12,
-              cursor: "pointer", fontFamily: "inherit",
+              cursor: payLoading ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
               display: "flex", alignItems: "center", gap: 8,
-              boxShadow: isUpToDate
-                ? "0 4px 16px rgba(5,150,105,.4)"
-                : "0 4px 16px rgba(29,201,164,.4)",
-              flexShrink: 0,
+              boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+              flexShrink: 0, transition: "all .2s",
             }}
           >
-            🌊 {isUpToDate ? "Payer en avance" : "Payer avec Wave"}
+            {payLoading ? (
+              <>
+                <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+                Redirection…
+              </>
+            ) : (
+              <>💳 {isUpToDate ? "Payer en avance" : "Payer avec CinetPay"}</>
+            )}
           </button>
         </div>
 
+        {/* Message d'erreur */}
+        {payError && (
+          <div style={{ marginTop:12, background:C.redL, border:`1px solid ${C.red}33`, borderRadius:8, padding:"10px 14px" }}>
+            <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
+          </div>
+        )}
+
         <div style={{
           marginTop: 14, paddingTop: 12,
-          borderTop: `1px solid ${isUpToDate ? C.primary : C.wave}44`,
+          borderTop: `1px solid ${isUpToDate ? C.primary : C.cinet}44`,
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span style={{ fontSize: 14 }}>ℹ️</span>
           <p style={{ margin: 0, fontSize: 12, color: C.slate }}>
             {isUpToDate
               ? "Votre cotisation est à jour. Vous pouvez payer des mois à l'avance pour rester serein."
-              : `Le lien Wave s'ouvrira directement dans votre app. Payez exactement ${fmt(pending?.amount || monthly)} et revenez confirmer.`
+              : "Vous serez redirigé vers CinetPay (MTN, Orange, Moov, Wave, carte…). Paiement 100% sécurisé."
             }
           </p>
         </div>
@@ -411,8 +335,8 @@ export default function ClientCotisations() {
                       </p>
                       <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>
                         {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
-                        {cot.method === "wave" && (
-                          <span style={{ marginLeft: 6, color: C.wave, fontWeight: 700 }}>· 🌊 Wave</span>
+                        {cot.method === "cinetpay" && (
+                          <span style={{ marginLeft: 6, color: C.cinet, fontWeight: 700 }}>· 💳 CinetPay</span>
                         )}
                       </p>
                     </div>
@@ -425,17 +349,19 @@ export default function ClientCotisations() {
                     <Badge label={s.label} color={s.color} bg={s.bg} />
                     {isPending && (
                       <button
-                        onClick={handleWaveClick}
+                        onClick={handleCinetPay}
+                        disabled={payLoading}
                         style={{
                           padding: "6px 14px",
-                          background: "linear-gradient(135deg,#1DC9A4,#15A882)",
+                          background: "linear-gradient(135deg,#0072C6,#005A9E)",
                           color: "#fff", fontWeight: 700, fontSize: 12,
                           border: "none", borderRadius: 8,
-                          cursor: "pointer", fontFamily: "inherit",
+                          cursor: payLoading ? "not-allowed" : "pointer",
+                          fontFamily: "inherit",
                           display: "flex", alignItems: "center", gap: 6,
                         }}
                       >
-                        🌊 Payer
+                        💳 Payer
                       </button>
                     )}
                   </div>
@@ -447,7 +373,7 @@ export default function ClientCotisations() {
       </Card>
 
       <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
-        🔒 Paiements sécurisés · Awoundjô Mutuelle Santé CI<br />
+        🔒 Paiements sécurisés via CinetPay · Awoundjô Mutuelle Santé CI<br />
         En cas de problème : <strong>+225 XX XX XX XX</strong>
       </p>
     </div>
