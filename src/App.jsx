@@ -205,7 +205,7 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
             } />
             <Route path="/groups" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
             } />
             <Route path="/agents" element={
               <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
