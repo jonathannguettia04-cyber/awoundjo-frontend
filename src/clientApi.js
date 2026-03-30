@@ -53,7 +53,7 @@ export const clientCardAPI = {
 export const clientContribAPI = {
   get:     ()     => clientApi.get("/contributions"),
   pay:     (data) => clientApi.post("/contributions/pay", { ...data, payment_method: "CinetPay" }),
-  initiate: (data) => clientApi.post("/contributions/initiate", data), // ✅ CORRECTION : /init → /initiate
+  initiate: (data) => clientApi.post("/contributions/initiate", data), // ✅ CORRECTION : route exacte du backend
   confirm: (data) => clientApi.post("/contributions/confirm", data), // ← ajoute ça
 };
 // ── DÉPENDANTS ───────────────────────────────────────────────────
