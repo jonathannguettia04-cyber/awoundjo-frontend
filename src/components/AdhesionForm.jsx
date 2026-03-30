@@ -34,6 +34,13 @@ const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 // ── Constantes ────────────────────────────────────────────────
 const MEMBERSHIP_FEE = 15000;
 
+// Lien Wave marchand Awoundjô
+const WAVE_MERCHANT_BASE = "https://pay.wave.com/m/M_Sh7TOpfh6ALd/c/ci/";
+
+function buildWaveLink(amount, description) {
+  return `${WAVE_MERCHANT_BASE}?amount=${amount}&message=${encodeURIComponent(description)}`;
+}
+
 const PLANS = [
   { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  monthly:10000 },
   { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie", monthly:15000 },
@@ -115,9 +122,10 @@ function InputField({ label, type="text", placeholder, value, onChange, required
 export default function AdhesionForm({ targetRole, onSuccess }) {
   const rc = ROLE_CONFIG[targetRole] || ROLE_CONFIG.RECRUTEUR;
 
-  // Étapes : "form" → "payment" → "processing" → "done"
-  const [step, setStep]     = useState("form");
-  const [error, setError]   = useState("");
+  // Étapes : "form" → "wave_pending" | "payment" → "processing" → "done"
+  const [step, setStep]           = useState("form");
+  const [error, setError]         = useState("");
+  const [waveConfirmed, setWaveConfirmed] = useState(false); // Wave : l'user confirme manuellement
 
   // Données du formulaire
   const [form, setForm] = useState({
@@ -130,6 +138,13 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
   });
 
   const selectedPlan = PLANS.find(p => p.value === form.plan) || PLANS[0];
+  const isWave       = form.paymentMethod === "wave";
+
+  // Lien Wave généré dynamiquement avec nom + montant
+  const waveLink = buildWaveLink(
+    MEMBERSHIP_FEE,
+    `Adhesion Awoundjo - ${form.name || "Nouveau membre"} - ${rc.title}`
+  );
 
   function setField(key) {
     return (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -144,46 +159,52 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
     return null;
   }
 
-  // ── Soumission → CinetPay ─────────────────────────────────
+  // ── Créer le compte après paiement confirmé ───────────────
+  async function createAccount(txId) {
+    setStep("processing");
+    try {
+      const { data } = await diasporaBeneAPI.createAmbassador({
+        name:           form.name,
+        email:          form.email,
+        phone:          form.phone,
+        country:        form.country,
+        role:           targetRole,
+        plan:           form.plan,
+        payment_method: form.paymentMethod,
+        transaction_id: txId,
+        membership_fee: MEMBERSHIP_FEE,
+      });
+      setStep("done");
+      onSuccess?.(data.credentials, rc.art);
+    } catch (err) {
+      setError(err.response?.data?.error || "Paiement reçu mais erreur lors de la création du compte. Contactez le support.");
+      setStep("form");
+    }
+  }
+
+  // ── Soumission principale ─────────────────────────────────
   function handlePay(e) {
     e.preventDefault();
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
     setError("");
-    setStep("payment");
 
+    if (isWave) {
+      // Wave : montrer le bloc de confirmation, l'user ouvre Wave et revient confirmer
+      setStep("wave_pending");
+      return;
+    }
+
+    // CinetPay : popup direct
+    setStep("payment");
     const txId = `AWJ-${Date.now()}-${Math.random().toString(36).substr(2,5).toUpperCase()}`;
 
     payWithCinetPay({
       user: { name: form.name, email: form.email, phone: form.phone },
-      amount:      MEMBERSHIP_FEE,
-      description: `${rc.title} — Awoundjô`,
+      amount:        MEMBERSHIP_FEE,
+      description:   `${rc.title} — Awoundjô`,
       transactionId: txId,
-
-      // ── Paiement accepté → créer le compte ────────────────
-      onSuccess: async (_data, finalTxId) => {
-        setStep("processing");
-        try {
-          const { data } = await diasporaBeneAPI.createAmbassador({
-            name:           form.name,
-            email:          form.email,
-            phone:          form.phone,
-            country:        form.country,
-            role:           targetRole,
-            plan:           form.plan,
-            payment_method: form.paymentMethod,
-            transaction_id: finalTxId,
-            membership_fee: MEMBERSHIP_FEE,
-          });
-          setStep("done");
-          onSuccess?.(data.credentials, rc.art);
-        } catch (err) {
-          setError(err.response?.data?.error || "Paiement reçu mais erreur lors de la création du compte. Contactez le support.");
-          setStep("form");
-        }
-      },
-
-      // ── Paiement refusé / annulé ──────────────────────────
+      onSuccess: async (_data, finalTxId) => { await createAccount(finalTxId); },
       onError: ({ message }) => {
         setError(message || "Paiement échoué ou annulé.");
         setStep("form");
@@ -191,17 +212,125 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
     });
   }
 
+  // ── Confirmation Wave par l'utilisateur ───────────────────
+  async function handleWaveConfirm() {
+    const txId = `AWJ-WAVE-${Date.now()}-${Math.random().toString(36).substr(2,5).toUpperCase()}`;
+    await createAccount(txId);
+  }
+
   // ── Écran "Traitement en cours" ───────────────────────────
   if (step === "processing") {
     return (
       <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"48px 24px", textAlign:"center" }}>
-        <div style={{
-          width:52, height:52, border:`4px solid ${C.blueL}`, borderTop:`4px solid ${rc.color}`,
-          borderRadius:"50%", animation:"spin .8s linear infinite", margin:"0 auto 20px",
-        }} />
+        <div style={{ width:52, height:52, border:`4px solid ${C.blueL}`, borderTop:`4px solid ${rc.color}`, borderRadius:"50%", animation:"spin .8s linear infinite", margin:"0 auto 20px" }} />
         <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
         <p style={{ margin:0, fontWeight:800, fontSize:16, color:C.dark }}>Création du compte en cours…</p>
         <p style={{ margin:"6px 0 0", fontSize:13, color:C.slate }}>Paiement confirmé. Génération des identifiants…</p>
+      </div>
+    );
+  }
+
+  // ── Écran Wave : attente confirmation utilisateur ─────────
+  if (step === "wave_pending") {
+    return (
+      <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+        {/* En-tête */}
+        <div style={{ background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`, padding:"18px 22px", display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:28 }}>{rc.icon}</span>
+          <div>
+            <p style={{ margin:0, color:"#fff", fontWeight:900, fontSize:17 }}>{rc.title}</p>
+            <p style={{ margin:"2px 0 0", color:"rgba(255,255,255,.75)", fontSize:12 }}>Paiement Wave</p>
+          </div>
+        </div>
+
+        <div style={{ padding:"28px 24px", display:"flex", flexDirection:"column", gap:20 }}>
+          {error && (
+            <div style={{ background:C.redL, border:`1px solid ${C.red}44`, borderRadius:10, padding:"11px 14px", fontSize:13, color:C.red, fontWeight:600 }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Récap */}
+          <div style={{ background:C.bg, borderRadius:12, padding:"14px 16px", border:`1px solid ${C.border}` }}>
+            <p style={{ margin:"0 0 8px", fontWeight:800, fontSize:13, color:C.dark }}>Récapitulatif :</p>
+            <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate }}>
+              👤 <strong>{form.name}</strong> — {form.email}
+            </p>
+            <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate }}>
+              📋 Rôle : <strong>{rc.title}</strong>
+            </p>
+            <p style={{ margin:0, fontSize:15, fontWeight:900, color:rc.color }}>
+              💰 Montant à payer : {fmt(MEMBERSHIP_FEE)}
+            </p>
+          </div>
+
+          {/* Étapes Wave */}
+          <div>
+            <p style={{ margin:"0 0 14px", fontWeight:800, fontSize:14, color:C.dark }}>
+              🌊 Comment payer avec Wave :
+            </p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {[
+                { n:"1", text:"Cliquez sur le bouton ci-dessous pour ouvrir Wave" },
+                { n:"2", text:`Payez exactement ${fmt(MEMBERSHIP_FEE)} à Awoundjô` },
+                { n:"3", text:"Revenez ici et cliquez sur \"J'ai payé, créer mon compte\"" },
+              ].map(s => (
+                <div key={s.n} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 14px", background:"#F0FDFA", borderRadius:10 }}>
+                  <div style={{ width:26, height:26, borderRadius:99, background:C.teal, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:900, flexShrink:0 }}>
+                    {s.n}
+                  </div>
+                  <p style={{ margin:0, fontSize:13, color:C.dark }}>{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bouton Wave */}
+          <a
+            href={waveLink}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display:"flex", alignItems:"center", justifyContent:"center", gap:12,
+              padding:"16px 20px", borderRadius:12, textDecoration:"none",
+              background:"linear-gradient(135deg, #1DC9A4, #15A882)",
+              color:"#fff", fontWeight:900, fontSize:16,
+              boxShadow:"0 6px 20px rgba(29,201,164,.4)",
+            }}
+          >
+            <span style={{ fontSize:24 }}>🌊</span>
+            Payer {fmt(MEMBERSHIP_FEE)} avec Wave
+            <span style={{ fontSize:16 }}>↗</span>
+          </a>
+
+          {/* Séparateur */}
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ flex:1, height:1, background:C.border }} />
+            <p style={{ margin:0, fontSize:12, color:C.slate, whiteSpace:"nowrap" }}>Après le paiement Wave</p>
+            <div style={{ flex:1, height:1, background:C.border }} />
+          </div>
+
+          {/* Bouton confirmation */}
+          <button
+            onClick={handleWaveConfirm}
+            style={{
+              width:"100%", padding:"14px 20px", borderRadius:12, border:`2px solid ${rc.color}`,
+              background:rc.bg, color:rc.color, fontWeight:900, fontSize:14,
+              cursor:"pointer", fontFamily:"inherit",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            }}
+          >
+            ✅ J'ai payé — Créer mon compte
+          </button>
+
+          {/* Retour */}
+          <button
+            onClick={() => { setStep("form"); setError(""); }}
+            style={{ background:"none", border:"none", color:C.slate, fontSize:13, cursor:"pointer", textDecoration:"underline" }}
+          >
+            ← Changer de méthode de paiement
+          </button>
+        </div>
       </div>
     );
   }
@@ -331,14 +460,14 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
                   onClick={() => setForm(prev => ({ ...prev, paymentMethod: m.value }))}
                   style={{
                     padding:"12px 8px", borderRadius:10,
-                    border:`2px solid ${selected ? rc.color : C.border}`,
-                    background: selected ? rc.bg : "#fff",
+                    border:`2px solid ${selected ? (m.value === "wave" ? "#1DC9A4" : rc.color) : C.border}`,
+                    background: selected ? (m.value === "wave" ? "#F0FDF9" : rc.bg) : "#fff",
                     cursor:"pointer", textAlign:"center",
                     transition:"all .15s",
                   }}
                 >
                   <p style={{ margin:"0 0 4px", fontSize:20 }}>{m.label.split(" ")[0]}</p>
-                  <p style={{ margin:"0 0 2px", fontSize:12, fontWeight:700, color:selected ? rc.color : C.dark }}>
+                  <p style={{ margin:"0 0 2px", fontSize:12, fontWeight:700, color: selected ? (m.value === "wave" ? "#1DC9A4" : rc.color) : C.dark }}>
                     {m.label.split(" ").slice(1).join(" ")}
                   </p>
                   <p style={{ margin:0, fontSize:10, color:C.slate }}>{m.desc}</p>
@@ -346,6 +475,40 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
               );
             })}
           </div>
+
+          {/* Aperçu lien Wave quand sélectionné */}
+          {isWave && (
+            <div style={{ marginTop:14, background:"#F0FDF9", border:"1.5px solid #1DC9A4", borderRadius:12, padding:"14px 16px" }}>
+              <p style={{ margin:"0 0 8px", fontSize:13, fontWeight:700, color:"#0D9488" }}>
+                🌊 Lien de paiement Wave prêt
+              </p>
+              <p style={{ margin:"0 0 10px", fontSize:12, color:C.slate }}>
+                Cliquez sur le bouton ci-dessous → Wave s'ouvre → payez {fmt(MEMBERSHIP_FEE)} → revenez confirmer.
+              </p>
+              <a
+                href={form.name ? waveLink : "#"}
+                target="_blank"
+                rel="noreferrer"
+                onClick={e => { if (!form.name) e.preventDefault(); }}
+                style={{
+                  display:"inline-flex", alignItems:"center", gap:8,
+                  padding:"9px 18px", borderRadius:8,
+                  background: form.name ? "linear-gradient(135deg,#1DC9A4,#15A882)" : C.border,
+                  color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none",
+                  opacity: form.name ? 1 : 0.5,
+                  cursor: form.name ? "pointer" : "not-allowed",
+                }}
+              >
+                🌊 Ouvrir Wave — {fmt(MEMBERSHIP_FEE)}
+                <span style={{ fontSize:12 }}>↗</span>
+              </a>
+              {!form.name && (
+                <p style={{ margin:"6px 0 0", fontSize:11, color:C.red }}>
+                  ⚠️ Renseignez d'abord votre nom complet pour activer le lien.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Bouton de soumission ──────────────────────────── */}
@@ -356,11 +519,13 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
             width:"100%", padding:"15px 20px", borderRadius:12, border:"none",
             fontSize:15, fontWeight:900, cursor: step === "payment" ? "not-allowed" : "pointer",
             opacity: step === "payment" ? 0.7 : 1,
-            background: `linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
+            background: isWave
+              ? "linear-gradient(135deg,#1DC9A4,#15A882)"
+              : `linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
             color:"#fff",
-            boxShadow:`0 6px 20px ${rc.color}44`,
+            boxShadow: isWave ? "0 6px 20px rgba(29,201,164,.4)" : `0 6px 20px ${rc.color}44`,
             display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-            transition:"opacity .2s",
+            transition:"all .2s",
             fontFamily:"inherit",
           }}
         >
@@ -369,16 +534,19 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
               <div style={{ width:18, height:18, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
               Redirection vers CinetPay…
             </>
+          ) : isWave ? (
+            <>🌊 Continuer avec Wave — {fmt(MEMBERSHIP_FEE)}</>
           ) : (
-            <>
-              💳 Payer {fmt(MEMBERSHIP_FEE)} et créer {rc.art}
-            </>
+            <>💳 Payer {fmt(MEMBERSHIP_FEE)} et créer {rc.art}</>
           )}
         </button>
 
         {/* Note sécurité */}
         <p style={{ margin:"-12px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
-          🔒 Paiement sécurisé via CinetPay · Aucun compte créé avant confirmation du paiement
+          {isWave
+            ? "🌊 Paiement Wave · Vous serez redirigé vers Wave puis reviendrez confirmer"
+            : "🔒 Paiement sécurisé via CinetPay · Aucun compte créé avant confirmation du paiement"
+          }
         </p>
 
       </form>

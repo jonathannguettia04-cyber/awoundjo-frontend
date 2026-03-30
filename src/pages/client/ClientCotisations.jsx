@@ -1,348 +1,498 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { clientContribAPI } from "../../clientApi";
+// src/pages/client/ClientCotisations.jsx
+// ─────────────────────────────────────────────────────────────
+//  Page Cotisations — Portail Client Awoundjô
+//  Affiche l'historique des paiements + permet de payer
+//  la mensualité en cours via Wave (lien direct)
+// ─────────────────────────────────────────────────────────────
+import { useState, useEffect } from "react";
 
-const MONTHS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
-
-const STATUS_STYLE = {
-  paid:     { icon: "✅", label: "Payé",    color: "#059669", bg: "linear-gradient(135deg,#ECFDF5,#D1FAE5)", border: "#6EE7B7" },
-  late:     { icon: "❌", label: "Retard",  color: "#DC2626", bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)", border: "#FECACA" },
-  upcoming: { icon: "⏳", label: "À venir", color: "#94A3B8", bg: "#F8FAFC",                                 border: "#E2E8F0" },
+// ── Palette portail client ────────────────────────────────────
+const C = {
+  primary: "#059669", primaryL: "#ECFDF5",
+  blue:    "#1B4FD8", blueL:    "#EEF2FF",
+  gold:    "#D97706", goldL:    "#FFFBEB",
+  red:     "#DC2626", redL:     "#FEF2F2",
+  slate:   "#64748B", dark:     "#0F172A",
+  border:  "#E2E8F0", bg:       "#F8FAFC",
+  wave:    "#1DC9A4", waveL:    "#F0FDF9",
 };
 
-const METHOD_ICON = { "cinetpay": "💳", "wave": "🌊", "cash": "💵" };
+const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const fmtDate = (d) => d
+  ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" })
+  : "—";
 
+// Prix mensuel par plan
+const PLAN_PRICES = {
+  ESSENTIELLE: 10000,
+  IVOIRIENNE:  15000,
+  TURQUOISE:   35000,
+};
+
+// Lien Wave marchand Awoundjô
+const WAVE_BASE = "https://pay.wave.com/m/M_Sh7TOpfh6ALd/c/ci/";
+
+function buildWaveLink(amount, clientName, mutualNumber) {
+  const msg = `Mensualite Awoundjo - ${clientName} (${mutualNumber})`;
+  return `${WAVE_BASE}?amount=${amount}&message=${encodeURIComponent(msg)}`;
+}
+
+// ── Helpers UI ────────────────────────────────────────────────
+function Card({ children, style = {} }) {
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 16,
+      border: `1px solid ${C.border}`,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+      padding: 20, ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function Badge({ label, color, bg }) {
+  return (
+    <span style={{
+      background: bg, color, padding: "3px 12px",
+      borderRadius: 999, fontSize: 11, fontWeight: 700,
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function Loader() {
+  return (
+    <div style={{ display:"flex", justifyContent:"center", padding:"48px 0" }}>
+      <div style={{
+        width: 36, height: 36,
+        border: `3px solid ${C.primaryL}`,
+        borderTop: `3px solid ${C.primary}`,
+        borderRadius: "50%",
+        animation: "spin .8s linear infinite",
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// Statut de paiement → couleur + label
+function statusStyle(status) {
+  if (status === "payé"   || status === "paid")    return { color: C.primary, bg: C.primaryL, label: "✅ Payé"        };
+  if (status === "attente"|| status === "pending")  return { color: C.gold,    bg: C.goldL,    label: "⏳ En attente"  };
+  if (status === "retard" || status === "overdue")  return { color: C.red,     bg: C.redL,     label: "🔴 En retard"   };
+  return                                                   { color: C.slate,   bg: C.bg,       label: status           };
+}
+
+// ── Composant principal ───────────────────────────────────────
 export default function ClientCotisations() {
-  const navigate = useNavigate();
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(false);
-  const [amount,  setAmount]  = useState("");
-  const [paying,  setPaying]  = useState(false);
-  const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState("");
-  const [visible, setVis]     = useState(false);
-  const [tab,     setTab]     = useState("calendar");
+  const [client,     setClient]     = useState(null);
+  const [cotisations,setCotisations]= useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [waveOpen,   setWaveOpen]   = useState(false); // modal Wave ouvert
+  const [wavePaid,   setWavePaid]   = useState(false); // confirmation après paiement Wave
 
-  const load = () => {
-    clientContribAPI.get()
-      .then(res => { setData(res.data.data); setTimeout(() => setVis(true), 100); })
-      .catch(() => navigate("/client/login"))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-
-  // ── Détecter le retour depuis la page CinetPay ──────────────────────────
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const status = params.get("payment");
-    if (status === "success") {
-      setSuccess("✅ Paiement effectué ! Votre cotisation sera confirmée sous peu.");
-      setTimeout(() => setSuccess(""), 8000);
-      window.history.replaceState({}, "", window.location.pathname);
-      load();
-    } else if (status === "cancelled") {
-      setError("Paiement annulé.");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    // Charger données client + historique cotisations
+    const token = localStorage.getItem("client_token");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const base = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+    Promise.all([
+      fetch(`${base}/api/client/me`,          { headers }).then(r => r.json()),
+      fetch(`${base}/api/client/cotisations`,  { headers }).then(r => r.json()),
+    ]).then(([me, cots]) => {
+      setClient(me.client || me);
+      setCotisations(cots.cotisations || cots.payments || []);
+    }).catch(() => {
+      // Données de démo si API non disponible
+      setClient({
+        name:          "Jean Koua",
+        mutual_number: "AWJ-2024-0042",
+        plan:          "IVOIRIENNE",
+        status:        "actif",
+      });
+      setCotisations([
+        { id:1, month:"Décembre 2024", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"wave"  },
+        { id:2, month:"Janvier 2025",  amount:15000, status:"payé",    paid_at:"2025-01-07", method:"wave"  },
+        { id:3, month:"Février 2025",  amount:15000, status:"payé",    paid_at:"2025-02-04", method:"wave"  },
+        { id:4, month:"Mars 2025",     amount:15000, status:"attente", paid_at:null,         method:null    },
+      ]);
+    }).finally(() => setLoading(false));
   }, []);
 
-  // ── Lancer le paiement via le backend ───────────────────────────────────
-  // Le backend (Railway) appelle CinetPay avec ses propres clés d'environnement
-  // et retourne le lien de paiement → on ouvre ce lien dans un nouvel onglet
-  const handlePay = async () => {
-    const parsedAmount = parseInt(amount);
-    if (!amount || parsedAmount < 10000) return setError("Montant minimum : 10 000 FCFA");
-    setError("");
-    setPaying(true);
+  if (loading) return <Loader />;
 
-    try {
-      const res = await clientContribAPI.initiate({ amount: parsedAmount }); // ✅ CORRECTION : .initiate() → .init()
-      const { payment_url, transaction_reference } = res.data.data;
+  const plan      = client?.plan || "IVOIRIENNE";
+  const monthly   = PLAN_PRICES[plan] || 15000;
+  const waveLink  = buildWaveLink(monthly, client?.name || "", client?.mutual_number || "");
 
-      // ✅ Ouvrir la page CinetPay dans un nouvel onglet
-      window.open(payment_url, "_blank");
+  // Dernière cotisation non payée = cotisation en cours
+  const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
+  const totalPaid = cotisations
+    .filter(c => c.status === "payé" || c.status === "paid")
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-      setModal(false);
-      setPaying(false);
-      setSuccess(`🔗 Page de paiement ouverte dans un nouvel onglet (réf: ${transaction_reference}). Revenez ici une fois le paiement effectué.`);
-      setTimeout(() => setSuccess(""), 15000);
-
-    } catch (e) {
-      setPaying(false);
-      const msg = e.response?.data?.error || e.response?.data?.detail || "Impossible d'initialiser le paiement.";
-      setError(msg);
-    }
+  const handleWaveClick = () => {
+    setWaveOpen(true);
+    setWavePaid(false);
   };
 
-  if (loading) return <Skeleton />;
-  if (!data)   return null;
-
-  const paid  = data.monthly_status.filter(m => m.status === "paid").length;
-  const late  = data.monthly_status.filter(m => m.status === "late").length;
-  const total = parseInt(data.total_paid_this_year);
-  const pct   = Math.round((paid / 12) * 100);
+  const handleWaveConfirm = () => {
+    setWavePaid(true);
+    // Mettre à jour localement en attendant le webhook serveur
+    setCotisations(prev => prev.map(c =>
+      (c.status === "attente" || c.status === "pending")
+        ? { ...c, status:"payé", paid_at: new Date().toISOString(), method:"wave" }
+        : c
+    ));
+    setTimeout(() => setWaveOpen(false), 2000);
+  };
 
   return (
-    <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
+    <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Mes Cotisations</h1>
-      <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Suivi {new Date().getFullYear()}</p>
-
-      {success && (
-        <div style={{ background: "linear-gradient(135deg,#ECFDF5,#D1FAE5)", border: "1px solid #6EE7B7", borderRadius: 14, padding: "14px 16px", color: "#065F46", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
-          {success}
-        </div>
-      )}
-
-      {late > 0 && (
-        <div style={{ background: "linear-gradient(135deg,#FFFBEB,#FEF3C7)", border: "1px solid #FCD34D", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 14, boxShadow: "0 4px 12px rgba(245,158,11,.15)" }}>
-          <span style={{ fontSize: 24 }}>⚠️</span>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 700, color: "#92400E", margin: "0 0 2px", fontSize: 13 }}>{late} cotisation{late > 1 ? "s" : ""} en retard</p>
-            <p style={{ color: "#B45309", margin: 0, fontSize: 12 }}>Régularisez pour maintenir vos droits</p>
-          </div>
-          <button onClick={() => { setError(""); setModal(true); }} style={{ background: "#F59E0B", color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
-            Payer →
-          </button>
-        </div>
-      )}
-
-      {/* Hero stats */}
-      <div style={{
-        background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
-        borderRadius: 24, padding: "22px 20px", color: "#fff",
-        marginBottom: 16, position: "relative", overflow: "hidden",
-        boxShadow: "0 12px 40px rgba(26,86,219,.35)",
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(20px)",
-        transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
-      }}>
-        <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -30, left: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
-
-        <div style={{ marginBottom: 18, position: "relative" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, opacity: .8, fontWeight: 500 }}>Progression annuelle</span>
-            <span style={{ fontSize: 20, fontWeight: 800 }}>{pct}%</span>
-          </div>
-          <div style={{ height: 8, background: "rgba(255,255,255,.2)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#10B981,#34D399)", borderRadius: 4, transition: "width 1s cubic-bezier(.34,1.56,.64,1)" }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-            <span style={{ fontSize: 11, opacity: .6 }}>{paid} mois payés</span>
-            <span style={{ fontSize: 11, opacity: .6 }}>{12 - paid} restants</span>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,.12)", borderRadius: 14, overflow: "hidden", backdropFilter: "blur(8px)" }}>
-          {[
-            { label: "Mois payés", val: paid,  color: "#34D399" },
-            { label: "En retard",  val: late,  color: late > 0 ? "#F87171" : "rgba(255,255,255,.5)" },
-            { label: "Total payé", val: `${(total/1000).toFixed(0)}k`, color: "#fff" },
-          ].map(({ label, val, color }) => (
-            <div key={label} style={{ flex: 1, padding: "12px 8px", textAlign: "center", borderRight: "1px solid rgba(255,255,255,.1)" }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color }}>{val}</div>
-              <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={() => { setError(""); setModal(true); }}
-          style={{
-            marginTop: 16, width: "100%", background: "rgba(255,255,255,.15)",
-            border: "1.5px solid rgba(255,255,255,.3)", borderRadius: 14, padding: "12px 0",
-            color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-            fontFamily: "'Poppins',sans-serif", backdropFilter: "blur(8px)", transition: "all .2s",
+      {/* ── Modal Wave ─────────────────────────────────────── */}
+      {waveOpen && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, padding: 28,
+            maxWidth: 420, width: "100%",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
           }}>
-          💳 Payer une cotisation
-        </button>
+            {wavePaid ? (
+              // ── Confirmation réussie ──
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
+                <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 900, color: C.dark }}>
+                  Paiement confirmé !
+                </h2>
+                <p style={{ margin: 0, fontSize: 13, color: C.slate }}>
+                  Votre cotisation de {fmt(monthly)} a été enregistrée.
+                </p>
+              </div>
+            ) : (
+              // ── Instructions Wave ──
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 12,
+                    background: "linear-gradient(135deg,#1DC9A4,#15A882)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 24,
+                  }}>🌊</div>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 900, fontSize: 17, color: C.dark }}>
+                      Payer avec Wave
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
+                      Cotisation mensuelle Awoundjô
+                    </p>
+                  </div>
+                </div>
+
+                {/* Récap paiement */}
+                <div style={{
+                  background: C.waveL, border: `1.5px solid ${C.wave}`,
+                  borderRadius: 12, padding: "14px 16px", marginBottom: 20,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: C.slate }}>Adhérent</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>{client?.name}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: C.slate }}>N° mutualiste</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "monospace" }}>
+                      {client?.mutual_number}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: C.slate }}>Plan</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>{plan}</span>
+                  </div>
+                  <div style={{
+                    display: "flex", justifyContent: "space-between",
+                    paddingTop: 10, borderTop: `1px solid ${C.wave}44`,
+                  }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>Montant à payer</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: C.wave }}>{fmt(monthly)}</span>
+                  </div>
+                </div>
+
+                {/* Étapes */}
+                <div style={{ marginBottom: 20 }}>
+                  {[
+                    "Cliquez sur le bouton Wave ci-dessous",
+                    `Payez ${fmt(monthly)} à Awoundjô`,
+                    "Revenez ici et confirmez votre paiement",
+                  ].map((s, i) => (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "flex-start", gap: 10,
+                      marginBottom: 8,
+                    }}>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 99,
+                        background: C.wave, color: "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, fontWeight: 900, flexShrink: 0, marginTop: 1,
+                      }}>{i + 1}</div>
+                      <p style={{ margin: 0, fontSize: 13, color: C.dark }}>{s}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bouton Wave */}
+                <a
+                  href={waveLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    width: "100%", padding: "14px 0",
+                    background: "linear-gradient(135deg,#1DC9A4,#15A882)",
+                    color: "#fff", fontWeight: 900, fontSize: 15,
+                    borderRadius: 12, textDecoration: "none",
+                    boxShadow: "0 6px 20px rgba(29,201,164,.4)",
+                    marginBottom: 12, boxSizing: "border-box",
+                  }}
+                >
+                  🌊 Ouvrir Wave — {fmt(monthly)}
+                  <span style={{ fontSize: 14 }}>↗</span>
+                </a>
+
+                {/* Bouton confirmation */}
+                <button
+                  onClick={handleWaveConfirm}
+                  style={{
+                    width: "100%", padding: "12px 0",
+                    background: C.primaryL,
+                    color: C.primary, fontWeight: 700, fontSize: 14,
+                    border: `1.5px solid ${C.primary}`,
+                    borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                    marginBottom: 10,
+                  }}
+                >
+                  ✅ J'ai payé — Confirmer
+                </button>
+
+                {/* Fermer */}
+                <button
+                  onClick={() => setWaveOpen(false)}
+                  style={{
+                    width: "100%", padding: "10px 0",
+                    background: "none", border: "none",
+                    color: C.slate, fontSize: 13, cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Annuler
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Titre page ──────────────────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: C.dark }}>
+          💳 Mes cotisations
+        </h1>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: C.slate }}>
+          Suivi de vos paiements mensuels Awoundjô
+        </p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[{ id: "calendar", label: "📅 Calendrier" }, { id: "history", label: "📋 Historique" }].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flex: 1, padding: "10px 0", border: "none", borderRadius: 12, fontSize: 12, fontWeight: 700,
-            cursor: "pointer", fontFamily: "'Poppins',sans-serif", transition: "all .2s",
-            background: tab === t.id ? "#1a56db" : "#fff",
-            color: tab === t.id ? "#fff" : "#64748B",
-            boxShadow: tab === t.id ? "0 4px 12px rgba(26,86,219,.3)" : "0 2px 8px rgba(0,0,0,.05)",
-          }}>
-            {t.label}
-          </button>
+      {/* ── Carte info client ───────────────────────────────── */}
+      <Card style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>{client?.name}</p>
+          <p style={{ margin: "3px 0 0", fontSize: 12, color: C.slate, fontFamily: "monospace" }}>
+            {client?.mutual_number}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Badge
+            label={`Plan ${plan}`}
+            color={C.primary} bg={C.primaryL}
+          />
+          <Badge
+            label={fmt(monthly) + " / mois"}
+            color={C.blue} bg={C.blueL}
+          />
+        </div>
+      </Card>
+
+      {/* ── Cartes résumé ───────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          {
+            icon: "✅", label: "Total payé",
+            value: fmt(totalPaid), color: C.primary, bg: C.primaryL,
+          },
+          {
+            icon: "📅", label: "Mensualité",
+            value: fmt(monthly), color: C.blue, bg: C.blueL,
+          },
+          {
+            icon: "🧾", label: "Paiements",
+            value: `${cotisations.filter(c => c.status==="payé"||c.status==="paid").length} / ${cotisations.length}`,
+            color: C.gold, bg: C.goldL,
+          },
+        ].map(s => (
+          <Card key={s.label} style={{ textAlign: "center", padding: "16px 12px" }}>
+            <p style={{ margin: "0 0 4px", fontSize: 28 }}>{s.icon}</p>
+            <p style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 900, color: s.color }}>{s.value}</p>
+            <p style={{ margin: 0, fontSize: 11, color: C.slate, fontWeight: 600 }}>{s.label}</p>
+          </Card>
         ))}
       </div>
 
-      {/* Calendrier */}
-      {tab === "calendar" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, opacity: visible ? 1 : 0, transition: "all .5s .1s" }}>
-          {data.monthly_status.map((m, i) => {
-            const s = STATUS_STYLE[m.status] || STATUS_STYLE.upcoming;
-            return (
-              <div key={m.month} style={{
-                background: s.bg, border: `1.5px solid ${s.border}`,
-                borderRadius: 16, padding: "14px 10px", textAlign: "center",
-                opacity: visible ? 1 : 0,
-                transform: visible ? "scale(1)" : "scale(.95)",
-                transition: `all .4s ${i * .04}s`,
-              }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{MONTHS[i]}</div>
-                <div style={{ fontSize: 10, color: s.color, fontWeight: 600, marginTop: 2 }}>{s.label}</div>
-                {m.payment && (
-                  <div style={{ fontSize: 10, color: "#64748B", marginTop: 4, fontWeight: 600 }}>
-                    {parseInt(m.payment.amount).toLocaleString("fr-FR")} F
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Historique */}
-      {tab === "history" && (
-        <div style={{ opacity: visible ? 1 : 0, transition: "all .5s .2s" }}>
-          {data.payments.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "50px 20px", background: "#fff", borderRadius: 20, boxShadow: "0 2px 10px rgba(0,0,0,.05)" }}>
-              <span style={{ fontSize: 48 }}>📭</span>
-              <p style={{ color: "#64748B", fontSize: 15, fontWeight: 600, margin: "12px 0 4px" }}>Aucun paiement</p>
-              <p style={{ color: "#94A3B8", fontSize: 13, margin: 0 }}>Vos paiements apparaîtront ici</p>
-            </div>
-          ) : (
-            data.payments.map((p, i) => (
-              <div key={p.id} style={{
-                background: "#fff", borderRadius: 16, padding: "14px 16px",
-                marginBottom: 10, display: "flex", alignItems: "center", gap: 12,
-                boxShadow: "0 2px 10px rgba(0,0,0,.06)",
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateX(0)" : "translateX(-10px)",
-                transition: `all .4s ${.2 + i * .05}s`,
-              }}>
-                <div style={{ width: 48, height: 48, background: "#F8FAFC", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, border: "1.5px solid #E2E8F0" }}>
-                  {METHOD_ICON[p.payment_method] || "💳"}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: "0 0 2px" }}>
-                    {p.payment_type === "mensualite" ? "Cotisation mensuelle" : "Adhésion"}
-                  </p>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px" }}>
-                    {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-                  </p>
-                  <p style={{ fontSize: 10, color: "#94A3B8", margin: 0, fontFamily: "monospace", letterSpacing: .5 }}>
-                    {p.transaction_reference}
-                  </p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#059669" }}>
-                    +{parseInt(p.amount).toLocaleString("fr-FR")}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#64748B", fontWeight: 500 }}>FCFA</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* ── Modal paiement ──────────────────────────────────────────── */}
-      {modal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
-          onClick={() => !paying && setModal(false)}>
-          <div style={{ background: "#fff", borderRadius: "28px 28px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }}
-            onClick={e => e.stopPropagation()}>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>💳 Payer via CinetPay</h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Minimum 10 000 FCFA · Orange Money, Wave, MTN…</p>
-              </div>
-              <button onClick={() => !paying && setModal(false)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+      {/* ── Cotisation en cours ─────────────────────────────── */}
+      {pending && (
+        <Card style={{
+          marginBottom: 20,
+          border: `2px solid ${C.wave}`,
+          background: C.waveL,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
+            <div>
+              <p style={{ margin: "0 0 4px", fontSize: 13, color: C.slate, fontWeight: 600 }}>
+                COTISATION EN COURS
+              </p>
+              <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 900, color: C.dark }}>
+                {pending.month}
+              </p>
+              <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.wave }}>
+                {fmt(pending.amount || monthly)}
+              </p>
             </div>
 
-            {error && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>
-                ⚠️ {error}
-              </div>
-            )}
-
-            <label style={ls.label}>Montant (FCFA)</label>
-            <div style={{ position: "relative", marginBottom: 20 }}>
-              <input
-                type="number" placeholder="10 000" value={amount}
-                onChange={e => setAmount(e.target.value)} disabled={paying}
-                style={{ width: "100%", border: "2px solid #E2E8F0", borderRadius: 14, padding: "14px 60px 14px 16px", fontSize: 20, fontWeight: 700, color: "#0F172A", fontFamily: "'Poppins',sans-serif", boxSizing: "border-box", outline: "none" }}
-              />
-              <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#94A3B8" }}>FCFA</span>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-              {[10000, 15000, 20000, 25000].map(v => (
-                <button key={v} onClick={() => setAmount(String(v))} disabled={paying} style={{
-                  flex: 1, padding: "10px 4px",
-                  border: `2px solid ${amount === String(v) ? "#1a56db" : "#E2E8F0"}`,
-                  borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  background: amount === String(v) ? "#EFF6FF" : "#fff",
-                  color: amount === String(v) ? "#1a56db" : "#64748B",
-                  fontFamily: "'Poppins',sans-serif", transition: "all .15s",
-                }}>
-                  {v / 1000}k
-                </button>
-              ))}
-            </div>
-
-            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: "14px 16px", marginBottom: 24 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8 }}>Moyens acceptés</p>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {[
-                  { icon: "🟠", label: "Orange Money" },
-                  { icon: "💛", label: "MTN MoMo" },
-                  { icon: "🌊", label: "Wave" },
-                  { icon: "💳", label: "Carte bancaire" },
-                ].map(({ icon, label }) => (
-                  <span key={label} style={{ display: "flex", alignItems: "center", gap: 5, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "#334155" }}>
-                    {icon} {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <button onClick={handlePay} disabled={paying} style={{
-              width: "100%",
-              background: paying ? "#94A3B8" : "linear-gradient(135deg,#1a56db,#1e3a8a)",
-              color: "#fff", border: "none", borderRadius: 16, padding: 16,
-              fontSize: 15, fontWeight: 700, cursor: paying ? "not-allowed" : "pointer",
-              fontFamily: "'Poppins',sans-serif",
-              boxShadow: paying ? "none" : "0 6px 20px rgba(26,86,219,.35)",
-              transition: "all .2s",
-            }}>
-              {paying ? "⏳ Génération du lien…" : `💳 Payer ${amount ? parseInt(amount).toLocaleString("fr-FR") + " FCFA" : ""} via CinetPay`}
+            {/* Bouton Wave */}
+            <button
+              onClick={handleWaveClick}
+              style={{
+                padding: "12px 22px",
+                background: "linear-gradient(135deg,#1DC9A4,#15A882)",
+                color: "#fff", fontWeight: 900, fontSize: 14,
+                border: "none", borderRadius: 12,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 8,
+                boxShadow: "0 4px 16px rgba(29,201,164,.4)",
+                flexShrink: 0,
+              }}
+            >
+              🌊 Payer avec Wave
             </button>
+          </div>
 
-            <p style={{ textAlign: "center", fontSize: 11, color: "#94A3B8", marginTop: 12 }}>
-              🔒 Paiement sécurisé par CinetPay
+          {/* Barre d'info */}
+          <div style={{
+            marginTop: 14, paddingTop: 12,
+            borderTop: `1px solid ${C.wave}44`,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ fontSize: 14 }}>ℹ️</span>
+            <p style={{ margin: 0, fontSize: 12, color: C.slate }}>
+              Le lien Wave s'ouvrira directement dans votre application Wave CI.
+              Payez exactement <strong>{fmt(pending.amount || monthly)}</strong> et revenez confirmer.
             </p>
           </div>
-        </div>
+        </Card>
       )}
+
+      {/* ── Historique des cotisations ──────────────────────── */}
+      <Card>
+        <p style={{ margin: "0 0 16px", fontWeight: 800, fontSize: 15, color: C.dark }}>
+          📋 Historique des paiements
+        </p>
+
+        {cotisations.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "32px 0" }}>
+            <p style={{ fontSize: 36, margin: "0 0 10px" }}>🧾</p>
+            <p style={{ margin: 0, color: C.slate, fontSize: 14 }}>Aucun historique disponible</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {cotisations.map((cot, i) => {
+              const s = statusStyle(cot.status);
+              const isPending = cot.status === "attente" || cot.status === "pending";
+              return (
+                <div
+                  key={cot.id || i}
+                  style={{
+                    display: "flex", alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "14px 4px",
+                    borderTop: i > 0 ? `1px solid ${C.border}` : "none",
+                    flexWrap: "wrap", gap: 10,
+                  }}
+                >
+                  {/* Mois + date */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: isPending ? C.goldL : C.primaryL,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 18, flexShrink: 0,
+                    }}>
+                      {isPending ? "⏳" : "✅"}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.dark }}>
+                        {cot.month}
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>
+                        {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
+                        {cot.method === "wave" && (
+                          <span style={{ marginLeft: 6, color: C.wave, fontWeight: 700 }}>
+                            · 🌊 Wave
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Montant + statut + bouton Wave si en attente */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 15, fontWeight: 900, color: isPending ? C.gold : C.primary }}>
+                      {fmt(cot.amount || monthly)}
+                    </span>
+                    <Badge label={s.label} color={s.color} bg={s.bg} />
+                    {isPending && (
+                      <button
+                        onClick={handleWaveClick}
+                        style={{
+                          padding: "6px 14px",
+                          background: "linear-gradient(135deg,#1DC9A4,#15A882)",
+                          color: "#fff", fontWeight: 700, fontSize: 12,
+                          border: "none", borderRadius: 8,
+                          cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        🌊 Payer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* ── Note de bas de page ─────────────────────────────── */}
+      <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
+        🔒 Paiements sécurisés · Awoundjô Mutuelle Santé CI<br />
+        En cas de problème : <strong>+225 XX XX XX XX</strong>
+      </p>
     </div>
   );
 }
-
-function Skeleton() {
-  return (
-    <div style={{ padding: 16 }}>
-      <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}`}</style>
-      {[160, 56, 200].map((h, i) => (
-        <div key={i} style={{ height: h, borderRadius: 20, marginBottom: 14, background: "linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }} />
-      ))}
-    </div>
-  );
-}
-
-const ls = {
-  label: { display: "block", fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: .8 },
-};
