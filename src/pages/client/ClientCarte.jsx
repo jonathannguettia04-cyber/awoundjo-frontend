@@ -11,22 +11,22 @@ const PLAN_GRADIENTS = {
 
 export default function ClientCarte() {
   const navigate = useNavigate();
-  const [data,      setData]    = useState(null);
-  const [loading,   setLoading] = useState(true);
-  const [scanning,  setScanning]= useState(false);
-  const [scanResult,setScanRes] = useState(null);
-  const [visible,   setVis]     = useState(false);
-  const [qrUrl,     setQrUrl]   = useState(null);
-  const videoRef   = useRef();
-  const streamRef  = useRef();
-  const canvasRef  = useRef();
+  const [data,       setData]    = useState(null);
+  const [loading,    setLoading] = useState(true);
+  const [scanning,   setScanning]= useState(false);
+  const [scanResult, setScanRes] = useState(null);
+  const [visible,    setVis]     = useState(false);
+  const [qrUrl,      setQrUrl]   = useState(null);
+  const [qrExpanded, setQrExpanded] = useState(false); // agrandissement QR
+  const videoRef  = useRef();
+  const streamRef = useRef();
+  const canvasRef = useRef();
 
   useEffect(() => {
     clientCardAPI.get()
       .then(res => {
         const d = res.data.data;
         setData(d);
-        // Générer QR code via API gratuite
         const qrData = encodeURIComponent(JSON.stringify({
           id:     d.card.mutual_number,
           name:   d.card.name,
@@ -34,54 +34,38 @@ export default function ClientCarte() {
           status: d.card.status,
           exp:    d.card.expiration_date,
         }));
-        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrData}&bgcolor=ffffff&color=1a56db&margin=10`);
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrData}&bgcolor=ffffff&color=1a56db&margin=10`);
         setTimeout(() => setVis(true), 100);
       })
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Ouvrir la caméra ──────────────────────────────────────────
   const openCamera = async () => {
-    setScanning(true);
-    setScanRes(null);
+    setScanning(true); setScanRes(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+    } catch {
       alert("Impossible d'accéder à la caméra. Vérifiez les permissions.");
       setScanning(false);
     }
   };
 
   const closeCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setScanning(false);
-    setScanRes(null);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setScanning(false); setScanRes(null);
   };
 
-  // Capture frame pour simuler le scan
   const captureFrame = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
     canvas.width  = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
-    // Simulation résultat scan (en prod : utiliser jsQR ou ZXing)
-    setScanRes({
-      valid:  true,
-      name:   data?.card?.name,
-      number: data?.card?.mutual_number,
-      plan:   data?.card?.plan,
-      status: data?.card?.status,
-    });
+    setScanRes({ valid: true, name: data?.card?.name, number: data?.card?.mutual_number, plan: data?.card?.plan, status: data?.card?.status });
     closeCamera();
   };
 
@@ -91,7 +75,7 @@ export default function ClientCarte() {
   const { card, dependents } = data;
   const plan     = PLANS[card.plan] || PLANS.ESSENTIELLE;
   const gradient = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
-  const isActive = card.status === "active";
+  const isActive = card.status === "active" || card.status === "actif";
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
@@ -101,21 +85,17 @@ export default function ClientCarte() {
 
       {/* ── Carte recto ── */}
       <div style={{
-        background: gradient,
-        borderRadius: 24, padding: 22, color: "#fff",
+        background: gradient, borderRadius: 24, padding: 22, color: "#fff",
         position: "relative", overflow: "hidden",
-        boxShadow: "0 16px 48px rgba(26,86,219,.35)",
-        marginBottom: 14,
+        boxShadow: "0 16px 48px rgba(26,86,219,.35)", marginBottom: 14,
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
         transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
       }}>
-        {/* Cercles décoratifs */}
         <div style={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -60, right: 60, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: 40, left: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
 
-        {/* Header carte */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, position: "relative" }}>
           <div style={{ width: 42, height: 42, background: "rgba(255,255,255,.2)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20, backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.2)" }}>A</div>
           <div>
@@ -128,14 +108,12 @@ export default function ClientCarte() {
           </div>
         </div>
 
-        {/* Nom adhérent */}
         <div style={{ marginBottom: 18, position: "relative" }}>
           <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase" }}>Adhérent(e)</div>
           <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -.3 }}>{card.name}</div>
           <div style={{ fontSize: 13, opacity: .75, fontFamily: "monospace", letterSpacing: 2, marginTop: 2 }}>{card.mutual_number}</div>
         </div>
 
-        {/* Footer carte */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", position: "relative" }}>
           <div>
             <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Formule</div>
@@ -153,7 +131,7 @@ export default function ClientCarte() {
         </div>
       </div>
 
-      {/* ── QR Code card ── */}
+      {/* ── QR Code — SECTION PROMINENTE ── */}
       <div style={{
         background: "#fff", borderRadius: 24,
         boxShadow: "0 4px 20px rgba(0,0,0,.08)",
@@ -161,37 +139,107 @@ export default function ClientCarte() {
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(10px)",
         transition: "all .5s .15s cubic-bezier(.34,1.56,.64,1)",
+        border: "2px solid #E2E8F0",
       }}>
-        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #F1F5F9" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* QR Code */}
-            <div style={{ width: 110, height: 110, background: "#F8FAFC", borderRadius: 16, border: "2px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {qrUrl
-                ? <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                : <span style={{ fontSize: 40 }}>⬛</span>}
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.2 }}>Code de vérification</p>
-              <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>Présentez ce QR code à l'accueil de l'établissement</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#1a56db", fontFamily: "monospace", letterSpacing: 1.5, margin: 0 }}>{card.mutual_number}</p>
-            </div>
+        {/* Header section QR */}
+        <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#0F172A" }}>🔲 Code de vérification</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>Présentez ce QR code à l'accueil de l'établissement</p>
+          </div>
+          <button
+            onClick={() => setQrExpanded(!qrExpanded)}
+            style={{
+              background: "#EEF2FF", border: "none", borderRadius: 10,
+              padding: "8px 14px", fontSize: 12, fontWeight: 700,
+              color: "#1B4FD8", cursor: "pointer", fontFamily: "inherit",
+              flexShrink: 0,
+            }}
+          >
+            {qrExpanded ? "Réduire ↑" : "Agrandir ↓"}
+          </button>
+        </div>
+
+        {/* QR Code centré et bien visible */}
+        <div style={{ padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <div
+            onClick={() => setQrExpanded(!qrExpanded)}
+            style={{
+              width: qrExpanded ? 260 : 160,
+              height: qrExpanded ? 260 : 160,
+              background: "#F8FAFC",
+              borderRadius: 20,
+              border: "3px solid #E2E8F0",
+              overflow: "hidden",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              transition: "all .35s cubic-bezier(.34,1.56,.64,1)",
+              boxShadow: "0 4px 16px rgba(26,86,219,.12)",
+            }}
+          >
+            {qrUrl
+              ? <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              : <span style={{ fontSize: 48 }}>⬛</span>
+            }
+          </div>
+
+          {/* Numéro adhérent sous le QR */}
+          <div style={{ textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#1a56db", fontFamily: "monospace", letterSpacing: 2 }}>
+              {card.mutual_number}
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#64748B" }}>
+              Appuyez sur le QR pour agrandir
+            </p>
           </div>
         </div>
 
         {/* Bénéficiaires */}
-        {dependents.length > 0 && (
-          <div style={{ padding: "14px 20px" }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#64748B", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: .8 }}>Bénéficiaires couverts</p>
+        {dependents?.length > 0 && (
+          <div style={{ padding: "0 20px 16px", borderTop: "1px solid #F1F5F9", paddingTop: 14 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#64748B", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: .8 }}>
+              Bénéficiaires couverts
+            </p>
             {dependents.map((dep, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F8FAFC", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
                 <span style={{ fontSize: 20 }}>{dep.type === "spouse" ? "💑" : "👶"}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", flex: 1 }}>{dep.firstname} {dep.name}</span>
-                <span style={{ fontSize: 11, color: "#64748B", background: "#E2E8F0", borderRadius: 6, padding: "3px 8px" }}>{dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}</span>
+                <span style={{ fontSize: 11, color: "#64748B", background: "#E2E8F0", borderRadius: 6, padding: "3px 8px" }}>
+                  {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
+                </span>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* ── Modal QR agrandi ── */}
+      {qrExpanded && (
+        <div
+          onClick={() => setQrExpanded(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.85)", backdropFilter: "blur(8px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 28, padding: 32, textAlign: "center", maxWidth: 360, width: "100%" }}
+          >
+            <p style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800, color: "#0F172A" }}>🔲 QR Code Awoundjô</p>
+            <div style={{ width: 280, height: 280, margin: "0 auto 16px", borderRadius: 16, overflow: "hidden", border: "3px solid #E2E8F0" }}>
+              {qrUrl && <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />}
+            </div>
+            <p style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#1a56db", fontFamily: "monospace", letterSpacing: 2 }}>
+              {card.mutual_number}
+            </p>
+            <p style={{ margin: "0 0 20px", fontSize: 12, color: "#64748B" }}>{card.name} · {plan.name}</p>
+            <button
+              onClick={() => setQrExpanded(false)}
+              style={{ width: "100%", background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif" }}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Actions ── */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, opacity: visible ? 1 : 0, transition: "all .5s .25s", transform: visible ? "translateY(0)" : "translateY(10px)" }}>
@@ -209,8 +257,6 @@ export default function ClientCarte() {
       {/* ── Modal Caméra ── */}
       {scanning && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.95)", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-
-          {/* Header */}
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "20px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 10 }}>
             <div>
               <p style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Poppins',sans-serif" }}>📷 Scanner un QR code</p>
@@ -218,34 +264,24 @@ export default function ClientCarte() {
             </div>
             <button onClick={closeCamera} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
-
-          {/* Vidéo */}
           <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
             <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", borderRadius: 0, display: "block" }} />
-
-            {/* Viseur */}
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
               <div style={{ width: 240, height: 240, position: "relative" }}>
-                {/* Coins du viseur */}
                 {[
-                  { top: 0,    left: 0,    borderTop: "3px solid #fff",  borderLeft:  "3px solid #fff",  borderRadius: "12px 0 0 0" },
-                  { top: 0,    right: 0,   borderTop: "3px solid #fff",  borderRight: "3px solid #fff",  borderRadius: "0 12px 0 0" },
-                  { bottom: 0, left: 0,    borderBottom: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "0 0 0 12px" },
-                  { bottom: 0, right: 0,   borderBottom: "3px solid #fff", borderRight:"3px solid #fff", borderRadius: "0 0 12px 0" },
+                  { top: 0, left: 0, borderTop: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "12px 0 0 0" },
+                  { top: 0, right: 0, borderTop: "3px solid #fff", borderRight: "3px solid #fff", borderRadius: "0 12px 0 0" },
+                  { bottom: 0, left: 0, borderBottom: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "0 0 0 12px" },
+                  { bottom: 0, right: 0, borderBottom: "3px solid #fff", borderRight: "3px solid #fff", borderRadius: "0 0 12px 0" },
                 ].map((corner, i) => (
                   <div key={i} style={{ position: "absolute", width: 30, height: 30, ...corner }} />
                 ))}
-                {/* Ligne de scan animée */}
                 <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #1a56db, transparent)", animation: "scan 2s linear infinite", top: "50%" }} />
               </div>
             </div>
-
             <style>{`@keyframes scan { 0% { top: 10% } 100% { top: 90% } }`}</style>
           </div>
-
           <canvas ref={canvasRef} style={{ display: "none" }} />
-
-          {/* Bouton capture */}
           <div style={{ position: "absolute", bottom: 60, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
             <button onClick={captureFrame} style={{ background: "#fff", border: "4px solid rgba(255,255,255,.3)", borderRadius: "50%", width: 72, height: 72, fontSize: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,.4)" }}>
               📷

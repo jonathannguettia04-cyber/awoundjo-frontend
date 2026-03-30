@@ -38,6 +38,7 @@ function getNavLinks(role) {
     ],
     CONSEILLERE_CLIENTELE: [
       ...common,
+      { to: "/groups",          label: "Groupes",         icon: "👨‍👩‍👧‍👦" },
       { to: "/healthcare",      label: "Réseau de soins", icon: "🏥" },
       { to: "/admin/providers", label: "Établissements",  icon: "🏨" },
     ],
