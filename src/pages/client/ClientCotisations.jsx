@@ -5,6 +5,7 @@
 //  la mensualité en cours via Wave (lien direct)
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
+import WavePayButton from "../../components/WavePayButton";
 
 // ── Palette portail client ────────────────────────────────────
 const C = {
@@ -247,50 +248,13 @@ export default function ClientCotisations() {
                   ))}
                 </div>
 
-                {/* Bouton Wave */}
-                <a
-                  href={waveLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                    width: "100%", padding: "14px 0",
-                    background: "linear-gradient(135deg,#1DC9A4,#15A882)",
-                    color: "#fff", fontWeight: 900, fontSize: 15,
-                    borderRadius: 12, textDecoration: "none",
-                    boxShadow: "0 6px 20px rgba(29,201,164,.4)",
-                    marginBottom: 12, boxSizing: "border-box",
-                  }}
-                >
-                  🌊 Ouvrir Wave — {fmt(monthly)}
-                  <span style={{ fontSize: 14 }}>↗</span>
-                </a>
-
-                {/* Lien en clair — pour mobile (Android choisit entre navigateur et appli Wave) */}
-                <div style={{
-                  background: C.bg, border: `1px solid ${C.border}`,
-                  borderRadius: 10, padding: "10px 14px", marginBottom: 14,
-                }}>
-                  <p style={{ margin: "0 0 6px", fontSize: 11, color: C.slate, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-                    📱 Sur téléphone — appuyez sur le lien ci-dessous
-                  </p>
-                  <a
-                    href={waveLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: "block",
-                      fontSize: 11,
-                      color: C.wave,
-                      wordBreak: "break-all",
-                      fontWeight: 600,
-                      textDecoration: "underline",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {waveLink}
-                  </a>
-                </div>
+                {/* Bouton Wave + fallback copier-coller */}
+                <WavePayButton
+                  amount={monthly}
+                  message={`Mensualite Awoundjo - ${client?.name || ""} (${client?.mutual_number || ""})`}
+                  label={`Ouvrir Wave — ${fmt(monthly)}`}
+                  size="lg"
+                />
 
                 {/* Bouton confirmation */}
                 <button

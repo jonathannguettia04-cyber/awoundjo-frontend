@@ -14,6 +14,7 @@
 //    [6] → Paiement ACCEPTED → création compte + credentials
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
+import WavePayButton from "../components/WavePayButton";
 import { payWithCinetPay } from "../services/cinetpay";
 import { diasporaBeneAPI } from "../diasporaApi";
 
@@ -285,42 +286,13 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
             </div>
           </div>
 
-          {/* Bouton Wave */}
-          <a
-            href={waveLink}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display:"flex", alignItems:"center", justifyContent:"center", gap:12,
-              padding:"16px 20px", borderRadius:12, textDecoration:"none",
-              background:"linear-gradient(135deg, #1DC9A4, #15A882)",
-              color:"#fff", fontWeight:900, fontSize:16,
-              boxShadow:"0 6px 20px rgba(29,201,164,.4)",
-            }}
-          >
-            <span style={{ fontSize:24 }}>🌊</span>
-            Payer {fmt(MEMBERSHIP_FEE)} avec Wave
-            <span style={{ fontSize:16 }}>↗</span>
-          </a>
-
-          {/* Lien en clair — pour mobile (Android choisit entre navigateur et appli Wave) */}
-          <div style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px" }}>
-            <p style={{ margin:"0 0 6px", fontSize:11, color:C.slate, fontWeight:600, textTransform:"uppercase", letterSpacing:".5px" }}>
-              📱 Sur téléphone — appuyez sur le lien ci-dessous
-            </p>
-            <a
-              href={waveLink}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display:"block", fontSize:11, color:"#1DC9A4",
-                wordBreak:"break-all", fontWeight:600,
-                textDecoration:"underline", lineHeight:1.5,
-              }}
-            >
-              {waveLink}
-            </a>
-          </div>
+          {/* Bouton Wave + fallback copier-coller */}
+          <WavePayButton
+            amount={MEMBERSHIP_FEE}
+            message={`Adhesion Awoundjo - ${form.name || "Nouveau membre"} - ${rc.title}`}
+            label={`Payer ${fmt(MEMBERSHIP_FEE)} avec Wave`}
+            size="lg"
+          />
 
           {/* Séparateur */}
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -504,44 +476,15 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
               <p style={{ margin:"0 0 10px", fontSize:12, color:C.slate }}>
                 Cliquez sur le bouton ci-dessous → Wave s'ouvre → payez {fmt(MEMBERSHIP_FEE)} → revenez confirmer.
               </p>
-              <a
-                href={form.name ? waveLink : "#"}
-                target="_blank"
-                rel="noreferrer"
-                onClick={e => { if (!form.name) e.preventDefault(); }}
-                style={{
-                  display:"inline-flex", alignItems:"center", gap:8,
-                  padding:"9px 18px", borderRadius:8,
-                  background: form.name ? "linear-gradient(135deg,#1DC9A4,#15A882)" : C.border,
-                  color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none",
-                  opacity: form.name ? 1 : 0.5,
-                  cursor: form.name ? "pointer" : "not-allowed",
-                }}
-              >
-                🌊 Ouvrir Wave — {fmt(MEMBERSHIP_FEE)}
-                <span style={{ fontSize:12 }}>↗</span>
-              </a>
-              {form.name && (
-                <div style={{ marginTop:10, background:"#fff", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px" }}>
-                  <p style={{ margin:"0 0 4px", fontSize:11, color:C.slate, fontWeight:600, textTransform:"uppercase", letterSpacing:".5px" }}>
-                    📱 Sur téléphone — appuyez sur le lien ci-dessous
-                  </p>
-                  <a
-                    href={waveLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display:"block", fontSize:11, color:"#1DC9A4",
-                      wordBreak:"break-all", fontWeight:600,
-                      textDecoration:"underline", lineHeight:1.5,
-                    }}
-                  >
-                    {waveLink}
-                  </a>
-                </div>
-              )}
-              {!form.name && (
-                <p style={{ margin:"6px 0 0", fontSize:11, color:C.red }}>
+              {form.name ? (
+                <WavePayButton
+                  amount={MEMBERSHIP_FEE}
+                  message={`Adhesion Awoundjo - ${form.name} - ${rc.title}`}
+                  label={`Ouvrir Wave — ${fmt(MEMBERSHIP_FEE)}`}
+                  size="sm"
+                />
+              ) : (
+                <p style={{ margin:0, fontSize:11, color:C.red }}>
                   ⚠️ Renseignez d'abord votre nom complet pour activer le lien.
                 </p>
               )}
