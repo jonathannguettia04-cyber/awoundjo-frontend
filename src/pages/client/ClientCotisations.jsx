@@ -266,6 +266,32 @@ export default function ClientCotisations() {
                   <span style={{ fontSize: 14 }}>↗</span>
                 </a>
 
+                {/* Lien en clair — pour mobile (Android choisit entre navigateur et appli Wave) */}
+                <div style={{
+                  background: C.bg, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+                }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 11, color: C.slate, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                    📱 Sur téléphone — appuyez sur le lien ci-dessous
+                  </p>
+                  <a
+                    href={waveLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "block",
+                      fontSize: 11,
+                      color: C.wave,
+                      wordBreak: "break-all",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {waveLink}
+                  </a>
+                </div>
+
                 {/* Bouton confirmation */}
                 <button
                   onClick={handleWaveConfirm}

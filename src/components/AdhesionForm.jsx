@@ -303,6 +303,25 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
             <span style={{ fontSize:16 }}>↗</span>
           </a>
 
+          {/* Lien en clair — pour mobile (Android choisit entre navigateur et appli Wave) */}
+          <div style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px" }}>
+            <p style={{ margin:"0 0 6px", fontSize:11, color:C.slate, fontWeight:600, textTransform:"uppercase", letterSpacing:".5px" }}>
+              📱 Sur téléphone — appuyez sur le lien ci-dessous
+            </p>
+            <a
+              href={waveLink}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display:"block", fontSize:11, color:"#1DC9A4",
+                wordBreak:"break-all", fontWeight:600,
+                textDecoration:"underline", lineHeight:1.5,
+              }}
+            >
+              {waveLink}
+            </a>
+          </div>
+
           {/* Séparateur */}
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <div style={{ flex:1, height:1, background:C.border }} />
@@ -502,6 +521,25 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
                 🌊 Ouvrir Wave — {fmt(MEMBERSHIP_FEE)}
                 <span style={{ fontSize:12 }}>↗</span>
               </a>
+              {form.name && (
+                <div style={{ marginTop:10, background:"#fff", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px" }}>
+                  <p style={{ margin:"0 0 4px", fontSize:11, color:C.slate, fontWeight:600, textTransform:"uppercase", letterSpacing:".5px" }}>
+                    📱 Sur téléphone — appuyez sur le lien ci-dessous
+                  </p>
+                  <a
+                    href={waveLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display:"block", fontSize:11, color:"#1DC9A4",
+                      wordBreak:"break-all", fontWeight:600,
+                      textDecoration:"underline", lineHeight:1.5,
+                    }}
+                  >
+                    {waveLink}
+                  </a>
+                </div>
+              )}
               {!form.name && (
                 <p style={{ margin:"6px 0 0", fontSize:11, color:C.red }}>
                   ⚠️ Renseignez d'abord votre nom complet pour activer le lien.
