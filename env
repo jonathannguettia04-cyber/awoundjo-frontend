@@ -1,17 +1,1 @@
-# ─────────────────────────────────────────────────────────────────────────────
-#  .env — Variables d'environnement Awoundjô
-#
-#  ✅ CORRECTIONS APPLIQUÉES :
-#    - CINETPAY_API_KEY  → VITE_CINETPAY_API_KEY  (préfixe VITE_ obligatoire pour Vite)
-#    - CINETPAY_SITE_ID  → VITE_CINETPAY_SITE_ID  (idem)
-#    - Ces variables sont maintenant accessibles via import.meta.env dans le navigateur
-#
-#  ⚠️  IMPORTANT VERCEL :
-#    Ajouter ces 3 variables dans :
-#    Vercel Dashboard → Votre projet → Settings → Environment Variables
-#    puis redéployer le projet.
-# ─────────────────────────────────────────────────────────────────────────────
-
 VITE_API_URL=https://awoundjo-backend-production-ba8c.up.railway.app
-VITE_CINETPAY_API_KEY=12662532135d276e2265ca35.50646383
-VITE_CINETPAY_SITE_ID=622448
