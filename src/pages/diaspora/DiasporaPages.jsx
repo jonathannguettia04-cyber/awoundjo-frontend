@@ -170,13 +170,22 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
 // PAGE : ENREGISTRER AMBASSADEUR PAYS (AMBASSADEUR_DIASPORA uniquement)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterPays() {
-  const [list, setList]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]     = useState(null);
+  const [list, setList]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [creds, setCreds]         = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
+  // ── NOUVEAU : bannière retour CinetPay (failed_url pointe ici) ────────────
+  const [payFailed, setPayFailed] = useState(false);
 
   useEffect(() => {
+    // Détecter un retour CinetPay avec payment=failed dans l'URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "failed") {
+      setPayFailed(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
     diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
@@ -194,6 +203,27 @@ export function DiasporaRegisterPays() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+
+      {/* ── Bannière paiement échoué / annulé ─────────────────────────── */}
+      {payFailed && (
+        <div style={{
+          marginBottom: 20, padding: "14px 18px", borderRadius: 12,
+          background: "#FEF2F2", border: "1.5px solid #DC2626",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 22 }}>❌</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, color: "#DC2626", fontSize: 14 }}>Paiement annulé ou refusé</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#DC2626" }}>
+              Le paiement CinetPay n'a pas abouti. Veuillez réessayer ou contacter le support.
+            </p>
+          </div>
+          <button onClick={() => setPayFailed(false)}
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#DC2626" }}>
+            ✕
+          </button>
+        </div>
+      )}
 
       <PageHeader
         title="🗺️ Mes Ambassadeurs Pays"

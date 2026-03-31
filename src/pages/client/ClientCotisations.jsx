@@ -10,7 +10,7 @@ const C = {
   red:     "#DC2626", redL:     "#FEF2F2",
   slate:   "#64748B", dark:     "#0F172A",
   border:  "#E2E8F0", bg:       "#F8FAFC",
-  cinet:   "#0072C6", cinetL:   "#EFF6FF",  // Couleur CinetPay
+  cinet:   "#0072C6", cinetL:   "#EFF6FF",
 };
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
@@ -76,23 +76,33 @@ export default function ClientCotisations() {
   const [loading,     setLoading]     = useState(true);
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
+  // ── NOUVEAU : bannière retour CinetPay ────────────────────────────────────
+  const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
 
   useEffect(() => {
-    // Vérifier si retour de CinetPay (payment=success dans l'URL)
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
-      const tx = params.get("tx");
+    const payment = params.get("payment");
+    const tx      = params.get("tx");
+
+    if (payment === "success") {
+      setPayStatus("success");
+      // Confirmer le paiement côté backend
       if (tx) {
-        // Confirmer le paiement côté backend
         clientContribAPI.confirm({ transaction_id: tx }).catch(() => {});
       }
-      // Nettoyer l'URL
+    } else if (payment === "failed") {
+      // ── NOUVEAU : paiement annulé ou refusé par CinetPay ─────────────────
+      setPayStatus("failed");
+    }
+
+    // Nettoyer l'URL dans tous les cas
+    if (payment) {
       window.history.replaceState({}, "", window.location.pathname);
     }
 
-    const token = localStorage.getItem("client_token");
+    const token   = localStorage.getItem("client_token");
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-    const base = import.meta.env.VITE_API_URL || "http://localhost:3001";
+    const base    = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
     Promise.all([
       fetch(`${base}/api/client/me`,         { headers }).then(r => r.json()),
@@ -127,7 +137,7 @@ export default function ClientCotisations() {
     .filter(c => c.status === "payé" || c.status === "paid")
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-  const now = new Date();
+  const now          = new Date();
   const currentMonth = now.getMonth();
   const currentYear  = now.getFullYear();
 
@@ -148,6 +158,7 @@ export default function ClientCotisations() {
   // ── Déclencheur paiement CinetPay ─────────────────────────────────────────
   const handleCinetPay = () => {
     setPayError("");
+    setPayStatus(null);
     setPayLoading(true);
 
     payWithCinetPay({
@@ -158,9 +169,7 @@ export default function ClientCotisations() {
       },
       amount:      pending?.amount || monthly,
       description: `Mensualité Awoundjô - ${client?.name || ""} (${client?.mutual_number || ""})`,
-      onSuccess: (txId) => {
-        // La redirection est déjà faite dans cinetpay.js
-        // onSuccess est appelé avant la redirection pour permettre un état de chargement
+      onSuccess: () => {
         setPayLoading(true); // Garde le spinner pendant la redirection
       },
       onError: ({ message }) => {
@@ -173,6 +182,47 @@ export default function ClientCotisations() {
   return (
     <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── Bannière retour CinetPay ─────────────────────────────────── */}
+      {payStatus === "success" && (
+        <div style={{
+          marginBottom: 20, padding: "14px 18px", borderRadius: 12,
+          background: C.primaryL, border: `1.5px solid ${C.primary}`,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 22 }}>✅</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, color: C.primary, fontSize: 14 }}>Paiement confirmé !</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.primary }}>
+              Votre cotisation a bien été enregistrée.
+            </p>
+          </div>
+          <button onClick={() => setPayStatus(null)}
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.primary }}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {payStatus === "failed" && (
+        <div style={{
+          marginBottom: 20, padding: "14px 18px", borderRadius: 12,
+          background: C.redL, border: `1.5px solid ${C.red}`,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 22 }}>❌</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, color: C.red, fontSize: 14 }}>Paiement annulé ou refusé</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.red }}>
+              Votre paiement n'a pas abouti. Vous pouvez réessayer ci-dessous.
+            </p>
+          </div>
+          <button onClick={() => setPayStatus(null)}
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.red }}>
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ── Carte identité client ───────────────────────────────── */}
       <Card style={{ marginBottom: 20, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
@@ -271,7 +321,7 @@ export default function ClientCotisations() {
           </button>
         </div>
 
-        {/* Message d'erreur */}
+        {/* Message d'erreur technique (onError du service) */}
         {payError && (
           <div style={{ marginTop:12, background:C.redL, border:`1px solid ${C.red}33`, borderRadius:8, padding:"10px 14px" }}>
             <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
