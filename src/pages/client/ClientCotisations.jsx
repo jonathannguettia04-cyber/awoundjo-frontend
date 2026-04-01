@@ -1,6 +1,5 @@
 // src/pages/client/ClientCotisations.jsx
 import { useState, useEffect } from "react";
-import { payWithCinetPay } from "../../services/cinetpay";
 import { clientContribAPI } from "../../clientApi";
 
 const C = {
@@ -23,6 +22,8 @@ const PLAN_PRICES = {
   IVOIRIENNE:  15000,
   TURQUOISE:   35000,
 };
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 function Card({ children, style = {} }) {
   return (
@@ -64,10 +65,61 @@ function Loader() {
 }
 
 function statusStyle(status) {
-  if (status === "payé"   || status === "paid")    return { color: C.primary, bg: C.primaryL, label: "✅ Payé"        };
-  if (status === "attente"|| status === "pending")  return { color: C.gold,    bg: C.goldL,    label: "⏳ En attente"  };
-  if (status === "retard" || status === "overdue")  return { color: C.red,     bg: C.redL,     label: "🔴 En retard"   };
-  return                                                   { color: C.slate,   bg: C.bg,       label: status           };
+  if (status === "payé"    || status === "paid")    return { color: C.primary, bg: C.primaryL, label: "✅ Payé"        };
+  if (status === "attente" || status === "pending") return { color: C.gold,    bg: C.goldL,    label: "⏳ En attente"  };
+  if (status === "retard"  || status === "overdue") return { color: C.red,     bg: C.redL,     label: "🔴 En retard"   };
+  return                                                    { color: C.slate,  bg: C.bg,       label: status           };
+}
+
+// ── Écran bloquant si validation en cours ────────────────────────────────────
+function ValidationPendingScreen({ client }) {
+  return (
+    <div style={{ padding: "20px 16px", maxWidth: 560, margin: "0 auto" }}>
+      <Card style={{ textAlign: "center", padding: "40px 28px" }}>
+        <div style={{ fontSize: 56, marginBottom: 16 }}>⏳</div>
+        <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 900, color: C.dark }}>
+          Compte en attente de validation
+        </h2>
+        <p style={{ margin: "0 0 20px", fontSize: 14, color: C.slate, lineHeight: 1.6 }}>
+          Votre compte a bien été créé. Un administrateur doit le valider avant
+          que vous puissiez effectuer votre paiement d'adhésion.
+        </p>
+        <div style={{ background: C.goldL, border: `1.5px solid ${C.gold}44`, borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+          <p style={{ margin: "0 0 6px", fontSize: 13, color: C.gold, fontWeight: 700 }}>Numéro mutualiste</p>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.dark, fontFamily: "monospace" }}>
+            {client?.mutual_number || "—"}
+          </p>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: C.slate }}>
+          Vous recevrez une notification dès que votre compte sera validé.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+function ValidationRejectedScreen() {
+  return (
+    <div style={{ padding: "20px 16px", maxWidth: 560, margin: "0 auto" }}>
+      <Card style={{ textAlign: "center", padding: "40px 28px" }}>
+        <div style={{ fontSize: 56, marginBottom: 16 }}>❌</div>
+        <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 900, color: C.red }}>
+          Compte refusé
+        </h2>
+        <p style={{ margin: "0 0 20px", fontSize: 14, color: C.slate, lineHeight: 1.6 }}>
+          Votre demande d'adhésion a été refusée par l'administration.
+          Contactez-nous pour plus d'informations.
+        </p>
+        <a href="tel:+22500000000" style={{
+          display: "inline-block", padding: "10px 24px",
+          background: C.primary, color: "#fff",
+          borderRadius: 10, fontWeight: 700, fontSize: 13, textDecoration: "none",
+        }}>
+          📞 Contacter le support
+        </a>
+      </Card>
+    </div>
+  );
 }
 
 export default function ClientCotisations() {
@@ -76,57 +128,60 @@ export default function ClientCotisations() {
   const [loading,     setLoading]     = useState(true);
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
-  // ── NOUVEAU : bannière retour CinetPay ────────────────────────────────────
   const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params  = new URLSearchParams(window.location.search);
     const payment = params.get("payment");
     const tx      = params.get("tx");
 
     if (payment === "success") {
       setPayStatus("success");
-      // Confirmer le paiement côté backend
       if (tx) {
         clientContribAPI.confirm({ transaction_id: tx }).catch(() => {});
       }
     } else if (payment === "failed") {
-      // ── NOUVEAU : paiement annulé ou refusé par CinetPay ─────────────────
       setPayStatus("failed");
     }
 
-    // Nettoyer l'URL dans tous les cas
     if (payment) {
       window.history.replaceState({}, "", window.location.pathname);
     }
 
     const token   = localStorage.getItem("client_token");
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-    const base    = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
     Promise.all([
-      fetch(`${base}/api/client/me`,         { headers }).then(r => r.json()),
-      fetch(`${base}/api/client/cotisations`, { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/me`,          { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/cotisations`,  { headers }).then(r => r.json()),
     ]).then(([me, cots]) => {
       setClient(me.client || me);
       setCotisations(cots.cotisations || cots.payments || []);
     }).catch(() => {
+      // Données de démo si l'API n'est pas disponible
       setClient({
-        name:          "Jean Koua",
-        mutual_number: "AWJ-2024-0042",
-        plan:          "IVOIRIENNE",
-        status:        "actif",
+        name: "Jean Koua", mutual_number: "AWJ-2024-0042",
+        plan: "IVOIRIENNE", status: "actif",
+        status_validation: "approved", status_payment: "paid",
       });
       setCotisations([
         { id:1, month:"Décembre 2024", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"cinetpay" },
         { id:2, month:"Janvier 2025",  amount:15000, status:"payé",    paid_at:"2025-01-07", method:"cinetpay" },
         { id:3, month:"Février 2025",  amount:15000, status:"payé",    paid_at:"2025-02-04", method:"cinetpay" },
-        { id:4, month:"Mars 2025",     amount:15000, status:"attente", paid_at: null,        method:null       },
+        { id:4, month:"Mars 2025",     amount:15000, status:"attente", paid_at:null,         method:null       },
       ]);
     }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loader />;
+
+  // ── Gardes validation ────────────────────────────────────────────────────
+  if (client?.status_validation === "pending") {
+    return <ValidationPendingScreen client={client} />;
+  }
+  if (client?.status_validation === "rejected") {
+    return <ValidationRejectedScreen />;
+  }
 
   const plan    = client?.plan || "IVOIRIENNE";
   const monthly = PLAN_PRICES[plan] || 15000;
@@ -155,28 +210,59 @@ export default function ClientCotisations() {
 
   const isUpToDate = !pending && paidCount > 0;
 
-  // ── Déclencheur paiement CinetPay ─────────────────────────────────────────
-  const handleCinetPay = () => {
+  // ── Déclencheur paiement CinetPay — appel direct à /api/payments/cinetpay/init-web
+  const handleCinetPay = async () => {
     setPayError("");
     setPayStatus(null);
     setPayLoading(true);
 
-    payWithCinetPay({
-      user: {
-        name:  client?.name  || "",
-        email: client?.email || "",
-        phone: client?.phone || "",
-      },
-      amount:      pending?.amount || monthly,
-      description: `Mensualité Awoundjô - ${client?.name || ""} (${client?.mutual_number || ""})`,
-      onSuccess: () => {
-        setPayLoading(true); // Garde le spinner pendant la redirection
-      },
-      onError: ({ message }) => {
-        setPayError(message || "Le paiement a échoué. Veuillez réessayer.");
-        setPayLoading(false);
-      },
-    });
+    try {
+      const token   = localStorage.getItem("client_token");
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+      const amount  = pending?.amount || monthly;
+
+      // ── Étape 1 : pré-enregistrer via /api/payments/init ─────────────
+      // (optionnel si tu veux tracer côté backend avant redirection)
+      // Pour le portail client on appelle init-web directement
+
+      const txId = `AWJ-CLI-${Date.now()}`;
+
+      const initRes = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method:  "POST",
+        headers,
+        body: JSON.stringify({
+          amount,
+          transaction_id: txId,
+          description:    `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
+          client_name:    client?.name  || "Client",
+          client_email:   client?.email || "client@awoundjo.ci",
+          client_phone:   client?.phone || "",
+          success_url: `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
+          failed_url:  `${window.location.origin}/client/cotisations?payment=failed`,
+          notify_url:  `${BASE}/api/payments/cinetpay/notify`,
+        }),
+      });
+
+      const initData = await initRes.json();
+
+      // ── Lire payment_url — double .data géré ─────────────────────────
+      const paymentUrl =
+        initData?.data?.payment_url   ||
+        initData?.payment_url          ||
+        null;
+
+      if (!paymentUrl) {
+        console.error("[ClientCotisations] réponse init-web :", initData);
+        throw new Error(initData?.error || "URL de paiement non reçue du serveur");
+      }
+
+      // Redirection vers la page de paiement CinetPay
+      window.location.href = paymentUrl;
+
+    } catch (e) {
+      setPayError(e.message || "Le paiement a échoué. Veuillez réessayer.");
+      setPayLoading(false);
+    }
   };
 
   return (
@@ -241,10 +327,12 @@ export default function ClientCotisations() {
       {/* ── Cartes résumé ───────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
-          { icon: "✅", label: "Total payé",    value: fmt(totalPaid),                                                    color: C.primary, bg: C.primaryL },
-          { icon: "📅", label: "Mensualité",    value: fmt(monthly),                                                      color: C.blue,    bg: C.blueL    },
-          { icon: "🧾", label: "Paiements",     value: `${paidCount} / ${cotisations.length}`,                           color: C.gold,    bg: C.goldL    },
-          { icon: "⏩", label: "Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",             color: monthsAhead > 0 ? C.primary : C.slate, bg: monthsAhead > 0 ? C.primaryL : C.bg },
+          { icon: "✅", label: "Total payé",    value: fmt(totalPaid),                                        color: C.primary, bg: C.primaryL },
+          { icon: "📅", label: "Mensualité",    value: fmt(monthly),                                          color: C.blue,    bg: C.blueL    },
+          { icon: "🧾", label: "Paiements",     value: `${paidCount} / ${cotisations.length}`,               color: C.gold,    bg: C.goldL    },
+          { icon: "⏩", label: "Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",
+            color: monthsAhead > 0 ? C.primary : C.slate,
+            bg:    monthsAhead > 0 ? C.primaryL : C.bg },
         ].map(s => (
           <Card key={s.label} style={{ textAlign: "center", padding: "16px 12px" }}>
             <p style={{ margin: "0 0 4px", fontSize: 28 }}>{s.icon}</p>
@@ -321,7 +409,6 @@ export default function ClientCotisations() {
           </button>
         </div>
 
-        {/* Message d'erreur technique (onError du service) */}
         {payError && (
           <div style={{ marginTop:12, background:C.redL, border:`1px solid ${C.red}33`, borderRadius:8, padding:"10px 14px" }}>
             <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>

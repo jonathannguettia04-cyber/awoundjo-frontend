@@ -2,8 +2,7 @@
 // ─────────────────────────────────────────────────────────────
 //  Vue admin : réseau DIASPORA
 //  Rôles réels : AMBASSADEUR_DIASPORA → AMBASSADEUR_PAYS → RECRUTEUR
-//  API réelle — plus de données mock
-//  Affiche : plan, membership_fee, membership_transaction_id, membership_payment_method
+//  + Section "Comptes en attente de validation" avec Valider/Rejeter
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -38,9 +37,15 @@ const PLAN_CONFIG = {
 };
 
 const STATUS_CONFIG = {
-  ACTIVE:    { label:"Actif",      color:C.green, bg:C.greenL },
-  SUSPENDED: { label:"Suspendu",   color:C.red,   bg:C.redL   },
-  PENDING:   { label:"En attente", color:C.gold,  bg:C.goldL  },
+  ACTIVE:    { label:"Actif",       color:C.green, bg:C.greenL },
+  SUSPENDED: { label:"Suspendu",    color:C.red,   bg:C.redL   },
+  PENDING:   { label:"En attente",  color:C.gold,  bg:C.goldL  },
+};
+
+const VALIDATION_CONFIG = {
+  pending:  { label:"⏳ À valider", color:C.gold,  bg:C.goldL  },
+  approved: { label:"✅ Validé",    color:C.green, bg:C.greenL },
+  rejected: { label:"❌ Rejeté",    color:C.red,   bg:C.redL   },
 };
 
 function RoleBadge({ role }) {
@@ -72,19 +77,95 @@ function StatusBadge({ status }) {
   );
 }
 
+function ValidationBadge({ v }) {
+  const s = VALIDATION_CONFIG[v] || VALIDATION_CONFIG.pending;
+  return (
+    <span style={{ background:s.bg, color:s.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+      {s.label}
+    </span>
+  );
+}
+
+// ── Section comptes en attente de validation ──────────────────
+function PendingValidationSection({ ambassadors, onValidate }) {
+  const pending = ambassadors.filter(a => a.status_validation === "pending" || !a.status_validation);
+  if (pending.length === 0) return null;
+
+  return (
+    <div style={{ background:"#fff", borderRadius:14, border:`2px solid ${C.gold}`, padding:"18px 20px", marginBottom:20 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+        <span style={{ fontSize:22 }}>⏳</span>
+        <div>
+          <p style={{ margin:0, fontWeight:900, fontSize:15, color:C.dark }}>
+            Comptes en attente de validation
+          </p>
+          <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+            {pending.length} compte(s) à traiter — le paiement est bloqué jusqu'à validation
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {pending.map(amb => (
+          <div key={amb.id} style={{
+            background:C.goldL, borderRadius:10, padding:"12px 16px",
+            border:`1px solid ${C.gold}44`,
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            flexWrap:"wrap", gap:12,
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:38, height:38, borderRadius:10, background:ROLE_CONFIG[amb.role]?.bg || C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                {ROLE_CONFIG[amb.role]?.icon || "👤"}
+              </div>
+              <div>
+                <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:13 }}>{amb.name}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
+                  {amb.email} · {amb.country} · {fmtDate(amb.created_at)}
+                </p>
+                <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                  <RoleBadge role={amb.role} />
+                  <PlanBadge plan={amb.plan} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:8 }}>
+              <button
+                onClick={() => onValidate(amb.id, "approve")}
+                style={{ padding:"7px 16px", borderRadius:8, border:"none", background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer" }}
+              >
+                ✅ Valider
+              </button>
+              <button
+                onClick={() => onValidate(amb.id, "reject")}
+                style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer" }}
+              >
+                ❌ Rejeter
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDiaspora() {
-  const [ambassadors, setAmbassadors] = useState([]);
-  const [filtered, setFiltered]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState("");
-  const [search, setSearch]           = useState("");
-  const [roleFilter, setRoleFilter]   = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selected, setSelected]       = useState(null);
+  const [ambassadors, setAmbassadors]     = useState([]);
+  const [filtered, setFiltered]           = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState("");
+  const [search, setSearch]               = useState("");
+  const [roleFilter, setRoleFilter]       = useState("ALL");
+  const [statusFilter, setStatusFilter]   = useState("ALL");
+  const [validFilter, setValidFilter]     = useState("ALL");
+  const [selected, setSelected]           = useState(null);
+  const [validating, setValidating]       = useState(null); // id en cours
 
   const stats = {
     total:      ambassadors.length,
     actifs:     ambassadors.filter(a => a.status === "ACTIVE").length,
+    pending:    ambassadors.filter(a => a.status_validation === "pending" || !a.status_validation).length,
     cartes:     ambassadors.reduce((s, a) => s + Number(a.beneficiary_count || 0), 0),
     adhesions:  ambassadors.reduce((s, a) => s + Number(a.membership_fee || 0), 0),
     diaspora:   ambassadors.filter(a => a.role === "AMBASSADEUR_DIASPORA").length,
@@ -96,8 +177,13 @@ export default function AdminDiaspora() {
 
   useEffect(() => {
     let list = ambassadors;
-    if (roleFilter !== "ALL")   list = list.filter(a => a.role === roleFilter);
+    if (roleFilter !== "ALL")  list = list.filter(a => a.role === roleFilter);
     if (statusFilter !== "ALL") list = list.filter(a => a.status === statusFilter);
+    if (validFilter !== "ALL") {
+      if (validFilter === "pending")  list = list.filter(a => a.status_validation === "pending" || !a.status_validation);
+      if (validFilter === "approved") list = list.filter(a => a.status_validation === "approved");
+      if (validFilter === "rejected") list = list.filter(a => a.status_validation === "rejected");
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(a =>
@@ -109,7 +195,7 @@ export default function AdminDiaspora() {
       );
     }
     setFiltered(list);
-  }, [ambassadors, search, roleFilter, statusFilter]);
+  }, [ambassadors, search, roleFilter, statusFilter, validFilter]);
 
   async function fetchAmbassadors() {
     setLoading(true); setError("");
@@ -123,11 +209,28 @@ export default function AdminDiaspora() {
     } finally { setLoading(false); }
   }
 
+  async function handleValidate(id, action) {
+    if (validating) return;
+    setValidating(id);
+    try {
+      await axios.patch(
+        `${API}/api/diaspora/admin/ambassadors/${id}/validate`,
+        { action },
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      await fetchAmbassadors();
+      setSelected(null);
+    } catch (e) {
+      alert(e.response?.data?.error || "Erreur lors de la validation");
+    } finally { setValidating(null); }
+  }
+
   async function toggleStatus(amb, e) {
     e.stopPropagation();
     const newStatus = amb.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
     try {
-      await axios.put(`${API}/api/diaspora/admin/ambassadors/${amb.id}/status`,
+      await axios.put(
+        `${API}/api/diaspora/admin/ambassadors/${amb.id}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${agentToken()}` } }
       );
@@ -152,23 +255,27 @@ export default function AdminDiaspora() {
       {/* Stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { icon:"👥", label:"Total",           value:stats.total,      color:C.blue,   bg:C.blueL,   isText:false },
-          { icon:"✅", label:"Actifs",          value:stats.actifs,     color:C.green,  bg:C.greenL,  isText:false },
-          { icon:"🌍", label:"Diaspora",        value:stats.diaspora,   color:C.blue,   bg:C.blueL,   isText:false },
-          { icon:"🗺️", label:"Pays",            value:stats.pays,       color:C.green,  bg:C.greenL,  isText:false },
-          { icon:"🤝", label:"Recruteurs",      value:stats.recruteurs, color:C.gold,   bg:C.goldL,   isText:false },
-          { icon:"🎴", label:"Cartes",          value:stats.cartes,     color:C.teal,   bg:C.tealL,   isText:false },
-          { icon:"💳", label:"Adhésions FCFA",  value:`${fmt(stats.adhesions)} FCFA`, color:C.purple, bg:C.purpleL, isText:true },
+          { icon:"👥", label:"Total",           value:stats.total,      color:C.blue,   bg:C.blueL   },
+          { icon:"✅", label:"Actifs",          value:stats.actifs,     color:C.green,  bg:C.greenL  },
+          { icon:"⏳", label:"À valider",       value:stats.pending,    color:C.gold,   bg:C.goldL   },
+          { icon:"🌍", label:"Diaspora",        value:stats.diaspora,   color:C.blue,   bg:C.blueL   },
+          { icon:"🗺️", label:"Pays",            value:stats.pays,       color:C.green,  bg:C.greenL  },
+          { icon:"🤝", label:"Recruteurs",      value:stats.recruteurs, color:C.gold,   bg:C.goldL   },
+          { icon:"🎴", label:"Cartes",          value:stats.cartes,     color:C.teal,   bg:C.tealL   },
         ].map(s => (
           <div key={s.label} style={{ background:s.bg, borderRadius:12, padding:"14px 16px", border:`1px solid ${s.color}22` }}>
             <span style={{ fontSize:20 }}>{s.icon}</span>
-            <p style={{ margin:"8px 0 2px", fontSize:s.isText?13:22, fontWeight:900, color:s.color }}>
-              {s.isText ? s.value : fmt(s.value)}
-            </p>
+            <p style={{ margin:"8px 0 2px", fontSize:22, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
             <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>{s.label}</p>
           </div>
         ))}
       </div>
+
+      {/* ── Section validation en attente ─────────────────────────────── */}
+      <PendingValidationSection
+        ambassadors={ambassadors}
+        onValidate={handleValidate}
+      />
 
       {/* Organigramme */}
       <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"16px 20px", marginBottom:20 }}>
@@ -215,6 +322,13 @@ export default function AdminDiaspora() {
           <option value="PENDING">⏳ En attente</option>
           <option value="SUSPENDED">🚫 Suspendus</option>
         </select>
+        <select value={validFilter} onChange={e => setValidFilter(e.target.value)}
+          style={{ padding:"8px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, outline:"none", background:"#fff", color:C.dark }}>
+          <option value="ALL">Toutes validations</option>
+          <option value="pending">⏳ À valider</option>
+          <option value="approved">✅ Validés</option>
+          <option value="rejected">❌ Rejetés</option>
+        </select>
         <button onClick={fetchAmbassadors}
           style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontWeight:700, fontSize:12, cursor:"pointer" }}>
           🔄 Actualiser
@@ -240,6 +354,7 @@ export default function AdminDiaspora() {
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(amb => {
             const isOpen = selected?.id === amb.id;
+            const validCfg = VALIDATION_CONFIG[amb.status_validation] || VALIDATION_CONFIG.pending;
             return (
               <div key={amb.id}
                 onClick={() => setSelected(isOpen ? null : amb)}
@@ -259,6 +374,7 @@ export default function AdminDiaspora() {
                       <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:14 }}>{amb.name}</p>
                       <RoleBadge role={amb.role} />
                       <StatusBadge status={amb.status} />
+                      <ValidationBadge v={amb.status_validation} />
                     </div>
                     <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
                       {amb.email} • {amb.country}{amb.city ? ` • ${amb.city}` : ""}
@@ -281,12 +397,6 @@ export default function AdminDiaspora() {
                       <p style={{ margin:0, fontWeight:800, color:C.green, fontSize:16 }}>{amb.recruit_count || 0}</p>
                       <p style={{ margin:0, fontSize:10, color:C.slate }}>Recrutés</p>
                     </div>
-                    <div style={{ textAlign:"center" }}>
-                      <p style={{ margin:0, fontWeight:800, color:C.purple, fontSize:13 }}>
-                        {amb.membership_fee ? `${fmt(amb.membership_fee)} F` : "—"}
-                      </p>
-                      <p style={{ margin:0, fontSize:10, color:C.slate }}>Adhésion</p>
-                    </div>
                   </div>
 
                   <span style={{ fontSize:14, color:C.slate }}>{isOpen ? "▲" : "▼"}</span>
@@ -302,7 +412,7 @@ export default function AdminDiaspora() {
                         { label:"Plan mensuel",         value: amb.plan || "—"                         },
                         { label:"Adhésion payée",       value: amb.membership_fee ? `${fmt(amb.membership_fee)} FCFA` : "—" },
                         { label:"Mode paiement",        value: amb.membership_payment_method || "—"    },
-                        { label:"Transaction ID",       value: amb.membership_transaction_id || "—"    },
+                        { label:"Validation",           value: VALIDATION_CONFIG[amb.status_validation]?.label || "⏳ À valider" },
                         { label:"Téléphone",            value: amb.phone || "—"                        },
                         { label:"Dernière connexion",   value: fmtDate(amb.last_login)                 },
                       ].map(item => (
@@ -312,7 +422,28 @@ export default function AdminDiaspora() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ display:"flex", gap:10 }}>
+
+                    {/* Actions */}
+                    <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                      {/* Validation */}
+                      {(amb.status_validation === "pending" || !amb.status_validation) && (
+                        <>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "approve"); }}
+                            disabled={validating === amb.id}
+                            style={{ padding:"8px 16px", borderRadius:8, border:"none", background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", opacity: validating === amb.id ? 0.6 : 1 }}>
+                            ✅ Valider le compte
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "reject"); }}
+                            disabled={validating === amb.id}
+                            style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer", opacity: validating === amb.id ? 0.6 : 1 }}>
+                            ❌ Rejeter
+                          </button>
+                        </>
+                      )}
+
+                      {/* Activer / Suspendre */}
                       <button onClick={e => toggleStatus(amb, e)}
                         style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${amb.status==="ACTIVE"?C.red:C.green}`, background:"#fff", color:amb.status==="ACTIVE"?C.red:C.green, fontWeight:700, fontSize:12, cursor:"pointer" }}>
                         {amb.status === "ACTIVE" ? "🚫 Suspendre" : "✅ Réactiver"}
