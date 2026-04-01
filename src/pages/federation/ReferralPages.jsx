@@ -7,10 +7,24 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDiasporaData } from "../../diasporaApi";
-import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI } from "../../federationApi";
+import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI, federationDashAPI } from "../../federationApi";
 import AdhesionForm from "../../components/AdhesionForm";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+const C = {
+  purple:  "#7C3AED", purpleL: "#F5F3FF",
+  green:   "#059669", greenL:  "#ECFDF5",
+  gold:    "#D97706", goldL:   "#FFFBEB",
+  blue:    "#1B4FD8", blueL:   "#EEF2FF",
+  teal:    "#0D9488", tealL:   "#F0FDFA",
+  red:     "#DC2626", redL:    "#FEF2F2",
+  slate:   "#64748B", dark:    "#0F172A",
+  border:  "#E2E8F0", bg:      "#F8FAFC",
+};
+
+const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR");
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" }) : "—";
 
 // ── Bouton paiement pour un membre non encore payé (Référent) ─
 function PayButton({ ambassadorId }) {
@@ -134,7 +148,7 @@ function ClientCreatedScreenRef({ result, onClose }) {
         </button>
       </div>
       <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
-        <Btn variant="outline" onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}>
+        <Btn outline onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}>
           {copied ? "✅ Copié !" : "📋 Copier"}
         </Btn>
         <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
@@ -147,20 +161,6 @@ function ClientCreatedScreenRef({ result, onClose }) {
   );
 }
 
-
-const C = {
-  purple:  "#7C3AED", purpleL: "#F5F3FF",
-  green:   "#059669", greenL:  "#ECFDF5",
-  gold:    "#D97706", goldL:   "#FFFBEB",
-  blue:    "#1B4FD8", blueL:   "#EEF2FF",
-  teal:    "#0D9488", tealL:   "#F0FDFA",
-  red:     "#DC2626", redL:    "#FEF2F2",
-  slate:   "#64748B", dark:    "#0F172A",
-  border:  "#E2E8F0", bg:      "#F8FAFC",
-};
-
-const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR");
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" }) : "—";
 
 const ROLE_CONFIG = {
   RUM:         { label:"RUM",         icon:"👑", color:C.purple, bg:C.purpleL },
@@ -332,7 +332,7 @@ export function ReferralRegisterLeader() {
 
       {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
+        <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
         </Btn>
       </div>
@@ -419,7 +419,7 @@ export function ReferralRegisterPasteur() {
 
       {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
+        <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
         </Btn>
       </div>
@@ -506,7 +506,7 @@ export function ReferralRegisterResponsable() {
 
       {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
+        <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
         </Btn>
       </div>
@@ -981,7 +981,7 @@ export function ReferralLeaderboard() {
       <div style={{ display:"flex", gap:8, marginBottom:20 }}>
         {[{ id:"week",label:"Cette semaine" },{ id:"month",label:"Ce mois" },{ id:"all",label:"Tout temps" }].map(p => (
           <button key={p.id} onClick={() => setPeriod(p.id)}
-            style={{ padding:"7px 16px", borderRadius:8, border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
+            style={{ padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
             {p.label}
           </button>
         ))}
@@ -1269,5 +1269,4 @@ export function ReferralCards() {
   );
 }
 
-// Export manquant pour federationDashAPI (utilisé dans ReferralRewards et ReferralCards)
-import { federationDashAPI } from "../../federationApi";
+
