@@ -16,16 +16,16 @@ import {
   diasporaLeaderAPI,
   diasporaNotifAPI,
   diasporaProfileAPI,
+  diasporaDashAPI,
   getDiasporaData,
 } from "../../diasporaApi";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // ── Bouton paiement pour un ambassadeur non encore payé ──────
-function PayButton({ ambassadorId, onSuccess }) {
+function PayButton({ ambassadorId }) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
-
   async function handlePay() {
     setLoading(true); setError(null);
     try {
@@ -33,24 +33,18 @@ function PayButton({ ambassadorId, onSuccess }) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("diaspora_token")}` },
         body: JSON.stringify({
-          ambassador_id: ambassadorId,
-          amount:        15000,
-          currency:      "XOF",
-          description:   "Adhésion Awoundjô",
-          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+          ambassador_id: ambassadorId, amount: 15000, currency: "XOF",
+          description: "Adhésion Awoundjô",
+          return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed`,
         }),
       });
       const data = await res.json();
       const url = data?.data?.payment_url || data?.payment_url;
       if (!url) throw new Error("URL de paiement non reçue");
       window.location.href = url;
-    } catch (e) {
-      setError(e.message || "Erreur paiement");
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message || "Erreur paiement"); setLoading(false); }
   }
-
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
       <button onClick={handlePay} disabled={loading}
@@ -62,6 +56,102 @@ function PayButton({ ambassadorId, onSuccess }) {
     </div>
   );
 }
+
+// ── Formulaire création client final (tous niveaux) ──────────
+function CreateClientForm({ onSuccess }) {
+  const [form, setForm]       = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  async function submit() {
+    if (!form.name) return setError("Le nom est requis");
+    setLoading(true); setError("");
+    try {
+      const { data } = await diasporaBeneAPI.create(form);
+      onSuccess?.(data);
+    } catch(e) { setError(e.response?.data?.error || "Erreur lors de la création"); }
+    finally { setLoading(false); }
+  }
+  return (
+    <Card>
+      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {[
+          { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
+          { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
+          { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
+        ].map(f => (
+          <div key={f.key}>
+            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:5 }}>{f.label}</label>
+            <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
+              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
+          </div>
+        ))}
+        <div>
+          <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {PLANS.map(p => (
+              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
+                style={{ padding:"10px 14px", borderRadius:10,
+                         border:`2px solid ${form.plan===p.value?C.blue:C.border}`,
+                         background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer",
+                         display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div>
+                  <p style={{ margin:0, fontWeight:700, fontSize:13, color:form.plan===p.value?C.blue:C.dark }}>{p.label}</p>
+                  <p style={{ margin:0, fontSize:11, color:C.slate }}>{p.desc}</p>
+                </div>
+                <span style={{ fontWeight:800, fontSize:13, color:form.plan===p.value?C.blue:C.slate }}>{Number(p.price).toLocaleString()} FCFA</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <Btn onClick={submit} disabled={loading}>{loading ? "Enregistrement…" : "✅ Créer le client"}</Btn>
+      </div>
+    </Card>
+  );
+}
+
+// ── Écran succès création client avec credentials ────────────
+function ClientCreatedScreen({ result, onClose }) {
+  const creds = result?.credentials;
+  const [copied, setCopied] = useState(false);
+  const [show, setShow]     = useState(false);
+  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
+  return (
+    <Card style={{ textAlign:"center" }}>
+      <div style={{ fontSize:52, marginBottom:10 }}>⏳</div>
+      <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
+      <p style={{ fontSize:12, color:C.slate, margin:"0 0 16px" }}>Un admin doit valider avant que le client puisse payer</p>
+      <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}55`, borderRadius:12, padding:"16px 20px", marginBottom:16, textAlign:"left" }}>
+        <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.dark }}>📋 Identifiants à communiquer au client</p>
+        {[
+          { label:"Numéro mutualiste",  value: creds?.mutual_number },
+          { label:"Mot de passe temp.", value: show ? creds?.temp_password : "••••••••" },
+        ].map(r => (
+          <div key={r.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
+            <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13, color:C.dark }}>{r.value}</span>
+          </div>
+        ))}
+        <button onClick={() => setShow(s=>!s)}
+          style={{ fontSize:11, color:C.slate, background:"none", border:"none", cursor:"pointer", marginTop:4 }}>
+          {show ? "🙈 Masquer" : "👁️ Afficher le mot de passe"}
+        </button>
+      </div>
+      <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
+        <Btn onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }} variant="outline">
+          {copied ? "✅ Copié !" : "📋 Copier"}
+        </Btn>
+        <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
+          style={{ padding:"10px 18px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none" }}>
+          📱 WhatsApp
+        </a>
+        <Btn onClick={onClose}>➕ Nouveau client</Btn>
+      </div>
+    </Card>
+  );
+}
+
 
 const C = {
   blue:    "#1B4FD8", blueL:   "#EEF2FF",
@@ -213,120 +303,6 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER AMBASSADEUR PAYS (AMBASSADEUR_DIASPORA uniquement)
 // ─────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────
-// COMPOSANT RÉUTILISABLE : Formulaire création client final
-// Utilisable par tous les niveaux hiérarchiques
-// ─────────────────────────────────────────────────────────────
-const PLANS = [
-  { value:"ESSENTIELLE", label:"Essentielle",  price:5000,  desc:"Couverture de base" },
-  { value:"IVOIRIENNE",  label:"Ivoirienne",   price:8000,  desc:"Couverture standard" },
-  { value:"TURQUOISE",   label:"Turquoise",    price:12000, desc:"Couverture premium" },
-];
-
-function CreateClientForm({ onSuccess }) {
-  const [form, setForm]     = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState("");
-
-  async function submit() {
-    if (!form.name) return setError("Le nom est requis");
-    setLoading(true); setError("");
-    try {
-      const { data } = await diasporaBeneAPI.create(form);
-      onSuccess?.(data);
-    } catch(e) {
-      setError(e.response?.data?.error || "Erreur lors de la création");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <Card>
-      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
-      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-        {[
-          { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
-          { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
-          { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
-        ].map(f => (
-          <div key={f.key}>
-            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:5 }}>{f.label}</label>
-            <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
-          </div>
-        ))}
-        <div>
-          <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {PLANS.map(p => (
-              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
-                style={{ padding:"10px 14px", borderRadius:10, border:`2px solid ${form.plan===p.value?C.blue:C.border}`,
-                         background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer",
-                         display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <div>
-                  <p style={{ margin:0, fontWeight:700, fontSize:13, color:form.plan===p.value?C.blue:C.dark }}>{p.label}</p>
-                  <p style={{ margin:0, fontSize:11, color:C.slate }}>{p.desc}</p>
-                </div>
-                <span style={{ fontWeight:800, fontSize:13, color:form.plan===p.value?C.blue:C.slate }}>{p.price.toLocaleString()} FCFA</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Btn onClick={submit} disabled={loading}>
-          {loading ? "Enregistrement…" : "✅ Créer le client"}
-        </Btn>
-      </div>
-    </Card>
-  );
-}
-
-// Écran succès création client avec credentials
-function ClientCreatedScreen({ result, onClose }) {
-  const bene  = result?.beneficiary;
-  const creds = result?.credentials;
-  const [copied, setCopied] = useState(false);
-  const [show, setShow]     = useState(false);
-
-  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
-
-  function copy() { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }
-
-  return (
-    <Card style={{ textAlign:"center" }}>
-      <div style={{ fontSize:52, marginBottom:10 }}>⏳</div>
-      <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
-      <p style={{ fontSize:12, color:C.slate, margin:"0 0 16px" }}>Un admin doit valider avant que le client puisse payer</p>
-
-      <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}55`, borderRadius:12, padding:"16px 20px", marginBottom:16, textAlign:"left" }}>
-        <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.dark }}>📋 Identifiants à communiquer au client</p>
-        {[
-          { label:"Numéro mutualiste", value: creds?.mutual_number },
-          { label:"Mot de passe temp.", value: show ? creds?.temp_password : "••••••••" },
-        ].map(r => (
-          <div key={r.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-            <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
-            <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13, color:C.dark }}>{r.value}</span>
-          </div>
-        ))}
-        <button onClick={() => setShow(s=>!s)}
-          style={{ fontSize:11, color:C.slate, background:"none", border:"none", cursor:"pointer", marginTop:4 }}>
-          {show ? "🙈 Masquer" : "👁️ Afficher le mot de passe"}
-        </button>
-      </div>
-
-      <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
-        <Btn onClick={copy} variant="outline">{copied ? "✅ Copié !" : "📋 Copier"}</Btn>
-        <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
-          style={{ padding:"10px 18px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none" }}>
-          📱 Envoyer WhatsApp
-        </a>
-        <Btn onClick={onClose}>➕ Nouveau client</Btn>
-      </div>
-    </Card>
-  );
-}
-
 export function DiasporaRegisterPays() {
   const [list, setList]           = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -401,7 +377,7 @@ export function DiasporaRegisterPays() {
         </div>
       )}
 
-      {/* ── Formulaire création client direct ─────────────────── */}
+      {/* ── Créer un client final ───────────────────────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -442,9 +418,7 @@ export function DiasporaRegisterPays() {
                 <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
                   {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                 </span>
-                {a.status_payment !== "paid" && (
-                  <PayButton ambassadorId={a.id} />
-                )}
+                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
               </div>
             </Card>
           ))}
@@ -500,6 +474,7 @@ export function DiasporaRegisterRecruiter() {
         </div>
       )}
 
+      {/* ── Créer un client final ───────────────────────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -540,9 +515,7 @@ export function DiasporaRegisterRecruiter() {
                 <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
                   {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                 </span>
-                {a.status_payment !== "paid" && (
-                  <PayButton ambassadorId={a.id} />
-                )}
+                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
               </div>
             </Card>
           ))}
@@ -562,6 +535,8 @@ export function DiasporaRegisterRUM() {
   const [showForm, setShowForm] = useState(false);
   const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
+  const [showClientForm, setShowClientForm] = useState(false);
+  const [clientResult, setClientResult]     = useState(null);
 
   useEffect(() => {
     diasporaBeneAPI.getAmbassadors({ role:"RUM" })
@@ -612,6 +587,23 @@ export function DiasporaRegisterRUM() {
         </div>
       )}
 
+      {/* ── Créer un client final ───────────────────────────── */}
+      <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
+        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
+          {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
+        </Btn>
+      </div>
+      {clientResult && (
+        <div style={{ marginBottom:24 }}>
+          <ClientCreatedScreen result={clientResult} onClose={() => { setClientResult(null); setShowClientForm(false); }} />
+        </div>
+      )}
+      {showClientForm && !clientResult && (
+        <div style={{ marginBottom:24 }}>
+          <CreateClientForm onSuccess={r => { setClientResult(r); setShowClientForm(false); }} />
+        </div>
+      )}
+
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="👑" title="Aucun RUM enregistré" desc="Créez votre premier RUM pour lancer le réseau Parrainage" />
       ) : (
@@ -646,9 +638,7 @@ export function DiasporaRegisterRUM() {
                     @{a.username}
                   </span>
                 )}
-                {a.status_payment !== "paid" && (
-                  <PayButton ambassadorId={a.id} />
-                )}
+                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
               </div>
             </Card>
           ))}
@@ -1434,5 +1424,4 @@ export function DiasporaProfile() {
   );
 }
 
-// Import manquant pour DiasporaCards
-import { diasporaDashAPI } from "../../diasporaApi";
+
