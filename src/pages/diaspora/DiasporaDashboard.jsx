@@ -12,6 +12,8 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   diasporaDashAPI,
   diasporaRefAPI,
+  diasporaCommAPI,
+  diasporaBeneAPI,
   getDiasporaData,
 } from "../../diasporaApi";
 
@@ -33,6 +35,120 @@ const C = {
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
+
+// ── Plans disponibles ────────────────────────────────────────
+const PLANS_DIAS = [
+  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
+  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
+  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
+];
+
+// ── Sources de commission ────────────────────────────────────
+const SOURCE_LABELS = {
+  AMBASSADEUR_PAYS: { label:"Ambassadeur Pays", icon:"🗺️", color:"#059669" },
+  AMBASSADEUR_DIASPORA: { label:"Diaspora",     icon:"🌍", color:"#1B4FD8" },
+  RUM:              { label:"RUM",              icon:"👑", color:"#7C3AED" },
+  RECRUTEUR:        { label:"Référent",         icon:"🤝", color:"#D97706" },
+  CLIENT:           { label:"Client final",     icon:"👤", color:"#0D9488" },
+  direct:           { label:"Direct",           icon:"✅", color:"#059669" },
+  reseau:           { label:"Réseau",           icon:"🌐", color:"#1B4FD8" },
+};
+
+// ── Formulaire création client inline (dans le dashboard) ────
+function CreateClientInline({ onSuccess, onCancel }) {
+  const [form, setForm]     = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState("");
+
+  async function submit() {
+    if (!form.name.trim()) return setError("Le nom est requis");
+    setLoading(true); setError("");
+    try {
+      const { data } = await diasporaBeneAPI.create(form);
+      onSuccess?.(data);
+    } catch(e) {
+      setError(e.response?.data?.error || "Erreur lors de la création");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div style={{ background:"#fff", borderRadius:14, border:`1.5px solid #1B4FD833`, padding:"20px 22px", marginBottom:24 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+        <p style={{ margin:0, fontWeight:800, fontSize:15, color:"#0F172A" }}>👤 Créer un client final</p>
+        <button onClick={onCancel} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#64748B" }}>✕</button>
+      </div>
+      {error && <div style={{ background:"#FEF2F2", color:"#DC2626", padding:"10px 14px", borderRadius:8, marginBottom:14, fontSize:13 }}>⚠️ {error}</div>}
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {[
+          { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
+          { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
+          { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
+        ].map(f => (
+          <div key={f.key}>
+            <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#0F172A", marginBottom:5 }}>{f.label}</label>
+            <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
+              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              style={{ width:"100%", padding:"9px 13px", borderRadius:8, fontSize:13, border:"1.5px solid #E2E8F0", outline:"none", boxSizing:"border-box" }} />
+          </div>
+        ))}
+        <div>
+          <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#0F172A", marginBottom:8 }}>Offre *</label>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {PLANS_DIAS.map(p => (
+              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
+                style={{ flex:1, minWidth:100, padding:"10px 12px", borderRadius:10, cursor:"pointer",
+                  border:`2px solid ${form.plan===p.value?"#1B4FD8":"#E2E8F0"}`,
+                  background:form.plan===p.value?"#EEF2FF":"#F8FAFC" }}>
+                <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===p.value?"#1B4FD8":"#0F172A" }}>{p.label}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:"#64748B" }}>{Number(p.price).toLocaleString()} FCFA</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <button onClick={submit} disabled={loading}
+          style={{ padding:"10px 18px", background:"#1B4FD8", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
+          {loading ? "Enregistrement…" : "✅ Créer le client"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Écran succès création client ─────────────────────────────
+function ClientCreatedBanner({ result, onClose }) {
+  const creds = result?.credentials;
+  const [copied, setCopied] = useState(false);
+  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
+  return (
+    <div style={{ background:"#ECFDF5", border:"1.5px solid #05966944", borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+        <p style={{ margin:0, fontWeight:800, color:"#059669", fontSize:15 }}>✅ Client créé — en attente de validation</p>
+        <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"#64748B", fontSize:16 }}>✕</button>
+      </div>
+      <div style={{ background:"#fff", borderRadius:10, padding:"12px 16px", marginBottom:12 }}>
+        {[
+          { label:"Numéro mutualiste", value: creds?.mutual_number },
+          { label:"Mot de passe temp.", value: creds?.temp_password },
+        ].map(r => (
+          <div key={r.label} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ fontSize:12, color:"#64748B" }}>{r.label}</span>
+            <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13 }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+        <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
+          style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #059669", background:"#ECFDF5", color:"#059669", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+          {copied ? "✅ Copié !" : "📋 Copier"}
+        </button>
+        <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
+          style={{ padding:"8px 16px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:12, textDecoration:"none" }}>
+          📱 WhatsApp
+        </a>
+      </div>
+    </div>
+  );
+}
 
 // ── Config rôles Diaspora ─────────────────────────────────────
 const ROLE_CONFIG = {
@@ -253,10 +369,13 @@ export function DiasporaLayout() {
 export default function DiasporaDashboard() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [stats, setStats]   = useState(null);
-  const [link,  setLink]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [copied, setCopied]   = useState(false);
+  const [stats, setStats]           = useState(null);
+  const [link,  setLink]            = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [copied, setCopied]         = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [clientResult, setClientResult]         = useState(null);
+  const [commissions, setCommissions]           = useState(null);
   const amb  = getDiasporaData();
   const role = amb?.role || "RECRUTEUR";
   const rc   = ROLE_CONFIG[role] || ROLE_CONFIG.RECRUTEUR;
@@ -267,9 +386,11 @@ export default function DiasporaDashboard() {
     Promise.all([
       diasporaDashAPI.getStats(),
       diasporaRefAPI.getLink(),
-    ]).then(([s, l]) => {
+      diasporaCommAPI.getAll().catch(() => ({ data: null })),
+    ]).then(([s, l, c]) => {
       setStats(s.data);
       setLink(l.data);
+      setCommissions(c.data);
     }).catch(() => {}).finally(() => setLoading(false));
   }
 
@@ -419,6 +540,110 @@ export default function DiasporaDashboard() {
           ))}
         </div>
       </div>
+
+      {/* ── Création client rapide ── */}
+      {clientResult ? (
+        <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
+      ) : showCreateClient ? (
+        <CreateClientInline
+          onSuccess={r => { setClientResult(r); setShowCreateClient(false); }}
+          onCancel={() => setShowCreateClient(false)}
+        />
+      ) : (
+        <div style={{ marginBottom:24, display:"flex", justifyContent:"flex-start" }}>
+          <button onClick={() => setShowCreateClient(true)}
+            style={{ padding:"10px 20px", borderRadius:10, border:"2px solid #1B4FD8", background:"#EEF2FF", color:"#1B4FD8", fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+            👤 Créer un client final directement
+          </button>
+        </div>
+      )}
+
+      {/* ── Commissions par source ── */}
+      {commissions && (
+        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+            <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:15 }}>📈 Commissions par source</p>
+            <button onClick={() => navigate("/diaspora/earnings")}
+              style={{ background:"none", border:"none", fontSize:12, color:C.blue, fontWeight:700, cursor:"pointer" }}>
+              Tout voir →
+            </button>
+          </div>
+
+          {/* Totaux */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:16 }}>
+            {[
+              { label:"Total gagné",  value:commissions.totals?.total_earned  ?? 0, color:C.green  },
+              { label:"En attente",   value:commissions.totals?.pending        ?? 0, color:C.gold   },
+              { label:"Validé",       value:commissions.totals?.validated      ?? 0, color:C.blue   },
+              { label:"Payé",         value:commissions.totals?.paid           ?? 0, color:C.purple },
+              { label:"Ce mois",      value:commissions.totals?.this_month     ?? 0, color:C.teal   },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign:"center", padding:"10px 8px", background:C.bg, borderRadius:10 }}>
+                <p style={{ margin:0, fontSize:16, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
+                <p style={{ margin:"1px 0 0", fontSize:9, color:C.slate }}>FCFA</p>
+                <p style={{ margin:"4px 0 0", fontSize:10, fontWeight:700, color:C.dark }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Par source */}
+          {commissions.by_source?.length > 0 && (
+            <div>
+              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Détail par source</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {commissions.by_source.map(s => {
+                  const src = SOURCE_LABELS[s.source_role] || SOURCE_LABELS[s.type_source] || { label: s.source_role || s.type_source, icon:"💰", color:C.slate };
+                  return (
+                    <div key={s.source_role || s.type_source} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:C.bg, borderRadius:10 }}>
+                      <span style={{ fontSize:18 }}>{src.icon}</span>
+                      <div style={{ flex:1 }}>
+                        <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.dark }}>{src.label}</p>
+                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{s.count} commission(s)</p>
+                      </div>
+                      <span style={{ fontWeight:800, fontSize:14, color:src.color }}>{fmt(s.total)} FCFA</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Dernières commissions */}
+          {commissions.commissions?.length > 0 && (
+            <div style={{ marginTop:16 }}>
+              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Dernières commissions</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {commissions.commissions.slice(0, 5).map(c => {
+                  const src = SOURCE_LABELS[c.source] || { icon:"💰", color:C.slate };
+                  const statusColor = c.status==="PAID" ? C.green : c.status==="VALIDATED" ? C.blue : C.gold;
+                  const statusLabel = c.status==="PAID" ? "Payé" : c.status==="VALIDATED" ? "Validé" : "En attente";
+                  return (
+                    <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", background:C.bg, borderRadius:8 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        <span style={{ fontSize:14 }}>{src.icon}</span>
+                        <div>
+                          <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>{c.beneficiary_name || "—"}</p>
+                          <p style={{ margin:0, fontSize:11, color:C.slate }}>{c.rate_pct}% • {c.source === "direct" ? "Direct" : "Réseau"}</p>
+                        </div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <p style={{ margin:0, fontWeight:800, fontSize:13, color:C.green }}>{fmt(c.amount)} FCFA</p>
+                        <span style={{ fontSize:10, fontWeight:700, color:statusColor }}>{statusLabel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!commissions.by_source?.length && !commissions.commissions?.length && (
+            <div style={{ textAlign:"center", padding:"20px", color:C.slate, fontSize:13 }}>
+              💰 Aucune commission pour l'instant
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Résumé réseau ── */}
       {stats && (
