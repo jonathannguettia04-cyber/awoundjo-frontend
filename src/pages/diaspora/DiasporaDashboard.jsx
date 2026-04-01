@@ -15,6 +15,12 @@ import {
   getDiasporaData,
 } from "../../diasporaApi";
 
+// ── Utilitaire : bus d'événements léger pour forcer le refresh du dashboard
+// Appelé depuis n'importe quelle page après création/modification
+export function refreshDiasporaDashboard() {
+  window.dispatchEvent(new CustomEvent("diaspora:refresh"));
+}
+
 const C = {
   blue:    "#1B4FD8", blueL:  "#EEF2FF",
   green:   "#059669", greenL: "#ECFDF5",
@@ -246,6 +252,7 @@ export function DiasporaLayout() {
 // ── DiasporaDashboard (page Accueil) ─────────────────────────
 export default function DiasporaDashboard() {
   const navigate  = useNavigate();
+  const location  = useLocation();
   const [stats, setStats]   = useState(null);
   const [link,  setLink]    = useState(null);
   const [loading, setLoading] = useState(true);
@@ -254,7 +261,9 @@ export default function DiasporaDashboard() {
   const role = amb?.role || "RECRUTEUR";
   const rc   = ROLE_CONFIG[role] || ROLE_CONFIG.RECRUTEUR;
 
-  useEffect(() => {
+  // ── Chargement des stats (se relance à chaque retour sur la page)
+  function fetchStats() {
+    setLoading(true);
     Promise.all([
       diasporaDashAPI.getStats(),
       diasporaRefAPI.getLink(),
@@ -262,6 +271,15 @@ export default function DiasporaDashboard() {
       setStats(s.data);
       setLink(l.data);
     }).catch(() => {}).finally(() => setLoading(false));
+  }
+
+  // Se relance dès que le pathname change (retour depuis une autre page)
+  useEffect(() => { fetchStats(); }, [location.pathname]);
+
+  // Écoute l'événement manuel émis après création de client/recruteur
+  useEffect(() => {
+    window.addEventListener("diaspora:refresh", fetchStats);
+    return () => window.removeEventListener("diaspora:refresh", fetchStats);
   }, []);
 
   function copyLink() {
@@ -274,19 +292,19 @@ export default function DiasporaDashboard() {
   // ── Stats cards selon le rôle ──────────────────────────────
   const statCards = stats ? [
     ...(role === "RECRUTEUR" ? [
-      { icon:"👤", label:"Clients enregistrés", value:stats.clients?.total || 0, sub:`${stats.clients?.active||0} actifs`, color:C.blue,  bg:C.blueL,  path:"/diaspora/clients" },
-      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold || 0,     sub:"Ce mois",                            color:C.green, bg:C.greenL, path:"/diaspora/cards" },
+      { icon:"👤", label:"Clients enregistrés", value:stats.clients?.total ?? stats.total_clients ?? 0, sub:`${stats.clients?.active ?? stats.active_clients ?? 0} actifs`, color:C.blue,  bg:C.blueL,  path:"/diaspora/clients" },
+      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold ?? stats.clients?.total ?? 0,     sub:"Toutes périodes",                            color:C.green, bg:C.greenL, path:"/diaspora/cards" },
     ] : role === "AMBASSADEUR_PAYS" ? [
-      { icon:"🤝", label:"Mes Recruteurs",      value:stats.referrals || 0,       sub:"Recruteurs directs",                 color:C.blue,  bg:C.blueL,  path:"/diaspora/register-recruiter" },
-      { icon:"👥", label:"Total réseau",        value:stats.network_size || 0,    sub:"Tous niveaux",                       color:C.green, bg:C.greenL, path:"/diaspora/network" },
+      { icon:"🤝", label:"Mes Recruteurs",      value:stats.referrals ?? stats.direct_recruits ?? 0,       sub:"Recruteurs directs",                 color:C.blue,  bg:C.blueL,  path:"/diaspora/register-recruiter" },
+      { icon:"👥", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,    sub:"Tous niveaux",                       color:C.green, bg:C.greenL, path:"/diaspora/network" },
     ] : [
       // AMBASSADEUR_DIASPORA — crée Ambassadeurs Pays + RUM
-      { icon:"🗺️", label:"Ambassadeurs Pays",  value:stats.referrals_pays  || 0, sub:"Recrutés directs",     color:C.blue,   bg:C.blueL,   path:"/diaspora/register-pays" },
-      { icon:"👑", label:"RUM créés",           value:stats.referrals_rum   || 0, sub:"Réseau Parrainage",    color:C.purple, bg:C.purpleL, path:"/diaspora/register-rum"  },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size    || 0, sub:"Tous niveaux",         color:C.green,  bg:C.greenL,  path:"/diaspora/network"       },
+      { icon:"🗺️", label:"Ambassadeurs Pays",  value:stats.referrals_pays  ?? stats.referrals ?? 0, sub:"Recrutés directs",     color:C.blue,   bg:C.blueL,   path:"/diaspora/register-pays" },
+      { icon:"👑", label:"RUM créés",           value:stats.referrals_rum   ?? 0, sub:"Réseau Parrainage",    color:C.purple, bg:C.purpleL, path:"/diaspora/register-rum"  },
+    { icon:"🌐", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,    sub:"Tous niveaux",         color:C.green,  bg:C.greenL,  path:"/diaspora/network"       },
     ]),
-    { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned || 0, sub:`${fmt(stats.commissions?.pending||0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/diaspora/earnings", isAmount:true },
-    { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level || "—",  sub:stats.rewards?.unlocked || "Continuez !",   color:C.purple, bg:C.purpleL, path:"/diaspora/rewards", isText:true },
+    { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned ?? stats.commissions?.total ?? stats.total_earned ?? 0, sub:`${fmt(stats.commissions?.pending ?? stats.pending_commissions ?? 0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/diaspora/earnings", isAmount:true },
+    { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level ?? "—",  sub:stats.rewards?.unlocked ?? stats.rewards?.next_reward ?? "Continuez !",   color:C.purple, bg:C.purpleL, path:"/diaspora/rewards", isText:true },
   ] : [];
 
   // ── Actions rapides selon le rôle ─────────────────────────
@@ -336,7 +354,7 @@ export default function DiasporaDashboard() {
         <div style={{ textAlign:"right" }}>
           <p style={{ margin:"0 0 4px", color:"rgba(255,255,255,0.75)", fontSize:11, fontWeight:600 }}>GAINS EN ATTENTE</p>
           <p style={{ margin:0, color:"#fff", fontSize:28, fontWeight:900 }}>
-            {fmt(stats?.commissions?.pending || 0)} FCFA
+            {fmt(stats?.commissions?.pending ?? stats?.pending_commissions ?? 0)} FCFA
           </p>
         </div>
       </div>
@@ -414,10 +432,10 @@ export default function DiasporaDashboard() {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10 }}>
             {[
-              { label:"Total",      value:stats.network_size,            color:C.blue   },
-              { label:"Directs",    value:stats.referrals,               color:C.green  },
-              { label:"Actifs",     value:stats.clients?.active,         color:C.gold   },
-              { label:"En attente", value:stats.clients?.pending,        color:C.slate  },
+              { label:"Total",      value:stats.network_size ?? stats.total_network ?? 0,         color:C.blue   },
+              { label:"Directs",    value:stats.referrals ?? stats.direct_recruits ?? 0,           color:C.green  },
+              { label:"Actifs",     value:stats.clients?.active ?? stats.active_clients ?? 0,      color:C.gold   },
+              { label:"En attente", value:stats.clients?.pending ?? stats.pending_clients ?? 0,    color:C.slate  },
             ].map(s => (
               <div key={s.label} style={{ textAlign:"center", padding:"10px 6px", background:C.bg, borderRadius:8 }}>
                 <p style={{ margin:0, fontSize:20, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>

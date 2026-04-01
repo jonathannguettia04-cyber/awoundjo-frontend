@@ -16,6 +16,11 @@ import {
 } from "../../federationApi";
 import { getDiasporaData } from "../../diasporaApi";
 
+// ── Utilitaire : bus d'événements léger pour forcer le refresh du dashboard
+export function refreshFederationDashboard() {
+  window.dispatchEvent(new CustomEvent("federation:refresh"));
+}
+
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF", purpleM: "#DDD6FE",
   green:   "#059669", greenL:  "#ECFDF5",
@@ -217,17 +222,19 @@ export function FederationLayout() {
 // ── FederationDashboard (page Accueil) ────────────────────────
 export default function FederationDashboard() {
   const navigate  = useNavigate();
+  const location  = useLocation();
   const [stats, setStats]   = useState(null);
   const [link,  setLink]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied]   = useState(false);
-  // Mode Pasteur : peut basculer entre "enregistrer Responsable" et "enregistrer Client"
-  const [pasteurMode, setPasteurMode] = useState("responsable"); // "responsable" | "client"
+  const [pasteurMode, setPasteurMode] = useState("responsable");
   const amb  = getDiasporaData();
   const role = amb?.role || "RESPONSABLE";
   const rc   = ROLE_CONFIG[role] || ROLE_CONFIG.RESPONSABLE;
 
-  useEffect(() => {
+  // ── Chargement des stats (se relance à chaque retour sur la page)
+  function fetchStats() {
+    setLoading(true);
     Promise.all([
       federationDashAPI.getStats(),
       federationRecruitAPI.getLink(),
@@ -235,6 +242,15 @@ export default function FederationDashboard() {
       setStats(s.data);
       setLink(l.data);
     }).catch(() => {}).finally(() => setLoading(false));
+  }
+
+  // Se relance dès que le pathname change (retour depuis une autre page)
+  useEffect(() => { fetchStats(); }, [location.pathname]);
+
+  // Écoute l'événement manuel émis après création de client/recruteur
+  useEffect(() => {
+    window.addEventListener("federation:refresh", fetchStats);
+    return () => window.removeEventListener("federation:refresh", fetchStats);
   }, []);
 
   function copyLink() {
@@ -247,22 +263,22 @@ export default function FederationDashboard() {
   // ── Stats cards selon le rôle ──────────────────────────────
   const statCards = stats ? [
     ...(role === "RESPONSABLE" ? [
-      { icon:"👤", label:"Clients enregistrés", value:stats.clients?.total||0,  sub:`${stats.clients?.active||0} actifs`,    color:C.purple, bg:C.purpleL, path:"/referral/clients" },
-      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold||0,       sub:"Toutes périodes",                        color:C.teal,   bg:C.tealL,   path:"/referral/cards" },
+      { icon:"👤", label:"Clients enregistrés", value:stats.clients?.total ?? stats.total_clients ?? 0,  sub:`${stats.clients?.active ?? stats.active_clients ?? 0} actifs`,    color:C.purple, bg:C.purpleL, path:"/referral/clients" },
+      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold ?? stats.clients?.total ?? 0,       sub:"Toutes périodes",                        color:C.teal,   bg:C.tealL,   path:"/referral/cards" },
     ] : role === "PASTEUR" ? [
-      { icon:"🤝", label:"Mes Responsables",    value:stats.referrals||0,        sub:"Responsables directs",                   color:C.purple, bg:C.purpleL, path:"/referral/register-responsable" },
-      { icon:"👤", label:"Clients directs",     value:stats.direct_clients||0,   sub:"Enregistrés par vous",                   color:C.teal,   bg:C.tealL,   path:"/referral/clients" },
-      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold||0,       sub:"Toutes périodes",                        color:C.green,  bg:C.greenL,  path:"/referral/cards" },
+      { icon:"🤝", label:"Mes Responsables",    value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Responsables directs",                   color:C.purple, bg:C.purpleL, path:"/referral/register-responsable" },
+      { icon:"👤", label:"Clients directs",     value:stats.direct_clients ?? stats.clients?.total ?? 0,   sub:"Enregistrés par vous",                   color:C.teal,   bg:C.tealL,   path:"/referral/clients" },
+      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold ?? 0,                               sub:"Toutes périodes",                        color:C.green,  bg:C.greenL,  path:"/referral/cards" },
     ] : role === "LEADER" ? [
-      { icon:"⛪", label:"Mes Pasteurs",        value:stats.referrals||0,        sub:"Pasteurs directs",                       color:C.purple, bg:C.purpleL, path:"/referral/register-pasteur" },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size||0,     sub:"Tous niveaux",                           color:C.blue,   bg:C.blueL,   path:"/referral/network" },
+      { icon:"⛪", label:"Mes Pasteurs",        value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Pasteurs directs",                       color:C.purple, bg:C.purpleL, path:"/referral/register-pasteur" },
+      { icon:"🌐", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,     sub:"Tous niveaux",                           color:C.blue,   bg:C.blueL,   path:"/referral/network" },
     ] : [
       // RUM
-      { icon:"⭐", label:"Mes Leaders",         value:stats.referrals||0,        sub:"Leaders directs",                        color:C.purple, bg:C.purpleL, path:"/referral/register-leader" },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size||0,     sub:"Tous niveaux confondus",                 color:C.blue,   bg:C.blueL,   path:"/referral/network" },
+      { icon:"⭐", label:"Mes Leaders",         value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Leaders directs",                        color:C.purple, bg:C.purpleL, path:"/referral/register-leader" },
+      { icon:"🌐", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,     sub:"Tous niveaux confondus",                 color:C.blue,   bg:C.blueL,   path:"/referral/network" },
     ]),
-    { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned||0, sub:`${fmt(stats.commissions?.pending||0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/referral/earnings", isAmount:true },
-    { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level||"—",  sub:stats.rewards?.unlocked||"Continuez !",   color:C.green,  bg:C.greenL,  path:"/referral/rewards", isText:true },
+    { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned ?? stats.commissions?.total ?? stats.total_earned ?? 0, sub:`${fmt(stats.commissions?.pending ?? stats.pending_commissions ?? 0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/referral/earnings", isAmount:true },
+    { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level ?? "—",  sub:stats.rewards?.unlocked ?? stats.rewards?.next_reward ?? "Continuez !",   color:C.green,  bg:C.greenL,  path:"/referral/rewards", isText:true },
   ] : [];
 
   // ── Actions rapides selon le rôle ──────────────────────────
@@ -316,7 +332,7 @@ export default function FederationDashboard() {
         <div style={{ textAlign:"right" }}>
           <p style={{ margin:"0 0 4px", color:"rgba(255,255,255,0.75)", fontSize:11, fontWeight:600 }}>GAINS EN ATTENTE</p>
           <p style={{ margin:0, color:"#fff", fontSize:28, fontWeight:900 }}>
-            {fmt(stats?.commissions?.pending || 0)} FCFA
+            {fmt(stats?.commissions?.pending ?? stats?.pending_commissions ?? 0)} FCFA
           </p>
         </div>
       </div>
@@ -422,10 +438,10 @@ export default function FederationDashboard() {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10 }}>
             {[
-              { label:"Total",      value:stats.network_size,        color:C.purple },
-              { label:"Directs",    value:stats.referrals,           color:C.blue   },
-              { label:"Actifs",     value:stats.clients?.active,     color:C.teal   },
-              { label:"En attente", value:stats.clients?.pending,    color:C.slate  },
+              { label:"Total",      value:stats.network_size ?? stats.total_network ?? 0,       color:C.purple },
+              { label:"Directs",    value:stats.referrals ?? stats.direct_recruits ?? 0,         color:C.blue   },
+              { label:"Actifs",     value:stats.clients?.active ?? stats.active_clients ?? 0,    color:C.teal   },
+              { label:"En attente", value:stats.clients?.pending ?? stats.pending_clients ?? 0,  color:C.slate  },
             ].map(s => (
               <div key={s.label} style={{ textAlign:"center", padding:"10px 6px", background:C.bg, borderRadius:8 }}>
                 <p style={{ margin:0, fontSize:20, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
