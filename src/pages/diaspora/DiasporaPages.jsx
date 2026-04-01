@@ -90,7 +90,7 @@ function CreateClientForm({ onSuccess }) {
         <div>
           <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {PLANS.map(p => (
+            {PLANS_DIAS.map(p => (
               <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
                 style={{ padding:"10px 14px", borderRadius:10,
                          border:`2px solid ${form.plan===p.value?C.blue:C.border}`,
@@ -173,7 +173,7 @@ const ROLE_CONFIG = {
   RECRUTEUR:            { label:"Recruteur",            icon:"🤝", color:C.gold,   bg:C.goldL  },
 };
 
-const PLANS = [
+const PLANS_DIAS = [
   { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
   { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
   { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
@@ -715,7 +715,7 @@ export function DiasporaNewBeneficiary() {
           <div>
             <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {PLANS.map(p => (
+              {PLANS_DIAS.map(p => (
                 <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
                   style={{ padding:"12px 16px", borderRadius:10, border:`2px solid ${form.plan===p.value?C.blue:C.border}`, background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", transition:"all .15s" }}>
                   <div>
@@ -1423,5 +1423,4 @@ export function DiasporaProfile() {
     </div>
   );
 }
-
 
