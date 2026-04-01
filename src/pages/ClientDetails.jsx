@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
 import { clientAPI, paymentsAPI } from "../services/api";
-import { payWithCinetPay } from "../services/cinetpay";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import Modal from "../components/Modal";
@@ -53,6 +52,21 @@ export default function ClientDetails() {
 
   useEffect(() => { loadClient(); }, [id]);
 
+  // Gestion retour CinetPay après redirect
+  useEffect(() => {
+    const params  = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    const tx      = params.get("tx");
+    if (payment === "success") {
+      setPaySuccess(`✅ Paiement confirmé${tx ? ` — Réf : ${tx}` : ""}`);
+      window.history.replaceState({}, "", window.location.pathname);
+      loadClient();
+    } else if (payment === "failed") {
+      setPayError("❌ Paiement annulé ou refusé. Vous pouvez réessayer.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   async function handleEdit(e) {
     e.preventDefault();
     setEditError(""); setEditSaving(true);
@@ -72,46 +86,48 @@ export default function ClientDetails() {
     const amount = Number(payForm.amount);
 
     if (payForm.payment_method === "cinetpay") {
-      // 1. Pré-enregistrer la transaction
-      let txRef;
+      // Nouvelle intégration API v1 CinetPay — redirection
       try {
-        const { data } = await paymentsAPI.initPayment({
-          client_id: id,
-          amount,
-          type: payForm.type,
+        const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+        const token = localStorage.getItem("token");
+        const clientData = client?.client || {};
+        const txId = `AWJ-CLI-${Date.now()}`;
+
+        const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            amount,
+            transaction_id: txId,
+            description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${clientData.name || ""}`,
+            client_name:  clientData.name  || "Client",
+            client_email: clientData.email || "client@awoundjo.ci",
+            client_phone: clientData.phone || "",
+            client_id:    id,
+            type:         payForm.type,
+            success_url: `${window.location.origin}/clients/${id}?payment=success&tx=${txId}`,
+            failed_url:  `${window.location.origin}/clients/${id}?payment=failed`,
+          }),
         });
-        txRef = data.transaction_reference;
+
+        const data = await res.json();
+        const paymentUrl =
+          data?.data?.payment_url ||
+          data?.payment_url ||
+          null;
+
+        if (!paymentUrl) {
+          throw new Error(data?.error || "URL de paiement non reçue");
+        }
+
+        window.location.href = paymentUrl;
       } catch (err) {
-        setPayError(err.response?.data?.error || "Erreur initialisation paiement");
+        setPayError(err.message || "Erreur initialisation paiement CinetPay");
         setPaySaving(false);
-        return;
       }
-
-      // 2. Ouvrir le popup CinetPay
-      payWithCinetPay({
-  user: {
-    name:  client?.client?.name  || "",   // ✅
-    phone: client?.client?.phone || "",   // ✅
-    email: ""
-  },
-  amount,
-  description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${client?.client?.name || ""}`,
-  transactionId: txRef,
-
-        onSuccess: async (_, usedTxId) => {
-          setPaySaving(false);
-          try {
-            await paymentsAPI.confirmPayment({ transaction_reference: usedTxId });
-          } catch { /* webhook prendra le relais */ }
-          setPaySuccess(`✅ Paiement confirmé — Réf : ${usedTxId}`);
-          loadClient();
-        },
-
-        onError: ({ message }) => {
-          setPaySaving(false);
-          setPayError(message || "Paiement refusé ou annulé.");
-        },
-      });
 
     } else {
       // Cash — enregistrement direct
