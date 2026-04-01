@@ -10,6 +10,50 @@ import { getDiasporaData } from "../../diasporaApi";
 import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI } from "../../federationApi";
 import AdhesionForm from "../../components/AdhesionForm";
 
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+// ── Bouton paiement pour un membre non encore payé ───────────
+function PayButton({ ambassadorId }) {
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState(null);
+
+  async function handlePay() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("diaspora_token")}` },
+        body: JSON.stringify({
+          ambassador_id: ambassadorId,
+          amount:        15000,
+          currency:      "XOF",
+          description:   "Adhésion Awoundjô",
+          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
+      });
+      const data = await res.json();
+      const url = data?.data?.payment_url || data?.payment_url;
+      if (!url) throw new Error("URL de paiement non reçue");
+      window.location.href = url;
+    } catch (e) {
+      setError(e.message || "Erreur paiement");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
+      <button onClick={handlePay} disabled={loading}
+        style={{ background:"#D97706", color:"#fff", border:"none", borderRadius:8, padding:"6px 14px",
+                 fontWeight:700, fontSize:12, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
+        {loading ? "⏳ Redirection…" : "💳 Payer maintenant"}
+      </button>
+      {error && <span style={{ fontSize:11, color:"#DC2626" }}>{error}</span>}
+    </div>
+  );
+}
+
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF",
   green:   "#059669", greenL:  "#ECFDF5",
@@ -204,9 +248,12 @@ export function ReferralRegisterLeader() {
                   {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:C.blueL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
                 </div>
               </div>
-              <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-              </span>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+                {m.status_payment !== "paid" && <PayButton ambassadorId={m.id} />}
+              </div>
             </Card>
           ))}
         </div>
@@ -269,7 +316,12 @@ export function ReferralRegisterPasteur() {
                   {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.teal, background:C.tealL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
                 </div>
               </div>
-              <span style={{ background:C.tealL, color:C.teal, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>⛪ Pasteur</span>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+                {m.status_payment !== "paid" && <PayButton ambassadorId={m.id} />}
+              </div>
             </Card>
           ))}
         </div>
@@ -329,7 +381,12 @@ export function ReferralRegisterResponsable() {
                 <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{m.email} • {fmtDate(m.createdAt||m.created_at)}</p>
                 {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
               </div>
-              <span style={{ background:C.goldL, color:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>🤝 Responsable</span>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+                {m.status_payment !== "paid" && <PayButton ambassadorId={m.id} />}
+              </div>
             </Card>
           ))}
         </div>
