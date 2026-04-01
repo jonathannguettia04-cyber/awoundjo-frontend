@@ -476,13 +476,17 @@ export function DiasporaNewBeneficiary() {
     return (
       <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
         <Card style={{ textAlign:"center" }}>
-          <div style={{ fontSize:56, marginBottom:12 }}>✅</div>
-          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.dark }}>Client enregistré !</h2>
-          <div style={{ background:C.blueL, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
+          <div style={{ fontSize:56, marginBottom:12 }}>⏳</div>
+          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>
+            Compte créé — en attente de validation
+          </h2>
+          <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
             <p style={{ margin:"0 0 6px", fontSize:13, color:C.slate }}>Numéro mutualiste</p>
-            <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.blue, fontFamily:"monospace" }}>{success.mutual_number}</p>
+            <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
           </div>
-          <p style={{ fontSize:13, color:C.slate, marginBottom:20 }}>Ce numéro est la carte d'adhérent du client.</p>
+          <p style={{ fontSize:13, color:C.slate, marginBottom:20 }}>
+            Un administrateur doit valider ce compte avant que le client puisse effectuer son paiement d'adhésion.
+          </p>
           <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
             <Btn onClick={() => setSuccess(null)}>➕ Nouveau client</Btn>
             <Btn variant="outline" onClick={() => navigate("/diaspora/clients")}>Voir mes clients</Btn>

@@ -1,18 +1,19 @@
 // src/components/AdhesionForm.jsx
 // ─────────────────────────────────────────────────────────────
 //  Formulaire d'adhésion universel — Awoundjô
-//  Mode de paiement unique : CinetPay
 //
-//  Flux complet :
-//    [1] Infos personnelles
-//    [2] Choix du plan mensuel
-//    [3] Récapitulatif adhésion
-//    [4] → CinetPay redirection (15 000 FCFA frais d'adhésion)
-//    [5] → Retour return_url → création compte + credentials
+//  Workflow :
+//    [1] Infos personnelles + plan
+//    [2] Création compte → identifiants générés automatiquement
+//    [3] Affichage credentials → bouton paiement CinetPay
+//    [4] Paiement CinetPay (frais adhésion)
+//    [5] Validation admin → compte activé
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
-import { payWithCinetPay } from "../services/cinetpay";
 import { diasporaBeneAPI } from "../diasporaApi";
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const MEMBERSHIP_FEE = 15000;
 
 const C = {
   blue:    "#1B4FD8", blueL:  "#EEF2FF",
@@ -23,12 +24,9 @@ const C = {
   teal:    "#0D9488", tealL:  "#F0FDFA",
   slate:   "#64748B", dark:   "#0F172A",
   border:  "#E2E8F0", bg:     "#F8FAFC",
-  cinet:   "#0072C6", cinetL: "#EFF6FF",
 };
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
-
-const MEMBERSHIP_FEE = 15000;
 
 const PLANS = [
   { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  monthly:10000 },
@@ -86,10 +84,167 @@ function InputField({ label, type="text", placeholder, value, onChange, required
           type={type} placeholder={placeholder} value={value}
           onChange={onChange} required={required}
           style={baseStyle}
-          onFocus={e  => e.target.style.borderColor = C.blue}
-          onBlur={e   => e.target.style.borderColor = C.border}
+          onFocus={e => e.target.style.borderColor = C.blue}
+          onBlur={e  => e.target.style.borderColor = C.border}
         />
       )}
+    </div>
+  );
+}
+
+// ── Écran credentials + paiement CinetPay ────────────────────
+function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
+  const [copied,     setCopied]     = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
+
+  const text = `Identifiants ${roleLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
+
+  async function handlePay() {
+    setPayLoading(true);
+    setPayError("");
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ambassador_id:   ambassadorId,
+          amount:          MEMBERSHIP_FEE,
+          type:            "adhesion",
+          description:     `Adhésion Awoundjô — ${roleLabel}`,
+          return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url:      `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
+      });
+      const data = await res.json();
+      const url  = data?.data?.payment_url || data?.payment_url;
+      if (!url) throw new Error("URL de paiement non reçue du serveur");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
+      setPayLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* Étapes */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, flexWrap:"wrap" }}>
+        {[
+          { label:"Compte créé", done:true },
+          { label:"Paiement", done:false, active:true },
+          { label:"Validation admin", done:false },
+        ].map((s, i) => (
+          <div key={i} style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{
+              padding:"4px 12px", borderRadius:99, fontSize:11, fontWeight:700,
+              background: s.done ? C.greenL : s.active ? C.blueL : C.bg,
+              color:      s.done ? C.green  : s.active ? C.blue  : C.slate,
+              border:     `1.5px solid ${s.done ? C.green : s.active ? C.blue : C.border}`,
+            }}>
+              {s.done ? "✅ " : s.active ? "👉 " : ""}{s.label}
+            </div>
+            {i < 2 && <span style={{ color:C.border, fontSize:14 }}>→</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Credentials */}
+      <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", border:`1px solid ${C.border}` }}>
+        <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:800, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+          🔑 Identifiants de connexion générés
+        </p>
+        {[
+          { label:"Nom d'utilisateur",      value: credentials.username      },
+          { label:"Mot de passe temporaire", value: credentials.temp_password },
+        ].map(f => (
+          <div key={f.label} style={{ marginBottom:10 }}>
+            <p style={{ margin:"0 0 3px", fontSize:11, fontWeight:700, color:C.slate }}>{f.label}</p>
+            <p style={{ margin:0, fontSize:15, fontWeight:800, color:C.dark, fontFamily:"monospace", background:"#fff", padding:"7px 10px", borderRadius:6, border:`1px solid ${C.border}` }}>
+              {f.value}
+            </p>
+          </div>
+        ))}
+        <p style={{ margin:"8px 0 0", fontSize:11, color:C.red, fontWeight:600 }}>
+          ⚠️ Le mot de passe doit être changé à la première connexion
+        </p>
+      </div>
+
+      {/* Partage */}
+      <div style={{ display:"flex", gap:10 }}>
+        <button
+          onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+          style={{ flex:1, padding:"9px 0", background:C.blueL, color:C.blue, border:`1.5px solid ${C.blue}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}
+        >
+          {copied ? "✅ Copié !" : "📋 Copier les identifiants"}
+        </button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+          target="_blank" rel="noreferrer"
+          style={{ flex:1, padding:"9px 0", background:"#25D366", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}
+        >
+          📲 WhatsApp
+        </a>
+      </div>
+
+      {/* Paiement CinetPay */}
+      <div style={{ background:"#EFF6FF", border:"1.5px solid #0072C644", borderRadius:12, padding:"16px 18px" }}>
+        <p style={{ margin:"0 0 6px", fontSize:13, fontWeight:800, color:"#0072C6" }}>
+          💳 Étape suivante — Paiement des frais d'adhésion
+        </p>
+        <p style={{ margin:"0 0 14px", fontSize:12, color:C.slate }}>
+          Payez maintenant les frais d'adhésion de <strong>15 000 FCFA</strong> via CinetPay pour activer le processus de validation.
+        </p>
+        {payError && (
+          <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:12 }}>
+            <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
+          </div>
+        )}
+        <button
+          onClick={handlePay}
+          disabled={payLoading}
+          style={{
+            width:"100%", padding:"13px 0", borderRadius:10, border:"none",
+            background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+            color:"#fff", fontWeight:900, fontSize:14,
+            cursor: payLoading ? "not-allowed" : "pointer",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+            fontFamily:"inherit",
+          }}
+        >
+          {payLoading ? (
+            <>
+              <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+              Redirection…
+            </>
+          ) : (
+            <>💳 Payer 15 000 FCFA avec CinetPay</>
+          )}
+        </button>
+        <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
+          MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+        </p>
+      </div>
+
+      {/* Info validation */}
+      <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:10, padding:"12px 16px" }}>
+        <p style={{ margin:0, fontSize:12, color:C.gold, fontWeight:700 }}>
+          ⏳ Après paiement — validation admin requise
+        </p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:C.slate }}>
+          Un administrateur validera le compte. Le portail sera accessible après activation.
+        </p>
+      </div>
+
+      <button
+        onClick={onClose}
+        style={{ width:"100%", padding:"10px 0", background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}
+      >
+        Fermer (paiement plus tard)
+      </button>
     </div>
   );
 }
@@ -97,13 +252,15 @@ function InputField({ label, type="text", placeholder, value, onChange, required
 /**
  * AdhesionForm
  * @param {string}   targetRole - Rôle à créer
- * @param {function} onSuccess  - Appelé avec (credentials, roleLabel) après paiement + création
+ * @param {function} onSuccess  - Appelé avec (credentials, roleLabel) après création
  */
 export default function AdhesionForm({ targetRole, onSuccess }) {
   const rc = ROLE_CONFIG[targetRole] || ROLE_CONFIG.RECRUTEUR;
 
-  const [step,  setStep]  = useState("form");   // "form" | "payment" | "processing" | "done"
-  const [error, setError] = useState("");
+  const [step,          setStep]          = useState("form"); // "form" | "submitting" | "done"
+  const [error,         setError]         = useState("");
+  const [credentials,   setCredentials]   = useState(null);
+  const [ambassadorId,  setAmbassadorId]  = useState(null);
 
   const [form, setForm] = useState({
     name:    "",
@@ -127,55 +284,37 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
     return null;
   }
 
-  async function createAccount(txId) {
-    setStep("processing");
-    try {
-      const { data } = await diasporaBeneAPI.createAmbassador({
-        name:           form.name,
-        email:          form.email,
-        phone:          form.phone,
-        country:        form.country,
-        role:           targetRole,
-        plan:           form.plan,
-        payment_method: "cinetpay",
-        transaction_id: txId,
-        membership_fee: MEMBERSHIP_FEE,
-      });
-      setStep("done");
-      onSuccess?.(data.credentials, rc.art);
-    } catch (err) {
-      setError(err?.response?.data?.message || "Erreur lors de la création du compte.");
-      setStep("form");
-    }
-  }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
 
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
 
-    setStep("payment");
+    setStep("submitting");
+    try {
+      const { data } = await diasporaBeneAPI.createAmbassador({
+        name:    form.name,
+        email:   form.email,
+        phone:   form.phone,
+        country: form.country,
+        role:    targetRole,
+        plan:    form.plan,
+        // status_validation et status_payment = 'pending'/'unpaid' par défaut en DB
+      });
 
-    payWithCinetPay({
-      user: { name: form.name, email: form.email, phone: form.phone },
-      amount:      MEMBERSHIP_FEE,
-      description: `Adhésion Awoundjô - ${form.name} - ${rc.title}`,
-      onSuccess: (txId) => {
-        // La redirection a lieu — createAccount sera appelé au retour via return_url
-        // Pour les cas où le backend notifie avant la redirection, on peut aussi le déclencher ici
-        createAccount(txId);
-      },
-      onError: ({ message }) => {
-        setError(message || "Le paiement a échoué. Veuillez réessayer.");
-        setStep("form");
-      },
-    });
+      setCredentials(data.credentials);
+      setAmbassadorId(data.ambassador?.id || data.id);
+      setStep("done");
+      onSuccess?.(data.credentials, rc.art);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.response?.data?.message || "Erreur lors de la création du compte.");
+      setStep("form");
+    }
   }
 
-  // ── État : processing ──────────────────────────────────────────────────────
-  if (step === "processing") {
+  // ── État : submitting ──────────────────────────────────────
+  if (step === "submitting") {
     return (
       <div style={{ textAlign:"center", padding:"60px 20px" }}>
         <div style={{
@@ -186,15 +325,40 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <p style={{ fontWeight:800, fontSize:18, color:C.dark, margin:"0 0 8px" }}>
-          Création de votre compte…
+          Création du compte…
         </p>
         <p style={{ fontSize:13, color:C.slate, margin:0 }}>
-          Paiement confirmé. Génération des accès en cours.
+          Génération des identifiants et du numéro mutualiste en cours.
         </p>
       </div>
     );
   }
 
+  // ── État : done ────────────────────────────────────────────
+  if (step === "done" && credentials) {
+    return (
+      <div style={{
+        background:"#fff", borderRadius:16,
+        border:`1px solid ${C.border}`,
+        boxShadow:"0 4px 24px rgba(0,0,0,0.08)",
+        overflow:"hidden", maxWidth:540, margin:"0 auto",
+      }}>
+        <div style={{ padding:"18px 24px", background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`, color:"#fff" }}>
+          <p style={{ margin:"0 0 4px", fontSize:20 }}>{rc.icon}</p>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:900 }}>{rc.title}</h2>
+        </div>
+        <SuccessScreen
+          credentials={credentials}
+          ambassadorId={ambassadorId}
+          roleLabel={rc.art}
+          rc={rc}
+          onClose={() => { setStep("form"); setCredentials(null); setAmbassadorId(null); setForm({ name:"", email:"", phone:"", country:"Côte d'Ivoire", plan:"ESSENTIELLE" }); }}
+        />
+      </div>
+    );
+  }
+
+  // ── État : form ────────────────────────────────────────────
   return (
     <div style={{
       background:"#fff", borderRadius:16,
@@ -205,43 +369,38 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Header */}
-      <div style={{
-        padding:"20px 24px",
-        background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
-        color:"#fff",
-      }}>
+      <div style={{ padding:"20px 24px", background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`, color:"#fff" }}>
         <p style={{ margin:"0 0 4px", fontSize:22 }}>{rc.icon}</p>
         <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:900 }}>{rc.title}</h2>
         <p style={{ margin:0, fontSize:13, opacity:0.85 }}>
-          Frais d'adhésion uniques : <strong>{fmt(MEMBERSHIP_FEE)}</strong>
+          Le compte sera créé immédiatement. Le paiement sera effectué après validation admin.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} style={{ padding:"24px", display:"flex", flexDirection:"column", gap:24 }}>
 
-        {/* Erreur globale */}
         {error && (
           <div style={{ background:C.redL, border:`1px solid ${C.red}33`, borderRadius:10, padding:"12px 16px" }}>
             <p style={{ margin:0, fontSize:13, color:C.red, fontWeight:600 }}>⚠️ {error}</p>
           </div>
         )}
 
-        {/* ── Section 1 : Infos personnelles ─────────────────── */}
+        {/* Section 1 : Infos personnelles */}
         <div>
-          <SectionTitle step={1} label="Vos informations personnelles" color={rc.color} />
+          <SectionTitle step={1} label="Informations personnelles" color={rc.color} />
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <InputField label="Nom complet"          placeholder="Jean Koua"           value={form.name}    onChange={setField("name")}    required />
-            <InputField label="Email"                placeholder="jean@email.com"       value={form.email}   onChange={setField("email")}   required type="email" />
-            <InputField label="Téléphone WhatsApp"   placeholder="+225 07 00 00 00 00" value={form.phone}   onChange={setField("phone")}   required type="tel" />
-            <InputField label="Pays de résidence"    value={form.country}               onChange={setField("country")} as="select">
+            <InputField label="Nom complet"         placeholder="Jean Koua"           value={form.name}    onChange={setField("name")}    required />
+            <InputField label="Email"               placeholder="jean@email.com"       value={form.email}   onChange={setField("email")}   required type="email" />
+            <InputField label="Téléphone WhatsApp"  placeholder="+225 07 00 00 00 00" value={form.phone}   onChange={setField("phone")}   required type="tel" />
+            <InputField label="Pays de résidence"   value={form.country}               onChange={setField("country")} as="select">
               {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
             </InputField>
           </div>
         </div>
 
-        {/* ── Section 2 : Choix du plan mensuel ─────────────── */}
+        {/* Section 2 : Plan mensuel */}
         <div>
-          <SectionTitle step={2} label="Choisissez votre plan mensuel" color={rc.color} />
+          <SectionTitle step={2} label="Choisissez le plan mensuel" color={rc.color} />
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {PLANS.map(p => {
               const selected = form.plan === p.value;
@@ -282,17 +441,14 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
           </div>
         </div>
 
-        {/* ── Section 3 : Récapitulatif ──────────────────────── */}
+        {/* Section 3 : Récapitulatif */}
         <div>
-          <SectionTitle step={3} label="Récapitulatif de votre adhésion" color={rc.color} />
-          <div style={{
-            background:C.bg, borderRadius:12,
-            border:`1px solid ${C.border}`, overflow:"hidden",
-          }}>
+          <SectionTitle step={3} label="Récapitulatif" color={rc.color} />
+          <div style={{ background:C.bg, borderRadius:12, border:`1px solid ${C.border}`, overflow:"hidden" }}>
             {[
-              { label:"Frais d'adhésion (unique)",              value:fmt(MEMBERSHIP_FEE),                    highlight:false },
-              { label:`Plan mensuel — ${selectedPlan.label}`,   value:fmt(selectedPlan.monthly) + " / mois",  highlight:false },
-              { label:"À payer maintenant",                     value:fmt(MEMBERSHIP_FEE),                    highlight:true  },
+              { label:`Plan mensuel — ${selectedPlan.label}`, value:fmt(selectedPlan.monthly) + " / mois", highlight:false },
+              { label:"Frais d'adhésion (payés après validation)", value:"À définir", highlight:false },
+              { label:"À payer maintenant",                        value:"0 FCFA — après validation admin", highlight:true  },
             ].map((row, i) => (
               <div key={i} style={{
                 display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -303,65 +459,35 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
                 <p style={{ margin:0, fontSize:13, color:row.highlight ? rc.color : C.slate, fontWeight:row.highlight ? 700 : 400 }}>
                   {row.label}
                 </p>
-                <p style={{ margin:0, fontSize:row.highlight ? 16 : 14, fontWeight:row.highlight ? 900 : 600, color:row.highlight ? rc.color : C.dark }}>
+                <p style={{ margin:0, fontSize:row.highlight ? 14 : 14, fontWeight:row.highlight ? 900 : 600, color:row.highlight ? rc.color : C.dark }}>
                   {row.value}
                 </p>
               </div>
             ))}
           </div>
           <p style={{ margin:"8px 0 0", fontSize:12, color:C.slate }}>
-            💡 Le paiement mensuel de {fmt(selectedPlan.monthly)} démarre après activation du compte.
+            💡 Le paiement sera débloqué après validation du compte par un administrateur.
           </p>
         </div>
 
-        {/* ── Bloc CinetPay info ─────────────────────────────── */}
-        <div style={{
-          background: C.cinetL, border:`1.5px solid ${C.cinet}44`,
-          borderRadius:12, padding:"14px 16px",
-          display:"flex", alignItems:"flex-start", gap:12,
-        }}>
-          <span style={{ fontSize:22, flexShrink:0 }}>💳</span>
-          <div>
-            <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:C.cinet }}>
-              Paiement sécurisé via CinetPay
-            </p>
-            <p style={{ margin:0, fontSize:12, color:C.slate }}>
-              MTN Money · Orange Money · Moov Money · Wave · Carte bancaire
-            </p>
-          </div>
-        </div>
-
-        {/* ── Bouton de soumission ──────────────────────────── */}
+        {/* Bouton */}
         <button
           type="submit"
-          disabled={step === "payment"}
           style={{
             width:"100%", padding:"15px 20px", borderRadius:12, border:"none",
-            fontSize:15, fontWeight:900,
-            cursor: step === "payment" ? "not-allowed" : "pointer",
-            opacity: step === "payment" ? 0.75 : 1,
-            background: step === "payment"
-              ? "#94a3b8"
-              : `linear-gradient(135deg, ${C.cinet}, #005A9E)`,
+            fontSize:15, fontWeight:900, cursor:"pointer",
+            background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
             color:"#fff",
-            boxShadow: step === "payment" ? "none" : "0 6px 20px rgba(0,114,198,.35)",
+            boxShadow:`0 6px 20px ${rc.color}44`,
             display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-            transition:"all .2s",
-            fontFamily:"inherit",
+            transition:"all .2s", fontFamily:"inherit",
           }}
         >
-          {step === "payment" ? (
-            <>
-              <div style={{ width:18, height:18, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
-              Redirection vers CinetPay…
-            </>
-          ) : (
-            <>💳 Payer {fmt(MEMBERSHIP_FEE)} et créer {rc.art}</>
-          )}
+          ✅ Créer le compte {rc.art}
         </button>
 
         <p style={{ margin:"-12px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
-          🔒 Paiement sécurisé via CinetPay · Aucun compte créé avant confirmation du paiement
+          🔒 Les identifiants sont générés automatiquement · Paiement après validation admin
         </p>
 
       </form>
