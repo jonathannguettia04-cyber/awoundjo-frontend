@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -42,16 +42,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
 
-  const fetchStats = useCallback(() => {
+  useEffect(() => {
     setError("");
     setLoading(true);
     statsAPI.getStats()
       .then(({ data }) => setData(data))
       .catch(() => setError("Impossible de charger le tableau de bord"))
       .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  }, []); // ← une seule fois au montage
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -66,7 +64,14 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center">
         <p className="font-medium mb-3">{error}</p>
-        <button onClick={fetchStats}
+        <button onClick={() => {
+          setError("");
+          setLoading(true);
+          statsAPI.getStats()
+            .then(({ data }) => setData(data))
+            .catch(() => setError("Impossible de charger le tableau de bord"))
+            .finally(() => setLoading(false));
+        }}
           className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all">
           🔄 Réessayer
         </button>
