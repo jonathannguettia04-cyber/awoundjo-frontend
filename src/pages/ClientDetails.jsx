@@ -3,7 +3,6 @@ const handlePaySubmit = async (e) => {
   setPayError("");
   setPaySuccess(false);
 
-  // Vérification de sécurité : on s'assure que le montant est saisi
   if (!payForm.amount || isNaN(payForm.amount)) {
     setPayError("Veuillez saisir un montant valide.");
     return;
@@ -13,39 +12,49 @@ const handlePaySubmit = async (e) => {
 
   try {
     if (payForm.payment_method === 'cinetpay') {
-      // 1. Préparation des données pour CinetPay
-      // On s'assure d'envoyer des valeurs par défaut si client n'est pas encore chargé
       const payload = {
-        amount:         Number(payForm.amount),
-        client_id:      id, // l'ID du client provenant de useParams()
-        type:           payForm.type || "mensualite",
-        description:    `Paiement ${payForm.type} - ${client?.name || 'Client'}`,
-        client_name:    client?.name || "Membre Awoundjo",
-        client_email:   client?.email || "contact@awoundjo.ci",
-        client_phone:   client?.phone || ""
+        amount:       Number(payForm.amount),
+        client_id:    id,
+        type:         payForm.type || "mensualite",
+        description:  `Paiement ${payForm.type} - ${client?.name || 'Client'}`,
+        client_name:  client?.name  || "Membre Awoundjo",
+        client_email: client?.email || "contact@awoundjo.ci",
+        client_phone: client?.phone || ""
       };
 
       console.log("Envoi du paiement CinetPay:", payload);
 
-      // 2. Appel au backend Railway
-      // Note: Utilise bien ton instance axios 'clientAPI' ou 'api'
-      const response = await clientAPI.post('/payments/cinetpay/init-web', payload);
+      // Appel direct — évite le baseURL /api/client de clientAPI
+      const BASE  = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const token = localStorage.getItem("token");
 
-      // 3. Redirection si l'URL est reçue
-      if (response.data?.data?.payment_url) {
-        window.location.href = response.data.data.payment_url;
+      const res  = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:  `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      const paymentUrl = data?.data?.payment_url || data?.payment_url || null;
+
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
       } else {
-        throw new Error("Le serveur n'a pas renvoyé d'URL de paiement.");
+        throw new Error(data?.error || "Le serveur n'a pas renvoyé d'URL de paiement.");
       }
 
     } else {
-      // Logique pour le CASH (inchangée)
+      // Cash — inchangé
       await paymentsAPI.create({
         ...payForm,
         client_id: id,
         amount: Number(payForm.amount)
       });
-      
+
       setPaySuccess(true);
       setTimeout(() => {
         handleClosePayModal();
