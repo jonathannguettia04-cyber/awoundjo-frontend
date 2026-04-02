@@ -105,7 +105,7 @@ export default function ClientDetails() {
             description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${clientData.name || ""}`,
             client_name:  clientData.name  || "Client",
             client_email: clientData.email || "client@awoundjo.ci",
-            client_phone: clientData.phone || "",
+            // client_phone omis — format non garanti, backend gère la normalisation
             client_id:    id,
             type:         payForm.type,
             success_url: `${window.location.origin}/clients/${id}?ps=1&tx=${txId}`,
