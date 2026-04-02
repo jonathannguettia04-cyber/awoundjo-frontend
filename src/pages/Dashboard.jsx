@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -42,12 +42,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
 
-  useEffect(() => {
+  const fetchStats = useCallback(() => {
+    setError("");
+    setLoading(true);
     statsAPI.getStats()
       .then(({ data }) => setData(data))
       .catch(() => setError("Impossible de charger le tableau de bord"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -62,24 +66,24 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center">
         <p className="font-medium mb-3">{error}</p>
-        <button
-          onClick={() => {
-            setError("");
-            setLoading(true);
-            statsAPI.getStats()
-              .then(({ data }) => setData(data))
-              .catch(() => setError("Impossible de charger le tableau de bord"))
-              .finally(() => setLoading(false));
-          }}
-          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all"
-        >
+        <button onClick={fetchStats}
+          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all">
           🔄 Réessayer
         </button>
       </div>
     </div>
   );
 
-  const { clients: cs, payments: ps, top_agents, last_clients, last_payments, evolution = [] } = data;
+  // FIX : destructuring défensif — valeurs par défaut sur chaque champ
+  // évite les TypeError si l'API renvoie une réponse partielle
+  const {
+    clients:       cs            = {},
+    payments:      ps            = {},
+    top_agents                   = [],
+    last_clients                 = [],
+    last_payments                = [],
+    evolution                    = [],
+  } = data ?? {};
 
   const now   = new Date();
   const heure = now.getHours();
@@ -118,10 +122,10 @@ export default function Dashboard() {
           <Link to="/payments" className="text-xs text-brand-500 hover:underline font-medium">Voir les paiements →</Link>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard label="Revenu total" value={fmt(ps.total_revenue)} icon="💰" color="success" sub={`${ps.total_payments} paiements`} to="/payments" />
-          <StatsCard label="Aujourd'hui" value={fmt(ps.today_revenue)} icon="📅" color="brand" sub={`${ps.today_payments} paiements`} to="/payments" />
-          <StatsCard label="Adhésions" value={fmt(ps.adhesions_revenue)} icon="📋" color="purple" to="/payments" />
-          <StatsCard label="Mensualités" value={fmt(ps.mensualites_revenue)} icon="🔄" color="teal" to="/payments" />
+          <StatsCard label="Revenu total"  value={fmt(ps.total_revenue)}      icon="💰" color="success" sub={`${ps.total_payments ?? 0} paiements`} to="/payments" />
+          <StatsCard label="Aujourd'hui"   value={fmt(ps.today_revenue)}      icon="📅" color="brand"   sub={`${ps.today_payments ?? 0} paiements`} to="/payments" />
+          <StatsCard label="Adhésions"     value={fmt(ps.adhesions_revenue)}  icon="📋" color="purple"  to="/payments" />
+          <StatsCard label="Mensualités"   value={fmt(ps.mensualites_revenue)} icon="🔄" color="teal"   to="/payments" />
         </div>
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/payments")}>
@@ -149,27 +153,27 @@ export default function Dashboard() {
           <Link to="/clients" className="text-xs text-brand-500 hover:underline font-medium">Voir tous →</Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatsCard label="Total"       value={cs.total_clients}    icon="👥" color="brand"   to="/clients" />
-          <StatsCard label="Actifs"      value={cs.active}           icon="✅" color="success" to="/clients?status=actif" />
-          <StatsCard label="En attente"  value={cs.pending}          icon="⏳" color="warning" to="/clients?status=attente" />
-          <StatsCard label="Essentielle" value={cs.plan_essentielle} icon="🌱" color="brand"   to="/clients?plan=ESSENTIELLE" />
-          <StatsCard label="Ivoirienne"  value={cs.plan_ivoirienne}  icon="🌿" color="purple"  to="/clients?plan=IVOIRIENNE" />
-          <StatsCard label="Turquoise"   value={cs.plan_turquoise}   icon="💎" color="teal"    to="/clients?plan=TURQUOISE" />
+          <StatsCard label="Total"        value={cs.total_clients  ?? 0} icon="👥" color="slate"   to="/clients" />
+          <StatsCard label="Actifs"       value={cs.actifs         ?? 0} icon="✅" color="success" to="/clients?status=actif" />
+          <StatsCard label="En attente"   value={cs.attente        ?? 0} icon="⏳" color="warning" to="/clients?status=attente" />
+          <StatsCard label="Essentielle"  value={cs.plan_essentielle ?? 0} icon="🌱" color="brand"   to="/clients?plan=ESSENTIELLE" />
+          <StatsCard label="Ivoirienne"   value={cs.plan_ivoirienne  ?? 0} icon="🌿" color="purple"  to="/clients?plan=IVOIRIENNE" />
+          <StatsCard label="Turquoise"    value={cs.plan_turquoise   ?? 0} icon="💎" color="teal"    to="/clients?plan=TURQUOISE" />
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 p-5 mt-4">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Répartition par formule</p>
           <div className="space-y-3">
             {[
-              { label: "Essentielle", value: Number(cs.plan_essentielle), color: "bg-brand-500", text: "text-brand-600" },
-              { label: "Ivoirienne",  value: Number(cs.plan_ivoirienne),  color: "bg-purple-500", text: "text-purple-600" },
-              { label: "Turquoise",   value: Number(cs.plan_turquoise),   color: "bg-teal-500",   text: "text-teal-600" },
+              { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "bg-brand-500",  text: "text-brand-600" },
+              { label: "Ivoirienne",  value: Number(cs.plan_ivoirienne  ?? 0), color: "bg-purple-500", text: "text-purple-600" },
+              { label: "Turquoise",   value: Number(cs.plan_turquoise   ?? 0), color: "bg-teal-500",   text: "text-teal-600" },
             ].map((item) => (
               <div key={item.label}>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span className="font-medium text-slate-700">{item.label}</span>
                   <span className={`font-bold ${item.text}`}>{item.value} clients</span>
                 </div>
-                <ProgressBar value={item.value} max={Number(cs.total_clients)} color={item.color} />
+                <ProgressBar value={item.value} max={Number(cs.total_clients ?? 0)} color={item.color} />
               </div>
             ))}
           </div>

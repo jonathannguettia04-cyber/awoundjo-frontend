@@ -44,6 +44,7 @@ export default function ClientReseau() {
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>
         Réseau de Soins

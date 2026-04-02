@@ -7,11 +7,16 @@
 //  Auth partagée via DiasporaAuth + même token JWT
 // ─────────────────────────────────────────────────────────────
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
 
 import Navbar from "./components/Navbar";
+
+// ── Helper localStorage sécurisé (mobile / iOS privé) ────────
+function safeLocalStorage(method, ...args) {
+  try { return localStorage[method](...args); } catch { return null; }
+}
 
 // ── Pages AGENT ──────────────────────────────────────────────
 const Login               = lazy(() => import("./pages/Login"));
@@ -29,7 +34,6 @@ const AdminProviders      = lazy(() => import("./pages/AdminProviders"));
 // ── Pages ADMIN ambassadeurs ─────────────────────────────────
 const AdminDiaspora       = lazy(() => import("./pages/AdminDiaspora"));
 const AdminFederation     = lazy(() => import("./pages/AdminFederation"));
-// Nouvelle page admin : gestion des credentials des deux réseaux
 const AdminCredentials    = lazy(() => import("./pages/AdminCredentials"));
 
 // ── Pages CLIENT ─────────────────────────────────────────────
@@ -61,11 +65,9 @@ const DiasporaLayout      = lazy(() =>
 const DiasporaDashboard   = lazy(() => import("./pages/diaspora/DiasporaDashboard"));
 const DiasporaProfile     = lazy(() => import("./pages/diaspora/DiasporaProfile"));
 
-// Helper : importe un export nommé de DiasporaPages
 const diasporaPage = (name) =>
   lazy(() => import("./pages/diaspora/DiasporaPages").then(m => ({ default: m[name] })));
 
-// Pages communes à tous les rôles Diaspora
 const DiasporaPayments          = diasporaPage("DiasporaPayments");
 const DiasporaNewPayment        = diasporaPage("DiasporaNewPayment");
 const DiasporaEarnings          = diasporaPage("DiasporaEarnings");
@@ -74,52 +76,36 @@ const DiasporaNetwork           = diasporaPage("DiasporaNetwork");
 const DiasporaLeaderboard       = diasporaPage("DiasporaLeaderboard");
 const DiasporaNotifications     = diasporaPage("DiasporaNotifications");
 const DiasporaRewards           = diasporaPage("DiasporaRewards");
-
-// Pages spécifiques AMBASSADEUR_DIASPORA
 const DiasporaRegisterPays      = diasporaPage("DiasporaRegisterPays");
 const DiasporaRegisterRUM       = diasporaPage("DiasporaRegisterRUM");
-
-// Pages spécifiques AMBASSADEUR_PAYS
 const DiasporaRegisterRecruiter = diasporaPage("DiasporaRegisterRecruiter");
+const DiasporaBeneficiaries     = diasporaPage("DiasporaBeneficiaries");
+const DiasporaNewBeneficiary    = diasporaPage("DiasporaNewBeneficiary");
+const DiasporaCards             = diasporaPage("DiasporaCards");
 
-// Pages spécifiques RECRUTEUR
-const DiasporaBeneficiaries     = diasporaPage("DiasporaBeneficiaries");   // liste clients
-const DiasporaNewBeneficiary    = diasporaPage("DiasporaNewBeneficiary");  // enregistrer client
-const DiasporaCards             = diasporaPage("DiasporaCards");           // cartes vendues
-
-// ── Pages REFERRAL (Réseau Parrainage) ───────────────────────
+// ── Pages REFERRAL ───────────────────────────────────────────
 const FederationLayout    = lazy(() =>
   import("./pages/federation/FederationDashboard").then(m => ({ default: m.FederationLayout }))
 );
 const FederationDashboard = lazy(() => import("./pages/federation/FederationDashboard"));
 
-// Helper : importe un export nommé de ReferralPages
 const referralPage = (name) =>
   lazy(() => import("./pages/federation/ReferralPages").then(m => ({ default: m[name] })));
 
-// Pages communes réseau Parrainage
-const ReferralPayments          = referralPage("ReferralPayments");
-const ReferralEarnings          = referralPage("ReferralEarnings");
-const ReferralNetwork           = referralPage("ReferralNetwork");
-const ReferralLeaderboard       = referralPage("ReferralLeaderboard");
-const ReferralNotifications     = referralPage("ReferralNotifications");
-const ReferralReferral          = referralPage("ReferralReferral");
-const ReferralRewards           = referralPage("ReferralRewards");
-const ReferralProfile           = referralPage("ReferralProfile");
-
-// Pages spécifiques RUM
-const ReferralRegisterLeader    = referralPage("ReferralRegisterLeader");
-
-// Pages spécifiques LEADER
-const ReferralRegisterPasteur   = referralPage("ReferralRegisterPasteur");
-
-// Pages spécifiques PASTEUR
+const ReferralPayments            = referralPage("ReferralPayments");
+const ReferralEarnings            = referralPage("ReferralEarnings");
+const ReferralNetwork             = referralPage("ReferralNetwork");
+const ReferralLeaderboard         = referralPage("ReferralLeaderboard");
+const ReferralNotifications       = referralPage("ReferralNotifications");
+const ReferralReferral            = referralPage("ReferralReferral");
+const ReferralRewards             = referralPage("ReferralRewards");
+const ReferralProfile             = referralPage("ReferralProfile");
+const ReferralRegisterLeader      = referralPage("ReferralRegisterLeader");
+const ReferralRegisterPasteur     = referralPage("ReferralRegisterPasteur");
 const ReferralRegisterResponsable = referralPage("ReferralRegisterResponsable");
-
-// Pages spécifiques RESPONSABLE / PASTEUR (clients + cartes)
-const ReferralRegisterClient    = referralPage("ReferralRegisterClient");
-const ReferralClients           = referralPage("ReferralClients");
-const ReferralCards             = referralPage("ReferralCards");
+const ReferralRegisterClient      = referralPage("ReferralRegisterClient");
+const ReferralClients             = referralPage("ReferralClients");
+const ReferralCards               = referralPage("ReferralCards");
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
@@ -134,7 +120,7 @@ function PageLoader() {
 }
 
 // ── Guards ───────────────────────────────────────────────────
-const AGENT_ROLES = ["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"];
+const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user } = useAuth();
@@ -145,13 +131,15 @@ function ProtectedRoute({ children, allowedRoles = null }) {
 }
 
 function ClientRoute({ children }) {
-  const token = localStorage.getItem("client_token");
+  // FIX : localStorage wrappé — ne crashe plus sur iOS privé / WebView Android
+  const token = safeLocalStorage("getItem", "client_token");
   if (!token) return <Navigate to="/client/login" replace />;
   return children;
 }
 
 function ProviderRoute({ children }) {
-  const token = localStorage.getItem("provider_token");
+  // FIX : idem
+  const token = safeLocalStorage("getItem", "provider_token");
   if (!token) return <Navigate to="/etablissement/login" replace />;
   return children;
 }
@@ -159,8 +147,9 @@ function ProviderRoute({ children }) {
 // Guard partagé Diaspora + Referral — même token JWT
 function DiasporaGuard({ children }) {
   if (!isDiasporaTokenValid()) {
-    localStorage.removeItem("diaspora_token");
-    localStorage.removeItem("diaspora_data");
+    // FIX : localStorage wrappé
+    safeLocalStorage("removeItem", "diaspora_token");
+    safeLocalStorage("removeItem", "diaspora_data");
     return <Navigate to="/diaspora/login" replace />;
   }
   return children;
@@ -169,12 +158,14 @@ function DiasporaGuard({ children }) {
 // ── App ──────────────────────────────────────────────────────
 export default function App() {
   const { user } = useAuth();
-  const path = window.location.pathname;
+  // FIX : useLocation() au lieu de window.location.pathname
+  //       → se met à jour à chaque navigation SPA sans re-render manqué
+  const { pathname } = useLocation();
 
-  const isClientPage    = path.startsWith("/client");
-  const isProviderPage  = path.startsWith("/etablissement");
-  const isDiasporaPage  = path.startsWith("/diaspora");
-  const isReferralPage  = path.startsWith("/referral");
+  const isClientPage   = pathname.startsWith("/client");
+  const isProviderPage = pathname.startsWith("/etablissement");
+  const isDiasporaPage = pathname.startsWith("/diaspora");
+  const isReferralPage = pathname.startsWith("/referral");
   const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage;
 
   return (
@@ -199,22 +190,22 @@ export default function App() {
               <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
             } />
             <Route path="/payments" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
             } />
             <Route path="/commissions" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
             } />
             <Route path="/groups" element={
-              <ProtectedRoute allowedRoles={["ADMIN","AGENT","RESPONSABLE_COMMERCIAL","CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
             } />
             <Route path="/agents" element={
-              <ProtectedRoute allowedRoles={["ADMIN","RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
             } />
             <Route path="/healthcare" element={
-              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN","CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}
@@ -224,7 +215,6 @@ export default function App() {
             <Route path="/admin/federation" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminFederation /></ProtectedRoute>
             } />
-            {/* Nouvelle page admin : voir/reset credentials tous réseaux */}
             <Route path="/admin/credentials" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminCredentials /></ProtectedRoute>
             } />
@@ -261,87 +251,58 @@ export default function App() {
 
             {/* ═══════════════════════════════════════════════
                 RÉSEAU DIASPORA
-                Auth partagée : /diaspora/login
-                Guard : DiasporaGuard (token JWT valide)
             ══════════════════════════════════════════════════*/}
             <Route path="/diaspora/login" element={<DiasporaAuth />} />
             <Route path="/diaspora" element={<DiasporaGuard><DiasporaLayout /></DiasporaGuard>}>
               <Route index element={<Navigate to="/diaspora/dashboard" replace />} />
-              <Route path="dashboard" element={<DiasporaDashboard />} />
-
-              {/* ── AMBASSADEUR_DIASPORA : enregistre Ambassadeurs Pays ── */}
-              <Route path="register-pays"     element={<DiasporaRegisterPays />} />
-              <Route path="register-pays/new" element={<DiasporaRegisterPays />} />
-
-              {/* ── AMBASSADEUR_DIASPORA : enregistre RUM (tête du réseau Parrainage) ── */}
-              <Route path="register-rum"      element={<DiasporaRegisterRUM />} />
-              <Route path="register-rum/new"  element={<DiasporaRegisterRUM />} />
-
-              {/* ── AMBASSADEUR_PAYS : enregistre Recruteurs ── */}
+              <Route path="dashboard"              element={<DiasporaDashboard />} />
+              <Route path="register-pays"          element={<DiasporaRegisterPays />} />
+              <Route path="register-pays/new"      element={<DiasporaRegisterPays />} />
+              <Route path="register-rum"           element={<DiasporaRegisterRUM />} />
+              <Route path="register-rum/new"       element={<DiasporaRegisterRUM />} />
               <Route path="register-recruiter"     element={<DiasporaRegisterRecruiter />} />
               <Route path="register-recruiter/new" element={<DiasporaRegisterRecruiter />} />
-
-              {/* ── RECRUTEUR : enregistre Clients ── */}
-              <Route path="clients"     element={<DiasporaBeneficiaries />} />
-              <Route path="clients/new" element={<DiasporaNewBeneficiary />} />
-              {/* Alias legacy pour compatibilité */}
-              <Route path="beneficiaries"     element={<DiasporaBeneficiaries />} />
-              <Route path="beneficiaries/new" element={<DiasporaNewBeneficiary />} />
-
-              {/* ── RECRUTEUR : cartes vendues ── */}
-              <Route path="cards"     element={<DiasporaCards />} />
-              <Route path="cards/new" element={<DiasporaNewBeneficiary />} />
-
-              {/* ── Commun tous rôles Diaspora ── */}
-              <Route path="payments"      element={<DiasporaPayments />} />
-              <Route path="payments/new"  element={<DiasporaNewPayment />} />
-              <Route path="earnings"      element={<DiasporaEarnings />} />
-              <Route path="rewards"       element={<DiasporaRewards />} />
-              <Route path="referral"      element={<DiasporaReferral />} />
-              <Route path="network"       element={<DiasporaNetwork />} />
-              <Route path="leaderboard"   element={<DiasporaLeaderboard />} />
-              <Route path="notifications" element={<DiasporaNotifications />} />
-              <Route path="profile"       element={<DiasporaProfile />} />
+              <Route path="clients"                element={<DiasporaBeneficiaries />} />
+              <Route path="clients/new"            element={<DiasporaNewBeneficiary />} />
+              <Route path="beneficiaries"          element={<DiasporaBeneficiaries />} />
+              <Route path="beneficiaries/new"      element={<DiasporaNewBeneficiary />} />
+              <Route path="cards"                  element={<DiasporaCards />} />
+              <Route path="cards/new"              element={<DiasporaNewBeneficiary />} />
+              <Route path="payments"               element={<DiasporaPayments />} />
+              <Route path="payments/new"           element={<DiasporaNewPayment />} />
+              <Route path="earnings"               element={<DiasporaEarnings />} />
+              <Route path="rewards"                element={<DiasporaRewards />} />
+              <Route path="referral"               element={<DiasporaReferral />} />
+              <Route path="network"                element={<DiasporaNetwork />} />
+              <Route path="leaderboard"            element={<DiasporaLeaderboard />} />
+              <Route path="notifications"          element={<DiasporaNotifications />} />
+              <Route path="profile"                element={<DiasporaProfile />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════
                 RÉSEAU PARRAINAGE (REFERRAL)
-                Même login : /diaspora/login
-                Guard : DiasporaGuard (même token JWT)
             ══════════════════════════════════════════════════*/}
             <Route path="/referral" element={<DiasporaGuard><FederationLayout /></DiasporaGuard>}>
               <Route index element={<Navigate to="/referral/dashboard" replace />} />
-              <Route path="dashboard" element={<FederationDashboard />} />
-
-              {/* ── RUM : enregistre Leaders ── */}
-              <Route path="register-leader"     element={<ReferralRegisterLeader />} />
-              <Route path="register-leader/new" element={<ReferralRegisterLeader />} />
-
-              {/* ── LEADER : enregistre Pasteurs ── */}
-              <Route path="register-pasteur"     element={<ReferralRegisterPasteur />} />
-              <Route path="register-pasteur/new" element={<ReferralRegisterPasteur />} />
-
-              {/* ── PASTEUR : enregistre Responsables ── */}
-              <Route path="register-responsable"     element={<ReferralRegisterResponsable />} />
-              <Route path="register-responsable/new" element={<ReferralRegisterResponsable />} />
-
-              {/* ── PASTEUR / RESPONSABLE : enregistre Clients ── */}
-              <Route path="clients"     element={<ReferralClients />} />
-              <Route path="clients/new" element={<ReferralRegisterClient />} />
-
-              {/* ── PASTEUR / RESPONSABLE : cartes vendues ── */}
-              <Route path="cards"     element={<ReferralCards />} />
-              <Route path="cards/new" element={<ReferralRegisterClient />} />
-
-              {/* ── Commun tous rôles Referral ── */}
-              <Route path="payments"      element={<ReferralPayments />} />
-              <Route path="earnings"      element={<ReferralEarnings />} />
-              <Route path="rewards"       element={<ReferralRewards />} />
-              <Route path="referral"      element={<ReferralReferral />} />
-              <Route path="network"       element={<ReferralNetwork />} />
-              <Route path="leaderboard"   element={<ReferralLeaderboard />} />
-              <Route path="notifications" element={<ReferralNotifications />} />
-              <Route path="profile"       element={<ReferralProfile />} />
+              <Route path="dashboard"                  element={<FederationDashboard />} />
+              <Route path="register-leader"            element={<ReferralRegisterLeader />} />
+              <Route path="register-leader/new"        element={<ReferralRegisterLeader />} />
+              <Route path="register-pasteur"           element={<ReferralRegisterPasteur />} />
+              <Route path="register-pasteur/new"       element={<ReferralRegisterPasteur />} />
+              <Route path="register-responsable"       element={<ReferralRegisterResponsable />} />
+              <Route path="register-responsable/new"   element={<ReferralRegisterResponsable />} />
+              <Route path="clients"                    element={<ReferralClients />} />
+              <Route path="clients/new"                element={<ReferralRegisterClient />} />
+              <Route path="cards"                      element={<ReferralCards />} />
+              <Route path="cards/new"                  element={<ReferralRegisterClient />} />
+              <Route path="payments"                   element={<ReferralPayments />} />
+              <Route path="earnings"                   element={<ReferralEarnings />} />
+              <Route path="rewards"                    element={<ReferralRewards />} />
+              <Route path="referral"                   element={<ReferralReferral />} />
+              <Route path="network"                    element={<ReferralNetwork />} />
+              <Route path="leaderboard"                element={<ReferralLeaderboard />} />
+              <Route path="notifications"              element={<ReferralNotifications />} />
+              <Route path="profile"                    element={<ReferralProfile />} />
             </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}
