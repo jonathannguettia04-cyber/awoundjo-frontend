@@ -2,19 +2,30 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientDepsAPI } from "../../clientApi";
+import { uploadFile } from "../../supabaseClient";
 
 const EMPTY_SPOUSE = { type: "spouse", name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 const EMPTY_CHILD  = { type: "child",  name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 
 export default function ClientFamille() {
   const navigate = useNavigate();
-  const [deps, setDeps]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal]     = useState(null); // "spouse" | "child" | null
-  const [form, setForm]       = useState(EMPTY_SPOUSE);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState("");
-  const [success, setSuccess] = useState("");
+  const [deps, setDeps]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [modal, setModal]       = useState(null);
+  const [form, setForm]         = useState(EMPTY_SPOUSE);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState("");
+
+  // Fichiers bruts (File objects) pour upload Supabase
+  const [photoFile, setPhotoFile] = useState(null);
+  const [pieceFile, setPieceFile] = useState(null);
+  // Previews locaux (URL.createObjectURL)
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [pieceReady,   setPieceReady]   = useState(false);
+  // État upload
+  const [uploading, setUploading] = useState(false);
+
   const photoRef = useRef();
   const pieceRef = useRef();
 
@@ -32,27 +43,46 @@ export default function ClientFamille() {
 
   const openModal = (type) => {
     setForm(type === "spouse" ? { ...EMPTY_SPOUSE } : { ...EMPTY_CHILD });
+    setPhotoFile(null);
+    setPieceFile(null);
+    setPhotoPreview(null);
+    setPieceReady(false);
     setError("");
     setModal(type);
   };
 
-  const toBase64 = (file) => new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-
-  const handleFile = async (key, file) => {
+  const handlePhotoChange = (file) => {
     if (!file) return;
-    const b64 = await toBase64(file);
-    setForm(f => ({ ...f, [key]: b64 }));
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handlePieceChange = (file) => {
+    if (!file) return;
+    setPieceFile(file);
+    setPieceReady(true);
   };
 
   const handleAdd = async () => {
     if (!form.name || !form.firstname) return setError("Nom et prénom requis");
-    setError(""); setSaving(true);
+    setError("");
+    setSaving(true);
+    setUploading(true);
+
     try {
+      // ── Upload vers Supabase Storage (plus de base64) ──────────
+      const [photoUrl, pieceUrl] = await Promise.all([
+        photoFile ? uploadFile(photoFile, "photos") : Promise.resolve(null),
+        pieceFile ? uploadFile(pieceFile, "pieces") : Promise.resolve(null),
+      ]);
+      setUploading(false);
+
+      if (photoFile && !photoUrl)
+        return setError("Échec de l'upload de la photo. Réessayez.");
+      if (pieceFile && !pieceUrl)
+        return setError("Échec de l'upload du document. Réessayez.");
+
+      // ── Envoi au backend — uniquement des URLs, plus de base64 ─
       await clientDepsAPI.add({
         type:              form.type,
         name:              form.name,
@@ -60,15 +90,22 @@ export default function ClientFamille() {
         birth_date:        form.birth_date,
         birth_place:       form.birth_place,
         identity_document: form.identity_document,
-        photo:             form.photo,
-        piece:             form.piece,
+        photo:             photoUrl,
+        piece:             pieceUrl,
       });
+
       setSuccess(`${form.type === "spouse" ? "Conjoint(e)" : "Enfant"} ajouté(e) !`);
       setModal(null);
       load();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (err) { setError(err.response?.data?.error || "Erreur"); }
-    finally { setSaving(false); }
+
+    } catch (err) {
+      setUploading(false);
+      const msg = err.response?.data?.error || err.message || "Erreur lors de l'enregistrement";
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -78,6 +115,8 @@ export default function ClientFamille() {
   };
 
   if (loading) return <Skeleton />;
+
+  const isBusy = saving || uploading;
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
@@ -125,11 +164,11 @@ export default function ClientFamille() {
       {/* ── Modal ── */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
-          onClick={() => setModal(null)}>
+          onClick={() => !isBusy && setModal(null)}>
           <div style={{ background: "#fff", borderRadius: "28px 28px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Header modal */}
+            {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
@@ -139,20 +178,25 @@ export default function ClientFamille() {
                   {modal === "spouse" ? "1 conjoint maximum" : `${children.length}/3 enfants`}
                 </p>
               </div>
-              <button onClick={() => setModal(null)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              <button onClick={() => !isBusy && setModal(null)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
 
-            {error && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
+            {error && (
+              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>
+                ⚠️ {error}
+              </div>
+            )}
 
             {/* Photo d'identité */}
             <div style={{ marginBottom: 20 }}>
               <label style={ls.label}>📸 Photo d'identité</label>
-              <div onClick={() => photoRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "16px", textAlign: "center", cursor: "pointer", background: form.photo ? "#F0FDF4" : "#F8FAFC", transition: "all .2s" }}>
-                {form.photo
-                  ? <img src={form.photo} alt="photo" style={{ width: 80, height: 80, borderRadius: 12, objectFit: "cover", margin: "0 auto" }} />
+              <div onClick={() => photoRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "16px", textAlign: "center", cursor: "pointer", background: photoPreview ? "#F0FDF4" : "#F8FAFC", transition: "all .2s" }}>
+                {photoPreview
+                  ? <img src={photoPreview} alt="photo" style={{ width: 80, height: 80, borderRadius: 12, objectFit: "cover", margin: "0 auto" }} />
                   : <div><span style={{ fontSize: 32 }}>📷</span><p style={{ color: "#94A3B8", fontSize: 12, margin: "8px 0 0" }}>Cliquez pour importer</p></div>}
               </div>
-              <input ref={photoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleFile("photo", e.target.files[0])} />
+              <input ref={photoRef} type="file" accept="image/*" style={{ display: "none" }}
+                onChange={e => handlePhotoChange(e.target.files[0])} />
             </div>
 
             {/* Champs identité */}
@@ -178,20 +222,22 @@ export default function ClientFamille() {
             {/* Pièce justificative */}
             <div style={{ marginBottom: 24 }}>
               <label style={ls.label}>{modal === "spouse" ? "📄 CNI / Passeport (scan)" : "📄 Extrait de naissance (scan)"}</label>
-              <div onClick={() => pieceRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: form.piece ? "#EFF6FF" : "#F8FAFC" }}>
-                <span style={{ fontSize: 28 }}>{form.piece ? "✅" : "📎"}</span>
+              <div onClick={() => pieceRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: pieceReady ? "#EFF6FF" : "#F8FAFC" }}>
+                <span style={{ fontSize: 28 }}>{pieceReady ? "✅" : "📎"}</span>
                 <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: form.piece ? "#1D4ED8" : "#475569" }}>
-                    {form.piece ? "Document importé ✓" : "Importer le document"}
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: pieceReady ? "#1D4ED8" : "#475569" }}>
+                    {pieceReady ? "Document prêt ✓" : "Importer le document"}
                   </p>
                   <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94A3B8" }}>JPG, PNG ou PDF</p>
                 </div>
               </div>
-              <input ref={pieceRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={e => handleFile("piece", e.target.files[0])} />
+              <input ref={pieceRef} type="file" accept="image/*,.pdf" style={{ display: "none" }}
+                onChange={e => handlePieceChange(e.target.files[0])} />
             </div>
 
-            <button onClick={handleAdd} disabled={saving} style={{ width: "100%", background: modal === "spouse" ? "linear-gradient(135deg,#DB2777,#9D174D)" : "linear-gradient(135deg,#059669,#065F46)", color: "#fff", border: "none", borderRadius: 14, padding: 16, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.2)" }}>
-              {saving ? "⏳ Enregistrement..." : `✅ Enregistrer ${modal === "spouse" ? "le conjoint" : "l'enfant"}`}
+            {/* Bouton enregistrer */}
+            <button onClick={handleAdd} disabled={isBusy} style={{ width: "100%", background: isBusy ? "#94A3B8" : modal === "spouse" ? "linear-gradient(135deg,#DB2777,#9D174D)" : "linear-gradient(135deg,#059669,#065F46)", color: "#fff", border: "none", borderRadius: 14, padding: 16, fontSize: 15, fontWeight: 700, cursor: isBusy ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.2)", transition: "background .2s" }}>
+              {uploading ? "⬆️ Upload en cours..." : saving ? "⏳ Enregistrement..." : `✅ Enregistrer ${modal === "spouse" ? "le conjoint" : "l'enfant"}`}
             </button>
           </div>
         </div>
@@ -226,7 +272,7 @@ function SectionHeader({ title, icon, color, canAdd, onAdd }) {
 
 function EmptyCard({ icon, text, color, onAdd }) {
   return (
-    <div onClick={onAdd} style={{ background: "#fff", borderRadius: 16, padding: "28px 20px", textAlign: "center", border: "2px dashed #E2E8F0", marginBottom: 8, cursor: "pointer", transition: "border-color .2s" }}
+    <div onClick={onAdd} style={{ background: "#fff", borderRadius: 16, padding: "28px 20px", textAlign: "center", border: "2px dashed #E2E8F0", marginBottom: 8, cursor: "pointer" }}
       onMouseEnter={e => e.currentTarget.style.borderColor = color}
       onMouseLeave={e => e.currentTarget.style.borderColor = "#E2E8F0"}>
       <span style={{ fontSize: 36 }}>{icon}</span>
