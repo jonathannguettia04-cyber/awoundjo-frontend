@@ -95,10 +95,9 @@ export const dashboardAPI = {
 };
 
 // Alias utilisé par Dashboard.jsx
-// IMPORTANT : getStats pointe vers /dashboard/stats (même route que dashboardAPI)
-// /stats/dashboard n'existe pas côté backend → écran blanc sur mobile
+// La vraie route backend est /stats/dashboard (voir statsRoutes.js)
 export const statsAPI = {
-  getStats:     ()       => api.get("/dashboard/stats"),
+  getStats:     ()       => api.get("/stats/dashboard"),
   getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
   getTopAgents: ()       => api.get("/dashboard/top-agents"),
   commissions:  (params) => api.get("/stats/commissions", { params }),
