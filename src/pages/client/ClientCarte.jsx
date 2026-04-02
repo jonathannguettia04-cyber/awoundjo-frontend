@@ -9,38 +9,71 @@ const PLAN_GRADIENTS = {
   TURQUOISE:   "linear-gradient(135deg, #0891B2 0%, #164e63 100%)",
 };
 
+// ── QR dynamique : Carte + Nom + Mutualiste ──────────────────────────────────
+function buildQrUrl(card) {
+  const content = [
+    `Carte: ${card.numero_carte || card.mutual_number}`,
+    `Nom: ${card.name}`,
+    `Mutualiste: ${card.mutual_number}`,
+  ].join(" | ");
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(content)}&bgcolor=ffffff&color=1a56db&margin=10`;
+}
+
 export default function ClientCarte() {
   const navigate = useNavigate();
-  const [data,       setData]    = useState(null);
-  const [loading,    setLoading] = useState(true);
-  const [scanning,   setScanning]= useState(false);
-  const [scanResult, setScanRes] = useState(null);
-  const [visible,    setVis]     = useState(false);
-  const [qrUrl,      setQrUrl]   = useState(null);
-  const [qrExpanded, setQrExpanded] = useState(false); // agrandissement QR
+  const [data,        setData]       = useState(null);
+  const [loading,     setLoading]    = useState(true);
+  const [scanning,    setScanning]   = useState(false);
+  const [scanResult,  setScanRes]    = useState(null);
+  const [visible,     setVis]        = useState(false);
+  const [qrUrl,       setQrUrl]      = useState(null);
+  const [qrExpanded,  setQrExpanded] = useState(false);
+  const [downloading, setDownloading]= useState(false);
   const videoRef  = useRef();
   const streamRef = useRef();
   const canvasRef = useRef();
+  const carteRef  = useRef(); // pour html2canvas
 
   useEffect(() => {
     clientCardAPI.get()
       .then(res => {
         const d = res.data.data;
         setData(d);
-        const qrData = encodeURIComponent(JSON.stringify({
-          id:     d.card.mutual_number,
-          name:   d.card.name,
-          plan:   d.card.plan,
-          status: d.card.status,
-          exp:    d.card.expiration_date,
-        }));
-        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrData}&bgcolor=ffffff&color=1a56db&margin=10`);
+        setQrUrl(buildQrUrl(d.card));
         setTimeout(() => setVis(true), 100);
       })
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Téléchargement PNG via html2canvas ───────────────────────────────────
+  const handleDownload = async () => {
+    if (!carteRef.current || !data) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(carteRef.current, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `carte-mutualiste-${data.card.numero_carte || data.card.mutual_number}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) {
+      alert("Impossible de télécharger la carte. Réessayez.");
+      console.error(err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // ── Impression format CNI ────────────────────────────────────────────────
+  const handlePrint = () => window.print();
+
+  // ── Caméra ───────────────────────────────────────────────────────────────
   const openCamera = async () => {
     setScanning(true); setScanRes(null);
     try {
@@ -73,253 +106,303 @@ export default function ClientCarte() {
   if (!data)   return null;
 
   const { card, dependents } = data;
-  const plan     = PLANS[card.plan] || PLANS.ESSENTIELLE;
-  const gradient = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
-  const isActive = card.status === "active" || card.status === "actif";
+  const plan      = PLANS[card.plan] || PLANS.ESSENTIELLE;
+  const gradient  = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
+  const isActive  = card.status === "active" || card.status === "actif";
+  const numeroCarte = card.numero_carte || card.mutual_number;
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
 
+      {/* ── CSS impression CNI 85.6mm × 54mm ────────────────────────────── */}
+      <style>{`
+        @keyframes scan { 0% { top: 10% } 100% { top: 90% } }
+
+        @media print {
+          body * { visibility: hidden !important; }
+          #carte-physique,
+          #carte-physique * { visibility: visible !important; }
+          #carte-physique {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 85.6mm !important;
+            height: 54mm !important;
+            border-radius: 4mm !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 4mm !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          @page { size: 85.6mm 54mm; margin: 0; }
+        }
+      `}</style>
+
       <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Ma Carte Mutualiste</h1>
       <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Présentez cette carte dans les établissements partenaires</p>
 
-      {/* ── Carte recto ── */}
-      <div style={{
-        background: gradient, borderRadius: 24, padding: 22, color: "#fff",
-        position: "relative", overflow: "hidden",
-        boxShadow: "0 16px 48px rgba(26,86,219,.35)", marginBottom: 14,
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
-        transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
-      }}>
-        <div style={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -60, right: 60, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: 40, left: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
+      {/* ════════════════════════════════════════════════════════════════════
+          CARTE PHYSIQUE  — id="carte-physique" pour l'impression
+          ref={carteRef}  — pour html2canvas
+          ════════════════════════════════════════════════════════════════════ */}
+      <div
+        id="carte-physique"
+        ref={carteRef}
+        style={{
+          background: gradient, borderRadius: 24, padding: 22, color: "#fff",
+          position: "relative", overflow: "hidden",
+          boxShadow: "0 16px 48px rgba(26,86,219,.35)", marginBottom: 14,
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
+          transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
+        }}
+      >
+        {/* Cercles décoratifs */}
+        <div style={{ position:"absolute", top:-50, right:-50, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.08)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-60, right:60, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", top:40, left:-30, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,.06)", pointerEvents:"none" }} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, position: "relative" }}>
-          <div style={{ width: 42, height: 42, background: "rgba(255,255,255,.2)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20, backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.2)" }}>A</div>
+        {/* ── Ligne 1 : logo + N° carte en haut à droite ── */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10, position:"relative" }}>
+          <div style={{ width:42, height:42, background:"rgba(255,255,255,.2)", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:20, backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,.2)" }}>A</div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2 }}>AWOUNDJÔ</div>
-            <div style={{ fontSize: 10, opacity: .7, letterSpacing: .5 }}>Mutuelle Santé · Côte d'Ivoire</div>
+            <div style={{ fontSize:14, fontWeight:800, letterSpacing:2 }}>AWOUNDJÔ</div>
+            <div style={{ fontSize:10, opacity:.7, letterSpacing:.5 }}>Mutuelle Santé · Côte d'Ivoire</div>
           </div>
-          <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, background: isActive ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 12px", border: `1px solid ${isActive ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}` }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: isActive ? "#10B981" : "#EF4444", display: "inline-block", boxShadow: isActive ? "0 0 6px #10B981" : "none" }} />
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
+          {/* N° Carte — haut à droite */}
+          <div style={{ marginLeft:"auto", textAlign:"right" }}>
+            <div style={{ fontSize:9, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>N° Carte</div>
+            <div style={{
+              fontSize:11, fontWeight:800, fontFamily:"monospace", letterSpacing:.5,
+              background:"rgba(255,255,255,.18)", borderRadius:8, padding:"3px 10px",
+              border:"1px solid rgba(255,255,255,.25)",
+            }}>
+              {numeroCarte}
+            </div>
           </div>
         </div>
 
-        <div style={{ marginBottom: 18, position: "relative" }}>
-          <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase" }}>Adhérent(e)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -.3 }}>{card.name}</div>
-          <div style={{ fontSize: 13, opacity: .75, fontFamily: "monospace", letterSpacing: 2, marginTop: 2 }}>{card.mutual_number}</div>
+        {/* ── Statut ── */}
+        <div style={{ marginBottom:10, position:"relative" }}>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:5, background: isActive ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)", backdropFilter:"blur(8px)", borderRadius:20, padding:"4px 12px", border:`1px solid ${isActive ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}` }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background: isActive ? "#10B981" : "#EF4444", display:"inline-block", boxShadow: isActive ? "0 0 6px #10B981" : "none" }} />
+            <span style={{ fontSize:10, fontWeight:700, letterSpacing:.5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
+          </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", position: "relative" }}>
+        {/* ── Nom + mutualiste ── */}
+        <div style={{ marginBottom:14, position:"relative" }}>
+          <div style={{ fontSize:10, opacity:.6, letterSpacing:1.5, marginBottom:3, textTransform:"uppercase" }}>Adhérent(e)</div>
+          <div style={{ fontSize:21, fontWeight:800, letterSpacing:-.3 }}>{card.name}</div>
+          <div style={{ fontSize:12, opacity:.75, fontFamily:"monospace", letterSpacing:2, marginTop:2 }}>{card.mutual_number}</div>
+        </div>
+
+        {/* ── Formule + expiration + QR mini (comme carte OLEA) ── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", position:"relative" }}>
           <div>
-            <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Formule</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{plan.name}</div>
-            <div style={{ fontSize: 11, opacity: .7 }}>{plan.coverage} couverture</div>
+            <div style={{ fontSize:10, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>Formule</div>
+            <div style={{ fontSize:15, fontWeight:800 }}>{plan.name}</div>
+            <div style={{ fontSize:10, opacity:.7 }}>{plan.coverage} couverture</div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, opacity: .6, letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Expire le</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:10, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>Expire le</div>
+            <div style={{ fontSize:14, fontWeight:800 }}>
               {card.expiration_date
-                ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "numeric" })
+                ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month:"2-digit", year:"numeric" })
                 : "12/2026"}
             </div>
           </div>
+          {/* QR mini intégré dans la carte */}
+          {qrUrl && (
+            <div style={{ width:52, height:52, background:"#fff", borderRadius:8, overflow:"hidden", border:"2px solid rgba(255,255,255,.3)", flexShrink:0 }}>
+              <img src={qrUrl} alt="QR" style={{ width:"100%", height:"100%", objectFit:"contain" }} crossOrigin="anonymous" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── QR Code — SECTION PROMINENTE ── */}
-      <div style={{
-        background: "#fff", borderRadius: 24,
-        boxShadow: "0 4px 20px rgba(0,0,0,.08)",
-        overflow: "hidden", marginBottom: 16,
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(10px)",
-        transition: "all .5s .15s cubic-bezier(.34,1.56,.64,1)",
-        border: "2px solid #E2E8F0",
-      }}>
-        {/* Header section QR */}
-        <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#0F172A" }}>🔲 Code de vérification</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>Présentez ce QR code à l'accueil de l'établissement</p>
-          </div>
+      {/* ════════════════════════════════════════════════════════════════════
+          BOUTONS TÉLÉCHARGER / IMPRIMER  — uniquement si statut actif
+          ════════════════════════════════════════════════════════════════════ */}
+      {isActive ? (
+        <div style={{ display:"flex", gap:10, marginBottom:14, opacity: visible?1:0, transform: visible?"translateY(0)":"translateY(10px)", transition:"all .5s .1s" }}>
           <button
-            onClick={() => setQrExpanded(!qrExpanded)}
+            onClick={handleDownload}
+            disabled={downloading}
             style={{
-              background: "#EEF2FF", border: "none", borderRadius: 10,
-              padding: "8px 14px", fontSize: 12, fontWeight: 700,
-              color: "#1B4FD8", cursor: "pointer", fontFamily: "inherit",
-              flexShrink: 0,
+              flex:1, background:"linear-gradient(135deg,#7C3AED,#5B21B6)",
+              color:"#fff", border:"none", borderRadius:16,
+              padding:"14px 10px", fontSize:13, fontWeight:700,
+              cursor: downloading ? "not-allowed" : "pointer",
+              fontFamily:"'Poppins',sans-serif",
+              boxShadow:"0 4px 16px rgba(124,58,237,.35)",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+              opacity: downloading ? .7 : 1, transition:"opacity .2s",
             }}
           >
-            {qrExpanded ? "Réduire ↑" : "Agrandir ↓"}
+            {downloading ? "⏳ Export..." : "⬇️ Télécharger"}
+          </button>
+          <button
+            onClick={handlePrint}
+            style={{
+              flex:1, background:"linear-gradient(135deg,#0891B2,#164e63)",
+              color:"#fff", border:"none", borderRadius:16,
+              padding:"14px 10px", fontSize:13, fontWeight:700,
+              cursor:"pointer", fontFamily:"'Poppins',sans-serif",
+              boxShadow:"0 4px 16px rgba(8,145,178,.3)",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+            }}
+          >
+            🖨️ Imprimer
           </button>
         </div>
-
-        {/* QR Code centré et bien visible */}
-        <div style={{ padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-          <div
-            onClick={() => setQrExpanded(!qrExpanded)}
-            style={{
-              width: qrExpanded ? 260 : 160,
-              height: qrExpanded ? 260 : 160,
-              background: "#F8FAFC",
-              borderRadius: 20,
-              border: "3px solid #E2E8F0",
-              overflow: "hidden",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer",
-              transition: "all .35s cubic-bezier(.34,1.56,.64,1)",
-              boxShadow: "0 4px 16px rgba(26,86,219,.12)",
-            }}
-          >
-            {qrUrl
-              ? <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              : <span style={{ fontSize: 48 }}>⬛</span>
-            }
-          </div>
-
-          {/* Numéro adhérent sous le QR */}
-          <div style={{ textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#1a56db", fontFamily: "monospace", letterSpacing: 2 }}>
-              {card.mutual_number}
-            </p>
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#64748B" }}>
-              Appuyez sur le QR pour agrandir
-            </p>
-          </div>
-        </div>
-
-        {/* Bénéficiaires */}
-        {dependents?.length > 0 && (
-          <div style={{ padding: "0 20px 16px", borderTop: "1px solid #F1F5F9", paddingTop: 14 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#64748B", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: .8 }}>
-              Bénéficiaires couverts
-            </p>
-            {dependents.map((dep, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F8FAFC", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
-                <span style={{ fontSize: 20 }}>{dep.type === "spouse" ? "💑" : "👶"}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", flex: 1 }}>{dep.firstname} {dep.name}</span>
-                <span style={{ fontSize: 11, color: "#64748B", background: "#E2E8F0", borderRadius: 6, padding: "3px 8px" }}>
-                  {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Modal QR agrandi ── */}
-      {qrExpanded && (
-        <div
-          onClick={() => setQrExpanded(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.85)", backdropFilter: "blur(8px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 28, padding: 32, textAlign: "center", maxWidth: 360, width: "100%" }}
-          >
-            <p style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800, color: "#0F172A" }}>🔲 QR Code Awoundjô</p>
-            <div style={{ width: 280, height: 280, margin: "0 auto 16px", borderRadius: 16, overflow: "hidden", border: "3px solid #E2E8F0" }}>
-              {qrUrl && <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />}
-            </div>
-            <p style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#1a56db", fontFamily: "monospace", letterSpacing: 2 }}>
-              {card.mutual_number}
-            </p>
-            <p style={{ margin: "0 0 20px", fontSize: 12, color: "#64748B" }}>{card.name} · {plan.name}</p>
-            <button
-              onClick={() => setQrExpanded(false)}
-              style={{ width: "100%", background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif" }}
-            >
-              Fermer
-            </button>
+      ) : (
+        /* ── Message carte inactive ─────────────────────────────────── */
+        <div style={{ background:"linear-gradient(135deg,#FEF2F2,#FFF1F2)", border:"1px solid #FECACA", borderRadius:16, padding:"16px 18px", display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <span style={{ fontSize:24 }}>🔒</span>
+          <div>
+            <p style={{ fontWeight:700, color:"#991B1B", margin:"0 0 2px", fontSize:13 }}>Carte désactivée</p>
+            <p style={{ color:"#B91C1C", margin:0, fontSize:12 }}>Renouvelez votre adhésion pour accéder à votre carte et aux téléchargements.</p>
           </div>
         </div>
       )}
 
-      {/* ── Actions ── */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, opacity: visible ? 1 : 0, transition: "all .5s .25s", transform: visible ? "translateY(0)" : "translateY(10px)" }}>
-        <button onClick={openCamera} style={{ flex: 1, background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(26,86,219,.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+      {/* ════════════════════════════════════════════════════════════════════
+          SECTION QR étendu — uniquement si actif
+          ════════════════════════════════════════════════════════════════════ */}
+      {isActive && (
+        <div style={{
+          background:"#fff", borderRadius:24,
+          boxShadow:"0 4px 20px rgba(0,0,0,.08)",
+          overflow:"hidden", marginBottom:16,
+          opacity: visible?1:0, transform: visible?"translateY(0)":"translateY(10px)",
+          transition:"all .5s .15s cubic-bezier(.34,1.56,.64,1)",
+          border:"2px solid #E2E8F0",
+        }}>
+          <div style={{ padding:"16px 20px 12px", borderBottom:"1px solid #F1F5F9", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div>
+              <p style={{ margin:0, fontWeight:800, fontSize:15, color:"#0F172A" }}>🔲 Code de vérification</p>
+              <p style={{ margin:"2px 0 0", fontSize:12, color:"#64748B" }}>Présentez ce QR code à l'accueil de l'établissement</p>
+            </div>
+            <button onClick={() => setQrExpanded(!qrExpanded)} style={{ background:"#EEF2FF", border:"none", borderRadius:10, padding:"8px 14px", fontSize:12, fontWeight:700, color:"#1B4FD8", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+              {qrExpanded ? "Réduire ↑" : "Agrandir ↓"}
+            </button>
+          </div>
+
+          <div style={{ padding:"24px 20px", display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
+            <div onClick={() => setQrExpanded(!qrExpanded)} style={{ width: qrExpanded?260:160, height: qrExpanded?260:160, background:"#F8FAFC", borderRadius:20, border:"3px solid #E2E8F0", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", transition:"all .35s cubic-bezier(.34,1.56,.64,1)", boxShadow:"0 4px 16px rgba(26,86,219,.12)" }}>
+              {qrUrl
+                ? <img src={qrUrl} alt="QR Code" style={{ width:"100%", height:"100%", objectFit:"contain" }} />
+                : <span style={{ fontSize:48 }}>⬛</span>
+              }
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <p style={{ margin:0, fontSize:13, fontWeight:800, color:"#1a56db", fontFamily:"monospace", letterSpacing:1 }}>{numeroCarte}</p>
+              <p style={{ margin:"2px 0 0", fontSize:11, color:"#94A3B8" }}>{card.name}</p>
+              <p style={{ margin:"4px 0 0", fontSize:11, color:"#64748B" }}>Appuyez sur le QR pour agrandir</p>
+            </div>
+          </div>
+
+          {dependents?.length > 0 && (
+            <div style={{ padding:"0 20px 16px", borderTop:"1px solid #F1F5F9", paddingTop:14 }}>
+              <p style={{ fontSize:12, fontWeight:700, color:"#64748B", margin:"0 0 10px", textTransform:"uppercase", letterSpacing:.8 }}>Bénéficiaires couverts</p>
+              {dependents.map((dep, i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FAFC", borderRadius:12, padding:"10px 14px", marginBottom:8 }}>
+                  <span style={{ fontSize:20 }}>{dep.type === "spouse" ? "💑" : "👶"}</span>
+                  <span style={{ fontSize:13, fontWeight:600, color:"#0F172A", flex:1 }}>{dep.firstname} {dep.name}</span>
+                  <span style={{ fontSize:11, color:"#64748B", background:"#E2E8F0", borderRadius:6, padding:"3px 8px" }}>{dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Modal QR agrandi ─────────────────────────────────────────────── */}
+      {qrExpanded && (
+        <div onClick={() => setQrExpanded(false)} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.85)", backdropFilter:"blur(8px)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:"#fff", borderRadius:28, padding:32, textAlign:"center", maxWidth:360, width:"100%" }}>
+            <p style={{ margin:"0 0 16px", fontSize:16, fontWeight:800, color:"#0F172A" }}>🔲 QR Code Awoundjô</p>
+            <div style={{ width:280, height:280, margin:"0 auto 16px", borderRadius:16, overflow:"hidden", border:"3px solid #E2E8F0" }}>
+              {qrUrl && <img src={qrUrl} alt="QR Code" style={{ width:"100%", height:"100%" }} />}
+            </div>
+            <p style={{ margin:"0 0 2px", fontSize:14, fontWeight:800, color:"#1a56db", fontFamily:"monospace", letterSpacing:1 }}>{numeroCarte}</p>
+            <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:"#0F172A" }}>{card.name}</p>
+            <p style={{ margin:"0 0 20px", fontSize:12, color:"#64748B" }}>{card.mutual_number} · {plan.name}</p>
+            <button onClick={() => setQrExpanded(false)} style={{ width:"100%", background:"linear-gradient(135deg,#1a56db,#1e40af)", color:"#fff", border:"none", borderRadius:14, padding:14, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif" }}>Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Actions scanner / partager ───────────────────────────────────── */}
+      <div style={{ display:"flex", gap:12, marginBottom:16, opacity: visible?1:0, transition:"all .5s .25s", transform: visible?"translateY(0)":"translateY(10px)" }}>
+        <button onClick={openCamera} style={{ flex:1, background:"linear-gradient(135deg,#1a56db,#1e40af)", color:"#fff", border:"none", borderRadius:16, padding:"14px 10px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", boxShadow:"0 4px 16px rgba(26,86,219,.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           📷 Scanner
         </button>
-        <button onClick={() => navigator.share?.({ title: "Ma carte Awoundjô", text: card.mutual_number })} style={{ flex: 1, background: "linear-gradient(135deg,#059669,#064e3b)", color: "#fff", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(5,150,105,.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <button onClick={() => navigator.share?.({ title:"Ma carte Awoundjô", text:`${card.name} — ${numeroCarte}` })} style={{ flex:1, background:"linear-gradient(135deg,#059669,#064e3b)", color:"#fff", border:"none", borderRadius:16, padding:"14px 10px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", boxShadow:"0 4px 16px rgba(5,150,105,.3)", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           📤 Partager
-        </button>
-        <button onClick={() => window.print()} style={{ flex: 1, background: "#F1F5F9", color: "#475569", border: "none", borderRadius: 16, padding: "14px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          🖨️ Imprimer
         </button>
       </div>
 
-      {/* ── Modal Caméra ── */}
+      {/* ── Modal Caméra ─────────────────────────────────────────────────── */}
       {scanning && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.95)", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "20px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 10 }}>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.95)", zIndex:300, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ position:"absolute", top:0, left:0, right:0, padding:"20px 20px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", zIndex:10 }}>
             <div>
-              <p style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Poppins',sans-serif" }}>📷 Scanner un QR code</p>
-              <p style={{ color: "rgba(255,255,255,.6)", fontSize: 12, margin: "2px 0 0", fontFamily: "'Poppins',sans-serif" }}>Pointez vers le QR code à vérifier</p>
+              <p style={{ color:"#fff", fontWeight:700, fontSize:16, margin:0, fontFamily:"'Poppins',sans-serif" }}>📷 Scanner un QR code</p>
+              <p style={{ color:"rgba(255,255,255,.6)", fontSize:12, margin:"2px 0 0", fontFamily:"'Poppins',sans-serif" }}>Pointez vers le QR code à vérifier</p>
             </div>
-            <button onClick={closeCamera} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={closeCamera} style={{ background:"rgba(255,255,255,.15)", border:"none", borderRadius:"50%", width:40, height:40, color:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
           </div>
-          <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
-            <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", borderRadius: 0, display: "block" }} />
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <div style={{ width: 240, height: 240, position: "relative" }}>
+          <div style={{ position:"relative", width:"100%", maxWidth:400 }}>
+            <video ref={videoRef} autoPlay playsInline muted style={{ width:"100%", borderRadius:0, display:"block" }} />
+            <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", pointerEvents:"none" }}>
+              <div style={{ width:240, height:240, position:"relative" }}>
                 {[
-                  { top: 0, left: 0, borderTop: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "12px 0 0 0" },
-                  { top: 0, right: 0, borderTop: "3px solid #fff", borderRight: "3px solid #fff", borderRadius: "0 12px 0 0" },
-                  { bottom: 0, left: 0, borderBottom: "3px solid #fff", borderLeft: "3px solid #fff", borderRadius: "0 0 0 12px" },
-                  { bottom: 0, right: 0, borderBottom: "3px solid #fff", borderRight: "3px solid #fff", borderRadius: "0 0 12px 0" },
+                  { top:0, left:0, borderTop:"3px solid #fff", borderLeft:"3px solid #fff", borderRadius:"12px 0 0 0" },
+                  { top:0, right:0, borderTop:"3px solid #fff", borderRight:"3px solid #fff", borderRadius:"0 12px 0 0" },
+                  { bottom:0, left:0, borderBottom:"3px solid #fff", borderLeft:"3px solid #fff", borderRadius:"0 0 0 12px" },
+                  { bottom:0, right:0, borderBottom:"3px solid #fff", borderRight:"3px solid #fff", borderRadius:"0 0 12px 0" },
                 ].map((corner, i) => (
-                  <div key={i} style={{ position: "absolute", width: 30, height: 30, ...corner }} />
+                  <div key={i} style={{ position:"absolute", width:30, height:30, ...corner }} />
                 ))}
-                <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #1a56db, transparent)", animation: "scan 2s linear infinite", top: "50%" }} />
+                <div style={{ position:"absolute", left:0, right:0, height:2, background:"linear-gradient(90deg, transparent, #1a56db, transparent)", animation:"scan 2s linear infinite", top:"50%" }} />
               </div>
             </div>
-            <style>{`@keyframes scan { 0% { top: 10% } 100% { top: 90% } }`}</style>
           </div>
-          <canvas ref={canvasRef} style={{ display: "none" }} />
-          <div style={{ position: "absolute", bottom: 60, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-            <button onClick={captureFrame} style={{ background: "#fff", border: "4px solid rgba(255,255,255,.3)", borderRadius: "50%", width: 72, height: 72, fontSize: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,.4)" }}>
-              📷
-            </button>
+          <canvas ref={canvasRef} style={{ display:"none" }} />
+          <div style={{ position:"absolute", bottom:60, left:0, right:0, display:"flex", justifyContent:"center" }}>
+            <button onClick={captureFrame} style={{ background:"#fff", border:"4px solid rgba(255,255,255,.3)", borderRadius:"50%", width:72, height:72, fontSize:28, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 20px rgba(0,0,0,.4)" }}>📷</button>
           </div>
         </div>
       )}
 
-      {/* ── Résultat scan ── */}
+      {/* ── Résultat scan ────────────────────────────────────────────────── */}
       {scanResult && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.7)", backdropFilter: "blur(8px)", zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-          onClick={() => setScanRes(null)}>
-          <div style={{ background: "#fff", borderRadius: 24, padding: 28, width: "100%", maxWidth: 380, textAlign: "center" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ width: 80, height: 80, background: scanResult.valid ? "#ECFDF5" : "#FEF2F2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 36 }}>
+        <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.7)", backdropFilter:"blur(8px)", zIndex:250, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setScanRes(null)}>
+          <div style={{ background:"#fff", borderRadius:24, padding:28, width:"100%", maxWidth:380, textAlign:"center" }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:80, height:80, background: scanResult.valid ? "#ECFDF5" : "#FEF2F2", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:36 }}>
               {scanResult.valid ? "✅" : "❌"}
             </div>
-            <h3 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>
-              {scanResult.valid ? "Carte valide" : "Carte invalide"}
-            </h3>
+            <h3 style={{ fontSize:20, fontWeight:800, color:"#0F172A", margin:"0 0 6px" }}>{scanResult.valid ? "Carte valide" : "Carte invalide"}</h3>
             {scanResult.valid && (
-              <div style={{ background: "#F8FAFC", borderRadius: 14, padding: 16, marginTop: 16, textAlign: "left" }}>
+              <div style={{ background:"#F8FAFC", borderRadius:14, padding:16, marginTop:16, textAlign:"left" }}>
                 {[
-                  { label: "Nom",    value: scanResult.name   },
-                  { label: "N°",     value: scanResult.number },
-                  { label: "Plan",   value: scanResult.plan   },
-                  { label: "Statut", value: scanResult.status },
+                  { label:"Nom",    value: scanResult.name   },
+                  { label:"N°",     value: scanResult.number },
+                  { label:"Plan",   value: scanResult.plan   },
+                  { label:"Statut", value: scanResult.status },
                 ].map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: i < 3 ? 10 : 0 }}>
-                    <span style={{ fontSize: 12, color: "#64748B" }}>{r.label}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{r.value}</span>
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", marginBottom: i<3 ? 10 : 0 }}>
+                    <span style={{ fontSize:12, color:"#64748B" }}>{r.label}</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:"#0F172A" }}>{r.value}</span>
                   </div>
                 ))}
               </div>
             )}
-            <button onClick={() => setScanRes(null)} style={{ width: "100%", background: "linear-gradient(135deg,#1a56db,#1e40af)", color: "#fff", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", marginTop: 20 }}>
-              Fermer
-            </button>
+            <button onClick={() => setScanRes(null)} style={{ width:"100%", background:"linear-gradient(135deg,#1a56db,#1e40af)", color:"#fff", border:"none", borderRadius:14, padding:14, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", marginTop:20 }}>Fermer</button>
           </div>
         </div>
       )}
@@ -329,10 +412,10 @@ export default function ClientCarte() {
 
 function Skeleton() {
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding:16 }}>
       <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}`}</style>
-      {[220, 180, 60].map((h, i) => (
-        <div key={i} style={{ height: h, borderRadius: 24, marginBottom: 14, background: "linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }} />
+      {[220, 60, 180, 60].map((h, i) => (
+        <div key={i} style={{ height:h, borderRadius:24, marginBottom:14, background:"linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize:"200% 100%", animation:"shimmer 1.5s infinite" }} />
       ))}
     </div>
   );
