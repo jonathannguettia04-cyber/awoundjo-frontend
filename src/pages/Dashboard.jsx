@@ -60,7 +60,22 @@ export default function Dashboard() {
 
   if (error) return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center font-medium">{error}</div>
+      <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center">
+        <p className="font-medium mb-3">{error}</p>
+        <button
+          onClick={() => {
+            setError("");
+            setLoading(true);
+            statsAPI.getStats()
+              .then(({ data }) => setData(data))
+              .catch(() => setError("Impossible de charger le tableau de bord"))
+              .finally(() => setLoading(false));
+          }}
+          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all"
+        >
+          🔄 Réessayer
+        </button>
+      </div>
     </div>
   );
 

@@ -7,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { "Content-Type": "application/json" },
-  timeout: 15000,
+  timeout: 30000, // 30s — Railway peut être endormi sur 1ère requête mobile
 });
 
 api.interceptors.request.use((config) => {
@@ -95,8 +95,10 @@ export const dashboardAPI = {
 };
 
 // Alias utilisé par Dashboard.jsx
+// IMPORTANT : getStats pointe vers /dashboard/stats (même route que dashboardAPI)
+// /stats/dashboard n'existe pas côté backend → écran blanc sur mobile
 export const statsAPI = {
-  getStats:     ()       => api.get("/stats/dashboard"),
+  getStats:     ()       => api.get("/dashboard/stats"),
   getMonthly:   (params) => api.get("/dashboard/monthly", { params }),
   getTopAgents: ()       => api.get("/dashboard/top-agents"),
   commissions:  (params) => api.get("/stats/commissions", { params }),
