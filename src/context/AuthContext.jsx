@@ -1,13 +1,21 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { authAPI } from "../services/api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
-  });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true); // ← AJOUT
+
+  // Lecture localStorage au montage — async-safe sur mobile
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) setUser(JSON.parse(stored));
+    } catch {}
+    setInitializing(false); // ← on ne bloque plus les routes
+  }, []);
 
   const login = useCallback(async (phone, password) => {
     setLoading(true);
@@ -34,7 +42,7 @@ export function AuthProvider({ children }) {
   const isAgent = user?.role === "AGENT";
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isAgent }}>
+    <AuthContext.Provider value={{ user, loading, initializing, login, logout, isAdmin, isAgent }}>
       {children}
     </AuthContext.Provider>
   );

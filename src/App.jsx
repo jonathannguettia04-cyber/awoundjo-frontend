@@ -123,7 +123,11 @@ function PageLoader() {
 const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
+
+  // Attend que le localStorage soit lu avant de décider
+  if (initializing) return <PageLoader />;
+
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role))
     return <Navigate to="/" replace />;
