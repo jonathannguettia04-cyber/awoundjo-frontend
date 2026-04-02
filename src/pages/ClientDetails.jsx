@@ -55,13 +55,13 @@ export default function ClientDetails() {
   // Gestion retour CinetPay après redirect
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
-    const payment = params.get("payment");
-    const tx      = params.get("tx");
-    if (payment === "success") {
+    const ps = params.get("ps");
+    const tx = params.get("tx");
+    if (ps === "1") {
       setPaySuccess(`✅ Paiement confirmé${tx ? ` — Réf : ${tx}` : ""}`);
       window.history.replaceState({}, "", window.location.pathname);
       loadClient();
-    } else if (payment === "failed") {
+    } else if (ps === "0") {
       setPayError("❌ Paiement annulé ou refusé. Vous pouvez réessayer.");
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -108,16 +108,18 @@ export default function ClientDetails() {
             client_phone: clientData.phone || "",
             client_id:    id,
             type:         payForm.type,
-            success_url: `${window.location.origin}/clients/${id}?payment=success&tx=${txId}`,
-            failed_url:  `${window.location.origin}/clients/${id}?payment=failed`,
+            success_url: `${window.location.origin}/clients/${id}?ps=1&tx=${txId}`,
+            failed_url:  `${window.location.origin}/clients/${id}?ps=0`,
           }),
         });
 
         const data = await res.json();
-        const paymentUrl =
-          data?.data?.payment_url ||
-          data?.payment_url ||
-          null;
+        let paymentUrl = data?.data?.payment_url || data?.payment_url || null;
+
+        if (!paymentUrl) {
+          const token = data?.data?.payment_token || data?.payment_token;
+          if (token) paymentUrl = `https://secure.cinetpay.net/payment/${token}`;
+        }
 
         if (!paymentUrl) {
           throw new Error(data?.error || "URL de paiement non reçue");
