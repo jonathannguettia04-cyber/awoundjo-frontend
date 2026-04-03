@@ -558,13 +558,6 @@ export default function DiasporaDashboard() {
         </div>
       )}
 
-      // ═══════════════════════════════════════════════════════════════
-//  REMPLACEMENT DE LA SECTION COMMISSIONS dans DiasporaDashboard.jsx
-//  Remplace le bloc entre les commentaires :
-//  {/* ── Commissions par source ── */}   (ligne ~561)
-//  jusqu'à la fin du bloc fermant         (ligne ~646)
-// ═══════════════════════════════════════════════════════════════
-
       {/* ── Commissions structurées ── */}
       {commissions && (
         <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", marginBottom:24 }}>
