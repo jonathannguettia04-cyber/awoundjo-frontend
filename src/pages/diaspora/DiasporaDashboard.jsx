@@ -558,87 +558,100 @@ export default function DiasporaDashboard() {
         </div>
       )}
 
-      {/* ── Commissions par source ── */}
+      // ═══════════════════════════════════════════════════════════════
+//  REMPLACEMENT DE LA SECTION COMMISSIONS dans DiasporaDashboard.jsx
+//  Remplace le bloc entre les commentaires :
+//  {/* ── Commissions par source ── */}   (ligne ~561)
+//  jusqu'à la fin du bloc fermant         (ligne ~646)
+// ═══════════════════════════════════════════════════════════════
+
+      {/* ── Commissions structurées ── */}
       {commissions && (
         <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", marginBottom:24 }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-            <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:15 }}>📈 Commissions par source</p>
+            <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:15 }}>📈 Mes commissions</p>
             <button onClick={() => navigate("/diaspora/earnings")}
               style={{ background:"none", border:"none", fontSize:12, color:C.blue, fontWeight:700, cursor:"pointer" }}>
               Tout voir →
             </button>
           </div>
 
-          {/* Totaux */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:16 }}>
+          {/* ── Totaux globaux ── */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(120px, 1fr))", gap:10, marginBottom:20 }}>
             {[
-              { label:"Total gagné",  value:commissions.totals?.total_earned  ?? 0, color:C.green  },
-              { label:"En attente",   value:commissions.totals?.pending        ?? 0, color:C.gold   },
-              { label:"Validé",       value:commissions.totals?.validated      ?? 0, color:C.blue   },
-              { label:"Payé",         value:commissions.totals?.paid           ?? 0, color:C.purple },
-              { label:"Ce mois",      value:commissions.totals?.this_month     ?? 0, color:C.teal   },
+              { label:"Total gagné",  value:commissions.totals?.total_earned ?? 0, color:C.green  },
+              { label:"En attente",   value:commissions.totals?.pending       ?? 0, color:C.gold   },
+              { label:"Validé",       value:commissions.totals?.validated     ?? 0, color:C.blue   },
+              { label:"Payé",         value:commissions.totals?.paid          ?? 0, color:C.purple },
+              { label:"Ce mois",      value:commissions.totals?.this_month    ?? 0, color:"#0D9488"},
             ].map(s => (
-              <div key={s.label} style={{ textAlign:"center", padding:"10px 8px", background:C.bg, borderRadius:10 }}>
-                <p style={{ margin:0, fontSize:16, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
+              <div key={s.label} style={{ textAlign:"center", padding:"10px 8px", background:C.bg, borderRadius:10, border:`1px solid ${s.color}22` }}>
+                <p style={{ margin:0, fontSize:15, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
                 <p style={{ margin:"1px 0 0", fontSize:9, color:C.slate }}>FCFA</p>
                 <p style={{ margin:"4px 0 0", fontSize:10, fontWeight:700, color:C.dark }}>{s.label}</p>
               </div>
             ))}
           </div>
 
-          {/* Par source */}
-          {commissions.by_source?.length > 0 && (
+          {/* ── Par catégorie structurée ── */}
+          {commissions.by_category?.length > 0 ? (
             <div>
-              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Détail par source</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {commissions.by_source.map(s => {
-                  const src = SOURCE_LABELS[s.source_role] || SOURCE_LABELS[s.type_source] || { label: s.source_role || s.type_source, icon:"💰", color:C.slate };
-                  return (
-                    <div key={s.source_role || s.type_source} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:C.bg, borderRadius:10 }}>
-                      <span style={{ fontSize:18 }}>{src.icon}</span>
+              <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+                Détail par source
+              </p>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {commissions.by_category.map(cat => (
+                  <div key={cat.key} style={{ background:C.bg, borderRadius:12, overflow:"hidden", border:`1px solid ${cat.color}22` }}>
+                    {/* En-tête catégorie */}
+                    <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:`1px solid ${cat.color}22`, background:`${cat.color}08` }}>
+                      <span style={{ fontSize:20 }}>{cat.icon}</span>
                       <div style={{ flex:1 }}>
-                        <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.dark }}>{src.label}</p>
-                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{s.count} commission(s)</p>
-                      </div>
-                      <span style={{ fontWeight:800, fontSize:14, color:src.color }}>{fmt(s.total)} FCFA</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Dernières commissions */}
-          {commissions.commissions?.length > 0 && (
-            <div style={{ marginTop:16 }}>
-              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Dernières commissions</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                {commissions.commissions.slice(0, 5).map(c => {
-                  const src = SOURCE_LABELS[c.source] || { icon:"💰", color:C.slate };
-                  const statusColor = c.status==="PAID" ? C.green : c.status==="VALIDATED" ? C.blue : C.gold;
-                  const statusLabel = c.status==="PAID" ? "Payé" : c.status==="VALIDATED" ? "Validé" : "En attente";
-                  return (
-                    <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", background:C.bg, borderRadius:8 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:14 }}>{src.icon}</span>
-                        <div>
-                          <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>{c.beneficiary_name || "—"}</p>
-                          <p style={{ margin:0, fontSize:11, color:C.slate }}>{c.rate_pct}% • {c.source === "direct" ? "Direct" : "Réseau"}</p>
-                        </div>
+                        <p style={{ margin:0, fontSize:13, fontWeight:800, color:C.dark }}>{cat.label}</p>
+                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{cat.count} commission(s)</p>
                       </div>
                       <div style={{ textAlign:"right" }}>
-                        <p style={{ margin:0, fontWeight:800, fontSize:13, color:C.green }}>{fmt(c.amount)} FCFA</p>
-                        <span style={{ fontSize:10, fontWeight:700, color:statusColor }}>{statusLabel}</span>
+                        <p style={{ margin:0, fontWeight:900, fontSize:15, color:cat.color }}>{fmt(cat.total)} FCFA</p>
+                        {cat.pending > 0 && (
+                          <p style={{ margin:"2px 0 0", fontSize:10, color:C.gold }}>{fmt(cat.pending)} en attente</p>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                    {/* Dernières entrées de cette catégorie */}
+                    {cat.items.slice(0, 3).map(c => {
+                      const statusColor = c.status==="PAID" ? C.green : c.status==="VALIDATED" ? C.blue : C.gold;
+                      const statusLabel = c.status==="PAID" ? "Payé" : c.status==="VALIDATED" ? "Validé" : "En attente";
+                      return (
+                        <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 14px", borderBottom:`1px solid ${C.border}` }}>
+                          <div>
+                            <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>
+                              {c.beneficiary_name || c.source_user_name || "—"}
+                            </p>
+                            <p style={{ margin:"1px 0 0", fontSize:10, color:C.slate }}>
+                              {c.rate_pct}% · {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                              {c.source_user_name && c.source !== "direct" && ` · via ${c.source_user_name}`}
+                            </p>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <p style={{ margin:0, fontWeight:800, fontSize:13, color:C.green }}>{fmt(c.amount)} FCFA</p>
+                            <span style={{ fontSize:10, fontWeight:700, color:statusColor }}>{statusLabel}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {cat.items.length > 3 && (
+                      <div style={{ padding:"8px 14px", textAlign:"center" }}>
+                        <button onClick={() => navigate("/diaspora/earnings")}
+                          style={{ background:"none", border:"none", fontSize:11, color:C.blue, fontWeight:700, cursor:"pointer" }}>
+                          +{cat.items.length - 3} de plus → Voir tout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-
-          {!commissions.by_source?.length && !commissions.commissions?.length && (
-            <div style={{ textAlign:"center", padding:"20px", color:C.slate, fontSize:13 }}>
+          ) : (
+            <div style={{ textAlign:"center", padding:"24px", color:C.slate, fontSize:13 }}>
               💰 Aucune commission pour l'instant
             </div>
           )}
