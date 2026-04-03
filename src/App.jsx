@@ -32,9 +32,14 @@ const HealthcareAdmin     = lazy(() => import("./pages/HealthcareAdmin"));
 const AdminProviders      = lazy(() => import("./pages/AdminProviders"));
 
 // ── Pages ADMIN ambassadeurs ─────────────────────────────────
-const AdminDiaspora       = lazy(() => import("./pages/AdminDiaspora"));
-const AdminFederation     = lazy(() => import("./pages/AdminFederation"));
-const AdminCredentials    = lazy(() => import("./pages/AdminCredentials"));
+const AdminDiaspora             = lazy(() => import("./pages/AdminDiaspora"));
+const AdminFederation           = lazy(() => import("./pages/AdminFederation"));
+const AdminCredentials          = lazy(() => import("./pages/AdminCredentials"));
+
+// ── Pages ADMIN — outils ─────────────────────────────────────
+const AdminExports              = lazy(() => import("./pages/AdminExports"));
+const AdminValidationClients    = lazy(() => import("./pages/AdminValidationClients"));
+const AdminResetPassword        = lazy(() => import("./pages/AdminResetPassword"));
 
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin         = lazy(() => import("./pages/client/ClientLogin"));
@@ -221,6 +226,17 @@ export default function App() {
             } />
             <Route path="/admin/credentials" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminCredentials /></ProtectedRoute>
+            } />
+
+            {/* ── ADMIN — outils ──────────────────────────── */}
+            <Route path="/admin/exports" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminExports /></ProtectedRoute>
+            } />
+            <Route path="/admin/clients/validation" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminValidationClients /></ProtectedRoute>
+            } />
+            <Route path="/admin/clients/reset-password" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminResetPassword /></ProtectedRoute>
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}

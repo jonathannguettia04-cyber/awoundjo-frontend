@@ -69,11 +69,11 @@ const SECTIONS = [
     bg: "#FFF7ED",
     border: "#FED7AA",
     links: [
-      { icon: "👥", label: "Export clients",                path: "/clients?export=1",            desc: "Télécharger la base clients (CSV/Excel)" },
-      { icon: "👤", label: "Export agents",                 path: "/agents?export=1",             desc: "Télécharger la liste des agents" },
-      { icon: "🌍", label: "Export Diaspora",               path: "/admin/diaspora?export=1",     desc: "Télécharger le réseau diaspora" },
-      { icon: "⛪", label: "Export Fédérations",            path: "/admin/federation?export=1",   desc: "Télécharger le réseau fédérations" },
-      { icon: "🏥", label: "Export établissements",         path: "/healthcare?export=1",         desc: "Télécharger les établissements partenaires" },
+      { icon: "👥", label: "Export clients",                path: "/admin/exports",            desc: "Télécharger la base clients (CSV/Excel)" },
+      { icon: "👤", label: "Export agents",                 path: "/admin/exports",             desc: "Télécharger la liste des agents" },
+      { icon: "🌍", label: "Export Diaspora",               path: "/admin/exports",     desc: "Télécharger le réseau diaspora" },
+      { icon: "⛪", label: "Export Fédérations",            path: "/admin/exports",   desc: "Télécharger le réseau fédérations" },
+      { icon: "🏥", label: "Export établissements",         path: "/admin/exports",         desc: "Télécharger les établissements partenaires" },
     ],
   },
 
