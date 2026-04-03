@@ -489,11 +489,3 @@ const ls = {
   label: { display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: .6 },
 };
 
-// Helpers (déclarés ici pour éviter les imports circulaires)
-function buildQrContent(dep, depNumber) {
-  return [
-    `Carte: ${depNumber}`,
-    `Nom: ${dep.firstname} ${dep.name}`,
-    `Type: ${dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}`,
-  ].join(" | ");
-}
