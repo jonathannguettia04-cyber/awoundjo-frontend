@@ -7,9 +7,31 @@ import { uploadFile } from "../../supabaseClient";
 const EMPTY_SPOUSE = { type: "spouse", name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 const EMPTY_CHILD  = { type: "child",  name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 
+const DEP_GRADIENTS = {
+  spouse: "linear-gradient(135deg, #DB2777 0%, #9D174D 100%)",
+  child:  "linear-gradient(135deg, #059669 0%, #064e3b 100%)",
+};
+
+// Génère le numéro de carte ayant droit
+function buildDepNumber(mutualNumber, type, index) {
+  if (!mutualNumber) return "";
+  const suffix = type === "spouse" ? "-C1" : `-E${index}`;
+  return `${mutualNumber}${suffix}`;
+}
+
+// Construit le contenu du QR
+function buildQrContent(dep, depNumber) {
+  return [
+    `Carte: ${depNumber}`,
+    `Nom: ${dep.firstname} ${dep.name}`,
+    `Type: ${dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}`,
+  ].join(" | ");
+}
+
 export default function ClientFamille() {
   const navigate = useNavigate();
   const [deps, setDeps]         = useState([]);
+  const [titular, setTitular]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState(null);
   const [form, setForm]         = useState(EMPTY_SPOUSE);
@@ -17,21 +39,21 @@ export default function ClientFamille() {
   const [error, setError]       = useState("");
   const [success, setSuccess]   = useState("");
 
-  // Fichiers bruts (File objects) pour upload Supabase
-  const [photoFile, setPhotoFile] = useState(null);
-  const [pieceFile, setPieceFile] = useState(null);
-  // Previews locaux (URL.createObjectURL)
+  const [photoFile, setPhotoFile]     = useState(null);
+  const [pieceFile, setPieceFile]     = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [pieceReady,   setPieceReady]   = useState(false);
-  // État upload
-  const [uploading, setUploading] = useState(false);
+  const [pieceReady, setPieceReady]   = useState(false);
+  const [uploading, setUploading]     = useState(false);
 
   const photoRef = useRef();
   const pieceRef = useRef();
 
   const load = () => {
     clientDepsAPI.get()
-      .then(res => setDeps(res.data.data))
+      .then(res => {
+        setDeps(res.data.data);
+        setTitular(res.data.titular || null);
+      })
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
   };
@@ -43,12 +65,9 @@ export default function ClientFamille() {
 
   const openModal = (type) => {
     setForm(type === "spouse" ? { ...EMPTY_SPOUSE } : { ...EMPTY_CHILD });
-    setPhotoFile(null);
-    setPieceFile(null);
-    setPhotoPreview(null);
-    setPieceReady(false);
-    setError("");
-    setModal(type);
+    setPhotoFile(null); setPieceFile(null);
+    setPhotoPreview(null); setPieceReady(false);
+    setError(""); setModal(type);
   };
 
   const handlePhotoChange = (file) => {
@@ -59,53 +78,35 @@ export default function ClientFamille() {
 
   const handlePieceChange = (file) => {
     if (!file) return;
-    setPieceFile(file);
-    setPieceReady(true);
+    setPieceFile(file); setPieceReady(true);
   };
 
   const handleAdd = async () => {
     if (!form.name || !form.firstname) return setError("Nom et prénom requis");
-    setError("");
-    setSaving(true);
-    setUploading(true);
-
+    setError(""); setSaving(true); setUploading(true);
     try {
-      // ── Upload vers Supabase Storage (plus de base64) ──────────
       const [photoUrl, pieceUrl] = await Promise.all([
         photoFile ? uploadFile(photoFile, "photos") : Promise.resolve(null),
         pieceFile ? uploadFile(pieceFile, "pieces") : Promise.resolve(null),
       ]);
       setUploading(false);
+      if (photoFile && !photoUrl) return setError("Échec de l'upload de la photo. Réessayez.");
+      if (pieceFile && !pieceUrl) return setError("Échec de l'upload du document. Réessayez.");
 
-      if (photoFile && !photoUrl)
-        return setError("Échec de l'upload de la photo. Réessayez.");
-      if (pieceFile && !pieceUrl)
-        return setError("Échec de l'upload du document. Réessayez.");
-
-      // ── Envoi au backend — uniquement des URLs, plus de base64 ─
       await clientDepsAPI.add({
-        type:              form.type,
-        name:              form.name,
-        firstname:         form.firstname,
-        birth_date:        form.birth_date,
-        birth_place:       form.birth_place,
+        type: form.type, name: form.name, firstname: form.firstname,
+        birth_date: form.birth_date, birth_place: form.birth_place,
         identity_document: form.identity_document,
-        photo:             photoUrl,
-        piece:             pieceUrl,
+        photo: photoUrl, piece: pieceUrl,
       });
 
       setSuccess(`${form.type === "spouse" ? "Conjoint(e)" : "Enfant"} ajouté(e) !`);
-      setModal(null);
-      load();
+      setModal(null); load();
       setTimeout(() => setSuccess(""), 3000);
-
     } catch (err) {
       setUploading(false);
-      const msg = err.response?.data?.error || err.message || "Erreur lors de l'enregistrement";
-      setError(msg);
-    } finally {
-      setSaving(false);
-    }
+      setError(err.response?.data?.error || err.message || "Erreur lors de l'enregistrement");
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
@@ -120,6 +121,24 @@ export default function ClientFamille() {
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
+
+      {/* CSS impression */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .dep-carte-print, .dep-carte-print * { visibility: visible !important; }
+          .dep-carte-print {
+            position: fixed !important; left: 0 !important; top: 0 !important;
+            width: 85.6mm !important; height: 54mm !important;
+            border-radius: 4mm !important; box-shadow: none !important;
+            margin: 0 !important; padding: 4mm !important; overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          @page { size: 85.6mm 54mm; margin: 0; }
+        }
+      `}</style>
+
       <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: "0 0 4px", letterSpacing: -.3 }}>Ma Famille</h1>
       <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>Gérez les bénéficiaires couverts par votre mutuelle</p>
 
@@ -133,8 +152,8 @@ export default function ClientFamille() {
       <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
         {[
           { icon: "👤", label: "Souscripteur", count: 1,              max: 1, color: "#1D4ED8", bg: "#EFF6FF" },
-          { icon: "💑", label: "Conjoint(e)",  count: spouse.length,   max: 1, color: "#DB2777", bg: "#FDF2F8" },
-          { icon: "👶", label: "Enfants",       count: children.length, max: 3, color: "#059669", bg: "#ECFDF5" },
+          { icon: "💑", label: "Conjoint(e)",  count: spouse.length,  max: 1, color: "#DB2777", bg: "#FDF2F8" },
+          { icon: "👶", label: "Enfants",      count: children.length, max: 3, color: "#059669", bg: "#ECFDF5" },
         ].map((item, i) => (
           <div key={i} style={{ flex: 1, background: "#fff", borderRadius: 16, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, boxShadow: "0 2px 10px rgba(0,0,0,.06)", border: `1.5px solid ${item.bg}` }}>
             <span style={{ fontSize: 22 }}>{item.icon}</span>
@@ -152,23 +171,30 @@ export default function ClientFamille() {
         canAdd={spouse.length < 1} onAdd={() => openModal("spouse")} />
       {spouse.length === 0
         ? <EmptyCard icon="💑" text="Aucun conjoint enregistré" color="#DB2777" onAdd={() => openModal("spouse")} />
-        : spouse.map(d => <DepCard key={d.id} dep={d} onDelete={handleDelete} />)}
+        : spouse.map(d => (
+            <DepCard key={d.id} dep={d} onDelete={handleDelete}
+              depNumber={buildDepNumber(titular?.mutual_number, "spouse", 1)}
+              titular={titular} />
+          ))}
 
       {/* ── Section Enfants ── */}
       <SectionHeader title={`Enfants (${children.length}/3)`} icon="👶" color="#059669"
         canAdd={children.length < 3} onAdd={() => openModal("child")} />
       {children.length === 0
         ? <EmptyCard icon="👶" text="Aucun enfant enregistré" color="#059669" onAdd={() => openModal("child")} />
-        : children.map(d => <DepCard key={d.id} dep={d} onDelete={handleDelete} />)}
+        : children.map((d, i) => (
+            <DepCard key={d.id} dep={d} onDelete={handleDelete}
+              depNumber={buildDepNumber(titular?.mutual_number, "child", i + 1)}
+              titular={titular} />
+          ))}
 
-      {/* ── Modal ── */}
+      {/* ── Modal ajout ── */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}
           onClick={() => !isBusy && setModal(null)}>
           <div style={{ background: "#fff", borderRadius: "28px 28px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
@@ -187,7 +213,7 @@ export default function ClientFamille() {
               </div>
             )}
 
-            {/* Photo d'identité */}
+            {/* Photo */}
             <div style={{ marginBottom: 20 }}>
               <label style={ls.label}>📸 Photo d'identité</label>
               <div onClick={() => photoRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "16px", textAlign: "center", cursor: "pointer", background: photoPreview ? "#F0FDF4" : "#F8FAFC", transition: "all .2s" }}>
@@ -199,35 +225,30 @@ export default function ClientFamille() {
                 onChange={e => handlePhotoChange(e.target.files[0])} />
             </div>
 
-            {/* Champs identité */}
+            {/* Champs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <Field label="Nom *" placeholder="Nom de famille" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} />
               <Field label="Prénom *" placeholder="Prénom" value={form.firstname} onChange={v => setForm(f => ({ ...f, firstname: v }))} />
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <Field label="Date de naissance" type="date" value={form.birth_date} onChange={v => setForm(f => ({ ...f, birth_date: v }))} />
               <Field label="Lieu de naissance" placeholder="Ville" value={form.birth_place} onChange={v => setForm(f => ({ ...f, birth_place: v }))} />
             </div>
-
             <div style={{ marginBottom: 20 }}>
               <Field
                 label={modal === "spouse" ? "N° CNI / Passeport" : "N° Extrait de naissance"}
                 placeholder="Numéro du document"
                 value={form.identity_document}
-                onChange={v => setForm(f => ({ ...f, identity_document: v }))}
-              />
+                onChange={v => setForm(f => ({ ...f, identity_document: v }))} />
             </div>
 
-            {/* Pièce justificative */}
+            {/* Pièce */}
             <div style={{ marginBottom: 24 }}>
               <label style={ls.label}>{modal === "spouse" ? "📄 CNI / Passeport (scan)" : "📄 Extrait de naissance (scan)"}</label>
               <div onClick={() => pieceRef.current?.click()} style={{ border: "2px dashed #CBD5E1", borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: pieceReady ? "#EFF6FF" : "#F8FAFC" }}>
                 <span style={{ fontSize: 28 }}>{pieceReady ? "✅" : "📎"}</span>
                 <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: pieceReady ? "#1D4ED8" : "#475569" }}>
-                    {pieceReady ? "Document prêt ✓" : "Importer le document"}
-                  </p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: pieceReady ? "#1D4ED8" : "#475569" }}>{pieceReady ? "Document prêt ✓" : "Importer le document"}</p>
                   <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94A3B8" }}>JPG, PNG ou PDF</p>
                 </div>
               </div>
@@ -235,7 +256,6 @@ export default function ClientFamille() {
                 onChange={e => handlePieceChange(e.target.files[0])} />
             </div>
 
-            {/* Bouton enregistrer */}
             <button onClick={handleAdd} disabled={isBusy} style={{ width: "100%", background: isBusy ? "#94A3B8" : modal === "spouse" ? "linear-gradient(135deg,#DB2777,#9D174D)" : "linear-gradient(135deg,#059669,#065F46)", color: "#fff", border: "none", borderRadius: 14, padding: 16, fontSize: 15, fontWeight: 700, cursor: isBusy ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.2)", transition: "background .2s" }}>
               {uploading ? "⬆️ Upload en cours..." : saving ? "⏳ Enregistrement..." : `✅ Enregistrer ${modal === "spouse" ? "le conjoint" : "l'enfant"}`}
             </button>
@@ -246,6 +266,169 @@ export default function ClientFamille() {
   );
 }
 
+// ── Carte ayant droit ─────────────────────────────────────────────
+function DepCard({ dep, onDelete, depNumber, titular }) {
+  const [expanded, setExpanded]     = useState(false);
+  const [showCarte, setShowCarte]   = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const carteRef = useRef();
+
+  const gradient = DEP_GRADIENTS[dep.type] || DEP_GRADIENTS.child;
+  const expiry   = titular?.expiration_date
+    ? new Date(titular.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "numeric" })
+    : "12/2026";
+
+  const qrUrl = depNumber
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(buildQrContent(dep, depNumber))}&bgcolor=ffffff&color=1a56db&margin=8`
+    : null;
+
+  const handleDownload = async () => {
+    if (!carteRef.current) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(carteRef.current, { scale: 3, useCORS: true, backgroundColor: null, logging: false });
+      const link = document.createElement("a");
+      link.download = `carte-${depNumber || dep.firstname}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch { alert("Impossible de télécharger. Réessayez."); }
+    finally { setDownloading(false); }
+  };
+
+  const handlePrint = () => window.print();
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 16, marginBottom: 10, boxShadow: "0 2px 10px rgba(0,0,0,.06)", overflow: "hidden" }}>
+
+      {/* Ligne résumé */}
+      <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => setExpanded(!expanded)}>
+        <div style={{ width: 50, height: 50, background: dep.type === "spouse" ? "#FDF2F8" : "#ECFDF5", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, overflow: "hidden" }}>
+          {dep.photo
+            ? <img src={dep.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : (dep.type === "spouse" ? "💑" : "👶")}
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: "0 0 2px" }}>{dep.firstname} {dep.name}</p>
+          <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
+            {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
+            {dep.birth_date ? ` · Né(e) le ${new Date(dep.birth_date).toLocaleDateString("fr-FR")}` : ""}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 16, color: "#94A3B8", transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+          <button onClick={e => { e.stopPropagation(); onDelete(dep.id); }} style={{ background: "#FEF2F2", border: "none", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+        </div>
+      </div>
+
+      {/* Détails + carte */}
+      {expanded && (
+        <div style={{ borderTop: "1px solid #F1F5F9", padding: "14px 16px", background: "#FAFAFA" }}>
+          {dep.birth_place && <InfoRow label="Lieu de naissance" value={dep.birth_place} />}
+          {dep.identity_document && <InfoRow label={dep.type === "spouse" ? "N° CNI/Passeport" : "N° Extrait"} value={dep.identity_document} />}
+          {dep.piece && (
+            <div style={{ marginTop: 8, marginBottom: 12 }}>
+              <a href={dep.piece} target="_blank" rel="noreferrer" style={{ color: "#1D4ED8", fontSize: 13, fontWeight: 600 }}>📄 Voir le document</a>
+            </div>
+          )}
+
+          {/* Bouton afficher carte */}
+          <button
+            onClick={() => setShowCarte(!showCarte)}
+            style={{ width: "100%", background: showCarte ? "#F1F5F9" : gradient, color: showCarte ? "#475569" : "#fff", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .2s" }}>
+            💳 {showCarte ? "Masquer la carte" : "Voir la carte mutualiste"}
+          </button>
+
+          {/* ── Carte ayant droit ── */}
+          {showCarte && (
+            <div style={{ marginTop: 16 }}>
+
+              {/* Carte physique */}
+              <div
+                ref={carteRef}
+                className="dep-carte-print"
+                style={{ background: gradient, borderRadius: 20, padding: 18, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.25)", marginBottom: 12 }}>
+
+                {/* Cercles décoratifs */}
+                <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", bottom: -30, left: -20, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
+
+                {/* Ligne 1 : logo + N° */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <div style={{ width: 36, height: 36, background: "rgba(255,255,255,.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.2)", flexShrink: 0 }}>A</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2 }}>AWOUNDJÔ</div>
+                    <div style={{ fontSize: 9, opacity: .7 }}>Mutuelle Santé · Côte d'Ivoire</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 8, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Ayant droit</div>
+                    <div style={{ fontSize: 10, fontWeight: 800, fontFamily: "monospace", background: "rgba(255,255,255,.18)", borderRadius: 6, padding: "2px 8px", border: "1px solid rgba(255,255,255,.25)" }}>
+                      {depNumber}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ligne 2 : photo + nom */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.4)", flexShrink: 0, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                    {dep.photo
+                      ? <img src={dep.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+                      : (dep.type === "spouse" ? "💑" : "👶")}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
+                      {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: -.3 }}>{dep.firstname} {dep.name}</div>
+                    {dep.birth_date && (
+                      <div style={{ fontSize: 10, opacity: .75, marginTop: 2 }}>
+                        Né(e) le {new Date(dep.birth_date).toLocaleDateString("fr-FR")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ligne 3 : formule + expiry + QR */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                  <div>
+                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Formule</div>
+                    <div style={{ fontSize: 13, fontWeight: 800 }}>{titular?.plan || "ESSENTIELLE"}</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Expire le</div>
+                    <div style={{ fontSize: 13, fontWeight: 800 }}>{expiry}</div>
+                  </div>
+                  {qrUrl && (
+                    <div style={{ width: 48, height: 48, background: "#fff", borderRadius: 8, overflow: "hidden", border: "2px solid rgba(255,255,255,.3)", flexShrink: 0 }}>
+                      <img src={qrUrl} alt="QR" style={{ width: "100%", height: "100%", objectFit: "contain" }} crossOrigin="anonymous" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Boutons télécharger / imprimer */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  style={{ flex: 1, background: downloading ? "#94A3B8" : "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 10px", fontSize: 13, fontWeight: 700, cursor: downloading ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  {downloading ? "⏳ Export..." : "⬇️ Télécharger"}
+                </button>
+                <button
+                  onClick={handlePrint}
+                  style={{ flex: 1, background: "linear-gradient(135deg,#0891B2,#164e63)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  🖨️ Imprimer
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Composants utilitaires ────────────────────────────────────────
 function Field({ label, placeholder, value, onChange, type = "text" }) {
   return (
     <div>
@@ -282,42 +465,6 @@ function EmptyCard({ icon, text, color, onAdd }) {
   );
 }
 
-function DepCard({ dep, onDelete }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div style={{ background: "#fff", borderRadius: 16, marginBottom: 10, boxShadow: "0 2px 10px rgba(0,0,0,.06)", overflow: "hidden" }}>
-      <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => setExpanded(!expanded)}>
-        <div style={{ width: 50, height: 50, background: dep.type === "spouse" ? "#FDF2F8" : "#ECFDF5", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, overflow: "hidden" }}>
-          {dep.photo ? <img src={dep.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dep.type === "spouse" ? "💑" : "👶")}
-        </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: "0 0 2px" }}>{dep.firstname} {dep.name}</p>
-          <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
-            {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
-            {dep.birth_date ? ` · Né(e) le ${new Date(dep.birth_date).toLocaleDateString("fr-FR")}` : ""}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 16, color: "#94A3B8", transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-          <button onClick={e => { e.stopPropagation(); onDelete(dep.id); }} style={{ background: "#FEF2F2", border: "none", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-        </div>
-      </div>
-      {expanded && (
-        <div style={{ borderTop: "1px solid #F1F5F9", padding: "14px 16px", background: "#FAFAFA" }}>
-          {dep.birth_place && <InfoRow label="Lieu de naissance" value={dep.birth_place} />}
-          {dep.identity_document && <InfoRow label={dep.type === "spouse" ? "N° CNI/Passeport" : "N° Extrait"} value={dep.identity_document} />}
-          {dep.piece && (
-            <div style={{ marginTop: 10 }}>
-              <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 6px", fontWeight: 600, textTransform: "uppercase", letterSpacing: .8 }}>Document</p>
-              <a href={dep.piece} target="_blank" rel="noreferrer" style={{ color: "#1D4ED8", fontSize: 13, fontWeight: 600 }}>📄 Voir le document</a>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function InfoRow({ label, value }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -341,3 +488,12 @@ function Skeleton() {
 const ls = {
   label: { display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: .6 },
 };
+
+// Helpers (déclarés ici pour éviter les imports circulaires)
+function buildQrContent(dep, depNumber) {
+  return [
+    `Carte: ${depNumber}`,
+    `Nom: ${dep.firstname} ${dep.name}`,
+    `Type: ${dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}`,
+  ].join(" | ");
+}
