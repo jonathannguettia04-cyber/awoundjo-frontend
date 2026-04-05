@@ -11,7 +11,7 @@ const TYPES = [
 ];
 
 const TYPE_MAP = Object.fromEntries(TYPES.map((t) => [t.id, t]));
-const EMPTY = { name: "", type: "pharmacy", address: "", city: "", phone: "", phone2: "", email: "", website: "" };
+const EMPTY = { name: "", type: "pharmacy", address: "", city: "", commune: "", phone: "", phone2: "", email: "", website: "" };
 
 export default function HealthcareAdmin() {
   const [providers,    setProviders]    = useState([]);
@@ -51,7 +51,7 @@ export default function HealthcareAdmin() {
     setEditing(p);
     setForm({
       name: p.name, type: p.type,
-      address: p.address || "", city: p.city || "",
+      address: p.address || "", city: p.city || "", commune: p.commune || "",
       phone: p.phone || "", phone2: p.phone2 || "",
       email: p.email || "", website: p.website || "",
     });
@@ -111,6 +111,7 @@ export default function HealthcareAdmin() {
           name:    String(row["Nom"]         || row["name"]    || "").trim(),
           type:    String(row["Type"]        || row["type"]    || "pharmacy").trim().toLowerCase(),
           city:    String(row["Ville"]       || row["city"]    || "").trim(),
+          commune: String(row["Commune"]     || row["commune"] || "").trim(),
           address: String(row["Adresse"]     || row["address"] || "").trim(),
           phone:   String(row["Téléphone"]   || row["phone"]   || "").trim(),
           phone2:  String(row["Téléphone 2"] || row["phone2"]  || "").trim(),
@@ -149,8 +150,24 @@ export default function HealthcareAdmin() {
     const matchCity   = !filterCity || filterCity === "Toutes" || p.city === filterCity;
     const matchSearch = !search
       || p.name.toLowerCase().includes(search.toLowerCase())
-      || (p.city || "").toLowerCase().includes(search.toLowerCase());
+      || (p.city || "").toLowerCase().includes(search.toLowerCase())
+      || (p.commune || "").toLowerCase().includes(search.toLowerCase());
     return matchType && matchCity && matchSearch;
+  });
+
+  // Groupement 2 niveaux : ville → commune
+  const groupedByCity = filtered.reduce((acc, p) => {
+    const city    = p.city?.trim()    || "Sans ville";
+    const commune = p.commune?.trim() || "Sans commune";
+    if (!acc[city]) acc[city] = {};
+    if (!acc[city][commune]) acc[city][commune] = [];
+    acc[city][commune].push(p);
+    return acc;
+  }, {});
+  const sortedCities = Object.keys(groupedByCity).sort((a, b) => {
+    if (a === "Sans ville") return 1;
+    if (b === "Sans ville") return -1;
+    return a.localeCompare(b, "fr");
   });
 
   const counts = TYPES.reduce((acc, t) => {
@@ -270,8 +287,36 @@ export default function HealthcareAdmin() {
           <p className="font-medium">Aucun établissement trouvé</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((p) => {
+        <div className="space-y-10">
+          {sortedCities.map((city) => {
+            const communesInCity = Object.keys(groupedByCity[city]).sort((a, b) => {
+              if (a === "Sans commune") return 1;
+              if (b === "Sans commune") return -1;
+              return a.localeCompare(b, "fr");
+            });
+            const totalInCity = communesInCity.reduce((n, c) => n + groupedByCity[city][c].length, 0);
+            return (
+            <div key={city}>
+              {/* En-tête VILLE */}
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-base">📍</span>
+                <h3 className="font-bold text-slate-800 text-base uppercase tracking-wide">{city}</h3>
+                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{totalInCity} établissement(s)</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              {/* Communes */}
+              <div className="space-y-6 pl-4 border-l-2 border-slate-100">
+                {communesInCity.map((commune) => (
+                  <div key={commune}>
+                    {/* En-tête COMMUNE */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-sm">🏘</span>
+                      <h4 className="font-semibold text-slate-600 text-sm">{commune}</h4>
+                      <span className="text-xs text-slate-300 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{groupedByCity[city][commune].length}</span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {groupedByCity[city][commune].map((p) => {
             const t = TYPE_MAP[p.type] || TYPE_MAP.pharmacy;
             return (
               <div key={p.id}
@@ -287,8 +332,8 @@ export default function HealthcareAdmin() {
                   </div>
                 </div>
                 <p className="font-bold text-slate-800 text-sm leading-tight">{p.name}</p>
-                {(p.address || p.city) && (
-                  <p className="text-xs text-slate-400 mt-1">📍 {[p.address, p.city].filter(Boolean).join(", ")}</p>
+                {(p.address || p.commune || p.city) && (
+                  <p className="text-xs text-slate-400 mt-1">📍 {[p.address, p.commune, p.city].filter(Boolean).join(", ")}</p>
                 )}
                 {p.phone && (
                   <p className="text-xs text-slate-500 mt-0.5">📞 {p.phone}{p.phone2 ? ` · ${p.phone2}` : ""}</p>
@@ -312,6 +357,13 @@ export default function HealthcareAdmin() {
                   )}
                 </div>
               </div>
+            );
+          })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             );
           })}
         </div>
@@ -339,6 +391,12 @@ export default function HealthcareAdmin() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Ville</label>
               <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
                 placeholder="Ex : Abidjan"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Commune</label>
+              <input value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })}
+                placeholder="Ex : Cocody, Yopougon, Abobo…"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div className="sm:col-span-2">
