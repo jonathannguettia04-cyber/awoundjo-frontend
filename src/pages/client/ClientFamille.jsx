@@ -109,11 +109,6 @@ export default function ClientFamille() {
     } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer ce bénéficiaire ?")) return;
-    try { await clientDepsAPI.remove(id); load(); }
-    catch (err) { alert(err.response?.data?.error || "Erreur"); }
-  };
 
   if (loading) return <Skeleton />;
 
@@ -172,7 +167,7 @@ export default function ClientFamille() {
       {spouse.length === 0
         ? <EmptyCard icon="💑" text="Aucun conjoint enregistré" color="#DB2777" onAdd={() => openModal("spouse")} />
         : spouse.map(d => (
-            <DepCard key={d.id} dep={d} onDelete={handleDelete}
+            <DepCard key={d.id} dep={d}
               depNumber={buildDepNumber(titular?.mutual_number, "spouse", 1)}
               titular={titular} />
           ))}
@@ -183,7 +178,7 @@ export default function ClientFamille() {
       {children.length === 0
         ? <EmptyCard icon="👶" text="Aucun enfant enregistré" color="#059669" onAdd={() => openModal("child")} />
         : children.map((d, i) => (
-            <DepCard key={d.id} dep={d} onDelete={handleDelete}
+            <DepCard key={d.id} dep={d}
               depNumber={buildDepNumber(titular?.mutual_number, "child", i + 1)}
               titular={titular} />
           ))}
@@ -267,7 +262,7 @@ export default function ClientFamille() {
 }
 
 // ── Carte ayant droit ─────────────────────────────────────────────
-function DepCard({ dep, onDelete, depNumber, titular }) {
+function DepCard({ dep, depNumber, titular }) {
   const [expanded, setExpanded]     = useState(false);
   const [showCarte, setShowCarte]   = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -317,7 +312,6 @@ function DepCard({ dep, onDelete, depNumber, titular }) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: 16, color: "#94A3B8", transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-          <button onClick={e => { e.stopPropagation(); onDelete(dep.id); }} style={{ background: "#FEF2F2", border: "none", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 14 }}>🗑️</button>
         </div>
       </div>
 
