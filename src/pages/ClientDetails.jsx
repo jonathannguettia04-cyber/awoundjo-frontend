@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 
-import { clientAPI, paymentsAPI } from "../services/api";
+import { clientAPI, paymentsAPI, depsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import Modal from "../components/Modal";
@@ -34,9 +34,46 @@ export default function ClientDetails() {
   const [paySuccess,    setPaySuccess]    = useState("");
   const [showDelete,    setShowDelete]    = useState(false);
 
+  // Famille / Ayants droit
+  const [deps,          setDeps]          = useState([]);
+  const [depsLoading,   setDepsLoading]   = useState(false);
+  const [showDepEdit,   setShowDepEdit]   = useState(false);
+  const [depEditTarget, setDepEditTarget] = useState(null); // dep en cours d'édition
+  const [depForm,       setDepForm]       = useState({});
+  const [depSaving,     setDepSaving]     = useState(false);
+  const [depError,      setDepError]      = useState("");
+  const [depDeleteTarget, setDepDeleteTarget] = useState(null);
+
   async function handleDeleteClient(password) {
     await clientAPI.delete(id, { data: { adminPassword: password } });
     navigate("/clients");
+  }
+
+  async function loadDeps() {
+    setDepsLoading(true);
+    try {
+      const { data } = await depsAPI.getByClient(id);
+      setDeps(data.dependents || []);
+    } catch { /* ignore */ }
+    finally { setDepsLoading(false); }
+  }
+
+  async function handleDepEdit(e) {
+    e.preventDefault();
+    setDepSaving(true); setDepError("");
+    try {
+      await depsAPI.update(depEditTarget.id, depForm);
+      setShowDepEdit(false);
+      loadDeps();
+    } catch (err) {
+      setDepError(err.response?.data?.error || "Erreur lors de la modification");
+    } finally { setDepSaving(false); }
+  }
+
+  async function handleDepDelete(password) {
+    await depsAPI.deleteWithPassword(depDeleteTarget.id, password);
+    setDepDeleteTarget(null);
+    loadDeps();
   }
 
   async function loadClient() {
@@ -58,7 +95,7 @@ export default function ClientDetails() {
     }
   }
 
-  useEffect(() => { loadClient(); }, [id]);
+  useEffect(() => { loadClient(); loadDeps(); }, [id]);
 
   // Gestion retour CinetPay après redirect
   useEffect(() => {
@@ -289,6 +326,85 @@ export default function ClientDetails() {
         )}
       </div>
 
+
+      {/* ── Famille / Ayants droit (admin only) ── */}
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800">👨‍👩‍👧 Ayants droit</h2>
+            <span className="text-xs text-slate-400">{deps.length} membre(s)</span>
+          </div>
+
+          {depsLoading ? (
+            <div className="text-center py-8 text-slate-400 text-sm">Chargement…</div>
+          ) : deps.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <p className="text-3xl mb-2">👤</p>
+              <p className="text-sm">Aucun ayant droit enregistré</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {deps.map((dep) => (
+                <div key={dep.id} className="px-5 py-4 flex items-center gap-4">
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center font-bold text-brand-600 text-sm flex-shrink-0 overflow-hidden">
+                    {dep.photo
+                      ? <img src={dep.photo} alt="" className="w-full h-full object-cover" />
+                      : (dep.firstname || dep.name || "?").charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Infos */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 text-sm">
+                      {dep.firstname} {dep.name}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
+                      {dep.birth_date && ` · ${new Date(dep.birth_date).toLocaleDateString("fr-FR")}`}
+                      {dep.birth_place && ` · ${dep.birth_place}`}
+                    </p>
+                    {dep.identity_document && (
+                      <p className="text-xs text-slate-400 mt-0.5">N° pièce : {dep.identity_document}</p>
+                    )}
+                    {dep.piece && (
+                      <a href={dep.piece} target="_blank" rel="noreferrer"
+                        className="text-xs text-brand-600 hover:underline mt-0.5 block">
+                        📎 Voir la pièce d'identité
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Actions admin */}
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        setDepEditTarget(dep);
+                        setDepForm({
+                          name:              dep.name              || "",
+                          firstname:         dep.firstname         || "",
+                          birth_date:        dep.birth_date        ? dep.birth_date.split("T")[0] : "",
+                          birth_place:       dep.birth_place       || "",
+                          identity_document: dep.identity_document || "",
+                        });
+                        setDepError("");
+                        setShowDepEdit(true);
+                      }}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                      ✏️ Modifier
+                    </button>
+                    <button
+                      onClick={() => setDepDeleteTarget(dep)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modal modification */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Modifier le client">
         <form onSubmit={handleEdit} className="space-y-4">
@@ -416,6 +532,67 @@ export default function ClientDetails() {
         title={`Supprimer le client "${client?.client?.name}" ?`}
         description="Cela supprimera définitivement ce client et tous ses paiements associés."
         label={client?.client?.name}
+      />
+
+      {/* Modal modifier ayant droit */}
+      <Modal open={showDepEdit} onClose={() => setShowDepEdit(false)} title="✏️ Modifier l'ayant droit">
+        <form onSubmit={handleDepEdit} className="space-y-4">
+          {depError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{depError}</div>
+          )}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nom *</label>
+              <input required value={depForm.name || ""}
+                onChange={e => setDepForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Prénom *</label>
+              <input required value={depForm.firstname || ""}
+                onChange={e => setDepForm(f => ({ ...f, firstname: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Date de naissance</label>
+              <input type="date" value={depForm.birth_date || ""}
+                onChange={e => setDepForm(f => ({ ...f, birth_date: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Lieu de naissance</label>
+              <input value={depForm.birth_place || ""}
+                onChange={e => setDepForm(f => ({ ...f, birth_place: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">N° pièce d'identité</label>
+              <input value={depForm.identity_document || ""}
+                onChange={e => setDepForm(f => ({ ...f, identity_document: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" onClick={() => setShowDepEdit(false)}
+              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Annuler
+            </button>
+            <button type="submit" disabled={depSaving}
+              className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold disabled:opacity-60">
+              {depSaving ? "Sauvegarde…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal supprimer ayant droit */}
+      <ConfirmDeleteModal
+        open={!!depDeleteTarget}
+        onClose={() => setDepDeleteTarget(null)}
+        onConfirm={handleDepDelete}
+        title={`Supprimer l'ayant droit "${depDeleteTarget?.firstname} ${depDeleteTarget?.name}" ?`}
+        description="Cette action est irréversible."
+        label={`${depDeleteTarget?.firstname || ""} ${depDeleteTarget?.name || ""}`}
       />
     </div>
   );

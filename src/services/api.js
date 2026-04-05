@@ -125,4 +125,12 @@ export const healthcareAPI = {
   addAnalyse:      (clientId, data) => api.post(`/healthcare/medical/${clientId}/analyses`, data),
 };
 
+
+// ── AYANTS DROIT (admin) ─────────────────────────────────────────
+export const depsAPI = {
+  getByClient:       (clientId)       => api.get(`/clients/${clientId}/dependents`),
+  update:            (depId, data)    => api.put(`/dependents/${depId}`, data),
+  deleteWithPassword:(depId, password)=> api.delete(`/dependents/${depId}`, { data: { adminPassword: password } }),
+};
+
 export default api;
