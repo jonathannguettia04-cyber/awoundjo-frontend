@@ -1,8 +1,10 @@
 // src/pages/Agents.jsx
 import { useEffect, useState } from "react";
 import { agentsAPI } from "../services/api";
+import axios from "axios";
 import { useRole, ROLE_LABELS, ROLE_COLORS } from "../context/RoleContext";
 import Modal from "../components/Modal";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
 const EMPTY = { name: "", phone: "", email: "", role: "AGENT", password: "" };
 
@@ -40,7 +42,9 @@ export default function Agents() {
   const [form,      setForm]      = useState(EMPTY);
   const [saving,    setSaving]    = useState(false);
   const [formError, setFormError] = useState("");
-  const [search,    setSearch]    = useState("");
+  const [search,       setSearch]       = useState("");
+  const [deleteTarget,  setDeleteTarget]  = useState(null); // { id, name, clientCount }
+  const [togglingId,    setTogglingId]    = useState(null);
 
   const creatableRoles = getCreatableRoles(userRole);
 
@@ -73,9 +77,24 @@ export default function Agents() {
     } finally { setSaving(false); }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm("Supprimer cet agent ?")) return;
-    try { await agentsAPI.delete(id); load(); } catch { /* ignore */ }
+  async function handleToggleStatus(agent) {
+    if (!window.confirm(
+      agent.active
+        ? `Suspendre l'agent "${agent.name}" ? Il ne pourra plus se connecter.`
+        : `Réactiver l'agent "${agent.name}" ?`
+    )) return;
+    setTogglingId(agent.id);
+    try {
+      await axios.patch(`/api/agents/${agent.id}/toggle-status`);
+      load();
+    } catch { /* ignore */ }
+    finally { setTogglingId(null); }
+  }
+
+  async function handleDelete(password) {
+    await agentsAPI.delete(deleteTarget.id, { data: { adminPassword: password } });
+    setDeleteTarget(null);
+    load();
   }
 
   const filtered = agents.filter(a =>
@@ -170,7 +189,16 @@ export default function Agents() {
                     <td className="px-5 py-3 text-slate-600">{agent.client_count || 0} client(s)</td>
                     {isAdmin && (
                       <td className="px-5 py-3">
-                        <button onClick={() => handleDelete(agent.id)}
+                        <button
+                          onClick={() => handleToggleStatus(agent)}
+                          disabled={togglingId === agent.id}
+                          className={`text-xs font-semibold border rounded-lg px-3 py-1.5 transition-colors mr-2 disabled:opacity-50
+                            ${agent.active
+                              ? "text-amber-600 border-amber-200 hover:bg-amber-50"
+                              : "text-green-600 border-green-200 hover:bg-green-50"}`}>
+                          {togglingId === agent.id ? "…" : agent.active ? "Suspendre" : "Réactiver"}
+                        </button>
+                        <button onClick={() => setDeleteTarget({ id: agent.id, name: agent.name, clientCount: agent.client_count || 0 })}
                           className="text-xs text-red-500 hover:text-red-700 font-semibold border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors">
                           Supprimer
                         </button>
@@ -194,8 +222,19 @@ export default function Agents() {
                   <p className="text-xs text-slate-400">{agent.phone}</p>
                   <div className="mt-1"><RoleBadge role={agent.role} /></div>
                 </div>
-                <div className="text-right flex-shrink-0">
+                <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                   <p className="text-xs text-slate-500">{agent.client_count || 0} clients</p>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleToggleStatus(agent)}
+                      disabled={togglingId === agent.id}
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-lg border transition-colors disabled:opacity-50
+                        ${agent.active
+                          ? "text-amber-600 border-amber-200 hover:bg-amber-50"
+                          : "text-green-600 border-green-200 hover:bg-green-50"}`}>
+                      {togglingId === agent.id ? "…" : agent.active ? "Suspendre" : "Réactiver"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -290,6 +329,16 @@ export default function Agents() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal suppression définitive */}
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title={`Supprimer l'agent "${deleteTarget?.name}" ?`}
+        description={`Cela supprimera aussi ses ${deleteTarget?.clientCount} client(s) et tous leurs paiements associés.`}
+        label={deleteTarget?.name}
+      />
     </div>
   );
 }

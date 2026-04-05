@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 
 import { clientAPI, paymentsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import Modal from "../components/Modal";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
 const PLANS    = ["ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
 const STATUSES = ["actif", "attente", "suspendu"];
@@ -13,6 +14,7 @@ const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 export default function ClientDetails() {
   const { id } = useParams();
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const [client,  setClient]  = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,13 @@ export default function ClientDetails() {
   const [payForm,    setPayForm]    = useState({ amount: "", type: "mensualite", payment_method: "cash" });
   const [paySaving,  setPaySaving]  = useState(false);
   const [payError,   setPayError]   = useState("");
-  const [paySuccess, setPaySuccess] = useState("");
+  const [paySuccess,    setPaySuccess]    = useState("");
+  const [showDelete,    setShowDelete]    = useState(false);
+
+  async function handleDeleteClient(password) {
+    await clientAPI.delete(id, { data: { adminPassword: password } });
+    navigate("/clients");
+  }
 
   async function loadClient() {
     setLoading(true);
@@ -203,6 +211,14 @@ export default function ClientDetails() {
                 className="border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 ✏️ Modifier
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setShowDelete(true)}
+                className="border border-red-200 hover:bg-red-50 text-red-600 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                🗑️ Supprimer
               </button>
             )}
           </div>
@@ -392,6 +408,15 @@ export default function ClientDetails() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        onConfirm={handleDeleteClient}
+        title={`Supprimer le client "${client?.client?.name}" ?`}
+        description="Cela supprimera définitivement ce client et tous ses paiements associés."
+        label={client?.client?.name}
+      />
     </div>
   );
 }

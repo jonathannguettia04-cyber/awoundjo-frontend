@@ -511,7 +511,7 @@ export default function ClientCotisations() {
 
       <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
         🔒 Paiements sécurisés via CinetPay · Awoundjô Mutuelle Santé CI<br />
-        En cas de problème : <strong>+225 XX XX XX XX</strong>
+        En cas de problème : <strong>+225 01 71 72 16 68</strong>
       </p>
     </div>
   );

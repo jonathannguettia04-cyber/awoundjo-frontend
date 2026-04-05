@@ -1,6 +1,7 @@
 // src/pages/client/ClientProfil.jsx
 import { useState, useRef, useEffect } from "react";
 import { clientLogout, getClientData, clientProfileAPI } from "../../clientApi";
+import { uploadFile } from "../../supabaseClient";
 
 export default function ClientProfil() {
   const [client, setClient]   = useState(getClientData());
@@ -27,17 +28,19 @@ export default function ClientProfil() {
 
   useEffect(() => { setTimeout(() => setVis(true), 100); }, []);
 
-  const toBase64 = (file) => new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
+  const [uploading, setUploading] = useState(false);
 
   const handleFile = async (key, file) => {
     if (!file) return;
-    const b64 = await toBase64(file);
-    setForm(f => ({ ...f, [key]: b64 }));
+    setUploading(true);
+    try {
+      const bucket = key === "photo" ? "photos" : "pieces";
+      const url = await uploadFile(file, bucket);
+      if (!url) { setError("Échec de l\'upload. Réessayez."); return; }
+      setForm(f => ({ ...f, [key]: url }));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleUpdateProfile = async () => {
@@ -186,8 +189,8 @@ export default function ClientProfil() {
             <input ref={pieceRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={e => handleFile("piece", e.target.files[0])} />
           </div>
 
-          <button onClick={handleUpdateProfile} disabled={saving} style={ls.submitBtn}>
-            {saving ? "⏳ Sauvegarde..." : "💾 Sauvegarder les modifications"}
+          <button onClick={handleUpdateProfile} disabled={saving || uploading} style={ls.submitBtn}>
+            {uploading ? "⬆️ Upload en cours..." : saving ? "⏳ Sauvegarde..." : "💾 Sauvegarder les modifications"}
           </button>
         </Modal>
       )}
