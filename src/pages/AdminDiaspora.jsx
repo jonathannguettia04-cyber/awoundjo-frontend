@@ -151,16 +151,22 @@ function PendingValidationSection({ ambassadors, onValidate }) {
 }
 
 export default function AdminDiaspora() {
-  const [ambassadors, setAmbassadors]     = useState([]);
-  const [filtered, setFiltered]           = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState("");
-  const [search, setSearch]               = useState("");
-  const [roleFilter, setRoleFilter]       = useState("ALL");
-  const [statusFilter, setStatusFilter]   = useState("ALL");
-  const [validFilter, setValidFilter]     = useState("ALL");
-  const [selected, setSelected]           = useState(null);
-  const [validating, setValidating]       = useState(null); // id en cours
+  const [ambassadors, setAmbassadors]       = useState([]);
+  const [filtered, setFiltered]             = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState("");
+  const [search, setSearch]                 = useState("");
+  const [roleFilter, setRoleFilter]         = useState("ALL");
+  const [statusFilter, setStatusFilter]     = useState("ALL");
+  const [validFilter, setValidFilter]       = useState("ALL");
+  const [selected, setSelected]             = useState(null);
+  const [validating, setValidating]         = useState(null);
+
+  // ✅ FIX : états manquants pour la modal de suppression
+  const [deleteTarget, setDeleteTarget]     = useState(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError]       = useState("");
+  const [deleting, setDeleting]             = useState(false);
 
   const stats = {
     total:      ambassadors.length,
