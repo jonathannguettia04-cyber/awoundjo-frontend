@@ -241,6 +241,24 @@ export default function AdminDiaspora() {
     }
   }
 
+  async function handleDeleteAmbassador() {
+    if (!deletePassword) { setDeleteError("Mot de passe requis"); return; }
+    setDeleting(true); setDeleteError("");
+    try {
+      await axios.delete(
+        `${API}/api/diaspora/admin/ambassadors/${deleteTarget.id}`,
+        {
+          headers: { Authorization: `Bearer ${agentToken()}` },
+          data: { adminPassword: deletePassword },
+        }
+      );
+      setDeleteTarget(null); setDeletePassword("");
+      fetchAmbassadors();
+    } catch (e) {
+      setDeleteError(e.response?.data?.error || "Erreur suppression");
+    } finally { setDeleting(false); }
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:1100, margin:"0 auto" }}>
 
@@ -448,6 +466,12 @@ export default function AdminDiaspora() {
                         style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${amb.status==="ACTIVE"?C.red:C.green}`, background:"#fff", color:amb.status==="ACTIVE"?C.red:C.green, fontWeight:700, fontSize:12, cursor:"pointer" }}>
                         {amb.status === "ACTIVE" ? "🚫 Suspendre" : "✅ Réactiver"}
                       </button>
+
+                      {/* Supprimer définitivement */}
+                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(amb); setDeletePassword(""); setDeleteError(""); }}
+                        style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid #DC2626`, background:"#FEF2F2", color:"#DC2626", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                        🗑️ Supprimer
+                      </button>
                     </div>
                   </div>
                 )}
@@ -461,6 +485,58 @@ export default function AdminDiaspora() {
         <p style={{ marginTop:16, textAlign:"center", color:C.slate, fontSize:12 }}>
           {filtered.length} ambassadeur(s) sur {ambassadors.length} au total
         </p>
+      )}
+
+      {/* ── Modal suppression ambassadeur ── */}
+      {deleteTarget && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.6)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:500, padding:20 }}
+          onClick={() => setDeleteTarget(null)}>
+          <div style={{ background:"#fff", borderRadius:20, padding:"28px 24px", width:"100%", maxWidth:440 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin:"0 0 16px", fontSize:18, fontWeight:800, color:"#0F172A" }}>⚠️ Suppression définitive</h3>
+
+            <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:12, padding:"14px 16px", marginBottom:20 }}>
+              <p style={{ margin:"0 0 4px", fontWeight:700, color:"#DC2626", fontSize:14 }}>
+                Supprimer l'ambassadeur "{deleteTarget.name}" ?
+              </p>
+              <p style={{ margin:0, fontSize:12, color:"#EF4444" }}>
+                Cela supprimera définitivement ses bénéficiaires, paiements, commissions et notifications.
+              </p>
+              <p style={{ margin:"8px 0 0", fontSize:12, fontWeight:700, color:"#DC2626" }}>
+                ⚠️ Cette action est irréversible.
+              </p>
+            </div>
+
+            <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#475569", marginBottom:6, textTransform:"uppercase", letterSpacing:.6 }}>
+              Confirmez avec votre mot de passe admin
+            </label>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              placeholder="Votre mot de passe"
+              autoFocus
+              style={{ width:"100%", border:"1.5px solid #E2E8F0", borderRadius:10, padding:"11px 14px", fontSize:14, boxSizing:"border-box", marginBottom:12, outline:"none" }}
+            />
+
+            {deleteError && (
+              <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:8, padding:"10px 14px", color:"#DC2626", fontSize:13, marginBottom:12 }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                style={{ padding:"10px 18px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff", color:"#64748B", fontWeight:600, fontSize:13, cursor:"pointer" }}>
+                Annuler
+              </button>
+              <button onClick={handleDeleteAmbassador} disabled={deleting || !deletePassword}
+                style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"#DC2626", color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer", opacity: deleting || !deletePassword ? 0.6 : 1 }}>
+                {deleting ? "Suppression…" : "Supprimer définitivement"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
