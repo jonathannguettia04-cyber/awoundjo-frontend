@@ -126,7 +126,8 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         throw new Error(createData?.error || createData?.message || "Erreur lors de la création du compte.");
       }
 
-      const { ambassador_id, transaction_id } = createData.data;
+      const payload = createData.data ?? createData;
+      const { ambassador_id, transaction_id } = payload;
 
       if (!ambassador_id || !transaction_id) {
         throw new Error("Réponse serveur invalide (ambassador_id ou transaction_id manquant).");
