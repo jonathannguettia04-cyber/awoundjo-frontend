@@ -280,7 +280,9 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
       plan:    form.plan,
     }));
 
-    const txId = `AWJ-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    // ✅ transaction_id ≤ 30 caractères (limite CinetPay)
+    // AWJ + timestamp base36 (~8 cars) + random 4 cars = ~15 cars
+    const txId = `AWJ${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
     try {
       const token = localStorage.getItem("diaspora_token")
@@ -288,8 +290,6 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
                  || localStorage.getItem("agent_token");
 
       const origin = window.location.origin;
-      // ✅ FIX : utilise returnPath (prop fournie par la page parente) en priorité
-      // Fallback sur pathname courant si prop absente
       const path   = returnPath || window.location.pathname;
 
       const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
@@ -305,6 +305,10 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
           client_name:    form.name,
           client_email:   form.email,
           client_phone:   form.phone,
+          // ✅ transmis au backend pour stockage dans pending_payments
+          country:        form.country,
+          role:           targetRole,
+          plan:           form.plan,
           return_url: `${origin}${path}?payment=success&transaction_id=${txId}`,
           cancel_url:  `${origin}${path}?payment=failed`,
           notify_url:  `${BASE}/api/payments/cinetpay/notify`,
