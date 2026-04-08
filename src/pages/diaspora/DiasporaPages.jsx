@@ -122,20 +122,76 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
 }
 
 // Modal credentials — affiché après création d'un rôle intermédiaire
-function CredentialsModal({ credentials, targetLabel, onClose }) {
-  const [copied, setCopied] = useState(false);
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const MEMBERSHIP_FEE = 15000;
+
+function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
+  const [copied,     setCopied]     = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
+
+  async function handlePay() {
+    setPayLoading(true); setPayError("");
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ambassador_id: ambassadorId,
+          amount:        MEMBERSHIP_FEE,
+          type:          "adhesion",
+          description:   `Adhésion Awoundjô — ${targetLabel}`,
+          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
+      });
+      const data = await res.json();
+      const url  = data?.data?.payment_url || data?.payment_url;
+      if (!url) throw new Error("URL de paiement non reçue du serveur");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
+      setPayLoading(false);
+    }
+  }
+
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:460, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:480, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", maxHeight:"90vh", overflowY:"auto" }}>
+        {/* En-tête */}
         <div style={{ textAlign:"center", marginBottom:20 }}>
           <div style={{ fontSize:48, marginBottom:8 }}>🎉</div>
           <h2 style={{ margin:0, fontSize:20, fontWeight:900, color:C.dark }}>{targetLabel} créé(e) !</h2>
           <p style={{ margin:"6px 0 0", color:C.slate, fontSize:13 }}>Transmettez ces identifiants de connexion</p>
         </div>
-        <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", marginBottom:16, border:`1px solid ${C.border}` }}>
+
+        {/* Étapes */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, flexWrap:"wrap", marginBottom:18 }}>
           {[
-            { label:"Nom d'utilisateur", value:credentials.username },
+            { label:"Compte créé", done:true },
+            { label:"Paiement",    done:false, active:true },
+            { label:"Validation",  done:false },
+          ].map((s, i) => (
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{
+                padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700,
+                background: s.done ? C.greenL : s.active ? C.blueL : C.bg,
+                color:      s.done ? C.green  : s.active ? C.blue  : C.slate,
+                border:     `1.5px solid ${s.done ? C.green : s.active ? C.blue : C.border}`,
+              }}>
+                {s.done ? "✅ " : s.active ? "👉 " : ""}{s.label}
+              </div>
+              {i < 2 && <span style={{ color:C.border, fontSize:14 }}>→</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Identifiants */}
+        <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", marginBottom:14, border:`1px solid ${C.border}` }}>
+          {[
+            { label:"Nom d'utilisateur",      value:credentials.username      },
             { label:"Mot de passe temporaire", value:credentials.temp_password },
           ].map(f => (
             <div key={f.label} style={{ marginBottom:10 }}>
@@ -145,19 +201,150 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
           ))}
           <p style={{ margin:"4px 0 0", fontSize:11, color:C.red }}>⚠️ Le mot de passe doit être changé à la première connexion</p>
         </div>
-        <div style={{ display:"flex", gap:10 }}>
+
+        {/* Partage */}
+        <div style={{ display:"flex", gap:10, marginBottom:14 }}>
           <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
-            style={{ flex:1, padding:"10px 0", background:C.blueL, color:C.blue, border:`1.5px solid ${C.blue}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+            style={{ flex:1, padding:"9px 0", background:C.blueL, color:C.blue, border:`1.5px solid ${C.blue}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
             {copied ? "✅ Copié !" : "📋 Copier les identifiants"}
           </button>
           <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
-            style={{ flex:1, padding:"10px 0", background:"#25D366", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+            style={{ flex:1, padding:"9px 0", background:"#25D366", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
             📲 WhatsApp
           </a>
         </div>
+
+        {/* Paiement CinetPay */}
+        <div style={{ background:"#EFF6FF", border:"1.5px solid #0072C644", borderRadius:12, padding:"16px 18px", marginBottom:14 }}>
+          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:"#0072C6" }}>
+            💳 Étape suivante — Paiement des frais d'adhésion
+          </p>
+          <p style={{ margin:"0 0 12px", fontSize:12, color:C.slate }}>
+            Payez maintenant les frais d'adhésion de <strong>15 000 FCFA</strong> via CinetPay pour activer le processus de validation.
+          </p>
+          {payError && (
+            <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
+              <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
+            </div>
+          )}
+          <button onClick={handlePay} disabled={payLoading}
+            style={{
+              width:"100%", padding:"13px 0", borderRadius:10, border:"none",
+              background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+              color:"#fff", fontWeight:900, fontSize:14,
+              cursor: payLoading ? "not-allowed" : "pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+              boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+              fontFamily:"inherit",
+            }}>
+            {payLoading ? (
+              <>
+                <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+                Redirection…
+              </>
+            ) : <>💳 Payer 15 000 FCFA avec CinetPay</>}
+          </button>
+          <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
+            MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+          </p>
+        </div>
+
         <button onClick={onClose}
-          style={{ width:"100%", marginTop:10, padding:"10px 0", background:C.blue, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
-          Fermer
+          style={{ width:"100%", padding:"10px 0", background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+          Fermer (paiement plus tard)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal de paiement pour un membre existant (cartes cliquables)
+function PaymentModal({ member, roleLabel, onClose }) {
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
+
+  async function handlePay() {
+    setPayLoading(true); setPayError("");
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ambassador_id: member.id,
+          amount:        MEMBERSHIP_FEE,
+          type:          "adhesion",
+          description:   `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
+          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
+      });
+      const data = await res.json();
+      const url  = data?.data?.payment_url || data?.payment_url;
+      if (!url) throw new Error("URL de paiement non reçue du serveur");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
+      setPayLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:440, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <div style={{ fontSize:44, marginBottom:8 }}>💳</div>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:900, color:C.dark }}>Payer l'adhésion</h2>
+          <p style={{ margin:"6px 0 0", color:C.slate, fontSize:13 }}>{member.name} · {roleLabel}</p>
+        </div>
+
+        <div style={{ background:C.bg, borderRadius:12, padding:"14px 16px", marginBottom:16, border:`1px solid ${C.border}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+            <span style={{ fontSize:13, color:C.slate }}>Membre</span>
+            <span style={{ fontSize:13, fontWeight:700, color:C.dark }}>{member.name}</span>
+          </div>
+          {member.plan && (
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+              <span style={{ fontSize:13, color:C.slate }}>Plan</span>
+              <span style={{ fontSize:13, fontWeight:700, color:C.blue }}>{member.plan}</span>
+            </div>
+          )}
+          <div style={{ display:"flex", justifyContent:"space-between", paddingTop:8, borderTop:`1px solid ${C.border}` }}>
+            <span style={{ fontSize:13, fontWeight:800, color:C.dark }}>Frais d'adhésion</span>
+            <span style={{ fontSize:15, fontWeight:900, color:"#0072C6" }}>15 000 FCFA</span>
+          </div>
+        </div>
+
+        {payError && (
+          <div style={{ background:C.redL, borderRadius:8, padding:"10px 12px", marginBottom:14 }}>
+            <p style={{ margin:0, fontSize:13, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
+          </div>
+        )}
+
+        <button onClick={handlePay} disabled={payLoading}
+          style={{
+            width:"100%", padding:"14px 0", borderRadius:10, border:"none",
+            background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+            color:"#fff", fontWeight:900, fontSize:15,
+            cursor: payLoading ? "not-allowed" : "pointer",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+            fontFamily:"inherit", marginBottom:10,
+          }}>
+          {payLoading ? (
+            <>
+              <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+              Redirection vers CinetPay…
+            </>
+          ) : <>💳 Payer 15 000 FCFA avec CinetPay</>}
+        </button>
+        <p style={{ margin:"0 0 12px", fontSize:11, color:C.slate, textAlign:"center" }}>
+          MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+        </p>
+
+        <button onClick={onClose}
+          style={{ width:"100%", padding:"10px 0", background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+          Annuler
         </button>
       </div>
     </div>
@@ -175,11 +362,11 @@ export function DiasporaRegisterPays() {
   const [showForm, setShowForm]   = useState(false);
   const [creds, setCreds]         = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
-  // ── NOUVEAU : bannière retour CinetPay (failed_url pointe ici) ────────────
+  const [credsId, setCredsId]     = useState(null);
+  const [payMember, setPayMember] = useState(null);
   const [payFailed, setPayFailed] = useState(false);
 
   useEffect(() => {
-    // Détecter un retour CinetPay avec payment=failed dans l'URL
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "failed") {
       setPayFailed(true);
@@ -191,20 +378,20 @@ export function DiasporaRegisterPays() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
+  function handleSuccess(credentials, label, id) {
     setCreds(credentials);
     setCredsLabel(label);
+    setCredsId(id || null);
     setShowForm(false);
-    // Rafraîchir la liste
     diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
       .then(r => setList(r.data.ambassadors || []));
   }
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {payMember && <PaymentModal member={payMember} roleLabel="Ambassadeur Pays" onClose={() => setPayMember(null)} />}
 
-      {/* ── Bannière paiement échoué / annulé ─────────────────────────── */}
       {payFailed && (
         <div style={{
           marginBottom: 20, padding: "14px 18px", borderRadius: 12,
@@ -246,7 +433,10 @@ export function DiasporaRegisterPays() {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.greenL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🗺️</div>
                 <div>
@@ -261,9 +451,17 @@ export function DiasporaRegisterPays() {
                   )}
                 </div>
               </div>
-              <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-              </span>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                {a.status !== "ACTIVE" && (
+                  <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
+                    style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                    💳 Payer
+                  </button>
+                )}
+                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+              </div>
             </Card>
           ))}
         </div>
@@ -281,16 +479,25 @@ export function DiasporaRegisterRecruiter() {
   const [showForm, setShowForm] = useState(false);
   const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
+  const [credsId, setCredsId] = useState(null);
+  const [payMember, setPayMember] = useState(null);
+  const [payFailed, setPayFailed] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "failed") {
+      setPayFailed(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
+  function handleSuccess(credentials, label, id) {
     setCreds(credentials);
     setCredsLabel(label);
+    setCredsId(id || null);
     setShowForm(false);
     diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
       .then(r => setList(r.data.ambassadors || []));
@@ -298,7 +505,19 @@ export function DiasporaRegisterRecruiter() {
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {payMember && <PaymentModal member={payMember} roleLabel="Recruteur" onClose={() => setPayMember(null)} />}
+
+      {payFailed && (
+        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:22 }}>❌</span>
+          <div>
+            <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
+            <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
+          </div>
+          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
+        </div>
+      )}
 
       <PageHeader
         title="🤝 Mes Recruteurs"
@@ -321,7 +540,10 @@ export function DiasporaRegisterRecruiter() {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.goldL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🤝</div>
                 <div>
@@ -336,9 +558,17 @@ export function DiasporaRegisterRecruiter() {
                   )}
                 </div>
               </div>
-              <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-              </span>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                {a.status !== "ACTIVE" && (
+                  <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
+                    style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                    💳 Payer
+                  </button>
+                )}
+                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                </span>
+              </div>
             </Card>
           ))}
         </div>
@@ -357,16 +587,25 @@ export function DiasporaRegisterRUM() {
   const [showForm, setShowForm] = useState(false);
   const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
+  const [credsId, setCredsId] = useState(null);
+  const [payMember, setPayMember] = useState(null);
+  const [payFailed, setPayFailed] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "failed") {
+      setPayFailed(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     diasporaBeneAPI.getAmbassadors({ role:"RUM" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
+  function handleSuccess(credentials, label, id) {
     setCreds(credentials);
     setCredsLabel(label);
+    setCredsId(id || null);
     setShowForm(false);
     diasporaBeneAPI.getAmbassadors({ role:"RUM" })
       .then(r => setList(r.data.ambassadors || []));
@@ -374,7 +613,19 @@ export function DiasporaRegisterRUM() {
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {payMember && <PaymentModal member={payMember} roleLabel="RUM" onClose={() => setPayMember(null)} />}
+
+      {payFailed && (
+        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:22 }}>❌</span>
+          <div>
+            <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
+            <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
+          </div>
+          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
+        </div>
+      )}
 
       <PageHeader
         title="👑 Mes RUM"
@@ -412,7 +663,10 @@ export function DiasporaRegisterRUM() {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:"#F5F3FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👑</div>
                 <div>
@@ -433,9 +687,17 @@ export function DiasporaRegisterRUM() {
                 </div>
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-                </span>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {a.status !== "ACTIVE" && (
+                    <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
+                      style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                      💳 Payer
+                    </button>
+                  )}
+                  <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                    {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                  </span>
+                </div>
                 {a.username && (
                   <span style={{ fontSize:10, color:C.slate, fontFamily:"monospace" }}>
                     @{a.username}

@@ -303,10 +303,11 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
         // status_validation et status_payment = 'pending'/'unpaid' par défaut en DB
       });
 
+      const newId = data.ambassador?.id || data.id;
       setCredentials(data.credentials);
-      setAmbassadorId(data.ambassador?.id || data.id);
+      setAmbassadorId(newId);
       setStep("done");
-      onSuccess?.(data.credentials, rc.art);
+      onSuccess?.(data.credentials, rc.art, newId);
     } catch (err) {
       setError(err?.response?.data?.error || err?.response?.data?.message || "Erreur lors de la création du compte.");
       setStep("form");
