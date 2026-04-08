@@ -1,5 +1,5 @@
 // src/components/AdhesionForm.jsx
-// FLUX : Formulaire → Génération ID+MDP (pre-paiement) → CinetPay → Dashboard → Validation admin
+// FLUX : Formulaire → Enregistrer → Affichage ID+MDP → Copier/WhatsApp → Payer → Dashboard
 import { useState } from "react";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -52,9 +52,8 @@ function getToken() {
 // Composant principal
 // Props :
 //   targetRole   : string   — rôle à créer (RECRUTEUR, LEADER, etc.)
-//   returnPath   : string   — chemin de retour après CinetPay
-//                            ex: "/diaspora/register/pays"
-//   onSuccess    : fn()     — appelé après paiement confirmé (pour rafraîchir la liste)
+//   returnPath   : string   — chemin de retour si paiement échoue
+//   onSuccess    : fn()     — appelé après paiement confirmé
 //   onReset      : fn()     — appelé quand l'utilisateur ferme le formulaire
 // ─────────────────────────────────────────────────────────────
 export default function AdhesionForm({ targetRole, returnPath, onSuccess, onReset }) {
@@ -62,9 +61,13 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
 
   // ÉTAPES :
   //   "form"        → saisie des infos
-  //   "redirecting" → création du compte en cours + redirection CinetPay
-  const [step,  setStep]  = useState("form");
-  const [error, setError] = useState("");
+  //   "loading"     → création du compte en cours
+  //   "credentials" → affichage ID + MDP, bouton payer
+  //   "paying"      → init paiement en cours
+  const [step,        setStep]        = useState("form");
+  const [error,       setError]       = useState("");
+  const [credentials, setCredentials] = useState(null);
+  const [copied,      setCopied]      = useState(false);
 
   const [form, setForm] = useState({
     name:    "",
@@ -88,22 +91,19 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
     return null;
   }
 
-  async function handleSubmit(e) {
+  // ── ÉTAPE 1 : Enregistrer le client (pre-register) ──────────
+  async function handleRegister(e) {
     e.preventDefault();
     setError("");
 
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
 
-    setStep("redirecting");
+    setStep("loading");
 
     try {
-      const token  = getToken();
-      const origin = window.location.origin;
-      const path   = returnPath || window.location.pathname;
+      const token = getToken();
 
-      // ── ÉTAPE 1 : Créer le compte ambassadeur (status_payment='unpaid')
-      //             Le backend génère username + temp_password et les retourne
       const createRes = await fetch(`${BASE}/api/diaspora/ambassadors/pre-register`, {
         method:  "POST",
         headers: {
@@ -126,15 +126,65 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         throw new Error(createData?.error || createData?.message || "Erreur lors de la création du compte.");
       }
 
+      // Gère les deux formats : { data: {...} } ou directement { ... }
       const payload = createData.data ?? createData;
-      const { ambassador_id, transaction_id } = payload;
+      const { ambassador_id, transaction_id, username, password, temp_password } = payload;
 
       if (!ambassador_id || !transaction_id) {
         throw new Error("Réponse serveur invalide (ambassador_id ou transaction_id manquant).");
       }
 
-      // ── ÉTAPE 2 : Initialiser le paiement CinetPay
-      //             success_url → dashboard de l'ambassadeur (qui sera "pending" jusqu'à validation admin)
+      setCredentials({
+        ambassador_id,
+        transaction_id,
+        username: username || payload.login || "",
+        password: password || temp_password || payload.mot_de_passe || "",
+      });
+      setStep("credentials");
+
+    } catch (err) {
+      setError(err.message || "Une erreur inattendue s'est produite.");
+      setStep("form");
+    }
+  }
+
+  // ── Copier les identifiants ──────────────────────────────────
+  function handleCopy() {
+    const text =
+      `Awoundjô — Vos identifiants\n` +
+      `Nom : ${form.name}\n` +
+      `Identifiant : ${credentials.username}\n` +
+      `Mot de passe : ${credentials.password}\n` +
+      `\nConservez ces informations précieusement.`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+
+  // ── Envoyer par WhatsApp ─────────────────────────────────────
+  function handleWhatsApp() {
+    const text = encodeURIComponent(
+      `🎉 *Awoundjô — Vos identifiants de connexion*\n\n` +
+      `👤 Nom : ${form.name}\n` +
+      `🔑 Identifiant : ${credentials.username}\n` +
+      `🔒 Mot de passe : ${credentials.password}\n\n` +
+      `Connectez-vous sur https://awoundjo-app.vercel.app\n` +
+      `_Conservez ces informations précieusement._`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  }
+
+  // ── ÉTAPE 2 : Procéder au paiement CinetPay ─────────────────
+  async function handlePay() {
+    setError("");
+    setStep("paying");
+
+    try {
+      const token  = getToken();
+      const origin = window.location.origin;
+      const path   = returnPath || window.location.pathname;
+
       const networkDash = ["RUM","LEADER","PASTEUR","RESPONSABLE"].includes(targetRole)
         ? "/referral/dashboard"
         : "/diaspora/dashboard";
@@ -146,17 +196,15 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
           Authorization:  `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ambassador_id,
+          ambassador_id:  credentials.ambassador_id,
           amount:         MEMBERSHIP_FEE,
           description:    `Adhésion Awoundjô — ${rc.art}`,
-          transaction_id,
+          transaction_id: credentials.transaction_id,
           client_name:    form.name,
           client_email:   form.email,
           client_phone:   form.phone,
           type:           "adhesion",
-          // ✅ success_url = dashboard ambassadeur (pas la page courante)
-          // Le webhook CinetPay activera le compte côté serveur
-          success_url: `${origin}${networkDash}?payment=success&tx=${transaction_id}`,
+          success_url: `${origin}${networkDash}?payment=success&tx=${credentials.transaction_id}`,
           failed_url:  `${origin}${path}?payment=failed`,
         }),
       });
@@ -168,19 +216,18 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         throw new Error(payData?.message || "URL de paiement non reçue du serveur.");
       }
 
-      // ── ÉTAPE 3 : Rediriger vers CinetPay
       window.location.href = paymentUrl;
 
     } catch (err) {
       setError(err.message || "Une erreur inattendue s'est produite.");
-      setStep("form");
+      setStep("credentials");
     }
   }
 
-  // ── Écran de redirection ──────────────────────────────────
-  if (step === "redirecting") {
+  // ── Écran chargement ──────────────────────────────────────────
+  if (step === "loading") {
     return (
-      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, padding: 32, textAlign: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, padding: 40, textAlign: "center" }}>
         <div style={{
           width: 44, height: 44,
           border: `3px solid ${C.blueL}`, borderTop: `3px solid ${C.blue}`,
@@ -189,12 +236,127 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <p style={{ margin: 0, fontWeight: 800, color: C.blue, fontSize: 15 }}>Création du compte en cours…</p>
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>Redirection vers CinetPay — ne fermez pas cette fenêtre</p>
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>Veuillez patienter</p>
       </div>
     );
   }
 
-  // ── Formulaire ────────────────────────────────────────────
+  // ── Écran redirection paiement ────────────────────────────────
+  if (step === "paying") {
+    return (
+      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, padding: 40, textAlign: "center" }}>
+        <div style={{
+          width: 44, height: 44,
+          border: `3px solid ${C.greenL}`, borderTop: `3px solid ${C.green}`,
+          borderRadius: "50%", animation: "spin .8s linear infinite",
+          margin: "0 auto 16px",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ margin: 0, fontWeight: 800, color: C.green, fontSize: 15 }}>Redirection vers CinetPay…</p>
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>Ne fermez pas cette fenêtre</p>
+      </div>
+    );
+  }
+
+  // ── Écran identifiants ────────────────────────────────────────
+  if (step === "credentials") {
+    return (
+      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.green}18, ${C.green}08)`,
+          borderBottom: `1px solid ${C.border}`,
+          padding: "16px 20px",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 28 }}>✅</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>Compte créé avec succès !</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
+              Identifiants de <strong>{form.name}</strong>
+            </p>
+          </div>
+        </div>
+
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {error && (
+            <div style={{ background: C.redL, border: `1px solid ${C.red}44`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: C.red, fontWeight: 600 }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Carte identifiants */}
+          <div style={{ background: C.bg, borderRadius: 12, border: `2px solid ${C.green}44`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: C.slate, fontWeight: 600 }}>🔑 Identifiant</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: C.dark, fontFamily: "monospace", letterSpacing: 1 }}>
+                {credentials.username}
+              </span>
+            </div>
+            <div style={{ height: 1, background: C.border }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: C.slate, fontWeight: 600 }}>🔒 Mot de passe</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: C.dark, fontFamily: "monospace", letterSpacing: 1 }}>
+                {credentials.password}
+              </span>
+            </div>
+          </div>
+
+          {/* Boutons copier / WhatsApp */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={handleCopy}
+              style={{
+                flex: 1, padding: "11px 0",
+                background: copied ? C.greenL : C.bg,
+                color: copied ? C.green : C.dark,
+                border: `1.5px solid ${copied ? C.green : C.border}`,
+                borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                transition: "all .2s",
+              }}>
+              {copied ? "✅ Copié !" : "📋 Copier"}
+            </button>
+            <button onClick={handleWhatsApp}
+              style={{
+                flex: 1, padding: "11px 0",
+                background: "#25D366", color: "#fff",
+                border: "none", borderRadius: 9,
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}>
+              💬 Envoyer WhatsApp
+            </button>
+          </div>
+
+          {/* Avertissement */}
+          <div style={{ background: C.goldL, borderRadius: 10, padding: "10px 14px", display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+            <p style={{ margin: 0, fontSize: 12, color: C.gold, lineHeight: 1.6 }}>
+              <strong>Notez ces identifiants</strong> avant de continuer. Ils ne seront plus affichés après le paiement.
+            </p>
+          </div>
+
+          {/* Bouton payer */}
+          <button onClick={handlePay}
+            style={{
+              width: "100%", padding: "14px 0",
+              background: `linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
+              color: "#fff", border: "none", borderRadius: 10,
+              fontSize: 15, fontWeight: 900, cursor: "pointer",
+              boxShadow: `0 4px 14px ${rc.color}40`,
+            }}>
+            💳 Procéder au paiement — 15 000 FCFA
+          </button>
+
+          <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: C.slate }}>
+            🔒 Paiement sécurisé CinetPay · Redirection vers le tableau de bord après paiement
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Formulaire ────────────────────────────────────────────────
   return (
     <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
 
@@ -214,7 +376,7 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+      <form onSubmit={handleRegister} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
 
         {error && (
           <div style={{ background: C.redL, border: `1px solid ${C.red}44`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: C.red, fontWeight: 600 }}>
@@ -226,9 +388,8 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
         <div style={{ background: C.blueL, borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>ℹ️</span>
           <p style={{ margin: 0, fontSize: 12, color: C.blue, lineHeight: 1.6 }}>
-            Votre compte sera <strong>créé immédiatement</strong> après le paiement.
-            Vous serez redirigé(e) vers votre tableau de bord.
-            Un administrateur validera votre compte pour activer toutes les fonctionnalités.
+            Remplissez le formulaire et cliquez sur <strong>Enregistrer</strong> pour créer le compte.
+            Les identifiants s'afficheront — vous pourrez les copier ou les envoyer par WhatsApp avant de procéder au paiement.
           </p>
         </div>
 
@@ -240,9 +401,9 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[
-              { key: "name",  label: "Nom complet *",       type: "text",  placeholder: "Jean Kouassi"          },
-              { key: "email", label: "Adresse email *",      type: "email", placeholder: "jean@email.com"        },
-              { key: "phone", label: "Numéro WhatsApp *",    type: "tel",   placeholder: "+225 07 00 00 00 00"   },
+              { key: "name",  label: "Nom complet *",     type: "text",  placeholder: "Jean Kouassi"        },
+              { key: "email", label: "Adresse email *",    type: "email", placeholder: "jean@email.com"      },
+              { key: "phone", label: "Numéro WhatsApp *",  type: "tel",   placeholder: "+225 07 00 00 00 00" },
             ].map(f => (
               <div key={f.key}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>{f.label}</label>
@@ -302,7 +463,7 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
             <span style={{ fontSize: 13, fontWeight: 700, color: rc.color }}>{selectedPlan.label}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: C.dark }}>Total à payer maintenant</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.dark }}>Total à payer</span>
             <span style={{ fontSize: 14, fontWeight: 900, color: rc.color }}>15 000 FCFA</span>
           </div>
         </div>
@@ -315,11 +476,11 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
             fontSize: 15, fontWeight: 900, cursor: "pointer",
             boxShadow: `0 4px 14px ${rc.color}40`,
           }}>
-          💳 Créer le compte et payer 15 000 FCFA
+          ✅ Enregistrer le client
         </button>
 
         <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: C.slate }}>
-          🔒 Compte créé immédiatement · Paiement sécurisé CinetPay
+          Le paiement se fera à l'étape suivante · Paiement sécurisé CinetPay
         </p>
       </form>
     </div>
