@@ -1,6 +1,16 @@
 // src/components/AdhesionForm.jsx
-// FLUX : Formulaire → Enregistrer → Affichage ID+MDP → Copier/WhatsApp → Payer → Dashboard
+// ─────────────────────────────────────────────────────────────
+//  Formulaire d'adhésion universel — Awoundjô
+//
+//  Workflow :
+//    [1] Infos personnelles + plan
+//    [2] Création compte → identifiants générés automatiquement
+//    [3] Affichage credentials → bouton paiement CinetPay
+//    [4] Paiement CinetPay (frais adhésion)
+//    [5] Validation admin → compte activé
+// ─────────────────────────────────────────────────────────────
 import { useState } from "react";
+import { diasporaBeneAPI } from "../diasporaApi";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const MEMBERSHIP_FEE = 15000;
@@ -16,19 +26,21 @@ const C = {
   border:  "#E2E8F0", bg:     "#F8FAFC",
 };
 
+const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+
 const PLANS = [
-  { value: "ESSENTIELLE", label: "🌿 Essentielle", desc: "Couverture de base",  monthly: 10000 },
-  { value: "IVOIRIENNE",  label: "🌍 Ivoirienne",  desc: "Couverture élargie", monthly: 15000 },
-  { value: "TURQUOISE",   label: "💎 Turquoise",   desc: "Couverture premium", monthly: 35000 },
+  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  monthly:10000 },
+  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie", monthly:15000 },
+  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium", monthly:35000 },
 ];
 
 const ROLE_CONFIG = {
-  AMBASSADEUR_PAYS: { title: "Adhésion Ambassadeur Pays", icon: "🗺️", color: C.green,  bg: C.greenL,  art: "l'Ambassadeur Pays"  },
-  RECRUTEUR:        { title: "Adhésion Recruteur",        icon: "🤝", color: C.gold,   bg: C.goldL,   art: "le Recruteur"        },
-  RUM:              { title: "Adhésion RUM",              icon: "👑", color: C.purple, bg: C.purpleL, art: "le RUM"              },
-  LEADER:           { title: "Adhésion Leader",           icon: "⭐", color: C.blue,   bg: C.blueL,   art: "le Leader"           },
-  PASTEUR:          { title: "Adhésion Pasteur",          icon: "⛪", color: C.teal,   bg: C.tealL,   art: "le Pasteur"          },
-  RESPONSABLE:      { title: "Adhésion Responsable",      icon: "🤝", color: C.purple, bg: C.purpleL, art: "le Responsable"      },
+  AMBASSADEUR_PAYS: { title:"Adhésion Ambassadeur Pays", icon:"🗺️", color:C.green,  bg:C.greenL,  art:"l'Ambassadeur Pays"  },
+  RECRUTEUR:        { title:"Adhésion Recruteur",        icon:"🤝", color:C.gold,   bg:C.goldL,   art:"le Recruteur"        },
+  RUM:              { title:"Adhésion RUM",              icon:"👑", color:C.purple, bg:C.purpleL, art:"le RUM"              },
+  LEADER:           { title:"Adhésion Leader",           icon:"⭐", color:C.blue,   bg:C.blueL,   art:"le Leader"           },
+  PASTEUR:          { title:"Adhésion Pasteur",          icon:"⛪", color:C.teal,   bg:C.tealL,   art:"le Pasteur"          },
+  RESPONSABLE:      { title:"Adhésion Responsable",      icon:"🤝", color:C.purple, bg:C.purpleL, art:"le Responsable"      },
 };
 
 const COUNTRIES = [
@@ -37,37 +49,218 @@ const COUNTRIES = [
   "Togo","Bénin","Burkina Faso","Mali","Guinée","Gabon","Congo","Maroc","Autre",
 ];
 
-const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
-
-function getToken() {
+function SectionTitle({ step, label, color }) {
   return (
-    localStorage.getItem("diaspora_token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("agent_token") ||
-    ""
+    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+      <div style={{
+        width:28, height:28, borderRadius:99,
+        background:color, color:"#fff",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:13, fontWeight:900, flexShrink:0,
+      }}>{step}</div>
+      <p style={{ margin:0, fontSize:14, fontWeight:800, color:C.dark }}>{label}</p>
+    </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Composant principal
-// Props :
-//   targetRole   : string   — rôle à créer (RECRUTEUR, LEADER, etc.)
-//   returnPath   : string   — chemin de retour si paiement échoue
-//   onSuccess    : fn()     — appelé après paiement confirmé
-//   onReset      : fn()     — appelé quand l'utilisateur ferme le formulaire
-// ─────────────────────────────────────────────────────────────
-export default function AdhesionForm({ targetRole, returnPath, onSuccess, onReset }) {
+function InputField({ label, type="text", placeholder, value, onChange, required=false, as="input", children }) {
+  const baseStyle = {
+    width:"100%", padding:"11px 14px", borderRadius:8, fontSize:14,
+    border:`1.5px solid ${C.border}`, outline:"none",
+    boxSizing:"border-box", background:"#fff", fontFamily:"inherit",
+    transition:"border-color .2s",
+  };
+  return (
+    <div>
+      <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>
+        {label}{required && <span style={{ color:C.red }}> *</span>}
+      </label>
+      {as === "select" ? (
+        <select value={value} onChange={onChange} style={{ ...baseStyle, cursor:"pointer" }}>
+          {children}
+        </select>
+      ) : (
+        <input
+          type={type} placeholder={placeholder} value={value}
+          onChange={onChange} required={required}
+          style={baseStyle}
+          onFocus={e => e.target.style.borderColor = C.blue}
+          onBlur={e  => e.target.style.borderColor = C.border}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Écran credentials + paiement CinetPay ────────────────────
+function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
+  const [copied,     setCopied]     = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
+
+  const text = `Identifiants ${roleLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
+
+  async function handlePay() {
+    setPayLoading(true);
+    setPayError("");
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ambassador_id:   ambassadorId,
+          amount:          MEMBERSHIP_FEE,
+          type:            "adhesion",
+          description:     `Adhésion Awoundjô — ${roleLabel}`,
+          return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
+          cancel_url:      `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
+      });
+      const data = await res.json();
+      const url  = data?.data?.payment_url || data?.payment_url;
+      if (!url) throw new Error("URL de paiement non reçue du serveur");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
+      setPayLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* Étapes */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, flexWrap:"wrap" }}>
+        {[
+          { label:"Compte créé", done:true },
+          { label:"Paiement", done:false, active:true },
+          { label:"Validation admin", done:false },
+        ].map((s, i) => (
+          <div key={i} style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{
+              padding:"4px 12px", borderRadius:99, fontSize:11, fontWeight:700,
+              background: s.done ? C.greenL : s.active ? C.blueL : C.bg,
+              color:      s.done ? C.green  : s.active ? C.blue  : C.slate,
+              border:     `1.5px solid ${s.done ? C.green : s.active ? C.blue : C.border}`,
+            }}>
+              {s.done ? "✅ " : s.active ? "👉 " : ""}{s.label}
+            </div>
+            {i < 2 && <span style={{ color:C.border, fontSize:14 }}>→</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Credentials */}
+      <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", border:`1px solid ${C.border}` }}>
+        <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:800, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+          🔑 Identifiants de connexion générés
+        </p>
+        {[
+          { label:"Nom d'utilisateur",      value: credentials.username      },
+          { label:"Mot de passe temporaire", value: credentials.temp_password },
+        ].map(f => (
+          <div key={f.label} style={{ marginBottom:10 }}>
+            <p style={{ margin:"0 0 3px", fontSize:11, fontWeight:700, color:C.slate }}>{f.label}</p>
+            <p style={{ margin:0, fontSize:15, fontWeight:800, color:C.dark, fontFamily:"monospace", background:"#fff", padding:"7px 10px", borderRadius:6, border:`1px solid ${C.border}` }}>
+              {f.value}
+            </p>
+          </div>
+        ))}
+        <p style={{ margin:"8px 0 0", fontSize:11, color:C.red, fontWeight:600 }}>
+          ⚠️ Le mot de passe doit être changé à la première connexion
+        </p>
+      </div>
+
+      {/* Partage */}
+      <div style={{ display:"flex", gap:10 }}>
+        <button
+          onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+          style={{ flex:1, padding:"9px 0", background:C.blueL, color:C.blue, border:`1.5px solid ${C.blue}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}
+        >
+          {copied ? "✅ Copié !" : "📋 Copier les identifiants"}
+        </button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+          target="_blank" rel="noreferrer"
+          style={{ flex:1, padding:"9px 0", background:"#25D366", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}
+        >
+          📲 WhatsApp
+        </a>
+      </div>
+
+      {/* Paiement CinetPay */}
+      <div style={{ background:"#EFF6FF", border:"1.5px solid #0072C644", borderRadius:12, padding:"16px 18px" }}>
+        <p style={{ margin:"0 0 6px", fontSize:13, fontWeight:800, color:"#0072C6" }}>
+          💳 Étape suivante — Paiement des frais d'adhésion
+        </p>
+        <p style={{ margin:"0 0 14px", fontSize:12, color:C.slate }}>
+          Payez maintenant les frais d'adhésion de <strong>15 000 FCFA</strong> via CinetPay pour activer le processus de validation.
+        </p>
+        {payError && (
+          <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:12 }}>
+            <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
+          </div>
+        )}
+        <button
+          onClick={handlePay}
+          disabled={payLoading}
+          style={{
+            width:"100%", padding:"13px 0", borderRadius:10, border:"none",
+            background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+            color:"#fff", fontWeight:900, fontSize:14,
+            cursor: payLoading ? "not-allowed" : "pointer",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+            fontFamily:"inherit",
+          }}
+        >
+          {payLoading ? (
+            <>
+              <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+              Redirection…
+            </>
+          ) : (
+            <>💳 Payer 15 000 FCFA avec CinetPay</>
+          )}
+        </button>
+        <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
+          MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+        </p>
+      </div>
+
+      {/* Info validation */}
+      <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:10, padding:"12px 16px" }}>
+        <p style={{ margin:0, fontSize:12, color:C.gold, fontWeight:700 }}>
+          ⏳ Après paiement — validation admin requise
+        </p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:C.slate }}>
+          Un administrateur validera le compte. Le portail sera accessible après activation.
+        </p>
+      </div>
+
+      <button
+        onClick={onClose}
+        style={{ width:"100%", padding:"10px 0", background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}
+      >
+        Fermer (paiement plus tard)
+      </button>
+    </div>
+  );
+}
+
+/**
+ * AdhesionForm
+ * @param {string}   targetRole - Rôle à créer
+ * @param {function} onSuccess  - Appelé avec (credentials, roleLabel) après création
+ */
+export default function AdhesionForm({ targetRole, onSuccess }) {
   const rc = ROLE_CONFIG[targetRole] || ROLE_CONFIG.RECRUTEUR;
 
-  // ÉTAPES :
-  //   "form"        → saisie des infos
-  //   "loading"     → création du compte en cours
-  //   "credentials" → affichage ID + MDP, bouton payer
-  //   "paying"      → init paiement en cours
-  const [step,        setStep]        = useState("form");
-  const [error,       setError]       = useState("");
-  const [credentials, setCredentials] = useState(null);
-  const [copied,      setCopied]      = useState(false);
+  const [step,          setStep]          = useState("form"); // "form" | "submitting" | "done"
+  const [error,         setError]         = useState("");
+  const [credentials,   setCredentials]   = useState(null);
+  const [ambassadorId,  setAmbassadorId]  = useState(null);
 
   const [form, setForm] = useState({
     name:    "",
@@ -85,403 +278,218 @@ export default function AdhesionForm({ targetRole, returnPath, onSuccess, onRese
 
   function validate() {
     if (!form.name.trim())  return "Le nom complet est requis.";
-    if (!form.email.trim()) return "L'adresse email est requise.";
+    if (!form.email.trim()) return "L'email est requis.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return "Email invalide.";
     if (!form.phone.trim()) return "Le numéro WhatsApp est requis.";
     return null;
   }
 
-  // ── ÉTAPE 1 : Enregistrer le client (pre-register) ──────────
-  async function handleRegister(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
 
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
 
-    setStep("loading");
-
+    setStep("submitting");
     try {
-      const token = getToken();
-
-      const createRes = await fetch(`${BASE}/api/diaspora/ambassadors/pre-register`, {
-        method:  "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:  `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name:    form.name.trim(),
-          email:   form.email.trim().toLowerCase(),
-          phone:   form.phone.trim(),
-          country: form.country,
-          role:    targetRole,
-          plan:    form.plan,
-        }),
+      const { data } = await diasporaBeneAPI.createAmbassador({
+        name:    form.name,
+        email:   form.email,
+        phone:   form.phone,
+        country: form.country,
+        role:    targetRole,
+        plan:    form.plan,
+        // status_validation et status_payment = 'pending'/'unpaid' par défaut en DB
       });
 
-      const createData = await createRes.json();
-
-      if (!createRes.ok) {
-        throw new Error(createData?.error || createData?.message || "Erreur lors de la création du compte.");
-      }
-
-      // Gère les deux formats : { data: {...} } ou directement { ... }
-      const payload = createData.data ?? createData;
-      const { ambassador_id, transaction_id, username, password, temp_password } = payload;
-
-      if (!ambassador_id || !transaction_id) {
-        throw new Error("Réponse serveur invalide (ambassador_id ou transaction_id manquant).");
-      }
-
-      setCredentials({
-        ambassador_id,
-        transaction_id,
-        username: username || payload.login || "",
-        password: password || temp_password || payload.mot_de_passe || "",
-      });
-      setStep("credentials");
-
+      setCredentials(data.credentials);
+      setAmbassadorId(data.ambassador?.id || data.id);
+      setStep("done");
+      onSuccess?.(data.credentials, rc.art);
     } catch (err) {
-      setError(err.message || "Une erreur inattendue s'est produite.");
+      setError(err?.response?.data?.error || err?.response?.data?.message || "Erreur lors de la création du compte.");
       setStep("form");
     }
   }
 
-  // ── Copier les identifiants ──────────────────────────────────
-  function handleCopy() {
-    const text =
-      `Awoundjô — Vos identifiants\n` +
-      `Nom : ${form.name}\n` +
-      `Identifiant : ${credentials.username}\n` +
-      `Mot de passe : ${credentials.password}\n` +
-      `\nConservez ces informations précieusement.`;
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  }
-
-  // ── Envoyer par WhatsApp ─────────────────────────────────────
-  function handleWhatsApp() {
-    const text = encodeURIComponent(
-      `🎉 *Awoundjô — Vos identifiants de connexion*\n\n` +
-      `👤 Nom : ${form.name}\n` +
-      `🔑 Identifiant : ${credentials.username}\n` +
-      `🔒 Mot de passe : ${credentials.password}\n\n` +
-      `Connectez-vous sur https://awoundjo-app.vercel.app\n` +
-      `_Conservez ces informations précieusement._`
-    );
-    window.open(`https://wa.me/?text=${text}`, "_blank");
-  }
-
-  // ── ÉTAPE 2 : Procéder au paiement CinetPay ─────────────────
-  async function handlePay() {
-    setError("");
-    setStep("paying");
-
-    try {
-      const token  = getToken();
-      const origin = window.location.origin;
-      const path   = returnPath || window.location.pathname;
-
-      const networkDash = ["RUM","LEADER","PASTEUR","RESPONSABLE"].includes(targetRole)
-        ? "/referral/dashboard"
-        : "/diaspora/dashboard";
-
-      const payRes = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
-        method:  "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:  `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ambassador_id:  credentials.ambassador_id,
-          amount:         MEMBERSHIP_FEE,
-          description:    `Adhésion Awoundjô — ${rc.art}`,
-          transaction_id: credentials.transaction_id,
-          client_name:    form.name,
-          client_email:   form.email,
-          client_phone:   form.phone,
-          type:           "adhesion",
-          success_url: `${origin}${networkDash}?payment=success&tx=${credentials.transaction_id}`,
-          failed_url:  `${origin}${path}?payment=failed`,
-        }),
-      });
-
-      const payData = await payRes.json();
-      const paymentUrl = payData?.data?.payment_url || payData?.payment_url;
-
-      if (!paymentUrl) {
-        throw new Error(payData?.message || "URL de paiement non reçue du serveur.");
-      }
-
-      window.location.href = paymentUrl;
-
-    } catch (err) {
-      setError(err.message || "Une erreur inattendue s'est produite.");
-      setStep("credentials");
-    }
-  }
-
-  // ── Écran chargement ──────────────────────────────────────────
-  if (step === "loading") {
+  // ── État : submitting ──────────────────────────────────────
+  if (step === "submitting") {
     return (
-      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, padding: 40, textAlign: "center" }}>
+      <div style={{ textAlign:"center", padding:"60px 20px" }}>
         <div style={{
-          width: 44, height: 44,
-          border: `3px solid ${C.blueL}`, borderTop: `3px solid ${C.blue}`,
-          borderRadius: "50%", animation: "spin .8s linear infinite",
-          margin: "0 auto 16px",
+          width:48, height:48, border:`3px solid ${rc.bg}`,
+          borderTop:`3px solid ${rc.color}`,
+          borderRadius:"50%", animation:"spin .8s linear infinite",
+          margin:"0 auto 20px",
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p style={{ margin: 0, fontWeight: 800, color: C.blue, fontSize: 15 }}>Création du compte en cours…</p>
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>Veuillez patienter</p>
+        <p style={{ fontWeight:800, fontSize:18, color:C.dark, margin:"0 0 8px" }}>
+          Création du compte…
+        </p>
+        <p style={{ fontSize:13, color:C.slate, margin:0 }}>
+          Génération des identifiants et du numéro mutualiste en cours.
+        </p>
       </div>
     );
   }
 
-  // ── Écran redirection paiement ────────────────────────────────
-  if (step === "paying") {
+  // ── État : done ────────────────────────────────────────────
+  if (step === "done" && credentials) {
     return (
-      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, padding: 40, textAlign: "center" }}>
-        <div style={{
-          width: 44, height: 44,
-          border: `3px solid ${C.greenL}`, borderTop: `3px solid ${C.green}`,
-          borderRadius: "50%", animation: "spin .8s linear infinite",
-          margin: "0 auto 16px",
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p style={{ margin: 0, fontWeight: 800, color: C.green, fontSize: 15 }}>Redirection vers CinetPay…</p>
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>Ne fermez pas cette fenêtre</p>
+      <div style={{
+        background:"#fff", borderRadius:16,
+        border:`1px solid ${C.border}`,
+        boxShadow:"0 4px 24px rgba(0,0,0,0.08)",
+        overflow:"hidden", maxWidth:540, margin:"0 auto",
+      }}>
+        <div style={{ padding:"18px 24px", background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`, color:"#fff" }}>
+          <p style={{ margin:"0 0 4px", fontSize:20 }}>{rc.icon}</p>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:900 }}>{rc.title}</h2>
+        </div>
+        <SuccessScreen
+          credentials={credentials}
+          ambassadorId={ambassadorId}
+          roleLabel={rc.art}
+          rc={rc}
+          onClose={() => { setStep("form"); setCredentials(null); setAmbassadorId(null); setForm({ name:"", email:"", phone:"", country:"Côte d'Ivoire", plan:"ESSENTIELLE" }); }}
+        />
       </div>
     );
   }
 
-  // ── Écran identifiants ────────────────────────────────────────
-  if (step === "credentials") {
-    return (
-      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-
-        {/* Header */}
-        <div style={{
-          background: `linear-gradient(135deg, ${C.green}18, ${C.green}08)`,
-          borderBottom: `1px solid ${C.border}`,
-          padding: "16px 20px",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <span style={{ fontSize: 28 }}>✅</span>
-          <div>
-            <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>Compte créé avec succès !</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
-              Identifiants de <strong>{form.name}</strong>
-            </p>
-          </div>
-        </div>
-
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {error && (
-            <div style={{ background: C.redL, border: `1px solid ${C.red}44`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: C.red, fontWeight: 600 }}>
-              ⚠️ {error}
-            </div>
-          )}
-
-          {/* Carte identifiants */}
-          <div style={{ background: C.bg, borderRadius: 12, border: `2px solid ${C.green}44`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 13, color: C.slate, fontWeight: 600 }}>🔑 Identifiant</span>
-              <span style={{ fontSize: 16, fontWeight: 900, color: C.dark, fontFamily: "monospace", letterSpacing: 1 }}>
-                {credentials.username}
-              </span>
-            </div>
-            <div style={{ height: 1, background: C.border }} />
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 13, color: C.slate, fontWeight: 600 }}>🔒 Mot de passe</span>
-              <span style={{ fontSize: 16, fontWeight: 900, color: C.dark, fontFamily: "monospace", letterSpacing: 1 }}>
-                {credentials.password}
-              </span>
-            </div>
-          </div>
-
-          {/* Boutons copier / WhatsApp */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={handleCopy}
-              style={{
-                flex: 1, padding: "11px 0",
-                background: copied ? C.greenL : C.bg,
-                color: copied ? C.green : C.dark,
-                border: `1.5px solid ${copied ? C.green : C.border}`,
-                borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer",
-                transition: "all .2s",
-              }}>
-              {copied ? "✅ Copié !" : "📋 Copier"}
-            </button>
-            <button onClick={handleWhatsApp}
-              style={{
-                flex: 1, padding: "11px 0",
-                background: "#25D366", color: "#fff",
-                border: "none", borderRadius: 9,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-              }}>
-              💬 Envoyer WhatsApp
-            </button>
-          </div>
-
-          {/* Avertissement */}
-          <div style={{ background: C.goldL, borderRadius: 10, padding: "10px 14px", display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-            <p style={{ margin: 0, fontSize: 12, color: C.gold, lineHeight: 1.6 }}>
-              <strong>Notez ces identifiants</strong> avant de continuer. Ils ne seront plus affichés après le paiement.
-            </p>
-          </div>
-
-          {/* Bouton payer */}
-          <button onClick={handlePay}
-            style={{
-              width: "100%", padding: "14px 0",
-              background: `linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
-              color: "#fff", border: "none", borderRadius: 10,
-              fontSize: 15, fontWeight: 900, cursor: "pointer",
-              boxShadow: `0 4px 14px ${rc.color}40`,
-            }}>
-            💳 Procéder au paiement — 15 000 FCFA
-          </button>
-
-          <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: C.slate }}>
-            🔒 Paiement sécurisé CinetPay · Redirection vers le tableau de bord après paiement
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Formulaire ────────────────────────────────────────────────
+  // ── État : form ────────────────────────────────────────────
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+    <div style={{
+      background:"#fff", borderRadius:16,
+      border:`1px solid ${C.border}`,
+      boxShadow:"0 4px 24px rgba(0,0,0,0.08)",
+      overflow:"hidden", maxWidth:540, margin:"0 auto",
+    }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Header */}
-      <div style={{
-        background: `linear-gradient(135deg, ${rc.color}18, ${rc.color}08)`,
-        borderBottom: `1px solid ${C.border}`,
-        padding: "16px 20px",
-        display: "flex", alignItems: "center", gap: 12,
-      }}>
-        <span style={{ fontSize: 28 }}>{rc.icon}</span>
-        <div>
-          <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>{rc.title}</p>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>
-            Frais d'adhésion : <strong style={{ color: rc.color }}>15 000 FCFA</strong> — paiement sécurisé CinetPay
-          </p>
-        </div>
+      <div style={{ padding:"20px 24px", background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`, color:"#fff" }}>
+        <p style={{ margin:"0 0 4px", fontSize:22 }}>{rc.icon}</p>
+        <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:900 }}>{rc.title}</h2>
+        <p style={{ margin:0, fontSize:13, opacity:0.85 }}>
+          Le compte sera créé immédiatement. Le paiement sera effectué après validation admin.
+        </p>
       </div>
 
-      <form onSubmit={handleRegister} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+      <form onSubmit={handleSubmit} style={{ padding:"24px", display:"flex", flexDirection:"column", gap:24 }}>
 
         {error && (
-          <div style={{ background: C.redL, border: `1px solid ${C.red}44`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: C.red, fontWeight: 600 }}>
-            ⚠️ {error}
+          <div style={{ background:C.redL, border:`1px solid ${C.red}33`, borderRadius:10, padding:"12px 16px" }}>
+            <p style={{ margin:0, fontSize:13, color:C.red, fontWeight:600 }}>⚠️ {error}</p>
           </div>
         )}
 
-        {/* Infos processus */}
-        <div style={{ background: C.blueL, borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 18, flexShrink: 0 }}>ℹ️</span>
-          <p style={{ margin: 0, fontSize: 12, color: C.blue, lineHeight: 1.6 }}>
-            Remplissez le formulaire et cliquez sur <strong>Enregistrer</strong> pour créer le compte.
-            Les identifiants s'afficheront — vous pourrez les copier ou les envoyer par WhatsApp avant de procéder au paiement.
+        {/* Section 1 : Infos personnelles */}
+        <div>
+          <SectionTitle step={1} label="Informations personnelles" color={rc.color} />
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <InputField label="Nom complet"         placeholder="Jean Koua"           value={form.name}    onChange={setField("name")}    required />
+            <InputField label="Email"               placeholder="jean@email.com"       value={form.email}   onChange={setField("email")}   required type="email" />
+            <InputField label="Téléphone WhatsApp"  placeholder="+225 07 00 00 00 00" value={form.phone}   onChange={setField("phone")}   required type="tel" />
+            <InputField label="Pays de résidence"   value={form.country}               onChange={setField("country")} as="select">
+              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </InputField>
+          </div>
+        </div>
+
+        {/* Section 2 : Plan mensuel */}
+        <div>
+          <SectionTitle step={2} label="Choisissez le plan mensuel" color={rc.color} />
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {PLANS.map(p => {
+              const selected = form.plan === p.value;
+              return (
+                <div
+                  key={p.value}
+                  onClick={() => setForm(prev => ({ ...prev, plan: p.value }))}
+                  style={{
+                    padding:"14px 16px", borderRadius:10,
+                    border:`2px solid ${selected ? rc.color : C.border}`,
+                    background: selected ? rc.bg : "#fff",
+                    cursor:"pointer", display:"flex",
+                    alignItems:"center", justifyContent:"space-between",
+                    transition:"all .15s",
+                  }}
+                >
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{
+                      width:18, height:18, borderRadius:"50%",
+                      border:`2px solid ${selected ? rc.color : C.border}`,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      flexShrink:0,
+                    }}>
+                      {selected && <div style={{ width:9, height:9, borderRadius:"50%", background:rc.color }} />}
+                    </div>
+                    <div>
+                      <p style={{ margin:0, fontWeight:700, fontSize:14, color:selected ? rc.color : C.dark }}>{p.label}</p>
+                      <p style={{ margin:0, fontSize:12, color:C.slate }}>{p.desc}</p>
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <p style={{ margin:0, fontWeight:800, fontSize:15, color:selected ? rc.color : C.dark }}>{fmt(p.monthly)}</p>
+                    <p style={{ margin:0, fontSize:11, color:C.slate }}>/ mois</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 3 : Récapitulatif */}
+        <div>
+          <SectionTitle step={3} label="Récapitulatif" color={rc.color} />
+          <div style={{ background:C.bg, borderRadius:12, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+            {[
+              { label:`Plan mensuel — ${selectedPlan.label}`, value:fmt(selectedPlan.monthly) + " / mois", highlight:false },
+              { label:"Frais d'adhésion (payés après validation)", value:"À définir", highlight:false },
+              { label:"À payer maintenant",                        value:"0 FCFA — après validation admin", highlight:true  },
+            ].map((row, i) => (
+              <div key={i} style={{
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"12px 16px",
+                borderTop: i > 0 ? `1px solid ${C.border}` : "none",
+                background: row.highlight ? rc.bg : "transparent",
+              }}>
+                <p style={{ margin:0, fontSize:13, color:row.highlight ? rc.color : C.slate, fontWeight:row.highlight ? 700 : 400 }}>
+                  {row.label}
+                </p>
+                <p style={{ margin:0, fontSize:row.highlight ? 14 : 14, fontWeight:row.highlight ? 900 : 600, color:row.highlight ? rc.color : C.dark }}>
+                  {row.value}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin:"8px 0 0", fontSize:12, color:C.slate }}>
+            💡 Le paiement sera débloqué après validation du compte par un administrateur.
           </p>
         </div>
 
-        {/* Section 1 — Identité */}
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 99, background: rc.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>1</div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: C.dark }}>Informations personnelles</p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {[
-              { key: "name",  label: "Nom complet *",     type: "text",  placeholder: "Jean Kouassi"        },
-              { key: "email", label: "Adresse email *",    type: "email", placeholder: "jean@email.com"      },
-              { key: "phone", label: "Numéro WhatsApp *",  type: "tel",   placeholder: "+225 07 00 00 00 00" },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>{f.label}</label>
-                <input
-                  type={f.type} placeholder={f.placeholder} value={form[f.key]}
-                  onChange={setField(f.key)} required
-                  style={{ width: "100%", padding: "11px 14px", borderRadius: 8, fontSize: 14, border: `1.5px solid ${C.border}`, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-                />
-              </div>
-            ))}
-            <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 6 }}>Pays de résidence</label>
-              <select value={form.country} onChange={setField("country")}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 8, fontSize: 14, border: `1.5px solid ${C.border}`, outline: "none", boxSizing: "border-box", background: "#fff", fontFamily: "inherit" }}>
-                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2 — Offre */}
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 99, background: rc.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>2</div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: C.dark }}>Choisir une offre de couverture</p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {PLANS.map(p => (
-              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan: p.value }))}
-                style={{
-                  padding: "12px 16px", borderRadius: 10, cursor: "pointer",
-                  border: `2px solid ${form.plan === p.value ? rc.color : C.border}`,
-                  background: form.plan === p.value ? `${rc.color}10` : "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  transition: "all .15s",
-                }}>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: form.plan === p.value ? rc.color : C.dark }}>{p.label}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: C.slate }}>{p.desc}</p>
-                </div>
-                <span style={{ fontWeight: 800, fontSize: 13, color: form.plan === p.value ? rc.color : C.slate, whiteSpace: "nowrap" }}>
-                  {fmt(p.monthly)}/mois
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Récap paiement */}
-        <div style={{ background: C.bg, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, color: C.slate }}>Frais d'adhésion (unique)</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>15 000 FCFA</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, color: C.slate }}>Offre sélectionnée</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: rc.color }}>{selectedPlan.label}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: C.dark }}>Total à payer</span>
-            <span style={{ fontSize: 14, fontWeight: 900, color: rc.color }}>15 000 FCFA</span>
-          </div>
-        </div>
-
-        <button type="submit"
+        {/* Bouton */}
+        <button
+          type="submit"
           style={{
-            width: "100%", padding: "13px 0",
-            background: `linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
-            color: "#fff", border: "none", borderRadius: 10,
-            fontSize: 15, fontWeight: 900, cursor: "pointer",
-            boxShadow: `0 4px 14px ${rc.color}40`,
-          }}>
-          ✅ Enregistrer le client
+            width:"100%", padding:"15px 20px", borderRadius:12, border:"none",
+            fontSize:15, fontWeight:900, cursor:"pointer",
+            background:`linear-gradient(135deg, ${rc.color}, ${rc.color}cc)`,
+            color:"#fff",
+            boxShadow:`0 6px 20px ${rc.color}44`,
+            display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+            transition:"all .2s", fontFamily:"inherit",
+          }}
+        >
+          ✅ Créer le compte {rc.art}
         </button>
 
-        <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: C.slate }}>
-          Le paiement se fera à l'étape suivante · Paiement sécurisé CinetPay
+        <p style={{ margin:"-12px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
+          🔒 Les identifiants sont générés automatiquement · Paiement après validation admin
         </p>
+
       </form>
     </div>
   );

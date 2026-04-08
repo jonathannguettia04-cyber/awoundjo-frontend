@@ -1,4 +1,9 @@
 // src/pages/diaspora/DiasporaPages.jsx
+// ─────────────────────────────────────────────────────────────
+//  Toutes les pages du module Diaspora Awoundjô
+//  Hiérarchie : AMBASSADEUR_DIASPORA → AMBASSADEUR_PAYS → RECRUTEUR → CLIENT
+//  Exports nommés utilisés dans App.jsx via diasporaPage()
+// ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AdhesionForm from "../../components/AdhesionForm";
@@ -11,142 +16,8 @@ import {
   diasporaLeaderAPI,
   diasporaNotifAPI,
   diasporaProfileAPI,
-  diasporaDashAPI,
   getDiasporaData,
 } from "../../diasporaApi";
-
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-
-// ── Bouton paiement pour un ambassadeur non encore payé ──────
-function PayButton({ ambassadorId }) {
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
-  async function handlePay() {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("diaspora_token")}` },
-        body: JSON.stringify({
-          ambassador_id: ambassadorId, amount: 15000, currency: "XOF",
-          description: "Adhésion Awoundjô",
-          return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed`,
-        }),
-      });
-      const data = await res.json();
-      const url = data?.data?.payment_url || data?.payment_url;
-      if (!url) throw new Error("URL de paiement non reçue");
-      window.location.href = url;
-    } catch (e) { setError(e.message || "Erreur paiement"); setLoading(false); }
-  }
-  return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
-      <button onClick={handlePay} disabled={loading}
-        style={{ background:"#D97706", color:"#fff", border:"none", borderRadius:8, padding:"6px 14px",
-                 fontWeight:700, fontSize:12, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
-        {loading ? "⏳ Redirection…" : "💳 Payer maintenant"}
-      </button>
-      {error && <span style={{ fontSize:11, color:"#DC2626" }}>{error}</span>}
-    </div>
-  );
-}
-
-// ── Formulaire création client final (tous niveaux) ──────────
-function CreateClientForm({ onSuccess }) {
-  const [form, setForm]       = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  async function submit() {
-    if (!form.name) return setError("Le nom est requis");
-    setLoading(true); setError("");
-    try {
-      const { data } = await diasporaBeneAPI.create(form);
-      onSuccess?.(data);
-    } catch(e) { setError(e.response?.data?.error || "Erreur lors de la création"); }
-    finally { setLoading(false); }
-  }
-  return (
-    <Card>
-      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
-      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-        {[
-          { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
-          { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
-          { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
-        ].map(f => (
-          <div key={f.key}>
-            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:5 }}>{f.label}</label>
-            <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
-          </div>
-        ))}
-        <div>
-          <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {PLANS_DIAS.map(p => (
-              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
-                style={{ padding:"10px 14px", borderRadius:10,
-                         border:`2px solid ${form.plan===p.value?C.blue:C.border}`,
-                         background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer",
-                         display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <div>
-                  <p style={{ margin:0, fontWeight:700, fontSize:13, color:form.plan===p.value?C.blue:C.dark }}>{p.label}</p>
-                  <p style={{ margin:0, fontSize:11, color:C.slate }}>{p.desc}</p>
-                </div>
-                <span style={{ fontWeight:800, fontSize:13, color:form.plan===p.value?C.blue:C.slate }}>{Number(p.price).toLocaleString()} FCFA</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Btn onClick={submit} disabled={loading}>{loading ? "Enregistrement…" : "✅ Créer le client"}</Btn>
-      </div>
-    </Card>
-  );
-}
-
-// ── Écran succès création client avec credentials ────────────
-function ClientCreatedScreen({ result, onClose }) {
-  const creds = result?.credentials;
-  const [copied, setCopied] = useState(false);
-  const [show, setShow]     = useState(false);
-  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
-  return (
-    <Card style={{ textAlign:"center" }}>
-      <div style={{ fontSize:52, marginBottom:10 }}>⏳</div>
-      <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
-      <p style={{ fontSize:12, color:C.slate, margin:"0 0 16px" }}>Un admin doit valider avant que le client puisse payer</p>
-      <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}55`, borderRadius:12, padding:"16px 20px", marginBottom:16, textAlign:"left" }}>
-        <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.dark }}>📋 Identifiants à communiquer au client</p>
-        {[
-          { label:"Numéro mutualiste",  value: creds?.mutual_number },
-          { label:"Mot de passe temp.", value: show ? creds?.temp_password : "••••••••" },
-        ].map(r => (
-          <div key={r.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-            <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
-            <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13, color:C.dark }}>{r.value}</span>
-          </div>
-        ))}
-        <button onClick={() => setShow(s=>!s)}
-          style={{ fontSize:11, color:C.slate, background:"none", border:"none", cursor:"pointer", marginTop:4 }}>
-          {show ? "🙈 Masquer" : "👁️ Afficher le mot de passe"}
-        </button>
-      </div>
-      <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
-        <Btn onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }} variant="outline">
-          {copied ? "✅ Copié !" : "📋 Copier"}
-        </Btn>
-        <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
-          style={{ padding:"10px 18px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none" }}>
-          📱 WhatsApp
-        </a>
-        <Btn onClick={onClose}>➕ Nouveau client</Btn>
-      </div>
-    </Card>
-  );
-}
-
 
 const C = {
   blue:    "#1B4FD8", blueL:   "#EEF2FF",
@@ -168,10 +39,10 @@ const ROLE_CONFIG = {
   RECRUTEUR:            { label:"Recruteur",            icon:"🤝", color:C.gold,   bg:C.goldL  },
 };
 
-const PLANS_DIAS = [
-  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  price:15000 },
-  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie", price:15000 },
-  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium", price:15000 },
+const PLANS = [
+  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
+  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
+  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
 ];
 
 const REWARD_LEVELS = [
@@ -250,6 +121,7 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
   );
 }
 
+// Modal credentials — affiché après création d'un rôle intermédiaire
 function CredentialsModal({ credentials, targetLabel, onClose }) {
   const [copied, setCopied] = useState(false);
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
@@ -292,63 +164,26 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// HELPER — bannières réutilisables post-paiement
-// ─────────────────────────────────────────────────────────────
-function PayFailedBanner({ onClose }) {
-  return (
-    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-      <span style={{ fontSize:22 }}>❌</span>
-      <div>
-        <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Paiement annulé ou refusé</p>
-        <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-      </div>
-      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-    </div>
-  );
-}
-
-// Bannière "paiement confirmé, activation en cours côté webhook"
-function PayPendingActivationBanner({ onClose }) {
-  return (
-    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
-      <span style={{ fontSize:22 }}>✅</span>
-      <div>
-        <p style={{ margin:0, fontWeight:800, color:C.blue, fontSize:14 }}>Paiement confirmé</p>
-        <p style={{ margin:"2px 0 0", fontSize:12, color:C.blue }}>
-          Votre compte est en cours d'activation. Vous pouvez vous connecter avec les identifiants reçus avant le paiement.
-        </p>
-      </div>
-      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.blue }}>✕</button>
-    </div>
-  );
-}
+// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER AMBASSADEUR PAYS
+// PAGE : ENREGISTRER AMBASSADEUR PAYS (AMBASSADEUR_DIASPORA uniquement)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterPays() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-
-  const [payFailed,          setPayFailed]          = useState(false);
-  const [payPendingActivation, setPayPendingActivation] = useState(false);
-
-  const [showClientForm, setShowClientForm] = useState(false);
-  const [clientResult,   setClientResult]   = useState(null);
+  const [list, setList]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [creds, setCreds]         = useState(null);
+  const [credsLabel, setCredsLabel] = useState("");
+  // ── NOUVEAU : bannière retour CinetPay (failed_url pointe ici) ────────────
+  const [payFailed, setPayFailed] = useState(false);
 
   useEffect(() => {
+    // Détecter un retour CinetPay avec payment=failed dans l'URL
     const params = new URLSearchParams(window.location.search);
-    const paymentStatus = params.get("payment");
-    window.history.replaceState({}, "", window.location.pathname);
-
-    if (paymentStatus === "success") {
-      // Nouveau flux : le compte est déjà créé avant le paiement.
-      // Le webhook active le statut en arrière-plan — on informe juste l'utilisateur.
-      setPayPendingActivation(true);
-    } else if (paymentStatus === "failed") {
+    if (params.get("payment") === "failed") {
       setPayFailed(true);
+      window.history.replaceState({}, "", window.location.pathname);
     }
 
     diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
@@ -356,11 +191,39 @@ export function DiasporaRegisterPays() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    // Rafraîchir la liste
+    diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
-      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
+      {/* ── Bannière paiement échoué / annulé ─────────────────────────── */}
+      {payFailed && (
+        <div style={{
+          marginBottom: 20, padding: "14px 18px", borderRadius: 12,
+          background: "#FEF2F2", border: "1.5px solid #DC2626",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 22 }}>❌</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, color: "#DC2626", fontSize: 14 }}>Paiement annulé ou refusé</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#DC2626" }}>
+              Le paiement CinetPay n'a pas abouti. Veuillez réessayer ou contacter le support.
+            </p>
+          </div>
+          <button onClick={() => setPayFailed(false)}
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#DC2626" }}>
+            ✕
+          </button>
+        </div>
+      )}
 
       <PageHeader
         title="🗺️ Mes Ambassadeurs Pays"
@@ -374,34 +237,7 @@ export function DiasporaRegisterPays() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm
-            targetRole="AMBASSADEUR_PAYS"
-            returnPath="/diaspora/register/pays"
-            onSuccess={(credentials, roleLabel) => {
-              // onSuccess est appelé par AdhesionForm après pre-register + paiement lancé
-              // Les credentials sont déjà affichés dans AdhesionForm avant la redirection
-              diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
-                .then(r => setList(r.data.ambassadors || []));
-              setShowForm(false);
-            }}
-            onReset={() => setShowForm(false)}
-          />
-        </div>
-      )}
-
-      <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
-          {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
-        </Btn>
-      </div>
-      {clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <ClientCreatedScreen result={clientResult} onClose={() => { setClientResult(null); setShowClientForm(false); }} />
-        </div>
-      )}
-      {showClientForm && !clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <CreateClientForm onSuccess={r => { setClientResult(r); setShowClientForm(false); }} />
+          <AdhesionForm targetRole="AMBASSADEUR_PAYS" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -425,12 +261,9 @@ export function DiasporaRegisterPays() {
                   )}
                 </div>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-                </span>
-                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
-              </div>
+              <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+              </span>
             </Card>
           ))}
         </div>
@@ -440,40 +273,32 @@ export function DiasporaRegisterPays() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER RECRUTEUR
+// PAGE : ENREGISTRER RECRUTEUR (AMBASSADEUR_PAYS uniquement)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterRecruiter() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [list, setList]       = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-
-  const [payFailed,           setPayFailed]           = useState(false);
-  const [payPendingActivation, setPayPendingActivation] = useState(false);
-
-  const [showClientForm, setShowClientForm] = useState(false);
-  const [clientResult,   setClientResult]   = useState(null);
+  const [creds, setCreds]     = useState(null);
+  const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paymentStatus = params.get("payment");
-    window.history.replaceState({}, "", window.location.pathname);
-
-    if (paymentStatus === "success") {
-      setPayPendingActivation(true);
-    } else if (paymentStatus === "failed") {
-      setPayFailed(true);
-    }
-
     diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-
-      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
       <PageHeader
         title="🤝 Mes Recruteurs"
@@ -487,32 +312,7 @@ export function DiasporaRegisterRecruiter() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm
-            targetRole="RECRUTEUR"
-            returnPath="/diaspora/register/recruteur"
-            onSuccess={() => {
-              diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
-                .then(r => setList(r.data.ambassadors || []));
-              setShowForm(false);
-            }}
-            onReset={() => setShowForm(false)}
-          />
-        </div>
-      )}
-
-      <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
-          {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
-        </Btn>
-      </div>
-      {clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <ClientCreatedScreen result={clientResult} onClose={() => { setClientResult(null); setShowClientForm(false); }} />
-        </div>
-      )}
-      {showClientForm && !clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <CreateClientForm onSuccess={r => { setClientResult(r); setShowClientForm(false); }} />
+          <AdhesionForm targetRole="RECRUTEUR" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -526,16 +326,19 @@ export function DiasporaRegisterRecruiter() {
                 <div style={{ width:40, height:40, borderRadius:10, background:C.goldL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🤝</div>
                 <div>
                   <p style={{ margin:0, fontWeight:700, color:C.dark }}>{a.name}</p>
-                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{a.email} • {a.country} • {fmtDate(a.created_at)}</p>
-                  {a.plan && <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>{a.plan}</span>}
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+                    {a.email} • {a.country} • {fmtDate(a.created_at)}
+                  </p>
+                  {a.plan && (
+                    <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>
+                      {a.plan}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
-                </span>
-                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
-              </div>
+              <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+              </span>
             </Card>
           ))}
         </div>
@@ -545,40 +348,33 @@ export function DiasporaRegisterRecruiter() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER UN RUM
+// PAGE : ENREGISTRER UN RUM (AMBASSADEUR_DIASPORA uniquement)
+// Le RUM est la tête du réseau Parrainage — créé par l'Amb. Diaspora
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterRUM() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [list, setList]       = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-
-  const [payFailed,           setPayFailed]           = useState(false);
-  const [payPendingActivation, setPayPendingActivation] = useState(false);
-
-  const [showClientForm, setShowClientForm] = useState(false);
-  const [clientResult,   setClientResult]   = useState(null);
+  const [creds, setCreds]     = useState(null);
+  const [credsLabel, setCredsLabel] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paymentStatus = params.get("payment");
-    window.history.replaceState({}, "", window.location.pathname);
-
-    if (paymentStatus === "success") {
-      setPayPendingActivation(true);
-    } else if (paymentStatus === "failed") {
-      setPayFailed(true);
-    }
-
     diasporaBeneAPI.getAmbassadors({ role:"RUM" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
+  function handleSuccess(credentials, label) {
+    setCreds(credentials);
+    setCredsLabel(label);
+    setShowForm(false);
+    diasporaBeneAPI.getAmbassadors({ role:"RUM" })
+      .then(r => setList(r.data.ambassadors || []));
+  }
+
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-
-      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
+      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
 
       <PageHeader
         title="👑 Mes RUM"
@@ -590,6 +386,7 @@ export function DiasporaRegisterRUM() {
         }
       />
 
+      {/* Info contextuelle */}
       {!showForm && (
         <div style={{ background:"#F5F3FF", border:"1px solid #DDD6FE", borderRadius:12, padding:"12px 16px", marginBottom:20, display:"flex", gap:12, alignItems:"flex-start" }}>
           <span style={{ fontSize:20 }}>👑</span>
@@ -606,32 +403,7 @@ export function DiasporaRegisterRUM() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm
-            targetRole="RUM"
-            returnPath="/diaspora/register/rum"
-            onSuccess={() => {
-              diasporaBeneAPI.getAmbassadors({ role:"RUM" })
-                .then(r => setList(r.data.ambassadors || []));
-              setShowForm(false);
-            }}
-            onReset={() => setShowForm(false)}
-          />
-        </div>
-      )}
-
-      <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-        <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
-          {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
-        </Btn>
-      </div>
-      {clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <ClientCreatedScreen result={clientResult} onClose={() => { setClientResult(null); setShowClientForm(false); }} />
-        </div>
-      )}
-      {showClientForm && !clientResult && (
-        <div style={{ marginBottom:24 }}>
-          <CreateClientForm onSuccess={r => { setClientResult(r); setShowClientForm(false); }} />
+          <AdhesionForm targetRole="RUM" onSuccess={handleSuccess} />
         </div>
       )}
 
@@ -645,10 +417,18 @@ export function DiasporaRegisterRUM() {
                 <div style={{ width:44, height:44, borderRadius:12, background:"#F5F3FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👑</div>
                 <div>
                   <p style={{ margin:0, fontWeight:800, color:C.dark }}>{a.name}</p>
-                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{a.email} • {a.country} • {fmtDate(a.created_at)}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+                    {a.email} • {a.country} • {fmtDate(a.created_at)}
+                  </p>
                   <div style={{ display:"flex", gap:6, marginTop:4 }}>
-                    {a.plan && <span style={{ fontSize:10, fontWeight:700, color:"#7C3AED", background:"#F5F3FF", padding:"1px 8px", borderRadius:999 }}>{a.plan}</span>}
-                    <span style={{ fontSize:10, fontWeight:700, color:C.slate, background:C.bg, padding:"1px 8px", borderRadius:999 }}>Réseau Parrainage</span>
+                    {a.plan && (
+                      <span style={{ fontSize:10, fontWeight:700, color:"#7C3AED", background:"#F5F3FF", padding:"1px 8px", borderRadius:999 }}>
+                        {a.plan}
+                      </span>
+                    )}
+                    <span style={{ fontSize:10, fontWeight:700, color:C.slate, background:C.bg, padding:"1px 8px", borderRadius:999 }}>
+                      Réseau Parrainage
+                    </span>
                   </div>
                 </div>
               </div>
@@ -656,8 +436,11 @@ export function DiasporaRegisterRUM() {
                 <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
                   {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                 </span>
-                {a.username && <span style={{ fontSize:10, color:C.slate, fontFamily:"monospace" }}>@{a.username}</span>}
-                {a.status_payment !== "paid" && <PayButton ambassadorId={a.id} />}
+                {a.username && (
+                  <span style={{ fontSize:10, color:C.slate, fontFamily:"monospace" }}>
+                    @{a.username}
+                  </span>
+                )}
               </div>
             </Card>
           ))}
@@ -669,6 +452,7 @@ export function DiasporaRegisterRUM() {
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER CLIENT (RECRUTEUR uniquement)
+// Génère numéro mutualiste AWJ-YYYY-XXXX
 // ─────────────────────────────────────────────────────────────
 export function DiasporaNewBeneficiary() {
   const navigate  = useNavigate();
@@ -693,7 +477,9 @@ export function DiasporaNewBeneficiary() {
       <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
         <Card style={{ textAlign:"center" }}>
           <div style={{ fontSize:56, marginBottom:12 }}>⏳</div>
-          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
+          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>
+            Compte créé — en attente de validation
+          </h2>
           <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
             <p style={{ margin:"0 0 6px", fontSize:13, color:C.slate }}>Numéro mutualiste</p>
             <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
@@ -731,7 +517,7 @@ export function DiasporaNewBeneficiary() {
           <div>
             <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {PLANS_DIAS.map(p => (
+              {PLANS.map(p => (
                 <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
                   style={{ padding:"12px 16px", borderRadius:10, border:`2px solid ${form.plan===p.value?C.blue:C.border}`, background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", transition:"all .15s" }}>
                   <div>
@@ -753,11 +539,11 @@ export function DiasporaNewBeneficiary() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : MES CLIENTS / BÉNÉFICIAIRES
+// PAGE : MES CLIENTS / BÉNÉFICIAIRES (RECRUTEUR)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaBeneficiaries() {
   const navigate = useNavigate();
-  const [benes, setBenes]     = useState([]);
+  const [benes, setBenes]   = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -799,11 +585,11 @@ export function DiasporaBeneficiaries() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGES RESTANTES — inchangées par rapport à l'original
+// PAGE : CARTES VENDUES (RECRUTEUR)
 // ─────────────────────────────────────────────────────────────
 export function DiasporaCards() {
-  const [benes, setBenes]     = useState([]);
-  const [stats, setStats]     = useState(null);
+  const [benes, setBenes]   = useState([]);
+  const [stats, setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -817,7 +603,7 @@ export function DiasporaCards() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const cardsSold    = stats?.cards_sold || benes.length;
+  const cardsSold = stats?.cards_sold || benes.length;
   const currentLevel = REWARD_LEVELS.slice().reverse().find(l => cardsSold >= l.min) || null;
 
   if (loading) return <Loader />;
@@ -865,8 +651,11 @@ export function DiasporaCards() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : RÉCOMPENSES 🏆
+// ─────────────────────────────────────────────────────────────
 export function DiasporaRewards() {
-  const [stats, setStats]     = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -886,6 +675,7 @@ export function DiasporaRewards() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🏆 Mes récompenses" subtitle="Vendez des cartes pour débloquer des paliers" />
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
         <Card style={{ textAlign:"center" }}>
           <p style={{ margin:"0 0 4px", fontSize:36, fontWeight:900, color:C.blue }}>{cardsSold}</p>
@@ -897,6 +687,7 @@ export function DiasporaRewards() {
           <p style={{ margin:"2px 0 0", fontSize:13, color:C.slate, fontWeight:600 }}>Commissions totales</p>
         </Card>
       </div>
+
       <Card style={{ marginBottom:24 }}>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>🎖️ Niveau actuel</p>
         {currentLevel ? (
@@ -922,6 +713,7 @@ export function DiasporaRewards() {
           </div>
         )}
       </Card>
+
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📊 Tous les paliers</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -946,6 +738,9 @@ export function DiasporaRewards() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : PAIEMENTS
+// ─────────────────────────────────────────────────────────────
 export function DiasporaPayments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -1064,8 +859,11 @@ export function DiasporaNewPayment() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : GAINS / COMMISSIONS
+// ─────────────────────────────────────────────────────────────
 export function DiasporaEarnings() {
-  const [data, setData]       = useState(null);
+  const [data, setData]   = useState(null);
   const [loading, setLoading] = useState(true);
   const amb  = getDiasporaData();
   const role = amb?.role || "RECRUTEUR";
@@ -1081,6 +879,7 @@ export function DiasporaEarnings() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="📊 Mes gains" subtitle="Commissions générées par votre réseau" />
+
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:12, marginBottom:24 }}>
         {[
           { label:"Total gagné",   value:totals.total_earned, color:C.green  },
@@ -1096,6 +895,8 @@ export function DiasporaEarnings() {
           </Card>
         ))}
       </div>
+
+      {/* Commissions par rôle source — uniquement pour les non-RECRUTEUR */}
       {role !== "RECRUTEUR" && data?.by_source?.length > 0 && (
         <Card style={{ marginBottom:20 }}>
           <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📈 Par source</p>
@@ -1107,6 +908,7 @@ export function DiasporaEarnings() {
           ))}
         </Card>
       )}
+
       <Card>
         <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📋 Détail des commissions</p>
         {!data?.commissions?.length ? (
@@ -1149,11 +951,14 @@ export function DiasporaEarnings() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : PARRAINAGE / LIEN
+// ─────────────────────────────────────────────────────────────
 export function DiasporaReferral() {
-  const [link, setLink]         = useState(null);
+  const [link, setLink]     = useState(null);
   const [referrals, setReferrals] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [copied, setCopied]     = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied]   = useState(false);
 
   useEffect(() => {
     Promise.all([diasporaRefAPI.getLink(), diasporaRefAPI.getReferrals()])
@@ -1217,6 +1022,9 @@ export function DiasporaReferral() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : RÉSEAU
+// ─────────────────────────────────────────────────────────────
 export function DiasporaNetwork() {
   const [network, setNetwork] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1234,9 +1042,9 @@ export function DiasporaNetwork() {
       <PageHeader title="🌐 Mon réseau" subtitle={`${network?.totals?.total || 0} membres au total`} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:24 }}>
         {[
-          { label:"Niveau 1", value:levels.level1?.length||0, color:C.blue  },
-          { label:"Niveau 2", value:levels.level2?.length||0, color:C.green },
-          { label:"Niveau 3", value:levels.level3?.length||0, color:C.gold  },
+          { label:"Niveau 1",  value:levels.level1?.length||0, color:C.blue   },
+          { label:"Niveau 2",  value:levels.level2?.length||0, color:C.green  },
+          { label:"Niveau 3",  value:levels.level3?.length||0, color:C.gold   },
         ].map(s => (
           <Card key={s.label} style={{ textAlign:"center" }}>
             <p style={{ margin:0, fontSize:28, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -1269,8 +1077,11 @@ export function DiasporaNetwork() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
 export function DiasporaNotifications() {
-  const [notifs, setNotifs]   = useState([]);
+  const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1304,9 +1115,12 @@ export function DiasporaNotifications() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : CLASSEMENT
+// ─────────────────────────────────────────────────────────────
 export function DiasporaLeaderboard() {
-  const [data, setData]       = useState(null);
-  const [period, setPeriod]   = useState("month");
+  const [data, setData]   = useState(null);
+  const [period, setPeriod] = useState("month");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1350,8 +1164,11 @@ export function DiasporaLeaderboard() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// PAGE : PROFIL
+// ─────────────────────────────────────────────────────────────
 export function DiasporaProfile() {
-  const [form, setForm]       = useState({ name:"", country:"", city:"", phone:"" });
+  const [form, setForm]   = useState({ name:"", country:"", city:"", phone:"" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
@@ -1389,9 +1206,9 @@ export function DiasporaProfile() {
         <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
             { key:"name",    label:"Nom complet",   placeholder:"Jean Kouassi" },
-            { key:"phone",   label:"Téléphone",     placeholder:"+225 07 00 00 00 00" },
-            { key:"city",    label:"Ville",         placeholder:"Abidjan" },
-            { key:"country", label:"Pays",          placeholder:"Côte d'Ivoire" },
+            { key:"phone",   label:"Téléphone",      placeholder:"+225 07 00 00 00 00" },
+            { key:"city",    label:"Ville",           placeholder:"Abidjan" },
+            { key:"country", label:"Pays",            placeholder:"Côte d'Ivoire" },
           ].map(f => (
             <div key={f.key}>
               <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
@@ -1408,3 +1225,6 @@ export function DiasporaProfile() {
     </div>
   );
 }
+
+// Import manquant pour DiasporaCards
+import { diasporaDashAPI } from "../../diasporaApi";
