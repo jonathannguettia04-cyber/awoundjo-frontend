@@ -216,12 +216,12 @@ function SuccessScreen({ credentials, roleLabel, rc, onClose }) {
 // COMPOSANT PRINCIPAL
 // ─────────────────────────────────────────────────────────────
 /**
- * @param {string}   targetRole       - Rôle à créer
- * @param {string}   returnPath       - Chemin de retour après CinetPay (ex: "/diaspora/register/pays")
- *                                      Si absent, utilise window.location.pathname au moment du clic
+ * @param {string}   targetRole        - Rôle à créer
+ * @param {string}   returnPath        - Chemin de retour après CinetPay (ex: "/diaspora/register/pays")
+ *                                       Si absent, utilise window.location.pathname au moment du clic
  * @param {object}   postPaymentResult - Si fourni, affiche directement le SuccessScreen
- * @param {function} onSuccess        - Appelé après création réussie
- * @param {function} onReset          - Appelé quand l'utilisateur ferme le SuccessScreen
+ * @param {function} onSuccess         - Appelé après création réussie
+ * @param {function} onReset           - Appelé quand l'utilisateur ferme le SuccessScreen
  */
 export default function AdhesionForm({ targetRole, returnPath, postPaymentResult, onSuccess, onReset }) {
   const rc = ROLE_CONFIG[targetRole] || ROLE_CONFIG.RECRUTEUR;
@@ -280,7 +280,7 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
       plan:    form.plan,
     }));
 
-    // ✅ transaction_id ≤ 30 caractères (limite CinetPay)
+    // transaction_id ≤ 30 caractères (limite CinetPay)
     // AWJ + timestamp base36 (~8 cars) + random 4 cars = ~15 cars
     const txId = `AWJ${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
@@ -290,6 +290,7 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
                  || localStorage.getItem("agent_token");
 
       const origin = window.location.origin;
+      // FIX : utilise returnPath fixe si fourni, sinon pathname courant
       const path   = returnPath || window.location.pathname;
 
       const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
@@ -305,13 +306,15 @@ export default function AdhesionForm({ targetRole, returnPath, postPaymentResult
           client_name:    form.name,
           client_email:   form.email,
           client_phone:   form.phone,
-          // ✅ transmis au backend pour stockage dans pending_payments
+          // transmis au backend pour stockage dans pending_payments
           country:        form.country,
           role:           targetRole,
           plan:           form.plan,
-          return_url: `${origin}${path}?payment=success&transaction_id=${txId}`,
-          cancel_url:  `${origin}${path}?payment=failed`,
-          notify_url:  `${BASE}/api/payments/cinetpay/notify`,
+          // FIX : success_url / failed_url — noms attendus par paymentController.js
+          // (l'ancienne version utilisait return_url / cancel_url qui étaient ignorés,
+          //  provoquant un retour systématique vers /client/cotisations)
+          success_url: `${origin}${path}?payment=success&transaction_id=${txId}`,
+          failed_url:  `${origin}${path}?payment=failed`,
         }),
       });
 

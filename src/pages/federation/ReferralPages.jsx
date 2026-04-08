@@ -39,8 +39,8 @@ function PayButton({ ambassadorId }) {
         body: JSON.stringify({
           ambassador_id: ambassadorId, amount: 15000, currency: "XOF",
           description: "Adhésion Awoundjô",
-          return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed`,
+          success_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+          failed_url:  `${window.location.origin}${window.location.pathname}?payment=failed`,
         }),
       });
       const data = await res.json();
@@ -240,7 +240,6 @@ function Btn({ children, onClick, color=C.purple, outline=false, disabled=false,
   );
 }
 
-// Affiche les credentials générés après création
 function CredentialsModal({ credentials, targetLabel, onClose }) {
   const [copied, setCopied] = useState(false);
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
@@ -252,7 +251,6 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
           <h2 style={{ margin:0, fontSize:20, fontWeight:900, color:C.dark }}>{targetLabel} créé(e) avec succès !</h2>
           <p style={{ margin:"6px 0 0", color:C.slate, fontSize:13 }}>Transmettez ces identifiants de connexion</p>
         </div>
-
         <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", marginBottom:16, border:`1px solid ${C.border}` }}>
           {[
             { label:"Nom d'utilisateur", value:credentials.username },
@@ -265,7 +263,6 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
           ))}
           <p style={{ margin:"4px 0 0", fontSize:11, color:C.red }}>⚠️ Le mot de passe doit être changé à la première connexion</p>
         </div>
-
         <div style={{ display:"flex", gap:10 }}>
           <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
             style={{ flex:1, padding:"10px 0", background:C.purpleL, color:C.purple, border:`1.5px solid ${C.purple}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
@@ -276,7 +273,6 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
             📲 Envoyer WhatsApp
           </a>
         </div>
-
         <button onClick={onClose}
           style={{ width:"100%", marginTop:10, padding:"10px 0", background:C.purple, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
           Fermer
@@ -285,8 +281,6 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
     </div>
   );
 }
-
-// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN LEADER (RUM uniquement)
@@ -326,11 +320,15 @@ export function ReferralRegisterLeader() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="LEADER" onSuccess={handleSuccess} />
+          {/* FIX : returnPath fixé — CinetPay reviendra sur cette page */}
+          <AdhesionForm
+            targetRole="LEADER"
+            returnPath="/referral/register/leader"
+            onSuccess={handleSuccess}
+          />
         </div>
       )}
 
-      {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -413,11 +411,15 @@ export function ReferralRegisterPasteur() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="PASTEUR" onSuccess={handleSuccess} />
+          {/* FIX : returnPath fixé */}
+          <AdhesionForm
+            targetRole="PASTEUR"
+            returnPath="/referral/register/pasteur"
+            onSuccess={handleSuccess}
+          />
         </div>
       )}
 
-      {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -500,11 +502,15 @@ export function ReferralRegisterResponsable() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="RESPONSABLE" onSuccess={handleSuccess} />
+          {/* FIX : returnPath fixé */}
+          <AdhesionForm
+            targetRole="RESPONSABLE"
+            returnPath="/referral/register/responsable"
+            onSuccess={handleSuccess}
+          />
         </div>
       )}
 
-      {/* ── Créer un client final ───────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn outline onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -548,7 +554,6 @@ export function ReferralRegisterResponsable() {
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN CLIENT (RESPONSABLE / PASTEUR)
-// Génère numéro mutualiste AWJ-YYYY-XXXX
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterClient() {
   const navigate  = useNavigate();
@@ -610,8 +615,6 @@ export function ReferralRegisterClient() {
                 style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
             </div>
           ))}
-
-          {/* Choix offre */}
           <div>
             <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -627,7 +630,6 @@ export function ReferralRegisterClient() {
               ))}
             </div>
           </div>
-
           <Btn disabled={loading}>
             {loading ? "Enregistrement…" : "✅ Enregistrer le client"}
           </Btn>
@@ -682,7 +684,7 @@ export function ReferralClients() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : RÉCOMPENSES 🏆 (tous les rôles avec cardsSold)
+// PAGE : RÉCOMPENSES 🏆
 // ─────────────────────────────────────────────────────────────
 export function ReferralRewards() {
   const [stats, setStats] = useState(null);
@@ -707,8 +709,6 @@ export function ReferralRewards() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🏆 Mes récompenses" subtitle="Vendez des cartes pour débloquer des paliers" />
-
-      {/* Résumé */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
         <Card style={{ textAlign:"center" }}>
           <p style={{ margin:"0 0 4px", fontSize:36, fontWeight:900, color:C.purple }}>{cardsSold}</p>
@@ -720,8 +720,6 @@ export function ReferralRewards() {
           <p style={{ margin:"2px 0 0", fontSize:13, color:C.slate, fontWeight:600 }}>Commissions totales</p>
         </Card>
       </div>
-
-      {/* Niveau actuel */}
       <Card style={{ marginBottom:24 }}>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>🎖️ Niveau actuel</p>
         {currentLevel ? (
@@ -734,8 +732,6 @@ export function ReferralRewards() {
             <p style={{ margin:0, color:C.slate, fontSize:13 }}>Vendez {REWARD_LEVELS[0].min} cartes pour débloquer votre premier niveau !</p>
           </div>
         )}
-
-        {/* Progression vers le prochain niveau */}
         {nextLevel && (
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
@@ -749,8 +745,6 @@ export function ReferralRewards() {
           </div>
         )}
       </Card>
-
-      {/* Tous les paliers */}
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📊 Tous les paliers</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -797,8 +791,6 @@ export function ReferralEarnings() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="💰 Mes gains" subtitle="Commissions générées par votre réseau" />
-
-      {/* Totaux */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:12, marginBottom:24 }}>
         {[
           { label:"Total gagné",    value:totals.total_earned, color:C.green  },
@@ -814,8 +806,6 @@ export function ReferralEarnings() {
           </Card>
         ))}
       </div>
-
-      {/* Tableau commissions */}
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📋 Détail des commissions</p>
         {!data?.commissions?.length ? (
@@ -876,8 +866,6 @@ export function ReferralNetwork() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="🌐 Mon réseau" subtitle={`${network?.totals?.total || 0} membres au total`} />
-
-      {/* Totaux par niveau */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:24 }}>
         {[
           { label:"Niveau 1",  value:levels.level1?.length||0, color:C.purple },
@@ -890,8 +878,6 @@ export function ReferralNetwork() {
           </Card>
         ))}
       </div>
-
-      {/* Liste par niveau */}
       {["level1","level2","level3"].map((lvl, i) => (
         levels[lvl]?.length > 0 && (
           <Card key={lvl} style={{ marginBottom:16 }}>
@@ -912,7 +898,6 @@ export function ReferralNetwork() {
           </Card>
         )
       ))}
-
       {network?.totals?.total === 0 && (
         <EmptyState icon="🌐" title="Réseau vide" desc="Commencez à recruter pour construire votre réseau" />
       )}
@@ -976,8 +961,6 @@ export function ReferralLeaderboard() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🏅 Classement" subtitle="Les meilleurs performers de votre réseau" />
-
-      {/* Sélecteur période */}
       <div style={{ display:"flex", gap:8, marginBottom:20 }}>
         {[{ id:"week",label:"Cette semaine" },{ id:"month",label:"Ce mois" },{ id:"all",label:"Tout temps" }].map(p => (
           <button key={p.id} onClick={() => setPeriod(p.id)}
@@ -986,7 +969,6 @@ export function ReferralLeaderboard() {
           </button>
         ))}
       </div>
-
       {loading ? <Loader /> : (
         <Card>
           <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>🏆 Top gains</p>
@@ -1001,7 +983,6 @@ export function ReferralLeaderboard() {
             </div>
           ))}
           {!data?.top_earners?.length && <EmptyState icon="🏅" title="Aucune donnée" desc="Le classement s'affichera bientôt" />}
-
           {data?.my_rank && (
             <div style={{ marginTop:16, padding:"12px 16px", background:C.purpleL, borderRadius:10, textAlign:"center" }}>
               <p style={{ margin:0, fontWeight:700, color:C.purple }}>Votre rang : #{data.my_rank}</p>
@@ -1044,7 +1025,6 @@ export function ReferralProfile() {
     <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
       <PageHeader title="👤 Mon profil" subtitle="Gérez vos informations personnelles" />
       <Card>
-        {/* Badge rôle */}
         <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:rc.bg||C.purpleL, borderRadius:12, marginBottom:24 }}>
           <span style={{ fontSize:32 }}>{rc.icon}</span>
           <div>
@@ -1052,9 +1032,7 @@ export function ReferralProfile() {
             <span style={{ fontSize:12, fontWeight:700, color:rc.color||C.purple }}>{rc.label}</span>
           </div>
         </div>
-
         {saved && <div style={{ background:C.greenL, color:C.green, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13, fontWeight:700 }}>✅ Profil mis à jour !</div>}
-
         <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
             { key:"name",    label:"Nom complet",  placeholder:"Jean Kofi" },
@@ -1158,7 +1136,6 @@ export function ReferralReferral() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🔗 Recrutement" subtitle={`${referrals.length} recruté(s) direct(s)`} />
-
       {link && (
         <Card style={{ marginBottom:20 }}>
           <p style={{ margin:"0 0 12px", fontWeight:800, color:C.dark }}>Mon lien de recrutement</p>
@@ -1180,7 +1157,6 @@ export function ReferralReferral() {
           </div>
         </Card>
       )}
-
       <Card>
         <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>Mes recrutés directs</p>
         {referrals.length === 0 ? (
@@ -1206,7 +1182,7 @@ export function ReferralReferral() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : CARTES VENDUES (RESPONSABLE / PASTEUR)
+// PAGE : CARTES VENDUES
 // ─────────────────────────────────────────────────────────────
 export function ReferralCards() {
   const [stats, setStats] = useState(null);
@@ -1231,7 +1207,6 @@ export function ReferralCards() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="💳 Cartes vendues" subtitle={`${cardsSold} carte(s) au total`} />
-
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
         <Card style={{ textAlign:"center" }}>
           <p style={{ margin:"0 0 4px", fontSize:40, fontWeight:900, color:C.purple }}>{cardsSold}</p>
@@ -1243,7 +1218,6 @@ export function ReferralCards() {
           {currentLevel && <p style={{ margin:"6px 0 0", fontSize:12, color:C.gold }}>{currentLevel.reward}</p>}
         </Card>
       </div>
-
       <Card>
         <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📋 Liste des clients (cartes)</p>
         {clients.length === 0 ? (
@@ -1268,5 +1242,3 @@ export function ReferralCards() {
     </div>
   );
 }
-
-
