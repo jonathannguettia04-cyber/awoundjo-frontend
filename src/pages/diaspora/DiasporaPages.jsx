@@ -1,9 +1,4 @@
 // src/pages/diaspora/DiasporaPages.jsx
-// ─────────────────────────────────────────────────────────────
-//  Toutes les pages du module Diaspora Awoundjô
-//  Hiérarchie : AMBASSADEUR_DIASPORA → AMBASSADEUR_PAYS → RECRUTEUR → CLIENT
-//  Exports nommés utilisés dans App.jsx via diasporaPage()
-// ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AdhesionForm, { triggerPostPaymentCreation } from "../../components/AdhesionForm";
@@ -174,9 +169,9 @@ const ROLE_CONFIG = {
 };
 
 const PLANS_DIAS = [
-  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:15000  },
-  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:15000 },
-  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:15000 },
+  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  price:15000 },
+  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie", price:15000 },
+  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium", price:15000 },
 ];
 
 const REWARD_LEVELS = [
@@ -255,7 +250,6 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
   );
 }
 
-// Modal credentials — affiché après création d'un rôle intermédiaire
 function CredentialsModal({ credentials, targetLabel, onClose }) {
   const [copied, setCopied] = useState(false);
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
@@ -298,23 +292,59 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
   );
 }
 
-// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
+// ─────────────────────────────────────────────────────────────
+// HELPER — bannières réutilisables post-paiement
+// ─────────────────────────────────────────────────────────────
+function PayFailedBanner({ onClose }) {
+  return (
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>❌</span>
+      <div>
+        <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Paiement annulé ou refusé</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
+      </div>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
+    </div>
+  );
+}
+
+function PayErrorBanner({ message, onClose }) {
+  return (
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>⚠️</span>
+      <div>
+        <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Erreur après paiement</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>{message}</p>
+        <p style={{ margin:"4px 0 0", fontSize:11, color:"#DC2626" }}>Votre paiement a été reçu. Contactez le support avec le numéro de transaction.</p>
+      </div>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
+    </div>
+  );
+}
+
+function CreatingBanner() {
+  return (
+    <div style={{ marginBottom:20, padding:"16px 20px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
+      <div style={{ width:20, height:20, border:`2px solid ${C.blueL}`, borderTop:`2px solid ${C.blue}`, borderRadius:"50%", animation:"spin .7s linear infinite", flexShrink:0 }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <p style={{ margin:0, fontWeight:700, color:C.blue, fontSize:14 }}>Paiement confirmé — Création du compte en cours…</p>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER AMBASSADEUR PAYS (AMBASSADEUR_DIASPORA uniquement)
+// PAGE : ENREGISTRER AMBASSADEUR PAYS
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterPays() {
-  const [list, setList]           = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showForm, setShowForm]   = useState(false);
+  const [list, setList]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
-  // ── État post-paiement ────────────────────────────────────
-  const [postPayResult, setPostPayResult] = useState(null); // { credentials, roleLabel }
+  const [postPayResult, setPostPayResult] = useState(null);
   const [payFailed,     setPayFailed]     = useState(false);
   const [payError,      setPayError]      = useState("");
   const [creating,      setCreating]      = useState(false);
 
-  // ── Client final ──────────────────────────────────────────
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult,   setClientResult]   = useState(null);
 
@@ -323,19 +353,16 @@ export function DiasporaRegisterPays() {
     const paymentStatus = params.get("payment");
     const transactionId = params.get("transaction_id");
 
-    // Nettoyer l'URL immédiatement
     window.history.replaceState({}, "", window.location.pathname);
 
     if (paymentStatus === "success" && transactionId) {
-      // Retour CinetPay succès → créer le compte
       setCreating(true);
-      setShowForm(true); // Garder le formulaire visible pour afficher le résultat
+      setShowForm(true);
       triggerPostPaymentCreation(
         transactionId,
         (credentials, roleLabel) => {
           setPostPayResult({ credentials, roleLabel });
           setCreating(false);
-          // Rafraîchir la liste
           diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
             .then(r => setList(r.data.ambassadors || []));
         },
@@ -349,82 +376,17 @@ export function DiasporaRegisterPays() {
       setPayFailed(true);
     }
 
-    // Charger la liste
     diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
       .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
-  function handleFormSuccess() {
-    // onSuccess de AdhesionForm — appelé avec (credentials, roleLabel)
-    // mais dans le Plan A, on gère via triggerPostPaymentCreation
-    // Ce callback n'est appelé que si on veut aussi une notification dans la page parente
-    diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
-      .then(r => setList(r.data.ambassadors || []));
-  }
-
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {/* ── Bannière paiement échoué ──────────────────────── */}
-      {payFailed && (
-        <div style={{
-          marginBottom:20, padding:"14px 18px", borderRadius:12,
-          background:"#FEF2F2", border:"1.5px solid #DC2626",
-          display:"flex", alignItems:"center", gap:12,
-        }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>
-              Le paiement CinetPay n'a pas abouti. Veuillez réessayer.
-            </p>
-          </div>
-          <button onClick={() => setPayFailed(false)}
-            style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* ── Bannière erreur création post-paiement ─────────── */}
-      {payError && (
-        <div style={{
-          marginBottom:20, padding:"14px 18px", borderRadius:12,
-          background:"#FEF2F2", border:"1.5px solid #DC2626",
-          display:"flex", alignItems:"center", gap:12,
-        }}>
-          <span style={{ fontSize:22 }}>⚠️</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Erreur après paiement</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>{payError}</p>
-            <p style={{ margin:"4px 0 0", fontSize:11, color:"#DC2626" }}>
-              Votre paiement a été reçu. Contactez le support avec le numéro de transaction.
-            </p>
-          </div>
-          <button onClick={() => setPayError("")}
-            style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* ── Spinner création en cours ─────────────────────── */}
-      {creating && (
-        <div style={{
-          marginBottom:20, padding:"16px 20px", borderRadius:12,
-          background:C.blueL, border:`1.5px solid ${C.blue}44`,
-          display:"flex", alignItems:"center", gap:12,
-        }}>
-          <div style={{
-            width:20, height:20, border:`2px solid ${C.blueL}`, borderTop:`2px solid ${C.blue}`,
-            borderRadius:"50%", animation:"spin .7s linear infinite", flexShrink:0,
-          }} />
-          <p style={{ margin:0, fontWeight:700, color:C.blue, fontSize:14 }}>
-            Paiement confirmé — Création du compte en cours…
-          </p>
-        </div>
-      )}
+      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
+      {creating   && <CreatingBanner />}
 
       <PageHeader
         title="🗺️ Mes Ambassadeurs Pays"
@@ -438,16 +400,17 @@ export function DiasporaRegisterPays() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
+          {/* ✅ returnPath fixé — CinetPay reviendra sur cette page */}
           <AdhesionForm
             targetRole="AMBASSADEUR_PAYS"
+            returnPath="/diaspora/register/pays"
             postPaymentResult={postPayResult}
-            onSuccess={handleFormSuccess}
+            onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" }).then(r => setList(r.data.ambassadors || []))}
             onReset={() => { setShowForm(false); setPostPayResult(null); }}
           />
         </div>
       )}
 
-      {/* ── Créer un client final ─────────────────────────── */}
       <div style={{ marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
         <Btn variant="outline" onClick={() => { setShowClientForm(s=>!s); setClientResult(null); }}>
           {showClientForm ? "✕ Annuler" : "👤 Créer un client final"}
@@ -499,11 +462,11 @@ export function DiasporaRegisterPays() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER RECRUTEUR (AMBASSADEUR_PAYS uniquement)
+// PAGE : ENREGISTRER RECRUTEUR
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterRecruiter() {
-  const [list, setList]       = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [list, setList]         = useState([]);
+  const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
   const [postPayResult, setPostPayResult] = useState(null);
@@ -550,35 +513,9 @@ export function DiasporaRegisterRecruiter() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {payFailed && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-          </div>
-          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-        </div>
-      )}
-
-      {payError && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>⚠️</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Erreur après paiement</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>{payError}</p>
-            <p style={{ margin:"4px 0 0", fontSize:11, color:"#DC2626" }}>Votre paiement a été reçu. Contactez le support avec le numéro de transaction.</p>
-          </div>
-          <button onClick={() => setPayError("")} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-        </div>
-      )}
-
-      {creating && (
-        <div style={{ marginBottom:20, padding:"16px 20px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:20, height:20, border:`2px solid ${C.blueL}`, borderTop:`2px solid ${C.blue}`, borderRadius:"50%", animation:"spin .7s linear infinite", flexShrink:0 }} />
-          <p style={{ margin:0, fontWeight:700, color:C.blue, fontSize:14 }}>Paiement confirmé — Création du compte en cours…</p>
-        </div>
-      )}
+      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
+      {creating   && <CreatingBanner />}
 
       <PageHeader
         title="🤝 Mes Recruteurs"
@@ -592,8 +529,10 @@ export function DiasporaRegisterRecruiter() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
+          {/* ✅ returnPath fixé */}
           <AdhesionForm
             targetRole="RECRUTEUR"
+            returnPath="/diaspora/register/recruteur"
             postPaymentResult={postPayResult}
             onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" }).then(r => setList(r.data.ambassadors || []))}
             onReset={() => { setShowForm(false); setPostPayResult(null); }}
@@ -646,12 +585,11 @@ export function DiasporaRegisterRecruiter() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER UN RUM (AMBASSADEUR_DIASPORA uniquement)
-// Le RUM est la tête du réseau Parrainage — créé par l'Amb. Diaspora
+// PAGE : ENREGISTRER UN RUM
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRegisterRUM() {
-  const [list, setList]       = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [list, setList]         = useState([]);
+  const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
   const [postPayResult, setPostPayResult] = useState(null);
@@ -698,35 +636,9 @@ export function DiasporaRegisterRUM() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {payFailed && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-          </div>
-          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-        </div>
-      )}
-
-      {payError && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>⚠️</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Erreur après paiement</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>{payError}</p>
-            <p style={{ margin:"4px 0 0", fontSize:11, color:"#DC2626" }}>Votre paiement a été reçu. Contactez le support avec le numéro de transaction.</p>
-          </div>
-          <button onClick={() => setPayError("")} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-        </div>
-      )}
-
-      {creating && (
-        <div style={{ marginBottom:20, padding:"16px 20px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:20, height:20, border:`2px solid ${C.blueL}`, borderTop:`2px solid ${C.blue}`, borderRadius:"50%", animation:"spin .7s linear infinite", flexShrink:0 }} />
-          <p style={{ margin:0, fontWeight:700, color:C.blue, fontSize:14 }}>Paiement confirmé — Création du compte en cours…</p>
-        </div>
-      )}
+      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
+      {creating   && <CreatingBanner />}
 
       <PageHeader
         title="👑 Mes RUM"
@@ -754,8 +666,10 @@ export function DiasporaRegisterRUM() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
+          {/* ✅ returnPath fixé */}
           <AdhesionForm
             targetRole="RUM"
+            returnPath="/diaspora/register/rum"
             postPaymentResult={postPayResult}
             onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"RUM" }).then(r => setList(r.data.ambassadors || []))}
             onReset={() => { setShowForm(false); setPostPayResult(null); }}
@@ -813,7 +727,6 @@ export function DiasporaRegisterRUM() {
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER CLIENT (RECRUTEUR uniquement)
-// Génère numéro mutualiste AWJ-YYYY-XXXX
 // ─────────────────────────────────────────────────────────────
 export function DiasporaNewBeneficiary() {
   const navigate  = useNavigate();
@@ -838,9 +751,7 @@ export function DiasporaNewBeneficiary() {
       <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
         <Card style={{ textAlign:"center" }}>
           <div style={{ fontSize:56, marginBottom:12 }}>⏳</div>
-          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>
-            Compte créé — en attente de validation
-          </h2>
+          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
           <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
             <p style={{ margin:"0 0 6px", fontSize:13, color:C.slate }}>Numéro mutualiste</p>
             <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
@@ -900,11 +811,11 @@ export function DiasporaNewBeneficiary() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : MES CLIENTS / BÉNÉFICIAIRES (RECRUTEUR)
+// PAGE : MES CLIENTS / BÉNÉFICIAIRES
 // ─────────────────────────────────────────────────────────────
 export function DiasporaBeneficiaries() {
   const navigate = useNavigate();
-  const [benes, setBenes]   = useState([]);
+  const [benes, setBenes]     = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -946,11 +857,11 @@ export function DiasporaBeneficiaries() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : CARTES VENDUES (RECRUTEUR)
+// PAGE : CARTES VENDUES
 // ─────────────────────────────────────────────────────────────
 export function DiasporaCards() {
-  const [benes, setBenes]   = useState([]);
-  const [stats, setStats]   = useState(null);
+  const [benes, setBenes]     = useState([]);
+  const [stats, setStats]     = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -964,7 +875,7 @@ export function DiasporaCards() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const cardsSold = stats?.cards_sold || benes.length;
+  const cardsSold    = stats?.cards_sold || benes.length;
   const currentLevel = REWARD_LEVELS.slice().reverse().find(l => cardsSold >= l.min) || null;
 
   if (loading) return <Loader />;
@@ -1013,10 +924,10 @@ export function DiasporaCards() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : RÉCOMPENSES 🏆
+// PAGE : RÉCOMPENSES
 // ─────────────────────────────────────────────────────────────
 export function DiasporaRewards() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats]     = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1036,7 +947,6 @@ export function DiasporaRewards() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🏆 Mes récompenses" subtitle="Vendez des cartes pour débloquer des paliers" />
-
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
         <Card style={{ textAlign:"center" }}>
           <p style={{ margin:"0 0 4px", fontSize:36, fontWeight:900, color:C.blue }}>{cardsSold}</p>
@@ -1048,7 +958,6 @@ export function DiasporaRewards() {
           <p style={{ margin:"2px 0 0", fontSize:13, color:C.slate, fontWeight:600 }}>Commissions totales</p>
         </Card>
       </div>
-
       <Card style={{ marginBottom:24 }}>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>🎖️ Niveau actuel</p>
         {currentLevel ? (
@@ -1074,7 +983,6 @@ export function DiasporaRewards() {
           </div>
         )}
       </Card>
-
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📊 Tous les paliers</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -1224,7 +1132,7 @@ export function DiasporaNewPayment() {
 // PAGE : GAINS / COMMISSIONS
 // ─────────────────────────────────────────────────────────────
 export function DiasporaEarnings() {
-  const [data, setData]   = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const amb  = getDiasporaData();
   const role = amb?.role || "RECRUTEUR";
@@ -1240,7 +1148,6 @@ export function DiasporaEarnings() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="📊 Mes gains" subtitle="Commissions générées par votre réseau" />
-
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:12, marginBottom:24 }}>
         {[
           { label:"Total gagné",   value:totals.total_earned, color:C.green  },
@@ -1256,8 +1163,6 @@ export function DiasporaEarnings() {
           </Card>
         ))}
       </div>
-
-      {/* Commissions par rôle source — uniquement pour les non-RECRUTEUR */}
       {role !== "RECRUTEUR" && data?.by_source?.length > 0 && (
         <Card style={{ marginBottom:20 }}>
           <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📈 Par source</p>
@@ -1269,7 +1174,6 @@ export function DiasporaEarnings() {
           ))}
         </Card>
       )}
-
       <Card>
         <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📋 Détail des commissions</p>
         {!data?.commissions?.length ? (
@@ -1313,13 +1217,13 @@ export function DiasporaEarnings() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : PARRAINAGE / LIEN
+// PAGE : PARRAINAGE
 // ─────────────────────────────────────────────────────────────
 export function DiasporaReferral() {
-  const [link, setLink]     = useState(null);
+  const [link, setLink]         = useState(null);
   const [referrals, setReferrals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [copied, setCopied]   = useState(false);
+  const [loading, setLoading]   = useState(true);
+  const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
     Promise.all([diasporaRefAPI.getLink(), diasporaRefAPI.getReferrals()])
@@ -1403,9 +1307,9 @@ export function DiasporaNetwork() {
       <PageHeader title="🌐 Mon réseau" subtitle={`${network?.totals?.total || 0} membres au total`} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:24 }}>
         {[
-          { label:"Niveau 1",  value:levels.level1?.length||0, color:C.blue   },
-          { label:"Niveau 2",  value:levels.level2?.length||0, color:C.green  },
-          { label:"Niveau 3",  value:levels.level3?.length||0, color:C.gold   },
+          { label:"Niveau 1", value:levels.level1?.length||0, color:C.blue  },
+          { label:"Niveau 2", value:levels.level2?.length||0, color:C.green },
+          { label:"Niveau 3", value:levels.level3?.length||0, color:C.gold  },
         ].map(s => (
           <Card key={s.label} style={{ textAlign:"center" }}>
             <p style={{ margin:0, fontSize:28, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -1442,7 +1346,7 @@ export function DiasporaNetwork() {
 // PAGE : NOTIFICATIONS
 // ─────────────────────────────────────────────────────────────
 export function DiasporaNotifications() {
-  const [notifs, setNotifs] = useState([]);
+  const [notifs, setNotifs]   = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1480,8 +1384,8 @@ export function DiasporaNotifications() {
 // PAGE : CLASSEMENT
 // ─────────────────────────────────────────────────────────────
 export function DiasporaLeaderboard() {
-  const [data, setData]   = useState(null);
-  const [period, setPeriod] = useState("month");
+  const [data, setData]       = useState(null);
+  const [period, setPeriod]   = useState("month");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1529,7 +1433,7 @@ export function DiasporaLeaderboard() {
 // PAGE : PROFIL
 // ─────────────────────────────────────────────────────────────
 export function DiasporaProfile() {
-  const [form, setForm]   = useState({ name:"", country:"", city:"", phone:"" });
+  const [form, setForm]       = useState({ name:"", country:"", city:"", phone:"" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
@@ -1567,9 +1471,9 @@ export function DiasporaProfile() {
         <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
             { key:"name",    label:"Nom complet",   placeholder:"Jean Kouassi" },
-            { key:"phone",   label:"Téléphone",      placeholder:"+225 07 00 00 00 00" },
-            { key:"city",    label:"Ville",           placeholder:"Abidjan" },
-            { key:"country", label:"Pays",            placeholder:"Côte d'Ivoire" },
+            { key:"phone",   label:"Téléphone",     placeholder:"+225 07 00 00 00 00" },
+            { key:"city",    label:"Ville",         placeholder:"Abidjan" },
+            { key:"country", label:"Pays",          placeholder:"Côte d'Ivoire" },
           ].map(f => (
             <div key={f.key}>
               <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
@@ -1586,4 +1490,3 @@ export function DiasporaProfile() {
     </div>
   );
 }
-
