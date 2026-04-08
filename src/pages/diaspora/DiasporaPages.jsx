@@ -1,7 +1,7 @@
 // src/pages/diaspora/DiasporaPages.jsx
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import AdhesionForm, { triggerPostPaymentCreation } from "../../components/AdhesionForm";
+import AdhesionForm from "../../components/AdhesionForm";
 import {
   diasporaBeneAPI,
   diasporaPayAPI,
@@ -308,26 +308,18 @@ function PayFailedBanner({ onClose }) {
   );
 }
 
-function PayErrorBanner({ message, onClose }) {
+// Bannière "paiement confirmé, activation en cours côté webhook"
+function PayPendingActivationBanner({ onClose }) {
   return (
-    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:"#FEF2F2", border:"1.5px solid #DC2626", display:"flex", alignItems:"center", gap:12 }}>
-      <span style={{ fontSize:22 }}>⚠️</span>
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>✅</span>
       <div>
-        <p style={{ margin:0, fontWeight:800, color:"#DC2626", fontSize:14 }}>Erreur après paiement</p>
-        <p style={{ margin:"2px 0 0", fontSize:12, color:"#DC2626" }}>{message}</p>
-        <p style={{ margin:"4px 0 0", fontSize:11, color:"#DC2626" }}>Votre paiement a été reçu. Contactez le support avec le numéro de transaction.</p>
+        <p style={{ margin:0, fontWeight:800, color:C.blue, fontSize:14 }}>Paiement confirmé</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:C.blue }}>
+          Votre compte est en cours d'activation. Vous pouvez vous connecter avec les identifiants reçus avant le paiement.
+        </p>
       </div>
-      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#DC2626" }}>✕</button>
-    </div>
-  );
-}
-
-function CreatingBanner() {
-  return (
-    <div style={{ marginBottom:20, padding:"16px 20px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
-      <div style={{ width:20, height:20, border:`2px solid ${C.blueL}`, borderTop:`2px solid ${C.blue}`, borderRadius:"50%", animation:"spin .7s linear infinite", flexShrink:0 }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <p style={{ margin:0, fontWeight:700, color:C.blue, fontSize:14 }}>Paiement confirmé — Création du compte en cours…</p>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.blue }}>✕</button>
     </div>
   );
 }
@@ -340,10 +332,8 @@ export function DiasporaRegisterPays() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const [postPayResult, setPostPayResult] = useState(null);
-  const [payFailed,     setPayFailed]     = useState(false);
-  const [payError,      setPayError]      = useState("");
-  const [creating,      setCreating]      = useState(false);
+  const [payFailed,          setPayFailed]          = useState(false);
+  const [payPendingActivation, setPayPendingActivation] = useState(false);
 
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult,   setClientResult]   = useState(null);
@@ -351,27 +341,12 @@ export function DiasporaRegisterPays() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
-    const transactionId = params.get("transaction_id");
-
     window.history.replaceState({}, "", window.location.pathname);
 
-    if (paymentStatus === "success" && transactionId) {
-      setCreating(true);
-      setShowForm(true);
-      triggerPostPaymentCreation(
-        transactionId,
-        (credentials, roleLabel) => {
-          setPostPayResult({ credentials, roleLabel });
-          setCreating(false);
-          diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
-            .then(r => setList(r.data.ambassadors || []));
-        },
-        (errorMsg) => {
-          setPayError(errorMsg);
-          setCreating(false);
-          setShowForm(false);
-        }
-      );
+    if (paymentStatus === "success") {
+      // Nouveau flux : le compte est déjà créé avant le paiement.
+      // Le webhook active le statut en arrière-plan — on informe juste l'utilisateur.
+      setPayPendingActivation(true);
     } else if (paymentStatus === "failed") {
       setPayFailed(true);
     }
@@ -384,15 +359,14 @@ export function DiasporaRegisterPays() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
-      {creating   && <CreatingBanner />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="🗺️ Mes Ambassadeurs Pays"
         subtitle={`${list.length} ambassadeur(s) enregistré(s)`}
         action={
-          <Btn onClick={() => { setShowForm(!showForm); setPostPayResult(null); }}>
+          <Btn onClick={() => setShowForm(!showForm)}>
             {showForm ? "✕ Annuler" : "➕ Nouvel Ambassadeur Pays"}
           </Btn>
         }
@@ -400,13 +374,17 @@ export function DiasporaRegisterPays() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* ✅ returnPath fixé — CinetPay reviendra sur cette page */}
           <AdhesionForm
             targetRole="AMBASSADEUR_PAYS"
             returnPath="/diaspora/register/pays"
-            postPaymentResult={postPayResult}
-            onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" }).then(r => setList(r.data.ambassadors || []))}
-            onReset={() => { setShowForm(false); setPostPayResult(null); }}
+            onSuccess={(credentials, roleLabel) => {
+              // onSuccess est appelé par AdhesionForm après pre-register + paiement lancé
+              // Les credentials sont déjà affichés dans AdhesionForm avant la redirection
+              diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
+                .then(r => setList(r.data.ambassadors || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -469,10 +447,8 @@ export function DiasporaRegisterRecruiter() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const [postPayResult, setPostPayResult] = useState(null);
-  const [payFailed,     setPayFailed]     = useState(false);
-  const [payError,      setPayError]      = useState("");
-  const [creating,      setCreating]      = useState(false);
+  const [payFailed,           setPayFailed]           = useState(false);
+  const [payPendingActivation, setPayPendingActivation] = useState(false);
 
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult,   setClientResult]   = useState(null);
@@ -480,27 +456,10 @@ export function DiasporaRegisterRecruiter() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
-    const transactionId = params.get("transaction_id");
-
     window.history.replaceState({}, "", window.location.pathname);
 
-    if (paymentStatus === "success" && transactionId) {
-      setCreating(true);
-      setShowForm(true);
-      triggerPostPaymentCreation(
-        transactionId,
-        (credentials, roleLabel) => {
-          setPostPayResult({ credentials, roleLabel });
-          setCreating(false);
-          diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
-            .then(r => setList(r.data.ambassadors || []));
-        },
-        (errorMsg) => {
-          setPayError(errorMsg);
-          setCreating(false);
-          setShowForm(false);
-        }
-      );
+    if (paymentStatus === "success") {
+      setPayPendingActivation(true);
     } else if (paymentStatus === "failed") {
       setPayFailed(true);
     }
@@ -513,15 +472,14 @@ export function DiasporaRegisterRecruiter() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
-      {creating   && <CreatingBanner />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="🤝 Mes Recruteurs"
         subtitle={`${list.length} recruteur(s) enregistré(s)`}
         action={
-          <Btn onClick={() => { setShowForm(!showForm); setPostPayResult(null); }}>
+          <Btn onClick={() => setShowForm(!showForm)}>
             {showForm ? "✕ Annuler" : "➕ Nouveau Recruteur"}
           </Btn>
         }
@@ -529,13 +487,15 @@ export function DiasporaRegisterRecruiter() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* ✅ returnPath fixé */}
           <AdhesionForm
             targetRole="RECRUTEUR"
             returnPath="/diaspora/register/recruteur"
-            postPaymentResult={postPayResult}
-            onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" }).then(r => setList(r.data.ambassadors || []))}
-            onReset={() => { setShowForm(false); setPostPayResult(null); }}
+            onSuccess={() => {
+              diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
+                .then(r => setList(r.data.ambassadors || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -592,10 +552,8 @@ export function DiasporaRegisterRUM() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const [postPayResult, setPostPayResult] = useState(null);
-  const [payFailed,     setPayFailed]     = useState(false);
-  const [payError,      setPayError]      = useState("");
-  const [creating,      setCreating]      = useState(false);
+  const [payFailed,           setPayFailed]           = useState(false);
+  const [payPendingActivation, setPayPendingActivation] = useState(false);
 
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult,   setClientResult]   = useState(null);
@@ -603,27 +561,10 @@ export function DiasporaRegisterRUM() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
-    const transactionId = params.get("transaction_id");
-
     window.history.replaceState({}, "", window.location.pathname);
 
-    if (paymentStatus === "success" && transactionId) {
-      setCreating(true);
-      setShowForm(true);
-      triggerPostPaymentCreation(
-        transactionId,
-        (credentials, roleLabel) => {
-          setPostPayResult({ credentials, roleLabel });
-          setCreating(false);
-          diasporaBeneAPI.getAmbassadors({ role:"RUM" })
-            .then(r => setList(r.data.ambassadors || []));
-        },
-        (errorMsg) => {
-          setPayError(errorMsg);
-          setCreating(false);
-          setShowForm(false);
-        }
-      );
+    if (paymentStatus === "success") {
+      setPayPendingActivation(true);
     } else if (paymentStatus === "failed") {
       setPayFailed(true);
     }
@@ -636,15 +577,14 @@ export function DiasporaRegisterRUM() {
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
 
-      {payFailed  && <PayFailedBanner onClose={() => setPayFailed(false)} />}
-      {payError   && <PayErrorBanner message={payError} onClose={() => setPayError("")} />}
-      {creating   && <CreatingBanner />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="👑 Mes RUM"
         subtitle={`${list.length} RUM enregistré(s) — Réseau Parrainage`}
         action={
-          <Btn onClick={() => { setShowForm(!showForm); setPostPayResult(null); }}>
+          <Btn onClick={() => setShowForm(!showForm)}>
             {showForm ? "✕ Annuler" : "➕ Nouveau RUM"}
           </Btn>
         }
@@ -666,13 +606,15 @@ export function DiasporaRegisterRUM() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* ✅ returnPath fixé */}
           <AdhesionForm
             targetRole="RUM"
             returnPath="/diaspora/register/rum"
-            postPaymentResult={postPayResult}
-            onSuccess={() => diasporaBeneAPI.getAmbassadors({ role:"RUM" }).then(r => setList(r.data.ambassadors || []))}
-            onReset={() => { setShowForm(false); setPostPayResult(null); }}
+            onSuccess={() => {
+              diasporaBeneAPI.getAmbassadors({ role:"RUM" })
+                .then(r => setList(r.data.ambassadors || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -857,7 +799,7 @@ export function DiasporaBeneficiaries() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : CARTES VENDUES
+// PAGES RESTANTES — inchangées par rapport à l'original
 // ─────────────────────────────────────────────────────────────
 export function DiasporaCards() {
   const [benes, setBenes]     = useState([]);
@@ -923,9 +865,6 @@ export function DiasporaCards() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : RÉCOMPENSES
-// ─────────────────────────────────────────────────────────────
 export function DiasporaRewards() {
   const [stats, setStats]     = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1007,9 +946,6 @@ export function DiasporaRewards() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : PAIEMENTS
-// ─────────────────────────────────────────────────────────────
 export function DiasporaPayments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -1128,9 +1064,6 @@ export function DiasporaNewPayment() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : GAINS / COMMISSIONS
-// ─────────────────────────────────────────────────────────────
 export function DiasporaEarnings() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1216,9 +1149,6 @@ export function DiasporaEarnings() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : PARRAINAGE
-// ─────────────────────────────────────────────────────────────
 export function DiasporaReferral() {
   const [link, setLink]         = useState(null);
   const [referrals, setReferrals] = useState([]);
@@ -1287,9 +1217,6 @@ export function DiasporaReferral() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : RÉSEAU
-// ─────────────────────────────────────────────────────────────
 export function DiasporaNetwork() {
   const [network, setNetwork] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1342,9 +1269,6 @@ export function DiasporaNetwork() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────
 export function DiasporaNotifications() {
   const [notifs, setNotifs]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1380,9 +1304,6 @@ export function DiasporaNotifications() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : CLASSEMENT
-// ─────────────────────────────────────────────────────────────
 export function DiasporaLeaderboard() {
   const [data, setData]       = useState(null);
   const [period, setPeriod]   = useState("month");
@@ -1429,9 +1350,6 @@ export function DiasporaLeaderboard() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : PROFIL
-// ─────────────────────────────────────────────────────────────
 export function DiasporaProfile() {
   const [form, setForm]       = useState({ name:"", country:"", city:"", phone:"" });
   const [loading, setLoading] = useState(true);

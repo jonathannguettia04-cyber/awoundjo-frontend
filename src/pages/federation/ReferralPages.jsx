@@ -2,7 +2,6 @@
 // ─────────────────────────────────────────────────────────────
 //  Toutes les pages du réseau Parrainage (REFERRAL)
 //  RUM → LEADER → PASTEUR → RESPONSABLE → CLIENT
-//  Exports nommés utilisés dans App.jsx via referralPage()
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +25,7 @@ const C = {
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR");
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" }) : "—";
 
-// ── Bouton paiement pour un membre non encore payé (Référent) ─
+// ── Bouton paiement pour un membre non encore payé ───────────
 function PayButton({ ambassadorId }) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
@@ -161,7 +160,6 @@ function ClientCreatedScreenRef({ result, onClose }) {
   );
 }
 
-
 const ROLE_CONFIG = {
   RUM:         { label:"RUM",         icon:"👑", color:C.purple, bg:C.purpleL },
   LEADER:      { label:"Leader",      icon:"⭐", color:C.blue,   bg:C.blueL   },
@@ -282,6 +280,53 @@ function CredentialsModal({ credentials, targetLabel, onClose }) {
   );
 }
 
+// ── Bannières post-paiement ───────────────────────────────────
+function PayFailedBanner({ onClose }) {
+  return (
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>❌</span>
+      <div>
+        <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
+      </div>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
+    </div>
+  );
+}
+
+function PayPendingActivationBanner({ onClose }) {
+  return (
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.blueL, border:`1.5px solid ${C.blue}44`, display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>✅</span>
+      <div>
+        <p style={{ margin:0, fontWeight:800, color:C.blue, fontSize:14 }}>Paiement confirmé</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:C.blue }}>
+          Votre compte est en cours d'activation. Vous pouvez vous connecter avec les identifiants reçus avant le paiement.
+        </p>
+      </div>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.blue }}>✕</button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helper partagé — lecture des query params post-paiement
+// ─────────────────────────────────────────────────────────────
+function usePostPaymentStatus() {
+  const [payFailed,           setPayFailed]           = useState(false);
+  const [payPendingActivation, setPayPendingActivation] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("payment");
+    window.history.replaceState({}, "", window.location.pathname);
+    if (status === "success") setPayPendingActivation(true);
+    else if (status === "failed") setPayFailed(true);
+  }, []);
+
+  return { payFailed, setPayFailed, payPendingActivation, setPayPendingActivation };
+}
+
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN LEADER (RUM uniquement)
 // ─────────────────────────────────────────────────────────────
@@ -289,10 +334,10 @@ export function ReferralRegisterLeader() {
   const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]     = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult, setClientResult]     = useState(null);
+
+  const { payFailed, setPayFailed, payPendingActivation, setPayPendingActivation } = usePostPaymentStatus();
 
   useEffect(() => {
     federationMemberAPI.getAll({ role:"LEADER" })
@@ -300,17 +345,10 @@ export function ReferralRegisterLeader() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setShowForm(false);
-    federationMemberAPI.getAll({ role:"LEADER" })
-      .then(r => setList(r.data.members || []));
-  }
-
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="⭐ Mes Leaders"
@@ -320,11 +358,15 @@ export function ReferralRegisterLeader() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* FIX : returnPath fixé — CinetPay reviendra sur cette page */}
           <AdhesionForm
             targetRole="LEADER"
             returnPath="/referral/register/leader"
-            onSuccess={handleSuccess}
+            onSuccess={() => {
+              federationMemberAPI.getAll({ role:"LEADER" })
+                .then(r => setList(r.data.members || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -380,10 +422,10 @@ export function ReferralRegisterPasteur() {
   const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]     = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult, setClientResult]     = useState(null);
+
+  const { payFailed, setPayFailed, payPendingActivation, setPayPendingActivation } = usePostPaymentStatus();
 
   useEffect(() => {
     federationMemberAPI.getAll({ role:"PASTEUR" })
@@ -391,17 +433,10 @@ export function ReferralRegisterPasteur() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setShowForm(false);
-    federationMemberAPI.getAll({ role:"PASTEUR" })
-      .then(r => setList(r.data.members || []));
-  }
-
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="⛪ Mes Pasteurs"
@@ -411,11 +446,15 @@ export function ReferralRegisterPasteur() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* FIX : returnPath fixé */}
           <AdhesionForm
             targetRole="PASTEUR"
             returnPath="/referral/register/pasteur"
-            onSuccess={handleSuccess}
+            onSuccess={() => {
+              federationMemberAPI.getAll({ role:"PASTEUR" })
+                .then(r => setList(r.data.members || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -471,10 +510,10 @@ export function ReferralRegisterResponsable() {
   const [list, setList]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]     = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientResult, setClientResult]     = useState(null);
+
+  const { payFailed, setPayFailed, payPendingActivation, setPayPendingActivation } = usePostPaymentStatus();
 
   useEffect(() => {
     federationMemberAPI.getAll({ role:"RESPONSABLE" })
@@ -482,17 +521,10 @@ export function ReferralRegisterResponsable() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setShowForm(false);
-    federationMemberAPI.getAll({ role:"RESPONSABLE" })
-      .then(r => setList(r.data.members || []));
-  }
-
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} targetLabel={credsLabel} onClose={() => setCreds(null)} />}
+      {payFailed           && <PayFailedBanner onClose={() => setPayFailed(false)} />}
+      {payPendingActivation && <PayPendingActivationBanner onClose={() => setPayPendingActivation(false)} />}
 
       <PageHeader
         title="🤝 Mes Responsables"
@@ -502,11 +534,15 @@ export function ReferralRegisterResponsable() {
 
       {showForm && (
         <div style={{ marginBottom:24 }}>
-          {/* FIX : returnPath fixé */}
           <AdhesionForm
             targetRole="RESPONSABLE"
             returnPath="/referral/register/responsable"
-            onSuccess={handleSuccess}
+            onSuccess={() => {
+              federationMemberAPI.getAll({ role:"RESPONSABLE" })
+                .then(r => setList(r.data.members || []));
+              setShowForm(false);
+            }}
+            onReset={() => setShowForm(false)}
           />
         </div>
       )}
@@ -553,7 +589,7 @@ export function ReferralRegisterResponsable() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : ENREGISTRER UN CLIENT (RESPONSABLE / PASTEUR)
+// PAGES RESTANTES — inchangées par rapport à l'original
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterClient() {
   const navigate  = useNavigate();
@@ -577,9 +613,7 @@ export function ReferralRegisterClient() {
       <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
         <Card style={{ textAlign:"center" }}>
           <div style={{ fontSize:56, marginBottom:12 }}>⏳</div>
-          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>
-            Compte créé — en attente de validation
-          </h2>
+          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.gold }}>Compte créé — en attente de validation</h2>
           <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
             <p style={{ margin:"0 0 6px", fontSize:13, color:C.slate }}>Numéro mutualiste</p>
             <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
@@ -603,9 +637,9 @@ export function ReferralRegisterClient() {
         {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
         <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
-            { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",           type:"text" },
-            { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00",   type:"tel"  },
-            { key:"city",  label:"Ville",              placeholder:"Abidjan",               type:"text" },
+            { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
+            { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
+            { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
           ].map(f => (
             <div key={f.key}>
               <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
@@ -639,9 +673,6 @@ export function ReferralRegisterClient() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : MES CLIENTS
-// ─────────────────────────────────────────────────────────────
 export function ReferralClients() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -683,17 +714,12 @@ export function ReferralClients() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : RÉCOMPENSES 🏆
-// ─────────────────────────────────────────────────────────────
 export function ReferralRewards() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    federationDashAPI.getStats()
-      .then(r => setStats(r.data))
-      .finally(() => setLoading(false));
+    federationDashAPI.getStats().then(r => setStats(r.data)).finally(() => setLoading(false));
   }, []);
 
   const cardsSold    = stats?.cards_sold || 0;
@@ -769,19 +795,12 @@ export function ReferralRewards() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : GAINS / COMMISSIONS
-// ─────────────────────────────────────────────────────────────
 export function ReferralEarnings() {
   const [data, setData]   = useState(null);
   const [loading, setLoading] = useState(true);
-  const amb  = getDiasporaData();
-  const role = amb?.role || "RESPONSABLE";
 
   useEffect(() => {
-    federationCommAPI.getAll()
-      .then(r => setData(r.data))
-      .finally(() => setLoading(false));
+    federationCommAPI.getAll().then(r => setData(r.data)).finally(() => setLoading(false));
   }, []);
 
   const totals = data?.totals || {};
@@ -846,17 +865,12 @@ export function ReferralEarnings() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : MON RÉSEAU
-// ─────────────────────────────────────────────────────────────
 export function ReferralNetwork() {
   const [network, setNetwork] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    federationNetAPI.getHierarchy()
-      .then(r => setNetwork(r.data))
-      .finally(() => setLoading(false));
+    federationNetAPI.getHierarchy().then(r => setNetwork(r.data)).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loader />;
@@ -868,9 +882,9 @@ export function ReferralNetwork() {
       <PageHeader title="🌐 Mon réseau" subtitle={`${network?.totals?.total || 0} membres au total`} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:24 }}>
         {[
-          { label:"Niveau 1",  value:levels.level1?.length||0, color:C.purple },
-          { label:"Niveau 2",  value:levels.level2?.length||0, color:C.blue   },
-          { label:"Niveau 3",  value:levels.level3?.length||0, color:C.teal   },
+          { label:"Niveau 1", value:levels.level1?.length||0, color:C.purple },
+          { label:"Niveau 2", value:levels.level2?.length||0, color:C.blue   },
+          { label:"Niveau 3", value:levels.level3?.length||0, color:C.teal   },
         ].map(s => (
           <Card key={s.label} style={{ textAlign:"center" }}>
             <p style={{ margin:0, fontSize:28, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -898,16 +912,11 @@ export function ReferralNetwork() {
           </Card>
         )
       ))}
-      {network?.totals?.total === 0 && (
-        <EmptyState icon="🌐" title="Réseau vide" desc="Commencez à recruter pour construire votre réseau" />
-      )}
+      {network?.totals?.total === 0 && <EmptyState icon="🌐" title="Réseau vide" desc="Commencez à recruter pour construire votre réseau" />}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────
 export function ReferralNotifications() {
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -943,9 +952,6 @@ export function ReferralNotifications() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : CLASSEMENT
-// ─────────────────────────────────────────────────────────────
 export function ReferralLeaderboard() {
   const [data, setData]   = useState(null);
   const [period, setPeriod] = useState("month");
@@ -953,9 +959,7 @@ export function ReferralLeaderboard() {
 
   useEffect(() => {
     setLoading(true);
-    federationLeaderAPI.getLeaderboard(period)
-      .then(r => setData(r.data))
-      .finally(() => setLoading(false));
+    federationLeaderAPI.getLeaderboard(period).then(r => setData(r.data)).finally(() => setLoading(false));
   }, [period]);
 
   return (
@@ -994,9 +998,6 @@ export function ReferralLeaderboard() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : PROFIL
-// ─────────────────────────────────────────────────────────────
 export function ReferralProfile() {
   const [form, setForm]   = useState({ name:"", country:"", city:"", phone:"" });
   const [loading, setLoading] = useState(true);
@@ -1036,9 +1037,9 @@ export function ReferralProfile() {
         <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
             { key:"name",    label:"Nom complet",  placeholder:"Jean Kofi" },
-            { key:"phone",   label:"Téléphone",     placeholder:"+225 07 00 00 00 00" },
-            { key:"city",    label:"Ville",          placeholder:"Abidjan" },
-            { key:"country", label:"Pays",           placeholder:"Côte d'Ivoire" },
+            { key:"phone",   label:"Téléphone",    placeholder:"+225 07 00 00 00 00" },
+            { key:"city",    label:"Ville",        placeholder:"Abidjan" },
+            { key:"country", label:"Pays",         placeholder:"Côte d'Ivoire" },
           ].map(f => (
             <div key={f.key}>
               <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
@@ -1056,17 +1057,12 @@ export function ReferralProfile() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : PAIEMENTS
-// ─────────────────────────────────────────────────────────────
 export function ReferralPayments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    federationPayAPI.getAll()
-      .then(r => setPayments(r.data.payments || []))
-      .finally(() => setLoading(false));
+    federationPayAPI.getAll().then(r => setPayments(r.data.payments || [])).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -1110,9 +1106,6 @@ export function ReferralPayments() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : RECRUTEMENT / LIEN PARRAINAGE
-// ─────────────────────────────────────────────────────────────
 export function ReferralReferral() {
   const [link, setLink]   = useState(null);
   const [referrals, setReferrals] = useState([]);
@@ -1181,9 +1174,6 @@ export function ReferralReferral() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE : CARTES VENDUES
-// ─────────────────────────────────────────────────────────────
 export function ReferralCards() {
   const [stats, setStats] = useState(null);
   const [clients, setClients] = useState([]);
