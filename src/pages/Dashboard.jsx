@@ -4,6 +4,7 @@ import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import StatsCard from "../components/StatsCard";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
+import PlanModal from "./PlanModal";
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
@@ -47,10 +48,7 @@ export default function Dashboard() {
   const [showPlans,   setShowPlans]   = useState(false);
   const [planModal,   setPlanModal]   = useState(false);
   const [editingPlan, setEditingPlan] = useState(null); // null = création
-  const [planForm,    setPlanForm]    = useState({ name: "", adhesion_price: "", monthly_price: "", coverage_percent: "50" });
-  const [planSaving,  setPlanSaving]  = useState(false);
-  const [planError,   setPlanError]   = useState("");
-  const [planSuccess, setPlanSuccess] = useState("");
+
 
   const token = localStorage.getItem("token");
   const authHeader = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
@@ -66,46 +64,12 @@ export default function Dashboard() {
 
   function openCreate() {
     setEditingPlan(null);
-    setPlanForm({ name: "", adhesion_price: "", monthly_price: "", coverage_percent: "50" });
-    setPlanError(""); setPlanSuccess("");
     setPlanModal(true);
   }
 
   function openEdit(plan) {
     setEditingPlan(plan);
-    setPlanForm({
-      name:             plan.name,
-      adhesion_price:   String(plan.adhesion_price),
-      monthly_price:    String(plan.monthly_price),
-      coverage_percent: String(plan.coverage_percent),
-    });
-    setPlanError(""); setPlanSuccess("");
     setPlanModal(true);
-  }
-
-  async function savePlan(e) {
-    e.preventDefault();
-    setPlanError(""); setPlanSaving(true);
-    try {
-      const body = {
-        name:             planForm.name.trim(),
-        adhesion_price:   Number(planForm.adhesion_price),
-        monthly_price:    Number(planForm.monthly_price),
-        coverage_percent: Number(planForm.coverage_percent),
-      };
-      const url    = editingPlan ? `/api/plans/${editingPlan.id}` : "/api/plans";
-      const method = editingPlan ? "PUT" : "POST";
-      const res    = await fetch(url, { method, headers: authHeader, body: JSON.stringify(body) });
-      const json   = await res.json();
-      if (!res.ok) throw new Error(json.error || "Erreur");
-      setPlanSuccess(editingPlan ? "Formule mise à jour ✓" : "Formule créée ✓");
-      fetchPlans();
-      setTimeout(() => { setPlanModal(false); setPlanSuccess(""); }, 1200);
-    } catch (err) {
-      setPlanError(err.message);
-    } finally {
-      setPlanSaving(false);
-    }
   }
 
   async function togglePlanActive(plan) {
@@ -259,6 +223,20 @@ export default function Dashboard() {
                         🏥 Couverture : <strong className="text-brand-600">{plan.coverage_percent}%</strong>
                       </span>
                     </div>
+                    {plan.benefits?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {plan.benefits.map((b) => (
+                          <span key={b.category}
+                            className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-full font-medium">
+                            {b.category.replace(/_/g, " ")}
+                            {b.coverage_percent != null && <span className="text-brand-500">{b.coverage_percent}%</span>}
+                            {b.ceiling_fcfa != null && (
+                              <span className="text-slate-400">· {Number(b.ceiling_fcfa).toLocaleString("fr-FR")} FCFA</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button onClick={() => togglePlanActive(plan)} title={plan.is_active ? "Désactiver" : "Activer"}
@@ -287,93 +265,12 @@ export default function Dashboard() {
 
       {/* ── Modal création / édition formule ────────────────── */}
       {isAdmin && planModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-800 text-lg">
-                {editingPlan ? "✏️ Modifier la formule" : "✨ Nouvelle formule"}
-              </h3>
-              <button onClick={() => setPlanModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
-            </div>
-            <form onSubmit={savePlan} className="px-6 py-5 space-y-4">
-              {planError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{planError}</div>
-              )}
-              {planSuccess && (
-                <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3 text-center font-semibold">{planSuccess}</div>
-              )}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Nom de la formule *</label>
-                <input required value={planForm.name}
-                  onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-                  placeholder="Ex: Basique, Premium, Familiale…"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Adhésion (FCFA) *</label>
-                  <input required type="number" min="0" step="500"
-                    value={planForm.adhesion_price}
-                    onChange={(e) => setPlanForm({ ...planForm, adhesion_price: e.target.value })}
-                    placeholder="0"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                  {planForm.adhesion_price === "0" && (
-                    <p className="text-xs text-green-600 mt-1">✓ Adhésion gratuite</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Cotisation/mois *</label>
-                  <input required type="number" min="0" step="500"
-                    value={planForm.monthly_price}
-                    onChange={(e) => setPlanForm({ ...planForm, monthly_price: e.target.value })}
-                    placeholder="Ex: 5000"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Couverture santé : <span className="text-brand-600 font-bold">{planForm.coverage_percent}%</span>
-                </label>
-                <input type="range" min="0" max="100" step="5"
-                  value={planForm.coverage_percent}
-                  onChange={(e) => setPlanForm({ ...planForm, coverage_percent: e.target.value })}
-                  className="w-full accent-brand-500" />
-                <div className="flex justify-between text-xs text-slate-400 mt-0.5">
-                  <span>0%</span><span>50%</span><span>100%</span>
-                </div>
-              </div>
-              <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm space-y-1 border border-slate-100">
-                <p className="font-semibold text-slate-600 text-xs uppercase tracking-wide mb-2">Récapitulatif</p>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Adhésion</span>
-                  <span className={`font-bold ${planForm.adhesion_price === "0" ? "text-green-600" : "text-slate-800"}`}>
-                    {planForm.adhesion_price === "0" || planForm.adhesion_price === ""
-                      ? "Gratuit"
-                      : `${Number(planForm.adhesion_price || 0).toLocaleString("fr-FR")} FCFA`}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Cotisation mensuelle</span>
-                  <span className="font-bold text-slate-800">{Number(planForm.monthly_price || 0).toLocaleString("fr-FR")} FCFA</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Couverture</span>
-                  <span className="font-bold text-brand-600">{planForm.coverage_percent}%</span>
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setPlanModal(false)}
-                  className="flex-1 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                  Annuler
-                </button>
-                <button type="submit" disabled={planSaving}
-                  className="flex-1 py-2.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold disabled:opacity-60 transition-all">
-                  {planSaving ? "Enregistrement…" : editingPlan ? "Mettre à jour" : "Créer la formule"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <PlanModal
+          plan={editingPlan}
+          onClose={() => setPlanModal(false)}
+          onSaved={() => { fetchPlans(); setPlanModal(false); }}
+          apiBase={import.meta.env.VITE_API_URL}
+        />
       )}
 
       <section>
