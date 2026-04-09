@@ -45,6 +45,28 @@ const REWARD_LEVELS = [
   { level:5, min:100, label:"Diamant 🚀", reward:"Voiture + prime 500 000",  color:"#0D9488" },
 ];
 
+// ── Helper : statut d'un membre (paiement + validation admin) ──
+function memberStatusInfo(m) {
+  const paid      = m.status_payment    !== "unpaid";
+  const validated = m.status_validation === "approved";
+  const rejected  = m.status_validation === "rejected";
+  const active    = m.status            === "ACTIVE";
+
+  if (active && paid && validated) {
+    return { label:"✅ Actif",                      bg:"#ECFDF5", color:"#059669", canPay:false };
+  }
+  if (rejected) {
+    return { label:"❌ Compte refusé",               bg:"#FEF2F2", color:"#DC2626", canPay:false };
+  }
+  if (!paid) {
+    return { label:"💳 Paiement requis",             bg:"#EFF6FF", color:"#0072C6", canPay:true  };
+  }
+  if (!validated) {
+    return { label:"⏳ En attente validation admin", bg:"#FFFBEB", color:"#D97706", canPay:false };
+  }
+  return { label:"✅ Actif",                         bg:"#ECFDF5", color:"#059669", canPay:false };
+}
+
 // ── Shared UI ─────────────────────────────────────────────────
 function Card({ children, style={} }) {
   return (
@@ -399,10 +421,12 @@ export function ReferralRegisterLeader() {
         <EmptyState icon="⭐" title="Aucun Leader enregistré" desc="Cliquez sur + Nouveau Leader pour commencer" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+          {list.map(m => {
+            const si = memberStatusInfo(m);
+            return (
+            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
+              onClick={() => si.canPay && setPayMember(m)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.blueL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>⭐</div>
@@ -413,18 +437,19 @@ export function ReferralRegisterLeader() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {si.canPay && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {si.label}
                 </span>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -496,10 +521,12 @@ export function ReferralRegisterPasteur() {
         <EmptyState icon="⛪" title="Aucun Pasteur enregistré" desc="Créez votre premier Pasteur" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+          {list.map(m => {
+            const si = memberStatusInfo(m);
+            return (
+            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
+              onClick={() => si.canPay && setPayMember(m)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.tealL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>⛪</div>
@@ -510,16 +537,19 @@ export function ReferralRegisterPasteur() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {si.canPay && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:C.tealL, color:C.teal, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>⛪ Pasteur</span>
+                <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {si.label}
+                </span>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -591,10 +621,12 @@ export function ReferralRegisterResponsable() {
         <EmptyState icon="🤝" title="Aucun Responsable enregistré" desc="Créez votre premier Responsable" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
+          {list.map(m => {
+            const si = memberStatusInfo(m);
+            return (
+            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
+              onClick={() => si.canPay && setPayMember(m)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div>
                 <p style={{ margin:0, fontWeight:700, color:C.dark }}>{m.name}</p>
@@ -602,16 +634,19 @@ export function ReferralRegisterResponsable() {
                 {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {si.canPay && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:C.goldL, color:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>🤝 Responsable</span>
+                <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {si.label}
+                </span>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
