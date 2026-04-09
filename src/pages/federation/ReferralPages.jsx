@@ -151,9 +151,10 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
         }),
       });
       const data = await res.json();
-      const url  = data?.data?.payment_url || data?.payment_url;
-      if (!url) throw new Error("URL de paiement non reçue du serveur");
-      window.location.href = url;
+console.log("[Debug CinetPay]", JSON.stringify(data));
+const url  = data?.data?.payment_url || data?.payment_url;
+if (!url) throw new Error(data?.error || data?.message || "URL absente: " + JSON.stringify(data));
+
     } catch (e) {
       setPayError(e.message || "Erreur lors de l'initialisation du paiement");
       setPayLoading(false);
