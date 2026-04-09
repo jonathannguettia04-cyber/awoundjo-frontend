@@ -53,28 +53,6 @@ const REWARD_LEVELS = [
   { level:5, min:100, label:"Diamant 🚀", reward:"Voiture + prime 500 000", color:"#0D9488" },
 ];
 
-// ── Helper : statut d'un membre (paiement + validation admin) ──
-function memberStatusInfo(m) {
-  const paid      = m.status_payment    !== "unpaid";
-  const validated = m.status_validation === "approved";
-  const rejected  = m.status_validation === "rejected";
-  const active    = m.status            === "ACTIVE";
-
-  if (active && paid && validated) {
-    return { label:"✅ Actif",                      bg:"#ECFDF5", color:"#059669", canPay:false };
-  }
-  if (rejected) {
-    return { label:"❌ Compte refusé",               bg:"#FEF2F2", color:"#DC2626", canPay:false };
-  }
-  if (!paid) {
-    return { label:"💳 Paiement requis",             bg:"#EFF6FF", color:"#0072C6", canPay:true  };
-  }
-  if (!validated) {
-    return { label:"⏳ En attente validation admin", bg:"#FFFBEB", color:"#D97706", canPay:false };
-  }
-  return { label:"✅ Actif",                         bg:"#ECFDF5", color:"#059669", canPay:false };
-}
-
 // ── Shared UI ─────────────────────────────────────────────────
 function RoleBadge({ role }) {
   const r = ROLE_CONFIG[role] || ROLE_CONFIG.RECRUTEUR;
@@ -454,12 +432,10 @@ export function DiasporaRegisterPays() {
         <EmptyState icon="🗺️" title="Aucun Ambassadeur Pays" desc="Créez votre premier Ambassadeur Pays" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(a => {
-            const si = memberStatusInfo(a);
-            return (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
-              onClick={() => si.canPay && setPayMember(a)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
+          {list.map(a => (
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.greenL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🗺️</div>
@@ -476,19 +452,18 @@ export function DiasporaRegisterPays() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {si.canPay && (
+                {a.status !== "ACTIVE" && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {si.label}
+                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                 </span>
               </div>
             </Card>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>
@@ -564,12 +539,10 @@ export function DiasporaRegisterRecruiter() {
         <EmptyState icon="🤝" title="Aucun Recruteur" desc="Créez votre premier Recruteur" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(a => {
-            const si = memberStatusInfo(a);
-            return (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
-              onClick={() => si.canPay && setPayMember(a)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
+          {list.map(a => (
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:C.goldL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🤝</div>
@@ -586,19 +559,18 @@ export function DiasporaRegisterRecruiter() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {si.canPay && (
+                {a.status !== "ACTIVE" && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {si.label}
+                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                 </span>
               </div>
             </Card>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>
@@ -690,12 +662,10 @@ export function DiasporaRegisterRUM() {
         <EmptyState icon="👑" title="Aucun RUM enregistré" desc="Créez votre premier RUM pour lancer le réseau Parrainage" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {list.map(a => {
-            const si = memberStatusInfo(a);
-            return (
-            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:si.canPay?"pointer":"default", transition:"box-shadow .15s" }}
-              onClick={() => si.canPay && setPayMember(a)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow=si.canPay?"0 4px 16px rgba(0,0,0,0.10)":""}
+          {list.map(a => (
+            <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:"#F5F3FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👑</div>
@@ -718,14 +688,14 @@ export function DiasporaRegisterRUM() {
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  {si.canPay && (
+                  {a.status !== "ACTIVE" && (
                     <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                       style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                       💳 Payer
                     </button>
                   )}
-                  <span style={{ background:si.bg, color:si.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                    {si.label}
+                  <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                    {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
                   </span>
                 </div>
                 {a.username && (
@@ -735,8 +705,7 @@ export function DiasporaRegisterRUM() {
                 )}
               </div>
             </Card>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>
