@@ -101,31 +101,46 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
   const text = `Identifiants ${roleLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
 
   async function handlePay() {
-    setPayLoading(true);
-    setPayError("");
-    try {
-      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ambassador_id:   ambassadorId,
-          amount:          MEMBERSHIP_FEE,
-          type:            "adhesion",
-          description:     `Adhésion Awoundjô — ${roleLabel}`,
-          return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url:      `${window.location.origin}${window.location.pathname}?payment=failed`,
-        }),
-      });
-      const data = await res.json();
-      const url  = data?.data?.payment_url || data?.payment_url;
-      if (!url) throw new Error("URL de paiement non reçue du serveur");
-      window.location.href = url;
-    } catch (e) {
-      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
-      setPayLoading(false);
+  setPayLoading(true);
+  setPayError("");
+  try {
+    const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+    const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        ambassador_id:   ambassadorId,
+        amount:          MEMBERSHIP_FEE,
+        type:            "adhesion",
+        description:     `Adhésion Awoundjô — ${roleLabel}`,
+        return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
+        cancel_url:      `${window.location.origin}${window.location.pathname}?payment=failed`,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Erreur serveur ${res.status} : ${errText.slice(0, 200)}`);
     }
+
+    const data = await res.json();
+    console.log("[CinetPay] Réponse backend complète :", JSON.stringify(data));
+
+    // Cherche l'URL dans toutes les structures possibles
+    const url =
+      data?.data?.payment_url   ||   // structure ok() standard Awoundjô
+      data?.payment_url          ||   // réponse plate
+      data?.data?.data?.payment_url;  // CinetPay nested
+
+    if (!url) {
+      throw new Error(`URL absente. Réponse reçue : ${JSON.stringify(data).slice(0, 300)}`);
+    }
+    window.location.href = url;
+  } catch (e) {
+    setPayError(e.message || "Erreur lors de l'initialisation du paiement");
+    setPayLoading(false);
   }
+}
 
   return (
     <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:20 }}>
