@@ -99,8 +99,44 @@ export default function ClientDashboard() {
         </div>
       </div>
 
+      {/* ── Alerte suspension — cotisation expirée ────────────────── */}
+      {profile.status === "suspendu" && (
+        <div style={{
+          background: "linear-gradient(135deg,#FEF2F2,#FEE2E2)",
+          border: "1px solid #FCA5A5",
+          borderRadius: 16,
+          padding: "14px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 16,
+          boxShadow: "0 4px 12px rgba(220,38,38,.12)",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(10px)",
+          transition: "all .5s .05s cubic-bezier(.34,1.56,.64,1)",
+        }}>
+          <span style={{ fontSize: 24 }}>🚫</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 700, color: "#991B1B", margin: "0 0 2px", fontSize: 13 }}>
+              Compte suspendu — cotisation non à jour
+            </p>
+            <p style={{ color: "#B91C1C", margin: 0, fontSize: 12 }}>
+              Votre adhésion a expiré. Réglez votre cotisation pour réactiver l'accès à vos services.
+            </p>
+          </div>
+          <button onClick={() => navigate("/client/cotisations")} style={{
+            background: "linear-gradient(135deg,#DC2626,#B91C1C)",
+            color: "#fff", border: "none", borderRadius: 10,
+            padding: "9px 14px", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", fontFamily: "'Poppins',sans-serif",
+            boxShadow: "0 4px 10px rgba(220,38,38,.3)",
+            whiteSpace: "nowrap",
+          }}>Payer →</button>
+        </div>
+      )}
+
       {/* ── Alerte renouvellement ──────────────────────────────── */}
-      {(expiringSoon || profile.status === "renewal_required") && (
+      {profile.status !== "suspendu" && (expiringSoon || profile.status === "renewal_required") && (
         <div style={{
           background: "linear-gradient(135deg,#FFFBEB,#FEF3C7)",
           border: "1px solid #FCD34D",

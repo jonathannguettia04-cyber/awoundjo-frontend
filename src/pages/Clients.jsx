@@ -7,7 +7,7 @@ import { payWithCinetPay } from "../services/cinetpay";
 
 const PLANS    = ["ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
 const STATUSES = ["actif", "attente", "suspendu"];
-const EMPTY    = { name: "", phone: "", city: "", plan: "ESSENTIELLE", status: "attente" };
+const EMPTY    = { name: "", phone: "", city: "", plan: "ESSENTIELLE", status: "attente", is_returning_client: false, expiration_date: "" };
 
 // Frais d'adhésion : 15 000 FCFA pour toutes les formules
 const ADHESION_FEE = 15000;
@@ -97,12 +97,30 @@ export default function Clients() {
       const { data } = await clientAPI.create(form);
       setShowModal(false);
 
-      // Identifiants temporaires retournés par l'API
       const createdClient = data.client || data;
       const accessCode    = createdClient.access_code  || data.access_code  || null;
       const mutualNumber  = createdClient.mutual_number || data.mutual_number || null;
 
-      // Préparer les infos pour le paiement CinetPay
+      // Ancien client migré — pas de paiement adhésion, on affiche juste le code
+      if (form.is_returning_client || data.returning_client) {
+        setPendingPayment({
+          client:       { name: form.name, phone: form.phone, email: "" },
+          plan:         form.plan,
+          accessCode,
+          mutualNumber,
+          clientId:     createdClient.id || data.id,
+        });
+        setForm(EMPTY);
+        load(1);
+        // Afficher directement le modal code d'accès (pas de paiement)
+        if (accessCode) {
+          setAccessCode(accessCode);
+          setShowCode(true);
+        }
+        return;
+      }
+
+      // Nouveau client — proposer le paiement CinetPay
       setPendingPayment({
         client:       { name: form.name, phone: form.phone, email: "" },
         plan:         form.plan,
@@ -380,6 +398,31 @@ export default function Clients() {
               {formError}
             </div>
           )}
+
+          {/* Case Ancien client migré */}
+          <div
+            onClick={() => setForm(f => ({ ...f, is_returning_client: !f.is_returning_client, expiration_date: "" }))}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+              form.is_returning_client
+                ? "border-amber-400 bg-amber-50"
+                : "border-slate-200 bg-slate-50 hover:border-slate-300"
+            }`}
+          >
+            <div className={`w-5 h-5 rounded flex items-center justify-center border-2 flex-shrink-0 transition-colors ${
+              form.is_returning_client ? "bg-amber-400 border-amber-400" : "border-slate-300 bg-white"
+            }`}>
+              {form.is_returning_client && <span className="text-white text-xs font-bold">✓</span>}
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${form.is_returning_client ? "text-amber-800" : "text-slate-700"}`}>
+                🔄 Ancien client migré
+              </p>
+              <p className="text-xs text-slate-500">
+                Déjà adhérent sur l'ancienne plateforme — exonéré des frais d'adhésion
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nom complet *</label>
@@ -406,30 +449,67 @@ export default function Clients() {
                 {PLANS.map((p) => <option key={p}>{p}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Statut initial</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                {STATUSES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
+
+            {/* Champ date d'expiration — visible seulement si ancien client */}
+            {form.is_returning_client && (
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-amber-700 mb-1">
+                  📅 Date d'expiration de cotisation *
+                </label>
+                <input
+                  required={form.is_returning_client}
+                  type="date"
+                  value={form.expiration_date}
+                  onChange={(e) => setForm({ ...form, expiration_date: e.target.value })}
+                  className="w-full border-2 border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50"
+                />
+                <p className="text-xs text-amber-600 mt-1">
+                  {form.expiration_date
+                    ? new Date(form.expiration_date) >= new Date()
+                      ? "✅ Cotisation à jour — le compte sera ACTIF"
+                      : "⚠️ Cotisation expirée — le compte sera SUSPENDU"
+                    : "Saisissez la date jusqu'à laquelle le client a payé"}
+                </p>
+              </div>
+            )}
+
+            {/* Statut — masqué pour ancien client (calculé automatiquement) */}
+            {!form.is_returning_client && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Statut initial</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
-          {/* Aperçu frais d'adhésion */}
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
-            <span className="text-xl">💳</span>
-            <div>
-              <p className="text-sm font-semibold text-blue-800">Frais d'adhésion : {ADHESION_FEE.toLocaleString("fr-FR")} FCFA</p>
-              <p className="text-xs text-blue-500">Un paiement CinetPay sera proposé après la création · Identifiants générés automatiquement</p>
+          {/* Info adhésion */}
+          {form.is_returning_client ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-xl">🔄</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Exonéré des frais d'adhésion</p>
+                <p className="text-xs text-amber-600">L'adhésion a déjà été payée sur l'ancienne plateforme · Statut calculé automatiquement selon la date d'expiration</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-xl">💳</span>
+              <div>
+                <p className="text-sm font-semibold text-blue-800">Frais d'adhésion : {ADHESION_FEE.toLocaleString("fr-FR")} FCFA</p>
+                <p className="text-xs text-blue-500">Un paiement CinetPay sera proposé après la création · Identifiants générés automatiquement</p>
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 flex gap-3 justify-end">
             <button type="button" onClick={() => setShowModal(false)}
               className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Annuler</button>
             <button type="submit" disabled={saving}
               className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl disabled:opacity-60 font-semibold">
-              {saving ? "Enregistrement…" : "Créer le client"}
+              {saving ? "Enregistrement…" : form.is_returning_client ? "🔄 Migrer le client" : "Créer le client"}
             </button>
           </div>
         </form>
