@@ -127,11 +127,13 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
     console.log("[CinetPay] Réponse backend complète :", JSON.stringify(data));
 
     // Cherche l'URL dans toutes les structures possibles
+    // Cherche l'URL dans toutes les structures possibles (Ambassadeur, RUM, ou CinetPay direct)
     const url =
-      data?.data?.payment_url   ||   // structure ok() standard Awoundjô
-      data?.payment_url          ||   // réponse plate
-      data?.data?.data?.payment_url;  // CinetPay nested
-
+      data?.payment_url ||           // Réponse plate
+      data?.data?.payment_url ||     // Structure standard Awoundjô (souvent utilisée pour RUM)
+      data?.url ||                   // Alternative commune
+      data?.data?.data?.payment_url; // Cas d'imbrication profonde via CinetPay
+      console.log("[Debug] ID utilisé:", ambassadorId, "URL extraite:", url);
     if (!url) {
       throw new Error(`URL absente. Réponse reçue : ${JSON.stringify(data).slice(0, 300)}`);
     }
@@ -318,7 +320,7 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
         // status_validation et status_payment = 'pending'/'unpaid' par défaut en DB
       });
 
-      const newId = data.ambassador?.id || data.id;
+      const newId = data.ambassador?.id || data.rum?.id || data.id || data.data?.id;
       setCredentials(data.credentials);
       setAmbassadorId(newId);
       setStep("done");
