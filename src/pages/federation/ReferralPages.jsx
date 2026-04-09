@@ -106,6 +106,11 @@ function Btn({ children, onClick, color=C.purple, outline=false, disabled=false,
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const MEMBERSHIP_FEE = 15000;
 
+// Retourne true si le membre doit encore payer (status pas ACTIVE OU paiement non confirmé)
+const needsPayment = (m) =>
+  m.status !== "ACTIVE" ||
+  (m.status_payment && m.status_payment !== "paid");
+
 function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
@@ -401,7 +406,7 @@ export function ReferralRegisterLeader() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
             <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
+              onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -413,14 +418,14 @@ export function ReferralRegisterLeader() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:m.status==="ACTIVE"?C.greenL:C.goldL, color:m.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {m.status === "ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                <span style={{ background:!needsPayment(m)?C.greenL:C.goldL, color:!needsPayment(m)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {!needsPayment(m) ? "✅ Actif" : "⏳ Paiement requis"}
                 </span>
               </div>
             </Card>
@@ -498,7 +503,7 @@ export function ReferralRegisterPasteur() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
             <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
+              onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -510,13 +515,15 @@ export function ReferralRegisterPasteur() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:C.tealL, color:C.teal, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>⛪ Pasteur</span>
+                <span style={{ background:!needsPayment(m)?C.greenL:C.goldL, color:!needsPayment(m)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {!needsPayment(m) ? "✅ Actif" : "⏳ Paiement requis"}
+                </span>
               </div>
             </Card>
           ))}
@@ -593,7 +600,7 @@ export function ReferralRegisterResponsable() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
             <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => m.status !== "ACTIVE" && setPayMember(m)}
+              onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div>
@@ -602,13 +609,15 @@ export function ReferralRegisterResponsable() {
                 {m.plan && <span style={{ fontSize:10, fontWeight:700, color:C.gold, background:C.goldL, padding:"1px 8px", borderRadius:999 }}>{m.plan}</span>}
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {m.status !== "ACTIVE" && (
+                {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:C.goldL, color:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>🤝 Responsable</span>
+                <span style={{ background:!needsPayment(m)?C.greenL:C.goldL, color:!needsPayment(m)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {!needsPayment(m) ? "✅ Actif" : "⏳ Paiement requis"}
+                </span>
               </div>
             </Card>
           ))}

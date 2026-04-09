@@ -125,6 +125,11 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const MEMBERSHIP_FEE = 15000;
 
+// Retourne true si le membre doit encore payer (status pas ACTIVE OU paiement non confirmé)
+const needsPayment = (a) =>
+  a.status !== "ACTIVE" ||
+  (a.status_payment && a.status_payment !== "paid");
+
 function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
@@ -260,9 +265,8 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
 
 // Modal de paiement pour un membre existant (cartes cliquables)
 function PaymentModal({ member, roleLabel, onClose }) {
-  const [payLoading, setPayLoading] = useState(false);
-  const [payError,   setPayError]   = useState("");
-
+  const [payLoading,  setPayLoading]  = useState(false);
+  const [payError,    setPayError]    = useState("");
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
@@ -434,7 +438,7 @@ export function DiasporaRegisterPays() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
             <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onClick={() => needsPayment(a) && setPayMember(a)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -452,14 +456,14 @@ export function DiasporaRegisterPays() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {a.status !== "ACTIVE" && (
+                {needsPayment(a) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                <span style={{ background:!needsPayment(a)?C.greenL:C.goldL, color:!needsPayment(a)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {!needsPayment(a) ? "✅ Actif" : "⏳ Paiement requis"}
                 </span>
               </div>
             </Card>
@@ -541,7 +545,7 @@ export function DiasporaRegisterRecruiter() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
             <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onClick={() => needsPayment(a) && setPayMember(a)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -559,14 +563,14 @@ export function DiasporaRegisterRecruiter() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {a.status !== "ACTIVE" && (
+                {needsPayment(a) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                     style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
-                <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                  {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                <span style={{ background:!needsPayment(a)?C.greenL:C.goldL, color:!needsPayment(a)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                  {!needsPayment(a) ? "✅ Actif" : "⏳ Paiement requis"}
                 </span>
               </div>
             </Card>
@@ -664,7 +668,7 @@ export function DiasporaRegisterRUM() {
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(a => (
             <Card key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
-              onClick={() => a.status !== "ACTIVE" && setPayMember(a)}
+              onClick={() => needsPayment(a) && setPayMember(a)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -688,14 +692,14 @@ export function DiasporaRegisterRUM() {
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  {a.status !== "ACTIVE" && (
+                  {needsPayment(a) && (
                     <button onClick={e => { e.stopPropagation(); setPayMember(a); }}
                       style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                       💳 Payer
                     </button>
                   )}
-                  <span style={{ background:a.status==="ACTIVE"?C.greenL:C.goldL, color:a.status==="ACTIVE"?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                    {a.status==="ACTIVE" ? "✅ Actif" : "⏳ En attente"}
+                  <span style={{ background:!needsPayment(a)?C.greenL:C.goldL, color:!needsPayment(a)?C.green:C.gold, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                    {!needsPayment(a) ? "✅ Actif" : "⏳ Paiement requis"}
                   </span>
                 </div>
                 {a.username && (
