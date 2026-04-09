@@ -125,10 +125,9 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const MEMBERSHIP_FEE = 15000;
 
-// Retourne true si le membre doit encore payer (status pas ACTIVE OU paiement non confirmé)
+// Retourne true si le membre doit encore payer
 const needsPayment = (a) =>
-  a.status !== "ACTIVE" ||
-  (a.status_payment && a.status_payment !== "paid");
+  a.status !== "ACTIVE" || a.status_payment !== "paid";
 
 function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
   const [copied,     setCopied]     = useState(false);

@@ -106,10 +106,9 @@ function Btn({ children, onClick, color=C.purple, outline=false, disabled=false,
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const MEMBERSHIP_FEE = 15000;
 
-// Retourne true si le membre doit encore payer (status pas ACTIVE OU paiement non confirmé)
+// Retourne true si le membre doit encore payer
 const needsPayment = (m) =>
-  m.status !== "ACTIVE" ||
-  (m.status_payment && m.status_payment !== "paid");
+  m.status !== "ACTIVE" || m.status_payment !== "paid";
 
 function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
   const [copied,     setCopied]     = useState(false);
