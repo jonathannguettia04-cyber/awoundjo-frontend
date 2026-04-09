@@ -5,12 +5,8 @@ import { StatusBadge, PlanBadge } from "../components/Badge";
 import Modal from "../components/Modal";
 import { payWithCinetPay } from "../services/cinetpay";
 
-const PLANS    = ["ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
 const STATUSES = ["actif", "attente", "suspendu"];
-const EMPTY    = { name: "", phone: "", city: "", plan: "ESSENTIELLE", status: "attente", is_returning_client: false, expiration_date: "" };
-
-// Frais d'adhésion : 15 000 FCFA pour toutes les formules
-const ADHESION_FEE = 15000;
+const EMPTY    = { name: "", phone: "", city: "", plan: "", status: "attente", is_returning_client: false, expiration_date: "" };
 
 function parseCSV(text) {
   const lines = text.trim().split("\n").filter(Boolean);
@@ -48,6 +44,8 @@ export default function Clients() {
   const [search,       setSearch]       = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPlan,   setFilterPlan]   = useState("");
+  const [plans,        setPlans]        = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [pagination,   setPagination]   = useState({ total: 0, page: 1, pages: 1 });
 
   const [showModal, setShowModal] = useState(false);
@@ -86,6 +84,20 @@ export default function Clients() {
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [search, filterStatus, filterPlan]);
+
+  // Charger les formules depuis l'API
+  useEffect(() => {
+    fetch("/api/plans", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data?.length) {
+          setPlans(data);
+          setForm((f) => ({ ...f, plan: f.plan || data[0].slug.toUpperCase() }));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setPlansLoading(false));
+  }, []);
 
   useEffect(() => { load(1); }, [load]);
 
@@ -141,7 +153,12 @@ export default function Clients() {
   // ── Lancement du paiement d'adhésion CinetPay ──────────────────
   function handlePayAdhesion() {
     if (!pendingPayment) return;
-    const amount = ADHESION_FEE;
+    const selectedPlan = plans.find((p) => p.slug.toUpperCase() === pendingPayment.plan);
+    const amount = selectedPlan ? Number(selectedPlan.adhesion_price) : 0;
+    if (amount === 0) { /* adhesion gratuite — afficher code directement */
+      if (pendingPayment.accessCode) { setAccessCode(pendingPayment.accessCode); setShowPayModal(false); setShowCode(true); }
+      return;
+    }
     setPayError(""); setPaying(true);
 
     payWithCinetPay({
@@ -197,7 +214,8 @@ export default function Clients() {
         const errs = [];
         if (!m.name)  errs.push("Nom manquant");
         if (!m.phone) errs.push("Téléphone manquant");
-        if (!PLANS.includes(m.plan)) m.plan = "ESSENTIELLE";
+        const validPlanSlugs = plans.map((p) => p.slug.toUpperCase());
+        if (validPlanSlugs.length && !validPlanSlugs.includes(m.plan)) m.plan = validPlanSlugs[0];
         if (!STATUSES.includes(m.status)) m.status = "actif";
         return { ...m, _row: i + 2, _errors: errs, _selected: errs.length === 0 };
       });
@@ -273,7 +291,7 @@ export default function Clients() {
         <select value={filterPlan} onChange={(e) => setFilterPlan(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">Toutes les formules</option>
-          {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
+          {plans.map((p) => <option key={p.slug} value={p.slug.toUpperCase()}>{p.name}</option>)}
         </select>
       </div>
 
@@ -445,8 +463,21 @@ export default function Clients() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Formule *</label>
               <select required value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                {PLANS.map((p) => <option key={p}>{p}</option>)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                disabled={plansLoading}>
+                {plansLoading
+                  ? <option>Chargement…</option>
+                  : plans.map((p) => (
+                      <option key={p.slug} value={p.slug.toUpperCase()}>
+                        {p.name}
+                        {p.adhesion_price === 0
+                          ? " — Adhésion gratuite"
+                          : ` — Adhésion ${Number(p.adhesion_price).toLocaleString("fr-FR")} FCFA`}
+                        {" "}| Cotisation {Number(p.monthly_price).toLocaleString("fr-FR")} FCFA/mois
+                        {" "}| Couverture {p.coverage_percent}%
+                      </option>
+                    ))
+                }
               </select>
             </div>
 
@@ -498,7 +529,18 @@ export default function Clients() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
               <span className="text-xl">💳</span>
               <div>
-                <p className="text-sm font-semibold text-blue-800">Frais d'adhésion : {ADHESION_FEE.toLocaleString("fr-FR")} FCFA</p>
+                <p className="text-sm font-semibold text-blue-800">
+                  Frais d'adhésion : {
+                    (() => {
+                      const selected = plans.find((p) => p.slug.toUpperCase() === form.plan);
+                      return selected
+                        ? selected.adhesion_price === 0
+                          ? "Gratuit 🎉"
+                          : `${Number(selected.adhesion_price).toLocaleString("fr-FR")} FCFA`
+                        : "—";
+                    })()
+                  }
+                </p>
                 <p className="text-xs text-blue-500">Un paiement CinetPay sera proposé après la création · Identifiants générés automatiquement</p>
               </div>
             </div>
@@ -554,9 +596,14 @@ export default function Clients() {
                     </div>
                   )}
                   <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
-                    <span className="text-slate-600 font-semibold">Adhésion (toutes formules)</span>
+                    <span className="text-slate-600 font-semibold">Adhésion — {pendingPayment.plan}</span>
                     <span className="font-bold text-brand-600 text-base">
-                      {ADHESION_FEE.toLocaleString("fr-FR")} FCFA
+                      {(() => {
+                        const p = plans.find((pl) => pl.slug.toUpperCase() === pendingPayment.plan);
+                        return p?.adhesion_price === 0
+                          ? "Gratuit 🎉"
+                          : `${Number(p?.adhesion_price ?? 0).toLocaleString("fr-FR")} FCFA`;
+                      })()}
                     </span>
                   </div>
                 </div>
