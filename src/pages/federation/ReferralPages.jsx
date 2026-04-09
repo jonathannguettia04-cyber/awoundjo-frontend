@@ -110,7 +110,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
-  const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
+  const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/referral/login`;
 
   async function handlePay() {
     setPayLoading(true); setPayError("");
