@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 
+import axios from "axios";
 import { clientAPI, paymentsAPI, depsAPI } from "../services/api";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import Modal from "../components/Modal";
@@ -45,7 +48,11 @@ export default function ClientDetails() {
   const [depDeleteTarget, setDepDeleteTarget] = useState(null);
 
   async function handleDeleteClient(password) {
-    await clientAPI.delete(id, { data: { adminPassword: password } });
+    const token = localStorage.getItem("token");
+    await axios.delete(`${API}/api/clients/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { adminPassword: password },
+    });
     navigate("/clients");
   }
 
