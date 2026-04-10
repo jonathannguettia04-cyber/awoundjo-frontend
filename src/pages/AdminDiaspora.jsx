@@ -88,8 +88,11 @@ function ValidationBadge({ v }) {
 
 // ── Section comptes en attente de validation ──────────────────
 function PendingValidationSection({ ambassadors, onValidate }) {
+  const [cashModes, setCashModes] = useState({}); // { [ambId]: bool }
   const pending = ambassadors.filter(a => a.status_validation === "pending" || !a.status_validation);
   if (pending.length === 0) return null;
+
+  const toggleCash = (id) => setCashModes(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
     <div style={{ background:"#fff", borderRadius:14, border:`2px solid ${C.gold}`, padding:"18px 20px", marginBottom:20 }}>
@@ -106,45 +109,85 @@ function PendingValidationSection({ ambassadors, onValidate }) {
       </div>
 
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {pending.map(amb => (
-          <div key={amb.id} style={{
-            background:C.goldL, borderRadius:10, padding:"12px 16px",
-            border:`1px solid ${C.gold}44`,
-            display:"flex", alignItems:"center", justifyContent:"space-between",
-            flexWrap:"wrap", gap:12,
-          }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:38, height:38, borderRadius:10, background:ROLE_CONFIG[amb.role]?.bg || C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
-                {ROLE_CONFIG[amb.role]?.icon || "👤"}
+        {pending.map(amb => {
+          const isCash = !!cashModes[amb.id];
+          return (
+            <div key={amb.id} style={{
+              background: isCash ? "#F0FDF4" : C.goldL,
+              borderRadius:10, padding:"12px 16px",
+              border:`1px solid ${isCash ? C.green : C.gold}44`,
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              flexWrap:"wrap", gap:12,
+              transition:"background 0.2s",
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:38, height:38, borderRadius:10, background:ROLE_CONFIG[amb.role]?.bg || C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                  {ROLE_CONFIG[amb.role]?.icon || "👤"}
+                </div>
+                <div>
+                  <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:13 }}>{amb.name}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
+                    {amb.email} · {amb.country} · {fmtDate(amb.created_at)}
+                  </p>
+                  <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                    <RoleBadge role={amb.role} />
+                    <PlanBadge plan={amb.plan} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:13 }}>{amb.name}</p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
-                  {amb.email} · {amb.country} · {fmtDate(amb.created_at)}
-                </p>
-                <div style={{ display:"flex", gap:6, marginTop:4 }}>
-                  <RoleBadge role={amb.role} />
-                  <PlanBadge plan={amb.plan} />
+
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                {/* Toggle Cash */}
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color: isCash ? C.green : C.slate }}>
+                    💵 Paiement Cash
+                  </span>
+                  <button
+                    onClick={() => toggleCash(amb.id)}
+                    style={{
+                      width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+                      background: isCash ? C.green : C.border,
+                      position:"relative", transition:"background 0.2s", padding:0,
+                    }}
+                  >
+                    <span style={{
+                      position:"absolute", top:3, left: isCash ? 22 : 2,
+                      width:18, height:18, borderRadius:"50%", background:"#fff",
+                      transition:"left 0.2s", display:"block",
+                      boxShadow:"0 1px 3px rgba(0,0,0,.2)",
+                    }} />
+                  </button>
+                </div>
+
+                {isCash && (
+                  <p style={{ margin:0, fontSize:10, color:C.green, fontWeight:600, textAlign:"right" }}>
+                    ✓ Paiement physique confirmé — accès immédiat
+                  </p>
+                )}
+
+                <div style={{ display:"flex", gap:8 }}>
+                  <button
+                    onClick={() => onValidate(amb.id, "approve", isCash ? "cash" : null)}
+                    style={{
+                      padding:"7px 16px", borderRadius:8, border:"none",
+                      background: isCash ? C.green : C.green,
+                      color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer",
+                      opacity: 1,
+                    }}
+                  >
+                    ✅ {isCash ? "Valider (Cash)" : "Valider"}
+                  </button>
+                  <button
+                    onClick={() => onValidate(amb.id, "reject", null)}
+                    style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer" }}
+                  >
+                    ❌ Rejeter
+                  </button>
                 </div>
               </div>
             </div>
-
-            <div style={{ display:"flex", gap:8 }}>
-              <button
-                onClick={() => onValidate(amb.id, "approve")}
-                style={{ padding:"7px 16px", borderRadius:8, border:"none", background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer" }}
-              >
-                ✅ Valider
-              </button>
-              <button
-                onClick={() => onValidate(amb.id, "reject")}
-                style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer" }}
-              >
-                ❌ Rejeter
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -161,6 +204,7 @@ export default function AdminDiaspora() {
   const [validFilter, setValidFilter]       = useState("ALL");
   const [selected, setSelected]             = useState(null);
   const [validating, setValidating]         = useState(null);
+  const [cashModes, setCashModes]             = useState({});
 
   // ✅ FIX : états manquants pour la modal de suppression
   const [deleteTarget, setDeleteTarget]     = useState(null);
@@ -215,13 +259,15 @@ export default function AdminDiaspora() {
     } finally { setLoading(false); }
   }
 
-  async function handleValidate(id, action) {
+  async function handleValidate(id, action, paymentMethod = null) {
     if (validating) return;
     setValidating(id);
     try {
+      const body = { action };
+      if (paymentMethod) body.paymentMethod = paymentMethod;
       await axios.patch(
         `${API}/api/diaspora/admin/ambassadors/${id}/validate`,
-        { action },
+        body,
         { headers: { Authorization: `Bearer ${agentToken()}` } }
       );
       await fetchAmbassadors();
@@ -452,14 +498,42 @@ export default function AdminDiaspora() {
                       {/* Validation */}
                       {(amb.status_validation === "pending" || !amb.status_validation) && (
                         <>
+                          {/* Cash toggle */}
+                          <div style={{
+                            display:"flex", alignItems:"center", gap:8,
+                            background: cashModes[amb.id] ? "#F0FDF4" : C.goldL,
+                            border: `1.5px solid ${cashModes[amb.id] ? C.green : C.gold}`,
+                            borderRadius:8, padding:"6px 12px",
+                          }}>
+                            <span style={{ fontSize:13 }}>💵</span>
+                            <span style={{ fontSize:12, fontWeight:700, color: cashModes[amb.id] ? C.green : C.gold }}>
+                              Cash
+                            </span>
+                            <button
+                              onClick={e => { e.stopPropagation(); setCashModes(prev => ({ ...prev, [amb.id]: !prev[amb.id] })); }}
+                              style={{
+                                width:40, height:22, borderRadius:11, border:"none", cursor:"pointer",
+                                background: cashModes[amb.id] ? C.green : C.border,
+                                position:"relative", transition:"background 0.2s", padding:0, flexShrink:0,
+                              }}
+                            >
+                              <span style={{
+                                position:"absolute", top:2, left: cashModes[amb.id] ? 20 : 2,
+                                width:18, height:18, borderRadius:"50%", background:"#fff",
+                                transition:"left 0.2s", display:"block",
+                                boxShadow:"0 1px 3px rgba(0,0,0,.2)",
+                              }} />
+                            </button>
+                          </div>
+
                           <button
-                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "approve"); }}
+                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "approve", cashModes[amb.id] ? "cash" : null); }}
                             disabled={validating === amb.id}
                             style={{ padding:"8px 16px", borderRadius:8, border:"none", background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", opacity: validating === amb.id ? 0.6 : 1 }}>
-                            ✅ Valider le compte
+                            ✅ {cashModes[amb.id] ? "Valider (Cash)" : "Valider le compte"}
                           </button>
                           <button
-                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "reject"); }}
+                            onClick={e => { e.stopPropagation(); handleValidate(amb.id, "reject", null); }}
                             disabled={validating === amb.id}
                             style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer", opacity: validating === amb.id ? 0.6 : 1 }}>
                             ❌ Rejeter
