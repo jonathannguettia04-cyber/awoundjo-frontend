@@ -10,7 +10,7 @@ import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Ba
 import Modal from "../components/Modal";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
-const PLANS    = ["ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
+const PLANS    = ["BASIQUE", "ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
 const STATUSES = ["actif", "attente", "suspendu"];
 const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
