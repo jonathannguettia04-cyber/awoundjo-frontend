@@ -1,12 +1,19 @@
-// src/pages/federation/FederationDashboard.jsx (Réseau Parrainage)
+// src/pages/federation/FederationDashboard.jsx
 // ─────────────────────────────────────────────────────────────
-//  Dashboard + Layout pour le réseau REFERRAL (Parrainage)
-//  Hiérarchie : RUM → LEADER → PASTEUR → RESPONSABLE → CLIENT
+//  Dashboard + Layout pour le réseau PARRAINAGE (Fédération)
 //
-//  RUM         : enregistre des Leaders
-//  LEADER      : enregistre des Pasteurs
-//  PASTEUR     : enregistre des Responsables OU des Clients (2 modes)
-//  RESPONSABLE : enregistre uniquement des Clients + vend des cartes
+//  Hiérarchie :
+//    RUM         → crée Leaders
+//    LEADER      → crée Pasteurs
+//    PASTEUR     → crée Responsables (et peut créer Clients)
+//    RESPONSABLE → crée Clients + vend cartes
+//    TOUT LE MONDE → peut créer des clients finaux
+//
+//  Commissions par rôle :
+//    RUM         : commissions sur toute la chaîne (Leaders + Pasteurs + Responsables + Clients)
+//    LEADER      : commissions sur Pasteurs + Responsables + Clients
+//    PASTEUR     : commissions sur Responsables + Clients directs
+//    RESPONSABLE : commissions directes sur ses Clients uniquement
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -18,7 +25,6 @@ import {
 } from "../../federationApi";
 import { getDiasporaData } from "../../diasporaApi";
 
-// ── Utilitaire : bus d'événements léger pour forcer le refresh du dashboard
 export function refreshFederationDashboard() {
   window.dispatchEvent(new CustomEvent("federation:refresh"));
 }
@@ -37,25 +43,29 @@ const C = {
 const fmt = (n) =>
   Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
 
-// ── Plans disponibles ────────────────────────────────────────
 const PLANS_FED = [
   { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
   { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
   { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
 ];
 
-// ── Sources de commission ────────────────────────────────────
+// ── Labels des sources de commission par rôle ─────────────────
+// RUM         : touche sur Leaders, Pasteurs, Responsables, Clients
+// LEADER      : touche sur Pasteurs, Responsables, Clients
+// PASTEUR     : touche sur Responsables + Clients directs
+// RESPONSABLE : touche uniquement sur ses Clients directs
 const SOURCE_LABELS = {
-  RUM:          { label:"RUM",           icon:"👑", color:"#7C3AED" },
-  LEADER:       { label:"Leader",        icon:"⭐", color:"#1B4FD8" },
-  PASTEUR:      { label:"Pasteur",       icon:"⛪", color:"#0D9488" },
-  RESPONSABLE:  { label:"Référent",      icon:"🤝", color:"#D97706" },
-  CLIENT:       { label:"Client final",  icon:"👤", color:"#059669" },
-  direct:       { label:"Direct",        icon:"✅", color:"#059669" },
-  reseau:       { label:"Réseau",        icon:"🌐", color:"#1B4FD8" },
+  RUM:         { label:"RUM",          icon:"👑", color:"#7C3AED" },
+  LEADER:      { label:"Leader",       icon:"⭐", color:"#1B4FD8" },
+  PASTEUR:     { label:"Pasteur",      icon:"⛪", color:"#0D9488" },
+  RESPONSABLE: { label:"Responsable",  icon:"🤝", color:"#D97706" },
+  CLIENT:      { label:"Client final", icon:"👤", color:"#059669" },
+  direct:      { label:"Direct",       icon:"✅", color:"#059669" },
+  reseau:      { label:"Réseau",       icon:"🌐", color:"#1B4FD8" },
 };
 
-// ── Formulaire création client inline ───────────────────────
+// ── Formulaire création client inline ────────────────────────
+// Disponible pour TOUS les rôles
 function CreateClientInline({ onSuccess, onCancel }) {
   const [form, setForm]       = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
   const [loading, setLoading] = useState(false);
@@ -75,10 +85,10 @@ function CreateClientInline({ onSuccess, onCancel }) {
   return (
     <div style={{ background:"#fff", borderRadius:14, border:"1.5px solid #7C3AED33", padding:"20px 22px", marginBottom:24 }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <p style={{ margin:0, fontWeight:800, fontSize:15, color:"#0F172A" }}>👤 Créer un client final</p>
-        <button onClick={onCancel} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#64748B" }}>✕</button>
+        <p style={{ margin:0, fontWeight:800, fontSize:15, color:C.dark }}>👤 Créer un client final</p>
+        <button onClick={onCancel} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.slate }}>✕</button>
       </div>
-      {error && <div style={{ background:"#FEF2F2", color:"#DC2626", padding:"10px 14px", borderRadius:8, marginBottom:14, fontSize:13 }}>⚠️ {error}</div>}
+      {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:14, fontSize:13 }}>⚠️ {error}</div>}
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         {[
           { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
@@ -86,28 +96,28 @@ function CreateClientInline({ onSuccess, onCancel }) {
           { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
         ].map(f => (
           <div key={f.key}>
-            <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#0F172A", marginBottom:5 }}>{f.label}</label>
+            <label style={{ display:"block", fontSize:12, fontWeight:700, color:C.dark, marginBottom:5 }}>{f.label}</label>
             <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
               onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              style={{ width:"100%", padding:"9px 13px", borderRadius:8, fontSize:13, border:"1.5px solid #E2E8F0", outline:"none", boxSizing:"border-box" }} />
+              style={{ width:"100%", padding:"9px 13px", borderRadius:8, fontSize:13, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
           </div>
         ))}
         <div>
-          <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#0F172A", marginBottom:8 }}>Offre *</label>
+          <label style={{ display:"block", fontSize:12, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre *</label>
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             {PLANS_FED.map(p => (
               <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
                 style={{ flex:1, minWidth:100, padding:"10px 12px", borderRadius:10, cursor:"pointer",
-                  border:`2px solid ${form.plan===p.value?"#7C3AED":"#E2E8F0"}`,
-                  background:form.plan===p.value?"#F5F3FF":"#F8FAFC" }}>
-                <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===p.value?"#7C3AED":"#0F172A" }}>{p.label}</p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:"#64748B" }}>{Number(p.price).toLocaleString()} FCFA</p>
+                  border:`2px solid ${form.plan===p.value?C.purple:C.border}`,
+                  background:form.plan===p.value?C.purpleL:C.bg }}>
+                <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===p.value?C.purple:C.dark }}>{p.label}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{Number(p.price).toLocaleString()} FCFA</p>
               </div>
             ))}
           </div>
         </div>
         <button onClick={submit} disabled={loading}
-          style={{ padding:"10px 18px", background:"#7C3AED", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
+          style={{ padding:"10px 18px", background:C.purple, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
           {loading ? "Enregistrement…" : "✅ Créer le client"}
         </button>
       </div>
@@ -115,31 +125,31 @@ function CreateClientInline({ onSuccess, onCancel }) {
   );
 }
 
-// ── Écran succès création client ─────────────────────────────
+// ── Bannière succès après création client ─────────────────────
 function ClientCreatedBanner({ result, onClose }) {
   const creds = result?.credentials;
   const [copied, setCopied] = useState(false);
   const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
   return (
-    <div style={{ background:"#ECFDF5", border:"1.5px solid #05966944", borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
+    <div style={{ background:C.greenL, border:"1.5px solid #05966944", borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-        <p style={{ margin:0, fontWeight:800, color:"#059669", fontSize:15 }}>✅ Client créé — en attente de validation</p>
-        <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"#64748B", fontSize:16 }}>✕</button>
+        <p style={{ margin:0, fontWeight:800, color:C.green, fontSize:15 }}>✅ Client créé — en attente de validation</p>
+        <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:C.slate, fontSize:16 }}>✕</button>
       </div>
       <div style={{ background:"#fff", borderRadius:10, padding:"12px 16px", marginBottom:12 }}>
         {[
-          { label:"Numéro mutualiste", value: creds?.mutual_number },
+          { label:"Numéro mutualiste", value: creds?.mutual_number  },
           { label:"Mot de passe temp.", value: creds?.temp_password },
         ].map(r => (
           <div key={r.label} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-            <span style={{ fontSize:12, color:"#64748B" }}>{r.label}</span>
+            <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
             <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13 }}>{r.value}</span>
           </div>
         ))}
       </div>
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
         <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
-          style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #059669", background:"#ECFDF5", color:"#059669", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+          style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.green}`, background:C.greenL, color:C.green, fontWeight:700, fontSize:12, cursor:"pointer" }}>
           {copied ? "✅ Copié !" : "📋 Copier"}
         </button>
         <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
@@ -162,37 +172,44 @@ const ROLE_CONFIG = {
 // ── Navigation dynamique par rôle ────────────────────────────
 function getNavItems(role) {
   const base = [
-    { path:"/referral/dashboard", icon:"🏠", label:"Accueil" },
+    { path:"/referral/dashboard", icon:"🏠", label:"Accueil"    },
     { path:"/referral/network",   icon:"🌐", label:"Mon réseau" },
   ];
 
-  if (role === "RESPONSABLE") {
-    base.push({ path:"/referral/clients",     icon:"👤", label:"Mes clients" });
-    base.push({ path:"/referral/clients/new", icon:"➕", label:"Enregistrer client" });
-    base.push({ path:"/referral/cards",       icon:"💳", label:"Cartes vendues" });
-  } else if (role === "PASTEUR") {
-    base.push({ path:"/referral/register-responsable",     icon:"🤝", label:"Mes Responsables" });
-    base.push({ path:"/referral/register-responsable/new", icon:"➕", label:"Enregistrer Responsable" });
-    base.push({ path:"/referral/clients",     icon:"👤", label:"Mes clients directs" });
-    base.push({ path:"/referral/clients/new", icon:"➕", label:"Enregistrer client" });
-    base.push({ path:"/referral/cards",       icon:"💳", label:"Cartes vendues" });
+  if (role === "RUM") {
+    // RUM : crée des Leaders uniquement + peut créer Clients
+    base.push({ path:"/referral/register-leader",     icon:"⭐", label:"Mes Leaders"         });
+    base.push({ path:"/referral/register-leader/new", icon:"➕", label:"Enregistrer Leader"   });
+    base.push({ path:"/referral/clients",             icon:"👤", label:"Mes clients directs" });
+    base.push({ path:"/referral/clients/new",         icon:"➕", label:"Enregistrer client"   });
   } else if (role === "LEADER") {
-    base.push({ path:"/referral/register-pasteur",     icon:"⛪", label:"Mes Pasteurs" });
-    base.push({ path:"/referral/register-pasteur/new", icon:"➕", label:"Enregistrer Pasteur" });
+    // LEADER : crée des Pasteurs uniquement + peut créer Clients
+    base.push({ path:"/referral/register-pasteur",     icon:"⛪", label:"Mes Pasteurs"         });
+    base.push({ path:"/referral/register-pasteur/new", icon:"➕", label:"Enregistrer Pasteur"  });
+    base.push({ path:"/referral/clients",              icon:"👤", label:"Mes clients directs" });
+    base.push({ path:"/referral/clients/new",          icon:"➕", label:"Enregistrer client"   });
+  } else if (role === "PASTEUR") {
+    // PASTEUR : crée des Responsables + peut créer Clients directement
+    base.push({ path:"/referral/register-responsable",     icon:"🤝", label:"Mes Responsables"        });
+    base.push({ path:"/referral/register-responsable/new", icon:"➕", label:"Enregistrer Responsable" });
+    base.push({ path:"/referral/clients",                  icon:"👤", label:"Mes clients directs"    });
+    base.push({ path:"/referral/clients/new",              icon:"➕", label:"Enregistrer client"      });
+    base.push({ path:"/referral/cards",                    icon:"💳", label:"Cartes vendues"          });
   } else {
-    // RUM
-    base.push({ path:"/referral/register-leader",     icon:"⭐", label:"Mes Leaders" });
-    base.push({ path:"/referral/register-leader/new", icon:"➕", label:"Enregistrer Leader" });
+    // RESPONSABLE : crée Clients + vend cartes
+    base.push({ path:"/referral/clients",     icon:"👤", label:"Mes clients"         });
+    base.push({ path:"/referral/clients/new", icon:"➕", label:"Enregistrer client"  });
+    base.push({ path:"/referral/cards",       icon:"💳", label:"Cartes vendues"      });
   }
 
   base.push(
-    { path:"/referral/payments",      icon:"💰", label:"Paiements" },
-    { path:"/referral/earnings",      icon:"📊", label:"Mes gains" },
-    { path:"/referral/rewards",       icon:"🏆", label:"Récompenses" },
-    { path:"/referral/referral",      icon:"🔗", label:"Recrutement" },
-    { path:"/referral/leaderboard",   icon:"🏅", label:"Classement" },
+    { path:"/referral/payments",      icon:"💰", label:"Paiements"     },
+    { path:"/referral/earnings",      icon:"📊", label:"Mes gains"     },
+    { path:"/referral/rewards",       icon:"🏆", label:"Récompenses"   },
+    { path:"/referral/referral",      icon:"🔗", label:"Recrutement"   },
+    { path:"/referral/leaderboard",   icon:"🏅", label:"Classement"    },
     { path:"/referral/notifications", icon:"🔔", label:"Notifications" },
-    { path:"/referral/profile",       icon:"👤", label:"Mon profil" },
+    { path:"/referral/profile",       icon:"👤", label:"Mon profil"    },
   );
   return base;
 }
@@ -226,7 +243,6 @@ export function FederationLayout() {
 
   const SidebarContent = () => (
     <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
-      {/* Logo */}
       <div style={{ padding:"20px 20px 16px", borderBottom:`1px solid ${C.border}` }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg, #7C3AED, #A78BFA)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>⛪</div>
@@ -235,14 +251,12 @@ export function FederationLayout() {
             <p style={{ margin:0, fontSize:10, color:C.slate, fontWeight:600 }}>PARRAINAGE</p>
           </div>
         </div>
-
         {amb && (
           <div style={{ marginTop:14, padding:"10px 12px", background:rc.bg, borderRadius:10 }}>
             <p style={{ margin:0, fontWeight:800, fontSize:13, color:C.dark }}>{amb.name}</p>
             <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:999, marginTop:4, display:"inline-block", background:"rgba(255,255,255,.6)", color:rc.color }}>
               {rc.icon} {rc.label}
             </span>
-            {/* Barre de niveau */}
             <div style={{ marginTop:8, display:"flex", gap:3 }}>
               {[1,2,3,4].map(l => (
                 <div key={l} style={{ flex:1, height:4, borderRadius:2, background:l <= rc.level ? rc.color : C.border }} />
@@ -252,8 +266,6 @@ export function FederationLayout() {
           </div>
         )}
       </div>
-
-      {/* Navigation */}
       <nav style={{ flex:1, padding:"12px 12px", overflowY:"auto" }}>
         {NAV.map(item => {
           const active = isActive(item.path);
@@ -278,8 +290,6 @@ export function FederationLayout() {
           );
         })}
       </nav>
-
-      {/* Déconnexion */}
       <div style={{ padding:"12px 12px", borderTop:`1px solid ${C.border}` }}>
         <button onClick={logout}
           style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.red, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
@@ -295,25 +305,19 @@ export function FederationLayout() {
         @media (min-width:768px) { .federation-sidebar { display: block !important; } }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
-
       <aside style={{ width:240, flexShrink:0, background:"#fff", borderRight:`1px solid ${C.border}`, position:"sticky", top:0, height:"100vh", overflowY:"auto", display:"none" }}
         className="federation-sidebar">
         <SidebarContent />
       </aside>
-
       {mobileOpen && (
-        <div onClick={() => setMobileOpen(false)}
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:40 }} />
+        <div onClick={() => setMobileOpen(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:40 }} />
       )}
-
       <aside style={{ position:"fixed", top:0, left:mobileOpen ? 0 : -280, width:260, height:"100vh", background:"#fff", borderRight:`1px solid ${C.border}`, zIndex:50, transition:"left 0.25s ease", overflowY:"auto" }}>
         <SidebarContent />
       </aside>
-
       <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
         <header style={{ background:"#fff", borderBottom:`1px solid ${C.border}`, padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:30 }}>
-          <button onClick={() => setMobileOpen(true)}
-            style={{ border:"none", background:"none", fontSize:22, cursor:"pointer", color:C.dark }}>☰</button>
+          <button onClick={() => setMobileOpen(true)} style={{ border:"none", background:"none", fontSize:22, cursor:"pointer", color:C.dark }}>☰</button>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <div style={{ width:28, height:28, borderRadius:8, background:"linear-gradient(135deg,#7C3AED,#A78BFA)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>⛪</div>
             <span style={{ fontWeight:900, fontSize:14, color:C.dark }}>Awoundjô Parrainage</span>
@@ -326,7 +330,6 @@ export function FederationLayout() {
             )}
           </button>
         </header>
-
         <main style={{ flex:1, overflowY:"auto" }}>
           <Outlet />
         </main>
@@ -339,19 +342,19 @@ export function FederationLayout() {
 export default function FederationDashboard() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [stats, setStats]           = useState(null);
-  const [link,  setLink]            = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [copied, setCopied]         = useState(false);
-  const [pasteurMode, setPasteurMode]           = useState("responsable");
+  const [stats,       setStats]       = useState(null);
+  const [link,        setLink]        = useState(null);
+  const [commissions, setCommissions] = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [copied,      setCopied]      = useState(false);
+  const [pasteurMode,      setPasteurMode]      = useState("responsable");
   const [showCreateClient, setShowCreateClient] = useState(false);
-  const [clientResult, setClientResult]         = useState(null);
-  const [commissions, setCommissions]           = useState(null);
+  const [clientResult,     setClientResult]     = useState(null);
+
   const amb  = getDiasporaData();
   const role = amb?.role || "RESPONSABLE";
   const rc   = ROLE_CONFIG[role] || ROLE_CONFIG.RESPONSABLE;
 
-  // ── Chargement des stats (se relance à chaque retour sur la page)
   function fetchStats() {
     setLoading(true);
     Promise.all([
@@ -365,10 +368,7 @@ export default function FederationDashboard() {
     }).catch(() => {}).finally(() => setLoading(false));
   }
 
-  // Se relance dès que le pathname change (retour depuis une autre page)
   useEffect(() => { fetchStats(); }, [location.pathname]);
-
-  // Écoute l'événement manuel émis après création de client/recruteur
   useEffect(() => {
     window.addEventListener("federation:refresh", fetchStats);
     return () => window.removeEventListener("federation:refresh", fetchStats);
@@ -376,60 +376,124 @@ export default function FederationDashboard() {
 
   function copyLink() {
     if (link?.link) navigator.clipboard.writeText(link.link).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
     });
   }
 
-  // ── Stats cards selon le rôle ──────────────────────────────
+  // ── KPI cards — chaque rôle voit CE QU'IL GÈRE ──────────────
+  //
+  // RUM         : nb Leaders créés + total réseau + commissions chaîne complète
+  // LEADER      : nb Pasteurs créés + total réseau + commissions sur Pasteurs/Responsables/Clients
+  // PASTEUR     : nb Responsables créés + clients directs + commissions sur Responsables/Clients
+  // RESPONSABLE : nb Clients directs + cartes vendues + commissions directes uniquement
   const statCards = stats ? [
-    ...(role === "RESPONSABLE" ? [
-      { icon:"👤", label:"Clients enregistrés", value:stats.clients?.total ?? stats.total_clients ?? 0,  sub:`${stats.clients?.active ?? stats.active_clients ?? 0} actifs`,    color:C.purple, bg:C.purpleL, path:"/referral/clients" },
-      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold ?? stats.clients?.total ?? 0,       sub:"Toutes périodes",                        color:C.teal,   bg:C.tealL,   path:"/referral/cards" },
-    ] : role === "PASTEUR" ? [
-      { icon:"🤝", label:"Mes Responsables",    value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Responsables directs",                   color:C.purple, bg:C.purpleL, path:"/referral/register-responsable" },
-      { icon:"👤", label:"Clients directs",     value:stats.direct_clients ?? stats.clients?.total ?? 0,   sub:"Enregistrés par vous",                   color:C.teal,   bg:C.tealL,   path:"/referral/clients" },
-      { icon:"💳", label:"Cartes vendues",      value:stats.cards_sold ?? 0,                               sub:"Toutes périodes",                        color:C.green,  bg:C.greenL,  path:"/referral/cards" },
+    ...(role === "RUM" ? [
+      {
+        icon:"⭐", label:"Mes Leaders", color:C.purple, bg:C.purpleL,
+        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        sub:   "Leaders directs recrutés",
+        path:  "/referral/register-leader",
+      },
+      {
+        icon:"🌐", label:"Total réseau", color:C.blue, bg:C.blueL,
+        value: stats.network_size ?? stats.total_network ?? 0,
+        sub:   "Leaders + Pasteurs + Responsables + Clients",
+        path:  "/referral/network",
+      },
     ] : role === "LEADER" ? [
-      { icon:"⛪", label:"Mes Pasteurs",        value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Pasteurs directs",                       color:C.purple, bg:C.purpleL, path:"/referral/register-pasteur" },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,     sub:"Tous niveaux",                           color:C.blue,   bg:C.blueL,   path:"/referral/network" },
+      {
+        icon:"⛪", label:"Mes Pasteurs", color:C.blue, bg:C.blueL,
+        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        sub:   "Pasteurs recrutés par vous",
+        path:  "/referral/register-pasteur",
+      },
+      {
+        icon:"🌐", label:"Total réseau", color:C.teal, bg:C.tealL,
+        value: stats.network_size ?? stats.total_network ?? 0,
+        sub:   "Pasteurs + Responsables + Clients",
+        path:  "/referral/network",
+      },
+    ] : role === "PASTEUR" ? [
+      {
+        icon:"🤝", label:"Mes Responsables", color:C.purple, bg:C.purpleL,
+        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        sub:   "Responsables sous vous",
+        path:  "/referral/register-responsable",
+      },
+      {
+        icon:"👤", label:"Clients directs", color:C.teal, bg:C.tealL,
+        value: stats.direct_clients ?? stats.clients?.total ?? 0,
+        sub:   "Enregistrés directement par vous",
+        path:  "/referral/clients",
+      },
+      {
+        icon:"💳", label:"Cartes vendues", color:C.green, bg:C.greenL,
+        value: stats.cards_sold ?? 0,
+        sub:   "Toutes périodes",
+        path:  "/referral/cards",
+      },
     ] : [
-      // RUM
-      { icon:"⭐", label:"Mes Leaders",         value:stats.referrals ?? stats.direct_recruits ?? 0,        sub:"Leaders directs",                        color:C.purple, bg:C.purpleL, path:"/referral/register-leader" },
-      { icon:"🌐", label:"Total réseau",        value:stats.network_size ?? stats.total_network ?? 0,     sub:"Tous niveaux confondus",                 color:C.blue,   bg:C.blueL,   path:"/referral/network" },
+      // RESPONSABLE
+      {
+        icon:"👤", label:"Mes clients", color:C.purple, bg:C.purpleL,
+        value: stats.clients?.total ?? stats.total_clients ?? 0,
+        sub:   `${stats.clients?.active ?? stats.active_clients ?? 0} actifs`,
+        path:  "/referral/clients",
+      },
+      {
+        icon:"💳", label:"Cartes vendues", color:C.teal, bg:C.tealL,
+        value: stats.cards_sold ?? stats.clients?.total ?? 0,
+        sub:   "Toutes périodes",
+        path:  "/referral/cards",
+      },
     ]),
-    { icon:"💰", label:"Commissions totales", value:stats.commissions?.total_earned ?? stats.commissions?.total ?? stats.total_earned ?? 0, sub:`${fmt(stats.commissions?.pending ?? stats.pending_commissions ?? 0)} en attente`, color:C.gold,   bg:C.goldL,   path:"/referral/earnings", isAmount:true },
-    { icon:"🏆", label:"Récompenses",         value:stats.rewards?.level ?? "—",  sub:stats.rewards?.unlocked ?? stats.rewards?.next_reward ?? "Continuez !",   color:C.green,  bg:C.greenL,  path:"/referral/rewards", isText:true },
+    // Commissions — présent pour TOUS les rôles
+    {
+      icon:"💰", label:"Commissions totales", color:C.gold, bg:C.goldL,
+      value:    stats.commissions?.total_earned ?? stats.commissions?.total ?? stats.total_earned ?? 0,
+      sub:      `${fmt(stats.commissions?.pending ?? stats.pending_commissions ?? 0)} en attente`,
+      path:     "/referral/earnings",
+      isAmount: true,
+    },
+    {
+      icon:"🏆", label:"Récompenses", color:C.green, bg:C.greenL,
+      value:  stats.rewards?.level ?? "—",
+      sub:    stats.rewards?.unlocked ?? stats.rewards?.next_reward ?? "Continuez !",
+      path:   "/referral/rewards",
+      isText: true,
+    },
   ] : [];
 
-  // ── Actions rapides selon le rôle ──────────────────────────
-  const quickActions = role === "RESPONSABLE" ? [
-    { icon:"➕", label:"Enregistrer client",     path:"/referral/clients/new",            color:C.purple },
-    { icon:"💳", label:"Vendre une carte",       path:"/referral/cards/new",              color:C.teal   },
-    { icon:"📊", label:"Mes gains",              path:"/referral/earnings",               color:C.gold   },
-    { icon:"🏆", label:"Récompenses",            path:"/referral/rewards",                color:C.green  },
-  ] : role === "PASTEUR" ? [
-    { icon:"🤝", label:"Nouveau Responsable",    path:"/referral/register-responsable/new", color:C.purple },
-    { icon:"👤", label:"Enregistrer client",     path:"/referral/clients/new",            color:C.teal   },
-    { icon:"📊", label:"Mes gains",              path:"/referral/earnings",               color:C.gold   },
-    { icon:"🏆", label:"Récompenses",            path:"/referral/rewards",                color:C.green  },
+  // ── Actions rapides — chaque rôle a ses actions prioritaires ─
+  // + bouton "Créer client final" pour TOUS
+  const quickActions = role === "RUM" ? [
+    { icon:"⭐", label:"Nouveau Leader",      path:"/referral/register-leader/new", color:C.purple },
+    { icon:"🌐", label:"Mon réseau",         path:"/referral/network",              color:C.blue   },
+    { icon:"📊", label:"Mes gains",          path:"/referral/earnings",             color:C.gold   },
+    { icon:"🏆", label:"Récompenses",        path:"/referral/rewards",              color:C.green  },
   ] : role === "LEADER" ? [
-    { icon:"⛪", label:"Nouveau Pasteur",         path:"/referral/register-pasteur/new",   color:C.purple },
-    { icon:"🌐", label:"Mon réseau",             path:"/referral/network",                color:C.blue   },
-    { icon:"📊", label:"Mes gains",              path:"/referral/earnings",               color:C.gold   },
-    { icon:"🏆", label:"Récompenses",            path:"/referral/rewards",                color:C.green  },
+    { icon:"⛪", label:"Nouveau Pasteur",     path:"/referral/register-pasteur/new", color:C.blue   },
+    { icon:"🌐", label:"Mon réseau",         path:"/referral/network",               color:C.teal   },
+    { icon:"📊", label:"Mes gains",          path:"/referral/earnings",              color:C.gold   },
+    { icon:"🏆", label:"Récompenses",        path:"/referral/rewards",               color:C.green  },
+  ] : role === "PASTEUR" ? [
+    { icon:"🤝", label:"Nouveau Responsable", path:"/referral/register-responsable/new", color:C.purple },
+    { icon:"👤", label:"Enregistrer client", path:"/referral/clients/new",               color:C.teal   },
+    { icon:"📊", label:"Mes gains",          path:"/referral/earnings",                  color:C.gold   },
+    { icon:"🏆", label:"Récompenses",        path:"/referral/rewards",                   color:C.green  },
   ] : [
-    // RUM
-    { icon:"⭐", label:"Nouveau Leader",          path:"/referral/register-leader/new",    color:C.purple },
-    { icon:"🌐", label:"Mon réseau",             path:"/referral/network",                color:C.blue   },
-    { icon:"📊", label:"Mes gains",              path:"/referral/earnings",               color:C.gold   },
-    { icon:"🏆", label:"Récompenses",            path:"/referral/rewards",                color:C.green  },
+    // RESPONSABLE
+    { icon:"➕", label:"Enregistrer client", path:"/referral/clients/new", color:C.purple },
+    { icon:"💳", label:"Vendre une carte",  path:"/referral/cards/new",   color:C.teal   },
+    { icon:"📊", label:"Mes gains",         path:"/referral/earnings",    color:C.gold   },
+    { icon:"🏆", label:"Récompenses",       path:"/referral/rewards",     color:C.green  },
   ];
 
   if (loading) {
     return (
       <div style={{ display:"flex", justifyContent:"center", alignItems:"center", minHeight:300 }}>
         <div style={{ width:40, height:40, border:`3px solid ${C.purpleL}`, borderTop:`3px solid ${C.purple}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -437,7 +501,7 @@ export default function FederationDashboard() {
   return (
     <div style={{ padding:"20px 16px", maxWidth:960, margin:"0 auto" }}>
 
-      {/* ── Bannière ── */}
+      {/* ── Bannière de bienvenue ── */}
       <div style={{
         background:"linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)",
         borderRadius:16, padding:"20px 24px", marginBottom:24,
@@ -465,28 +529,24 @@ export default function FederationDashboard() {
           <div style={{ display:"flex", gap:10 }}>
             {[
               { id:"responsable", label:"🤝 Enregistrer un Responsable", desc:"Créer un nouveau Responsable sous vous" },
-              { id:"client",      label:"👤 Enregistrer un Client",       desc:"Inscrire directement un client final" },
+              { id:"client",      label:"👤 Enregistrer un Client",       desc:"Inscrire directement un client final"  },
             ].map(m => (
               <button key={m.id} onClick={() => setPasteurMode(m.id)}
-                style={{
-                  flex:1, padding:"12px 14px", borderRadius:10, border:`2px solid ${pasteurMode===m.id ? C.purple : C.border}`,
-                  background:pasteurMode===m.id ? C.purpleL : "#fff",
-                  cursor:"pointer", textAlign:"left", transition:"all .2s",
-                }}>
-                <p style={{ margin:"0 0 3px", fontSize:13, fontWeight:700, color:pasteurMode===m.id ? C.purple : C.dark }}>{m.label}</p>
+                style={{ flex:1, padding:"12px 14px", borderRadius:10, border:`2px solid ${pasteurMode===m.id?C.purple:C.border}`, background:pasteurMode===m.id?C.purpleL:"#fff", cursor:"pointer", textAlign:"left", transition:"all .2s" }}>
+                <p style={{ margin:"0 0 3px", fontSize:13, fontWeight:700, color:pasteurMode===m.id?C.purple:C.dark }}>{m.label}</p>
                 <p style={{ margin:0, fontSize:11, color:C.slate }}>{m.desc}</p>
               </button>
             ))}
           </div>
           <button
-            onClick={() => navigate(pasteurMode === "responsable" ? "/referral/register-responsable/new" : "/referral/clients/new")}
+            onClick={() => navigate(pasteurMode==="responsable" ? "/referral/register-responsable/new" : "/referral/clients/new")}
             style={{ marginTop:12, padding:"10px 20px", background:C.purple, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            ➕ {pasteurMode === "responsable" ? "Créer un Responsable" : "Enregistrer un Client"}
+            ➕ {pasteurMode==="responsable" ? "Créer un Responsable" : "Enregistrer un Client"}
           </button>
         </div>
       )}
 
-      {/* ── Stat cards ── */}
+      {/* ── KPI Cards ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:14, marginBottom:24 }}>
         {statCards.map(s => (
           <div key={s.label} onClick={() => navigate(s.path)}
@@ -547,7 +607,7 @@ export default function FederationDashboard() {
         </div>
       </div>
 
-      {/* ── Création client rapide ── */}
+      {/* ── Créer un client final — disponible pour TOUS les rôles ── */}
       {clientResult ? (
         <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
       ) : showCreateClient ? (
@@ -556,33 +616,46 @@ export default function FederationDashboard() {
           onCancel={() => setShowCreateClient(false)}
         />
       ) : (
-        <div style={{ marginBottom:24, display:"flex", justifyContent:"flex-start" }}>
+        <div style={{ marginBottom:24 }}>
           <button onClick={() => setShowCreateClient(true)}
-            style={{ padding:"10px 20px", borderRadius:10, border:"2px solid #7C3AED", background:"#F5F3FF", color:"#7C3AED", fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+            style={{ padding:"10px 20px", borderRadius:10, border:`2px solid ${C.purple}`, background:C.purpleL, color:C.purple, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
             👤 Créer un client final directement
           </button>
         </div>
       )}
 
-      {/* ── Commissions par source ── */}
+      {/* ── Commissions — section adaptée par rôle ──
+          RUM         : toute la chaîne — commissions groupées par niveau (Leaders → Pasteurs → Responsables → Clients)
+          LEADER      : commissions sur Pasteurs + Responsables + Clients (by_source)
+          PASTEUR     : commissions sur Responsables + Clients directs (by_source)
+          RESPONSABLE : commissions directes uniquement sur ses Clients (liste simple)
+      ── */}
       {commissions && (
         <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", marginBottom:24 }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-            <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:15 }}>📈 Commissions par source</p>
+            <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:15 }}>
+              {role === "RUM"
+                ? "📈 Commissions — chaîne complète"
+                : role === "LEADER"
+                ? "📈 Commissions réseau (Pasteurs → Clients)"
+                : role === "PASTEUR"
+                ? "📈 Commissions (Responsables + Clients)"
+                : "📈 Mes commissions directes (Clients)"}
+            </p>
             <button onClick={() => navigate("/referral/earnings")}
               style={{ background:"none", border:"none", fontSize:12, color:C.purple, fontWeight:700, cursor:"pointer" }}>
               Tout voir →
             </button>
           </div>
 
-          {/* Totaux */}
+          {/* Totaux — communs à tous les rôles */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:16 }}>
             {[
-              { label:"Total gagné",  value:commissions.totals?.total_earned ?? 0, color:C.green  },
-              { label:"En attente",   value:commissions.totals?.pending       ?? 0, color:C.gold   },
-              { label:"Validé",       value:commissions.totals?.validated     ?? 0, color:C.blue   },
-              { label:"Payé",         value:commissions.totals?.paid          ?? 0, color:C.purple },
-              { label:"Ce mois",      value:commissions.totals?.this_month    ?? 0, color:C.teal   },
+              { label:"Total gagné", value:commissions.totals?.total_earned ?? 0, color:C.green  },
+              { label:"En attente",  value:commissions.totals?.pending       ?? 0, color:C.gold   },
+              { label:"Validé",      value:commissions.totals?.validated     ?? 0, color:C.blue   },
+              { label:"Payé",        value:commissions.totals?.paid          ?? 0, color:C.purple },
+              { label:"Ce mois",     value:commissions.totals?.this_month    ?? 0, color:C.teal   },
             ].map(s => (
               <div key={s.label} style={{ textAlign:"center", padding:"10px 8px", background:C.bg, borderRadius:10 }}>
                 <p style={{ margin:0, fontSize:16, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -592,10 +665,64 @@ export default function FederationDashboard() {
             ))}
           </div>
 
-          {/* Par source */}
-          {commissions.by_source?.length > 0 && (
+          {/* RUM : commissions groupées par catégorie sur toute la chaîne */}
+          {role === "RUM" && commissions.by_category?.length > 0 && (
             <div>
-              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Détail par source</p>
+              <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+                Détail par niveau de la chaîne
+              </p>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {commissions.by_category.map(cat => (
+                  <div key={cat.key} style={{ background:C.bg, borderRadius:12, overflow:"hidden", border:`1px solid ${cat.color}22` }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:`1px solid ${cat.color}22`, background:`${cat.color}08` }}>
+                      <span style={{ fontSize:20 }}>{cat.icon}</span>
+                      <div style={{ flex:1 }}>
+                        <p style={{ margin:0, fontSize:13, fontWeight:800, color:C.dark }}>{cat.label}</p>
+                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{cat.count} commission(s)</p>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <p style={{ margin:0, fontWeight:900, fontSize:15, color:cat.color }}>{fmt(cat.total)} FCFA</p>
+                        {cat.pending > 0 && (
+                          <p style={{ margin:"2px 0 0", fontSize:10, color:C.gold }}>{fmt(cat.pending)} en attente</p>
+                        )}
+                      </div>
+                    </div>
+                    {cat.items?.slice(0, 3).map(c => {
+                      const statusColor = c.status==="PAID" ? C.green : c.status==="VALIDATED" ? C.blue : C.gold;
+                      const statusLabel = c.status==="PAID" ? "Payé" : c.status==="VALIDATED" ? "Validé" : "En attente";
+                      return (
+                        <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 14px", borderBottom:`1px solid ${C.border}` }}>
+                          <div>
+                            <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>{c.beneficiary_name || c.source_user_name || "—"}</p>
+                            <p style={{ margin:"1px 0 0", fontSize:10, color:C.slate }}>{c.rate_pct}% · {new Date(c.created_at).toLocaleDateString("fr-FR")}</p>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <p style={{ margin:0, fontWeight:800, fontSize:13, color:C.green }}>{fmt(c.amount)} FCFA</p>
+                            <span style={{ fontSize:10, fontWeight:700, color:statusColor }}>{statusLabel}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {cat.items?.length > 3 && (
+                      <div style={{ padding:"8px 14px", textAlign:"center" }}>
+                        <button onClick={() => navigate("/referral/earnings")}
+                          style={{ background:"none", border:"none", fontSize:11, color:C.purple, fontWeight:700, cursor:"pointer" }}>
+                          +{cat.items.length - 3} de plus → Voir tout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LEADER / PASTEUR : commissions par source rôle */}
+          {(role === "LEADER" || role === "PASTEUR") && commissions.by_source?.length > 0 && (
+            <div>
+              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+                {role === "LEADER" ? "Par source (Pasteurs, Responsables, Clients)" : "Par source (Responsables et Clients)"}
+              </p>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {commissions.by_source.map(s => {
                   const src = SOURCE_LABELS[s.source_role] || SOURCE_LABELS[s.type_source] || { label:s.source_role || s.type_source, icon:"💰", color:C.slate };
@@ -614,22 +741,23 @@ export default function FederationDashboard() {
             </div>
           )}
 
-          {/* Dernières commissions */}
-          {commissions.commissions?.length > 0 && (
-            <div style={{ marginTop:16 }}>
-              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>Dernières commissions</p>
+          {/* RESPONSABLE : liste simple des dernières commissions sur ses Clients uniquement */}
+          {role === "RESPONSABLE" && commissions.commissions?.length > 0 && (
+            <div>
+              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>
+                Dernières commissions sur vos clients
+              </p>
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {commissions.commissions.slice(0, 5).map(c => {
-                  const src = SOURCE_LABELS[c.source] || { icon:"💰", color:C.slate };
                   const statusColor = c.status==="PAID" ? C.green : c.status==="VALIDATED" ? C.blue : C.gold;
                   const statusLabel = c.status==="PAID" ? "Payé" : c.status==="VALIDATED" ? "Validé" : "En attente";
                   return (
                     <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", background:C.bg, borderRadius:8 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:14 }}>{src.icon}</span>
+                        <span style={{ fontSize:14 }}>👤</span>
                         <div>
                           <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>{c.beneficiary_name || "—"}</p>
-                          <p style={{ margin:0, fontSize:11, color:C.slate }}>{c.rate_pct}% • {c.source === "direct" ? "Direct" : "Réseau"}</p>
+                          <p style={{ margin:0, fontSize:11, color:C.slate }}>{c.rate_pct}% · Direct</p>
                         </div>
                       </div>
                       <div style={{ textAlign:"right" }}>
@@ -643,7 +771,8 @@ export default function FederationDashboard() {
             </div>
           )}
 
-          {!commissions.by_source?.length && !commissions.commissions?.length && (
+          {/* Cas vide — aucune commission pour l'instant */}
+          {!commissions.by_category?.length && !commissions.by_source?.length && !commissions.commissions?.length && (
             <div style={{ textAlign:"center", padding:"20px", color:C.slate, fontSize:13 }}>
               💰 Aucune commission pour l'instant
             </div>
@@ -654,7 +783,7 @@ export default function FederationDashboard() {
       {/* ── Résumé réseau ── */}
       {stats && (
         <div onClick={() => navigate("/referral/network")}
-          style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", cursor:"pointer", transition:"box-shadow 0.15s" }}
+          style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", cursor:"pointer", transition:"box-shadow 0.15s", marginBottom:24 }}
           onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 20px rgba(0,0,0,0.08)"}
           onMouseLeave={e => e.currentTarget.style.boxShadow="none"}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
@@ -663,8 +792,8 @@ export default function FederationDashboard() {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10 }}>
             {[
-              { label:"Total",      value:stats.network_size ?? stats.total_network ?? 0,       color:C.purple },
-              { label:"Directs",    value:stats.referrals ?? stats.direct_recruits ?? 0,         color:C.blue   },
+              { label:"Total",      value:stats.network_size ?? stats.total_network ?? 0,        color:C.purple },
+              { label:"Directs",    value:stats.referrals    ?? stats.direct_recruits ?? 0,       color:C.blue   },
               { label:"Actifs",     value:stats.clients?.active ?? stats.active_clients ?? 0,    color:C.teal   },
               { label:"En attente", value:stats.clients?.pending ?? stats.pending_clients ?? 0,  color:C.slate  },
             ].map(s => (
