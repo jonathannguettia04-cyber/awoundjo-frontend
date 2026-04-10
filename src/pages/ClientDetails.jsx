@@ -10,7 +10,7 @@ import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Ba
 import Modal from "../components/Modal";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
-const PLANS    = ["BASIQUE", "ESSENTIELLE", "IVOIRIENNE", "TURQUOISE"];
+// Les formules sont chargées dynamiquement depuis /api/plans
 const STATUSES = ["actif", "attente", "suspendu"];
 const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
@@ -28,6 +28,10 @@ export default function ClientDetails() {
   const [editForm,   setEditForm]   = useState({});
   const [editSaving, setEditSaving] = useState(false);
   const [editError,  setEditError]  = useState("");
+
+  // Formules dynamiques
+  const [plans,        setPlans]        = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
 
   // Payment modal
   const [showPay,    setShowPay]    = useState(false);
@@ -122,6 +126,16 @@ export default function ClientDetails() {
   }
 
   useEffect(() => { loadClient(); loadDeps(); }, [id]);
+
+  // Charger les formules depuis l'API
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    fetch(`${API}/api/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then(({ data }) => { if (data?.length) setPlans(data); })
+      .catch(console.error)
+      .finally(() => setPlansLoading(false));
+  }, []);
 
   // Gestion retour CinetPay après redirect
   useEffect(() => {
@@ -477,8 +491,16 @@ export default function ClientDetails() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Formule</label>
               <select value={editForm.plan} onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                {PLANS.map((p) => <option key={p}>{p}</option>)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                disabled={plansLoading}>
+                {plansLoading
+                  ? <option>Chargement…</option>
+                  : plans.map((p) => (
+                      <option key={p.slug} value={p.slug.toUpperCase()}>
+                        {p.name}
+                      </option>
+                    ))
+                }
               </select>
             </div>
             <div>

@@ -123,7 +123,7 @@ export default function Clients() {
           mutualNumber,
           clientId:     createdClient.id || data.id,
         });
-        setForm(EMPTY);
+        setForm({ ...EMPTY, plan: plans[0]?.slug.toUpperCase() || "" });
         load(1);
         // Afficher directement le modal code d'accès (pas de paiement)
         if (accessCode) {
@@ -144,7 +144,7 @@ export default function Clients() {
       setPayError("");
       setPaySuccess("");
       setShowPayModal(true);
-      setForm(EMPTY);
+      setForm({ ...EMPTY, plan: plans[0]?.slug.toUpperCase() || "" });
       load(1);
     } catch (err) {
       setFormError(err.response?.data?.error || "Erreur lors de la création");
@@ -269,7 +269,7 @@ export default function Clients() {
             📂 Importer CSV
           </button>
           <button
-            onClick={() => { setForm(EMPTY); setFormError(""); setShowModal(true); }}
+            onClick={() => { setForm({ ...EMPTY, plan: plans[0]?.slug.toUpperCase() || "" }); setFormError(""); setShowModal(true); }}
             className="flex-1 sm:flex-none bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm"
           >
             + Nouveau client
