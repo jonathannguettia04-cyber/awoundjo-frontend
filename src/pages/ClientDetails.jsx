@@ -36,6 +36,8 @@ export default function ClientDetails() {
   const [payError,   setPayError]   = useState("");
   const [paySuccess,    setPaySuccess]    = useState("");
   const [showDelete,    setShowDelete]    = useState(false);
+  const [forceActivating, setForceActivating] = useState(false);
+  const [forceSuccess,    setForceSuccess]    = useState("");
 
   // Famille / Ayants droit
   const [deps,          setDeps]          = useState([]);
@@ -54,6 +56,23 @@ export default function ClientDetails() {
       data: { adminPassword: password },
     });
     navigate("/clients");
+  }
+
+  async function handleForceActivate() {
+    setForceActivating(true);
+    setForceSuccess("");
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(`${API}/api/clients/${id}/force-activate`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setForceSuccess("✅ Client réactivé avec succès");
+      loadClient();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erreur lors de la réactivation");
+    } finally {
+      setForceActivating(false);
+    }
   }
 
   async function loadDeps() {
@@ -231,6 +250,29 @@ export default function ClientDetails() {
 
       {/* Breadcrumb */}
       <Link to="/clients" className="text-sm text-brand-500 hover:underline">← Retour aux clients</Link>
+
+      {/* Bandeau suspension manuelle — admin only */}
+      {isAdmin && c.status === "suspendu" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-amber-800 text-sm">⚠️ Client suspendu automatiquement</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Ce client a été suspendu par la règle du 6 du mois (cotisation impayée) ou manuellement.
+              Vous pouvez le réactiver manuellement si la situation a été régularisée.
+            </p>
+            {forceSuccess && (
+              <p className="text-xs text-green-700 font-semibold mt-1">{forceSuccess}</p>
+            )}
+          </div>
+          <button
+            onClick={handleForceActivate}
+            disabled={forceActivating}
+            className="flex-shrink-0 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            {forceActivating ? "⏳ Réactivation…" : "🔄 Réactiver manuellement"}
+          </button>
+        </div>
+      )}
 
       {/* Fiche client */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
