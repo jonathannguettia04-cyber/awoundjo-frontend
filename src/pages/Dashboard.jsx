@@ -6,6 +6,8 @@ import StatsCard from "../components/StatsCard";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import PlanModal from "./PlanModal";
 
+const API = import.meta.env.VITE_API_URL || "";
+
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
 
@@ -54,7 +56,7 @@ export default function Dashboard() {
   const authHeader = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
   function fetchPlans() {
-    fetch("/api/plans?all=true", { headers: authHeader })
+    fetch(`${API}/api/plans?all=true`, { headers: authHeader })
       .then((r) => r.json())
       .then(({ data }) => setPlans(data || []))
       .catch(console.error);
@@ -74,7 +76,7 @@ export default function Dashboard() {
 
   async function togglePlanActive(plan) {
     try {
-      await fetch(`/api/plans/${plan.id}`, {
+      await fetch(`${API}/api/plans/${plan.id}`, {
         method:  "PUT",
         headers: authHeader,
         body:    JSON.stringify({ is_active: !plan.is_active }),
@@ -86,7 +88,7 @@ export default function Dashboard() {
   async function deletePlan(plan) {
     if (!window.confirm(`Supprimer la formule "${plan.name}" ?`)) return;
     try {
-      const res  = await fetch(`/api/plans/${plan.id}`, { method: "DELETE", headers: authHeader });
+      const res  = await fetch(`${API}/api/plans/${plan.id}`, { method: "DELETE", headers: authHeader });
       const json = await res.json();
       alert(json.message || "Supprimée");
       fetchPlans();
@@ -269,7 +271,6 @@ export default function Dashboard() {
           plan={editingPlan}
           onClose={() => setPlanModal(false)}
           onSaved={() => { fetchPlans(); setPlanModal(false); }}
-          apiBase={import.meta.env.VITE_API_URL}
         />
       )}
 

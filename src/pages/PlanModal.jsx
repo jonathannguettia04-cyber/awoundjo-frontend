@@ -4,7 +4,7 @@
 //   plan       — formule à éditer (null = création)
 //   onClose    — ferme le modal
 //   onSaved    — callback(savedPlan) après succès
-//   apiBase    — ex: import.meta.env.VITE_API_URL
+//   (apiBase supprimé — la constante API est définie en local)
 
 import { useState, useEffect } from "react";
 
@@ -21,7 +21,9 @@ const CATEGORIES = [
 
 const EMPTY_BENEFIT = { category: "", coverage_percent: "", ceiling_fcfa: "" };
 
-export default function PlanModal({ plan, onClose, onSaved, apiBase }) {
+const API = import.meta.env.VITE_API_URL || "";
+
+export default function PlanModal({ plan, onClose, onSaved }) {
   const isEdit = Boolean(plan);
 
   // ── Champs principaux ─────────────────────────────────────────────────────
@@ -107,8 +109,8 @@ export default function PlanModal({ plan, onClose, onSaved, apiBase }) {
 
     const token = localStorage.getItem("token");
     const url   = isEdit
-      ? `${apiBase}/api/plans/${plan.id}`
-      : `${apiBase}/api/plans`;
+      ? `${API}/api/plans/${plan.id}`
+      : `${API}/api/plans`;
     const method = isEdit ? "PUT" : "POST";
 
     setLoading(true);
