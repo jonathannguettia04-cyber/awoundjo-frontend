@@ -216,10 +216,11 @@ export default function AdminFederation() {
   async function fetchMembers() {
     setLoading(true); setError("");
     try {
-      const { data } = await axios.get(`${API}/api/federation/admin/members`, {
+      const { data } = await axios.get(`${API}/api/federation/admin/ambassadors`, {
         headers: { Authorization: `Bearer ${agentToken()}` },
       });
-      setMembers(data.members || []);
+      // adminGetAmbassadors retourne data.ambassadors
+      setMembers(data.ambassadors || data.members || []);
     } catch (e) {
       setError(e.response?.data?.error || "Erreur lors du chargement des membres");
     } finally { setLoading(false); }
@@ -228,7 +229,7 @@ export default function AdminFederation() {
   async function toggleStatus(amb) {
     const newStatus = amb.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
     try {
-      await axios.put(`${API}/api/federation/admin/members/${amb.id}/status`,
+      await axios.patch(`${API}/api/federation/admin/ambassadors/${amb.id}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${agentToken()}` } }
       );
