@@ -87,7 +87,8 @@ export default function Clients() {
 
   // Charger les formules depuis l'API
   useEffect(() => {
-    fetch("/api/plans", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
+    const _API = import.meta.env.VITE_API_URL || "";
+    fetch(`${_API}/api/plans`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
       .then((r) => r.json())
       .then(({ data }) => {
         if (data?.length) {
