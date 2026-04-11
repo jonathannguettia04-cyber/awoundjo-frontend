@@ -162,10 +162,12 @@ export default function Commissions() {
           />
           <KpiCard
             label="Sur mensualités"
-            value={fmt(totals.commission_mensualite)}
+            value={rates.mensualite > 0 ? fmt(totals.commission_mensualite) : "—"}
             icon="🔄"
             color="teal"
-            sub={`${totals.nb_mensualites} mensualité(s) · ${rates.mensualite}%`}
+            sub={rates.mensualite > 0
+              ? `${totals.nb_mensualites} mensualité(s) · ${rates.mensualite}%`
+              : "Non applicable pour ce rôle"}
           />
           <KpiCard
             label="Paiements traités"
@@ -189,9 +191,11 @@ export default function Commissions() {
                 <tr>
                   <th className="text-left px-4 py-3">Mois</th>
                   <th className="text-right px-4 py-3">Base adhésion</th>
-                  <th className="text-right px-4 py-3">Commission (10%)</th>
+                  <th className="text-right px-4 py-3">Commission ({rates.adhesion}%)</th>
                   <th className="text-right px-4 py-3">Base mensualité</th>
-                  <th className="text-right px-4 py-3">Commission (5%)</th>
+                  <th className="text-right px-4 py-3">
+                    {rates.mensualite > 0 ? `Commission (${rates.mensualite}%)` : "Mensualité (non applicable)"}
+                  </th>
                   <th className="text-right px-4 py-3 font-bold text-slate-700">Total</th>
                 </tr>
               </thead>
@@ -207,8 +211,12 @@ export default function Commissions() {
                       </td>
                       <td className="px-4 py-3 text-right text-slate-500">{fmt(m.adhesion_base)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-purple-600">{fmt(m.commission_adhesion)}</td>
-                      <td className="px-4 py-3 text-right text-slate-500">{fmt(m.mensualite_base)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-teal-600">{fmt(m.commission_mensualite)}</td>
+                      <td className="px-4 py-3 text-right text-slate-500">
+                        {rates.mensualite > 0 ? fmt(m.mensualite_base) : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-teal-600">
+                        {rates.mensualite > 0 ? fmt(m.commission_mensualite) : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-4 py-3 text-right font-bold text-brand-600">{fmt(m.commission_totale)}</td>
                     </tr>
                   );
@@ -219,8 +227,12 @@ export default function Commissions() {
                   <td className="px-4 py-3 font-bold text-slate-800">TOTAL {year}</td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-600">{fmt(totals.total_collecte)}</td>
                   <td className="px-4 py-3 text-right font-bold text-purple-600">{fmt(totals.commission_adhesion)}</td>
-                  <td className="px-4 py-3 text-right"></td>
-                  <td className="px-4 py-3 text-right font-bold text-teal-600">{fmt(totals.commission_mensualite)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {rates.mensualite > 0 ? "" : <span className="text-xs text-slate-400">Non applicable</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-teal-600">
+                    {rates.mensualite > 0 ? fmt(totals.commission_mensualite) : <span className="text-slate-300">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right font-bold text-brand-700 text-base">{fmt(totals.commission_totale)}</td>
                 </tr>
               </tfoot>

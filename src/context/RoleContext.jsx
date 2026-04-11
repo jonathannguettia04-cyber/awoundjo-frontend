@@ -45,6 +45,7 @@ export const ROLE_LABELS = {
   AGENT:                  "Agent Commercial",
   RESPONSABLE_COMMERCIAL: "Responsable Commercial",
   CONSEILLERE_CLIENTELE:  "Conseillère Clientèle",
+  APPORTEUR_AFFAIRES: "Apporteur d'Affaires",
 };
 
 export const ROLE_COLORS = {
@@ -52,6 +53,7 @@ export const ROLE_COLORS = {
   AGENT:                  { bg: "bg-brand-100",  text: "text-brand-700",  dot: "bg-brand-500" },
   RESPONSABLE_COMMERCIAL: { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   CONSEILLERE_CLIENTELE:  { bg: "bg-teal-100",   text: "text-teal-700",   dot: "bg-teal-500" },
+  APPORTEUR_AFFAIRES: { bg:"bg-orange-50", text:"text-orange-700", dot:"bg-orange-500" },
 };
 
 export function useRole() {

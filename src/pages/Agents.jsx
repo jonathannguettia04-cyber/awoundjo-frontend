@@ -1,4 +1,7 @@
 // src/pages/Agents.jsx
+// ⚠️  Penser à ajouter APPORTEUR_AFFAIRES dans RoleContext.js :
+//   ROLE_LABELS : { APPORTEUR_AFFAIRES: "Apporteur d'Affaires", ... }
+//   ROLE_COLORS : { APPORTEUR_AFFAIRES: { bg:"bg-orange-50", text:"text-orange-700", dot:"bg-orange-500" }, ... }
 import { useEffect, useState } from "react";
 import { agentsAPI } from "../services/api";
 import axios from "axios";
@@ -15,6 +18,7 @@ function getCreatableRoles(userRole) {
       { value: "AGENT",                  label: "Agent Commercial" },
       { value: "RESPONSABLE_COMMERCIAL", label: "Responsable Commercial" },
       { value: "CONSEILLERE_CLIENTELE",  label: "Conseillère Clientèle" },
+      { value: "APPORTEUR_AFFAIRES",     label: "Apporteur d'Affaires" },
     ];
   }
   if (userRole === "RESPONSABLE_COMMERCIAL") {
@@ -281,7 +285,7 @@ export default function Agents() {
                       className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer text-center
                         ${form.role === r.value ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-slate-300"}`}>
                       <span className="text-xl">
-                        {r.value === "AGENT" ? "🧑‍💼" : r.value === "RESPONSABLE_COMMERCIAL" ? "💼" : "💁‍♀️"}
+                        {r.value === "AGENT" ? "🧑‍💼" : r.value === "RESPONSABLE_COMMERCIAL" ? "💼" : r.value === "APPORTEUR_AFFAIRES" ? "🤝" : "💁‍♀️"}
                       </span>
                       <span className={`text-xs font-semibold ${form.role === r.value ? "text-brand-700" : "text-slate-600"}`}>
                         {r.label}
@@ -295,6 +299,7 @@ export default function Agents() {
                   {form.role === "AGENT" && "Crée et suit ses propres clients, enregistre des paiements, voit ses commissions."}
                   {form.role === "RESPONSABLE_COMMERCIAL" && "Crée et suit des agents commerciaux, voit les commissions de son équipe, vue restreinte du tableau de bord."}
                   {form.role === "CONSEILLERE_CLIENTELE" && "Gère les établissements, importe/exporte des clients, fait des adhésions. Pas de création d'agents."}
+                  {form.role === "APPORTEUR_AFFAIRES" && "Enregistre uniquement des clients finaux. Commission de 5% sur les adhésions uniquement (pas de commission sur mensualités)."}
                 </div>
               </div>
             )}
