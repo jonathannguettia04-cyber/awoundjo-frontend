@@ -43,8 +43,10 @@ export default function ClientDashboard() {
     ? new Date(profile.expiration_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
     : "N/A";
 
+  // Alerte renouvellement : seulement dans les 7 derniers jours avant expiration
+  // (évite les faux positifs pour les réactivations manuelles en cours de mois)
   const expiringSoon = profile.expiration_date &&
-    new Date(profile.expiration_date) - new Date() < 30 * 86400000;
+    new Date(profile.expiration_date) - new Date() < 7 * 86400000;
 
   const spouse   = profile.dependents_summary?.spouse   || 0;
   const children = profile.dependents_summary?.children || 0;

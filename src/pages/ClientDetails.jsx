@@ -42,6 +42,7 @@ export default function ClientDetails() {
   const [showDelete,    setShowDelete]    = useState(false);
   const [forceActivating, setForceActivating] = useState(false);
   const [forceSuccess,    setForceSuccess]    = useState("");
+  const [flagging,        setFlagging]        = useState(false);
 
   // Famille / Ayants droit
   const [deps,          setDeps]          = useState([]);
@@ -76,6 +77,21 @@ export default function ClientDetails() {
       alert(err.response?.data?.error || "Erreur lors de la réactivation");
     } finally {
       setForceActivating(false);
+    }
+  }
+
+  async function handleFlagRenewal() {
+    setFlagging(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(`${API}/api/clients/${id}/flag-renewal`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      loadClient();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erreur lors du marquage");
+    } finally {
+      setFlagging(false);
     }
   }
 
@@ -284,6 +300,26 @@ export default function ClientDetails() {
             className="flex-shrink-0 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
           >
             {forceActivating ? "⏳ Réactivation…" : "🔄 Réactiver manuellement"}
+          </button>
+        </div>
+      )}
+
+      {/* Bandeau renouvellement requis — admin only */}
+      {isAdmin && c.status === "renewal_required" && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-blue-800 text-sm">🔔 Renouvellement requis</p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              Ce client a été marqué comme devant renouveler sa cotisation. Il voit une alerte dans son espace adhérent.
+              Vous pouvez le réactiver une fois le paiement régularisé.
+            </p>
+          </div>
+          <button
+            onClick={handleForceActivate}
+            disabled={forceActivating}
+            className="flex-shrink-0 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            {forceActivating ? "⏳ Réactivation…" : "✅ Marquer comme payé"}
           </button>
         </div>
       )}
