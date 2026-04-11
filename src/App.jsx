@@ -147,7 +147,7 @@ function ClientRoute({ children }) {
 }
 
 function ProviderRoute({ children }) {
-  // FIX : idem
+  // FIX : clé dédiée "provider_token" — isolée du token agent
   const token = safeLocalStorage("getItem", "provider_token");
   if (!token) return <Navigate to="/etablissement/login" replace />;
   return children;
@@ -185,7 +185,12 @@ export default function App() {
           <Routes>
 
             {/* ── Auth ────────────────────────────────────── */}
-            <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+            {/* FIX : la redirection après login ne se déclenche que si
+                c'est un agent connecté — un provider_token seul ne redirige
+                plus vers le dashboard admin */}
+            <Route path="/login" element={
+              user ? <Navigate to="/" replace /> : <Login />
+            } />
             <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
 
             {/* ── AGENT ───────────────────────────────────── */}
@@ -254,7 +259,12 @@ export default function App() {
             </Route>
 
             {/* ── ÉTABLISSEMENT ───────────────────────────── */}
-            <Route path="/etablissement/login" element={<EtablissementLogin />} />
+            {/* FIX : page login redirige vers dashboard provider si déjà connecté */}
+            <Route path="/etablissement/login" element={
+              safeLocalStorage("getItem", "provider_token")
+                ? <Navigate to="/etablissement/dashboard" replace />
+                : <EtablissementLogin />
+            } />
             <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
               <Route index element={<Navigate to="/etablissement/dashboard" replace />} />
               <Route path="dashboard"         element={<ProviderDashboard />} />
@@ -326,7 +336,12 @@ export default function App() {
             </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
+            <Route path="*" element={
+              safeLocalStorage("getItem", "provider_token")
+                ? <Navigate to="/etablissement/dashboard" replace />
+                : <Navigate to="/" replace />
+            } />
 
           </Routes>
         </Suspense>
