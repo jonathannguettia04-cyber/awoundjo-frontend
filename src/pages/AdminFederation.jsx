@@ -203,6 +203,8 @@ function PendingValidationSection({ members, onValidate }) {
     </div>
   );
 }
+
+function DetailModal({ amb, onClose, onToggleStatus }) {
   if (!amb) return null;
   const rc = ROLE_CONFIG[amb.role] || { icon:"👤", color:C.slate, bg:C.bg };
   return (
