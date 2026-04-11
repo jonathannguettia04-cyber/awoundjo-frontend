@@ -101,6 +101,7 @@ export default function Payments() {
         >
           <option value="">Toutes les méthodes</option>
           <option value="cinetpay">CinetPay</option>
+          <option value="paydunya">PayDunya</option>
           <option value="cash">Cash</option>
         </select>
       </div>

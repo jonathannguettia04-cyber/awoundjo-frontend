@@ -232,6 +232,46 @@ export default function ClientDetails() {
         setPaySaving(false);
       }
 
+    } else if (payForm.payment_method === "paydunya") {
+      // PayDunya PAR — redirection
+      try {
+        const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+        const token = localStorage.getItem("token");
+        const clientData = client?.client || {};
+        const txId = `AWJ-CLI-${Date.now()}`;
+
+        const res = await fetch(`${BASE}/api/payments/paydunya/init-web`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            amount,
+            transaction_id: txId,
+            description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${clientData.name || ""}`,
+            client_name:  clientData.name  || "Client",
+            client_email: clientData.email || "client@awoundjo.ci",
+            client_id:    id,
+            type:         payForm.type,
+            success_url: `${window.location.origin}/clients/${id}?ps=1&tx=${txId}`,
+            failed_url:  `${window.location.origin}/clients/${id}?ps=0`,
+          }),
+        });
+
+        const data = await res.json();
+        const paymentUrl = data?.data?.payment_url;
+
+        if (!paymentUrl) {
+          throw new Error(data?.error || "URL de paiement PayDunya non reçue");
+        }
+
+        window.location.href = paymentUrl;
+      } catch (err) {
+        setPayError(err.message || "Erreur initialisation paiement PayDunya");
+        setPaySaving(false);
+      }
+
     } else {
       // Cash — enregistrement direct
       try {
@@ -602,14 +642,21 @@ export default function ClientDetails() {
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="cash">💵 Cash</option>
               <option value="cinetpay">💳 CinetPay (Orange Money, Wave, MTN…)</option>
+              <option value="paydunya">🏦 PayDunya (Orange Money, Wave, MTN, Moov)</option>
             </select>
           </div>
 
-          {/* Info CinetPay */}
+          {/* Info méthode de paiement */}
           {payForm.payment_method === "cinetpay" && (
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-blue-700">
               <span className="text-base">💳</span>
-              Un popup de paiement sécurisé s'ouvrira — Orange Money, Wave, MTN MoMo, carte bancaire acceptés.
+              Redirection vers CinetPay — Orange Money, Wave, MTN MoMo, carte bancaire acceptés.
+            </div>
+          )}
+          {payForm.payment_method === "paydunya" && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-emerald-700">
+              <span className="text-base">🏦</span>
+              Redirection vers PayDunya — Orange Money CI, Wave CI, MTN CI, Moov CI acceptés.
             </div>
           )}
 
@@ -625,6 +672,8 @@ export default function ClientDetails() {
                   ? "⏳ Ouverture…"
                   : payForm.payment_method === "cinetpay"
                     ? "💳 Payer via CinetPay"
+                    : payForm.payment_method === "paydunya"
+                    ? "🏦 Payer via PayDunya"
                     : "✅ Valider le paiement"}
               </button>
             )}
