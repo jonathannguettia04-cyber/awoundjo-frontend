@@ -22,6 +22,7 @@ import {
   diasporaBeneAPI,
   getDiasporaData,
 } from "../../diasporaApi";
+import { usePlans, planIcon } from "../../hooks/usePlans";
 
 export function refreshDiasporaDashboard() {
   window.dispatchEvent(new CustomEvent("diaspora:refresh"));
@@ -41,11 +42,8 @@ const C = {
 const fmt = (n) =>
   Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 });
 
-const PLANS_DIAS = [
-  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
-  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
-  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
-];
+
+
 
 // ── Labels des sources de commission par rôle ─────────────────
 // AMBASSADEUR_DIASPORA touche sur Amb.Pays, Recruteurs, Clients
@@ -63,9 +61,16 @@ const SOURCE_LABELS = {
 // ── Formulaire création client inline ────────────────────────
 // Disponible pour TOUS les rôles
 function CreateClientInline({ onSuccess, onCancel }) {
-  const [form, setForm]     = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
+  const { plans, plansLoading } = usePlans();
+  const [form, setForm]     = useState({ name:"", phone:"", city:"", plan:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState("");
+
+  useEffect(() => {
+    if (plans.length && !form.plan) {
+      setForm(f => ({ ...f, plan: plans[0].slug.toUpperCase() }));
+    }
+  }, [plans]);
 
   async function submit() {
     if (!form.name.trim()) return setError("Le nom est requis");
@@ -100,17 +105,24 @@ function CreateClientInline({ onSuccess, onCancel }) {
         ))}
         <div>
           <label style={{ display:"block", fontSize:12, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre *</label>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {PLANS_DIAS.map(p => (
-              <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
-                style={{ flex:1, minWidth:100, padding:"10px 12px", borderRadius:10, cursor:"pointer",
-                  border:`2px solid ${form.plan===p.value?C.blue:C.border}`,
-                  background:form.plan===p.value?C.blueL:C.bg }}>
-                <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===p.value?C.blue:C.dark }}>{p.label}</p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{Number(p.price).toLocaleString()} FCFA</p>
-              </div>
-            ))}
-          </div>
+          {plansLoading ? (
+            <p style={{ fontSize:12, color:C.slate }}>Chargement des formules…</p>
+          ) : (
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {plans.map(p => {
+                const slug = p.slug.toUpperCase();
+                return (
+                  <div key={slug} onClick={() => setForm(f => ({ ...f, plan: slug }))}
+                    style={{ flex:1, minWidth:100, padding:"10px 12px", borderRadius:10, cursor:"pointer",
+                      border:`2px solid ${form.plan===slug?C.blue:C.border}`,
+                      background:form.plan===slug?C.blueL:C.bg }}>
+                    <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===slug?C.blue:C.dark }}>{planIcon(slug)} {p.name}</p>
+                    <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{Number(p.monthly_price).toLocaleString("fr-FR")} FCFA/mois</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <button onClick={submit} disabled={loading}
           style={{ padding:"10px 18px", background:C.blue, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>

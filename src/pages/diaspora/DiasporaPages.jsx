@@ -18,6 +18,7 @@ import {
   diasporaProfileAPI,
   getDiasporaData,
 } from "../../diasporaApi";
+import { usePlans, planIcon } from "../../hooks/usePlans";
 
 const C = {
   blue:    "#1B4FD8", blueL:   "#EEF2FF",
@@ -39,11 +40,8 @@ const ROLE_CONFIG = {
   RECRUTEUR:            { label:"Recruteur",            icon:"🤝", color:C.gold,   bg:C.goldL  },
 };
 
-const PLANS = [
-  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",   price:5000  },
-  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie",  price:10000 },
-  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium",  price:20000 },
-];
+
+
 
 const REWARD_LEVELS = [
   { level:1, min:5,   label:"Bronze 🥉",  reward:"Bon d'achat 5 000 FCFA",  color:"#CD7F32" },
@@ -123,17 +121,16 @@ function Btn({ children, onClick, variant="primary", style={}, disabled=false })
 
 // Modal credentials — affiché après création d'un rôle intermédiaire
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const MEMBERSHIP_FEE = 15000;
-
 // Retourne true si le membre doit encore payer
 const needsPayment = (a) =>
   a.status !== "ACTIVE" || a.status_payment !== "paid";
 
-function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
+function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
+  const fee = Number(adhesionFee) || 0;
 
   async function handlePay() {
     setPayLoading(true); setPayError("");
@@ -144,7 +141,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ambassador_id: ambassadorId,
-          amount:        MEMBERSHIP_FEE,
+          amount:        fee,
           type:          "adhesion",
           description:   `Adhésion Awoundjô — ${targetLabel}`,
           return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
@@ -224,7 +221,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
             💳 Étape suivante — Paiement des frais d'adhésion
           </p>
           <p style={{ margin:"0 0 12px", fontSize:12, color:C.slate }}>
-            Payez maintenant les frais d'adhésion de <strong>15 000 FCFA</strong> via CinetPay pour activer le processus de validation.
+            Payez maintenant les frais d'adhésion de <strong>{fee.toLocaleString("fr-FR")} FCFA</strong> via CinetPay pour activer le processus de validation.
           </p>
           {payError && (
             <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
@@ -246,7 +243,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
                 <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
                 Redirection…
               </>
-            ) : <>💳 Payer 15 000 FCFA avec CinetPay</>}
+            ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>}
           </button>
           <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
             MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
@@ -266,6 +263,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, onClose }) {
 function PaymentModal({ member, roleLabel, onClose }) {
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
+  const fee = Number(member.membership_fee) || 0;
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
@@ -275,7 +273,7 @@ function PaymentModal({ member, roleLabel, onClose }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ambassador_id: member.id,
-          amount:        MEMBERSHIP_FEE,
+          amount:        fee,
           type:          "adhesion",
           description:   `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
           return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
@@ -314,7 +312,7 @@ function PaymentModal({ member, roleLabel, onClose }) {
           )}
           <div style={{ display:"flex", justifyContent:"space-between", paddingTop:8, borderTop:`1px solid ${C.border}` }}>
             <span style={{ fontSize:13, fontWeight:800, color:C.dark }}>Frais d'adhésion</span>
-            <span style={{ fontSize:15, fontWeight:900, color:"#0072C6" }}>15 000 FCFA</span>
+            <span style={{ fontSize:15, fontWeight:900, color:"#0072C6" }}>{fee.toLocaleString("fr-FR")} FCFA</span>
           </div>
         </div>
 
@@ -339,7 +337,7 @@ function PaymentModal({ member, roleLabel, onClose }) {
               <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
               Redirection vers CinetPay…
             </>
-          ) : <>💳 Payer 15 000 FCFA avec CinetPay</>}
+          ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>}
         </button>
         <p style={{ margin:"0 0 12px", fontSize:11, color:C.slate, textAlign:"center" }}>
           MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
@@ -363,9 +361,10 @@ export function DiasporaRegisterPays() {
   const [list, setList]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(false);
-  const [creds, setCreds]         = useState(null);
+  const [creds, setCreds]           = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
-  const [credsId, setCredsId]     = useState(null);
+  const [credsId, setCredsId]       = useState(null);
+  const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
   const [payMember, setPayMember] = useState(null);
   const [payFailed, setPayFailed] = useState(false);
 
@@ -381,10 +380,11 @@ export function DiasporaRegisterPays() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id) {
+  function handleSuccess(credentials, label, id, fee) {
     setCreds(credentials);
     setCredsLabel(label);
     setCredsId(id || null);
+    setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     diasporaBeneAPI.getAmbassadors({ role:"AMBASSADEUR_PAYS" })
       .then(r => setList(r.data.ambassadors || []));
@@ -392,7 +392,7 @@ export function DiasporaRegisterPays() {
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Ambassadeur Pays" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
@@ -483,6 +483,7 @@ export function DiasporaRegisterRecruiter() {
   const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
   const [credsId, setCredsId] = useState(null);
+  const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
   const [payMember, setPayMember] = useState(null);
   const [payFailed, setPayFailed] = useState(false);
 
@@ -497,10 +498,11 @@ export function DiasporaRegisterRecruiter() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id) {
+  function handleSuccess(credentials, label, id, fee) {
     setCreds(credentials);
     setCredsLabel(label);
     setCredsId(id || null);
+    setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     diasporaBeneAPI.getAmbassadors({ role:"RECRUTEUR" })
       .then(r => setList(r.data.ambassadors || []));
@@ -508,7 +510,7 @@ export function DiasporaRegisterRecruiter() {
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Recruteur" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
@@ -591,6 +593,7 @@ export function DiasporaRegisterRUM() {
   const [creds, setCreds]     = useState(null);
   const [credsLabel, setCredsLabel] = useState("");
   const [credsId, setCredsId] = useState(null);
+  const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
   const [payMember, setPayMember] = useState(null);
   const [payFailed, setPayFailed] = useState(false);
 
@@ -605,10 +608,11 @@ export function DiasporaRegisterRUM() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id) {
+  function handleSuccess(credentials, label, id, fee) {
     setCreds(credentials);
     setCredsLabel(label);
     setCredsId(id || null);
+    setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     diasporaBeneAPI.getAmbassadors({ role:"RUM" })
       .then(r => setList(r.data.ambassadors || []));
@@ -616,7 +620,7 @@ export function DiasporaRegisterRUM() {
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="RUM" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
@@ -721,10 +725,17 @@ export function DiasporaRegisterRUM() {
 // ─────────────────────────────────────────────────────────────
 export function DiasporaNewBeneficiary() {
   const navigate  = useNavigate();
-  const [form, setForm] = useState({ name:"", phone:"", city:"", plan:"ESSENTIELLE" });
+  const { plans, plansLoading } = usePlans();
+  const [form, setForm] = useState({ name:"", phone:"", city:"", plan:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState(null);
+
+  useEffect(() => {
+    if (plans.length && !form.plan) {
+      setForm(f => ({ ...f, plan: plans[0].slug.toUpperCase() }));
+    }
+  }, [plans]);
 
   async function submit() {
     if (!form.name) return setError("Le nom est requis");
@@ -781,18 +792,25 @@ export function DiasporaNewBeneficiary() {
           ))}
           <div>
             <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {PLANS.map(p => (
-                <div key={p.value} onClick={() => setForm(f => ({ ...f, plan:p.value }))}
-                  style={{ padding:"12px 16px", borderRadius:10, border:`2px solid ${form.plan===p.value?C.blue:C.border}`, background:form.plan===p.value?C.blueL:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", transition:"all .15s" }}>
-                  <div>
-                    <p style={{ margin:0, fontWeight:700, fontSize:14, color:form.plan===p.value?C.blue:C.dark }}>{p.label}</p>
-                    <p style={{ margin:0, fontSize:12, color:C.slate }}>{p.desc}</p>
-                  </div>
-                  <span style={{ fontWeight:800, fontSize:14, color:form.plan===p.value?C.blue:C.slate }}>{fmt(p.price)} FCFA</span>
-                </div>
-              ))}
-            </div>
+            {plansLoading ? (
+              <p style={{ fontSize:12, color:C.slate }}>Chargement des formules…</p>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {plans.map(p => {
+                  const slug = p.slug.toUpperCase();
+                  return (
+                    <div key={slug} onClick={() => setForm(f => ({ ...f, plan: slug }))}
+                      style={{ padding:"12px 16px", borderRadius:10, border:`2px solid ${form.plan===slug?C.blue:C.border}`, background:form.plan===slug?C.blueL:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", transition:"all .15s" }}>
+                      <div>
+                        <p style={{ margin:0, fontWeight:700, fontSize:14, color:form.plan===slug?C.blue:C.dark }}>{planIcon(slug)} {p.name}</p>
+                        <p style={{ margin:0, fontSize:12, color:C.slate }}>{p.coverage_percent}% de couverture</p>
+                      </div>
+                      <span style={{ fontWeight:800, fontSize:14, color:form.plan===slug?C.blue:C.slate }}>{fmt(p.monthly_price)} FCFA/mois</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <Btn onClick={submit} disabled={loading}>
             {loading ? "Enregistrement…" : "✅ Enregistrer le client"}
