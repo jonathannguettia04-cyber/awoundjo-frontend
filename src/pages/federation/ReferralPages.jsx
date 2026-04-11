@@ -1079,7 +1079,7 @@ export function ReferralLeaderboard() {
       <div style={{ display:"flex", gap:8, marginBottom:20 }}>
         {[{ id:"week",label:"Cette semaine" },{ id:"month",label:"Ce mois" },{ id:"all",label:"Tout temps" }].map(p => (
           <button key={p.id} onClick={() => setPeriod(p.id)}
-            style={{ padding:"7px 16px", borderRadius:8, border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
+            style={{ padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
             {p.label}
           </button>
         ))}
