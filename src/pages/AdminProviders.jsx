@@ -26,6 +26,8 @@ const adminProviderAPI = {
   reject:       (id, notes) => api.put(`/provider/admin/requests/${id}/reject`, { notes }),
   getProviders: ()       => api.get("/provider/admin/providers"),
   suspend:      (id, suspend) => api.put(`/provider/admin/providers/${id}/suspend`, { suspend }),
+  resetPassword:(id)          => api.post(`/provider/admin/providers/${id}/reset-password`),
+  delete:       (id)          => api.delete(`/provider/admin/providers/${id}`),
 };
 
 export default function AdminProviders() {
@@ -41,6 +43,7 @@ export default function AdminProviders() {
   const [error,     setError]    = useState("");
   const [success,   setSuccess]  = useState("");
   const [tempPass,  setTempPass] = useState("");
+  const [resetPass, setResetPass] = useState("");
 
   async function loadRequests() {
     setLoading(true);
@@ -97,6 +100,27 @@ export default function AdminProviders() {
       loadProviders();
     } catch (err) {
       setError(err.response?.data?.error || "Erreur");
+    }
+  }
+
+  async function handleResetPassword(provider) {
+    try {
+      const { data } = await adminProviderAPI.resetPassword(provider.id);
+      setResetPass(data.temp_password);
+      setModal({ type: "reset_result", item: provider });
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur reset mot de passe");
+    }
+  }
+
+  async function handleDelete(provider) {
+    try {
+      await adminProviderAPI.delete(provider.id);
+      setSuccess(`${provider.name} supprimé`);
+      setModal(null);
+      loadProviders();
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur suppression");
     }
   }
 
@@ -248,10 +272,14 @@ export default function AdminProviders() {
                       <p className="text-xs text-slate-400">{TYPE_LABELS[p.type]} · {p.city || "—"} · {p.phone}</p>
                       {p.last_login && <p className="text-xs text-slate-300 mt-0.5">Dernière connexion : {fmtDate(p.last_login)}</p>}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                       <span style={{ background: s.bg, color: s.color }} className="text-xs font-bold px-2.5 py-1 rounded-full">
                         {s.label}
                       </span>
+                      <button onClick={() => handleResetPassword(p)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors">
+                        🔑 Réinit. MDP
+                      </button>
                       {p.status === "ACTIVE" ? (
                         <button onClick={() => handleSuspend(p, true)}
                           className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
@@ -263,6 +291,10 @@ export default function AdminProviders() {
                           Réactiver
                         </button>
                       )}
+                      <button onClick={() => setModal({ type: "delete_confirm", item: p })}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+                        🗑️
+                      </button>
                     </div>
                   </div>
                 );
@@ -323,6 +355,68 @@ export default function AdminProviders() {
               className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold text-sm">
               J'ai noté les identifiants ✓
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Reset Mot de passe ────────────────────────── */}
+      {modal?.type === "reset_result" && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-3">🔑</div>
+              <h3 className="font-bold text-slate-800 text-lg">Mot de passe réinitialisé</h3>
+              <p className="text-slate-500 text-sm mt-1">{modal.item.name}</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3">Nouveaux identifiants</p>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Login (téléphone)</span>
+                  <span className="font-mono font-bold text-slate-800">{modal.item.phone}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Mot de passe temporaire</span>
+                  <span className="font-mono font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-lg text-sm">{resetPass}</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mb-4 text-center">
+              ⚠️ Notez ces identifiants — ils ne seront plus affichés.
+            </p>
+            <button onClick={() => { setModal(null); setResetPass(""); }}
+              className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold text-sm">
+              J'ai noté les identifiants ✓
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Suppression provider ───────────────────────── */}
+      {modal?.type === "delete_confirm" && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-3">🗑️</div>
+              <h3 className="font-bold text-slate-800 text-lg">Supprimer l'établissement ?</h3>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+              <p className="font-semibold text-slate-800">{modal.item.name}</p>
+              <p className="text-sm text-slate-500">{TYPE_LABELS[modal.item.type]} · {modal.item.phone}</p>
+            </div>
+            <p className="text-sm text-red-600 mb-4 text-center font-medium">
+              ⚠️ Cette action est irréversible. Tous les actes et factures liés seront supprimés.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm">
+                Annuler
+              </button>
+              <button onClick={() => handleDelete(modal.item)}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                🗑️ Supprimer définitivement
+              </button>
+            </div>
           </div>
         </div>
       )}
