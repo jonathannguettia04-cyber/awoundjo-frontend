@@ -204,6 +204,8 @@ export default function AdminDiaspora() {
   const [validFilter, setValidFilter]       = useState("ALL");
   const [selected, setSelected]             = useState(null);
   const [validating, setValidating]         = useState(null);
+  const [recalcLoading, setRecalcLoading]   = useState(null);   // id en cours
+  const [recalcMsgs, setRecalcMsgs]         = useState({});     // { [id]: msg }
   const [cashModes, setCashModes]             = useState({});
 
   // ✅ FIX : états manquants pour la modal de suppression
@@ -275,6 +277,26 @@ export default function AdminDiaspora() {
     } catch (e) {
       alert(e.response?.data?.error || "Erreur lors de la validation");
     } finally { setValidating(null); }
+  }
+
+  async function handleRecalc(amb, e) {
+    e.stopPropagation();
+    if (!window.confirm(`Recalculer les commissions pour ${amb.name} ?\n\nOpération annulée automatiquement si des commissions existent déjà.`)) return;
+    setRecalcLoading(amb.id);
+    setRecalcMsgs(prev => ({ ...prev, [amb.id]: "" }));
+    try {
+      const { data } = await axios.post(
+        `${API}/api/diaspora/admin/ambassadors/${amb.id}/recalc-commissions`,
+        {},
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      setRecalcMsgs(prev => ({ ...prev, [amb.id]: "✅ " + (data.message || "Commissions calculées") }));
+      fetchAmbassadors();
+    } catch (err) {
+      setRecalcMsgs(prev => ({ ...prev, [amb.id]: "❌ " + (err.response?.data?.error || "Erreur serveur") }));
+    } finally {
+      setRecalcLoading(null);
+    }
   }
 
   async function toggleStatus(amb, e) {
@@ -546,6 +568,25 @@ export default function AdminDiaspora() {
                         style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${amb.status==="ACTIVE"?C.red:C.green}`, background:"#fff", color:amb.status==="ACTIVE"?C.red:C.green, fontWeight:700, fontSize:12, cursor:"pointer" }}>
                         {amb.status === "ACTIVE" ? "🚫 Suspendre" : "✅ Réactiver"}
                       </button>
+
+                      {/* Recalculer commissions — visible uniquement si validé */}
+                      {amb.status_validation === "approved" && (
+                        <button onClick={e => handleRecalc(amb, e)}
+                          disabled={recalcLoading === amb.id}
+                          style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #7C3AED44", background:"#F5F3FF", color:"#7C3AED", fontWeight:700, fontSize:12, cursor: recalcLoading === amb.id ? "not-allowed" : "pointer", opacity: recalcLoading === amb.id ? 0.6 : 1 }}>
+                          {recalcLoading === amb.id ? "⏳ Calcul…" : "🔁 Recalc. commissions"}
+                        </button>
+                      )}
+
+                      {/* Message retour recalcul */}
+                      {recalcMsgs[amb.id] && (
+                        <p style={{ margin:0, fontSize:11, fontWeight:700,
+                          color: recalcMsgs[amb.id].startsWith("✅") ? "#059669" : "#DC2626",
+                          background: recalcMsgs[amb.id].startsWith("✅") ? "#ECFDF5" : "#FEF2F2",
+                          padding:"5px 10px", borderRadius:6, width:"100%" }}>
+                          {recalcMsgs[amb.id]}
+                        </p>
+                      )}
 
                       {/* Supprimer définitivement */}
                       <button onClick={e => { e.stopPropagation(); setDeleteTarget(amb); setDeletePassword(""); setDeleteError(""); }}

@@ -204,7 +204,28 @@ function PendingValidationSection({ members, onValidate }) {
   );
 }
 
-function DetailModal({ amb, onClose, onToggleStatus }) {
+function DetailModal({ amb, onClose, onToggleStatus, onRefresh }) {
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const [recalcMsg,     setRecalcMsg]     = useState("");
+
+  async function handleRecalc() {
+    if (!window.confirm(`Recalculer les commissions pour ${amb?.name} ?\n\nOpération annulée si des commissions existent déjà.`)) return;
+    setRecalcLoading(true); setRecalcMsg("");
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(
+        `${API}/api/diaspora/admin/ambassadors/${amb.id}/recalc-commissions`,
+        { method:"POST", headers:{ Authorization:`Bearer ${token}`, "Content-Type":"application/json" } }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur serveur");
+      setRecalcMsg("\u2705 " + data.message);
+      onRefresh?.();
+    } catch(e) {
+      setRecalcMsg("\u274C " + e.message);
+    } finally { setRecalcLoading(false); }
+  }
+
   if (!amb) return null;
   const rc = ROLE_CONFIG[amb.role] || { icon:"👤", color:C.slate, bg:C.bg };
   return (
@@ -278,6 +299,23 @@ function DetailModal({ amb, onClose, onToggleStatus }) {
             })}
           </div>
         )}
+
+        {/* Recalcul commissions */}
+        {recalcMsg && (
+          <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700,
+            color: recalcMsg.startsWith("✅") ? "#059669" : "#DC2626",
+            background: recalcMsg.startsWith("✅") ? "#ECFDF5" : "#FEF2F2",
+            padding:"8px 12px", borderRadius:8 }}>
+            {recalcMsg}
+          </p>
+        )}
+        <button onClick={handleRecalc} disabled={recalcLoading}
+          style={{ width:"100%", padding:"9px 0", borderRadius:10, marginBottom:10,
+            border:"1.5px solid #7C3AED44", background:"#F5F3FF",
+            color:"#7C3AED", fontWeight:700, fontSize:13, cursor:recalcLoading?"not-allowed":"pointer",
+            opacity:recalcLoading?0.6:1 }}>
+          {recalcLoading ? "⏳ Calcul en cours…" : "🔁 Recalculer les commissions"}
+        </button>
 
         <div style={{ display:"flex", gap:10 }}>
           <button onClick={() => onToggleStatus(amb)}
@@ -665,7 +703,7 @@ export default function AdminFederation() {
       )}
 
       {/* Modal détail */}
-      <DetailModal amb={selected} onClose={() => setSelected(null)} onToggleStatus={toggleStatus} />
+      <DetailModal amb={selected} onClose={() => setSelected(null)} onToggleStatus={toggleStatus} onRefresh={fetchMembers} />
     </div>
   );
 }
