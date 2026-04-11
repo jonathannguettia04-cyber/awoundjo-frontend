@@ -10,6 +10,7 @@ const C = {
   slate:   "#64748B", dark:     "#0F172A",
   border:  "#E2E8F0", bg:       "#F8FAFC",
   cinet:   "#0072C6", cinetL:   "#EFF6FF",
+  pdunya:  "#00B09B", pdunyaL:  "#E6F7F5",
 };
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
@@ -129,6 +130,7 @@ export default function ClientCotisations() {
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
   const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
+  const [payMethod,   setPayMethod]   = useState("cinetpay"); // "cinetpay" | "paydunya"
 
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
@@ -265,6 +267,57 @@ export default function ClientCotisations() {
     }
   };
 
+
+  // ── Déclencheur paiement PayDunya ─────────────────────────────────────────
+  const handlePayDunya = async () => {
+    setPayError("");
+    setPayStatus(null);
+    setPayLoading(true);
+
+    try {
+      const token   = localStorage.getItem("client_token");
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+      const amount  = pending?.amount || monthly;
+      const txId    = `AWJ-CLI-PD-${Date.now()}`;
+
+      const initRes = await fetch(`${BASE}/api/payments/paydunya/init-web`, {
+        method:  "POST",
+        headers,
+        body: JSON.stringify({
+          amount,
+          transaction_id: txId,
+          description:    `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
+          client_name:    client?.name  || "Client",
+          client_email:   client?.email || "client@awoundjo.ci",
+          client_phone:   client?.phone || "",
+          success_url: `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
+          cancel_url:  `${window.location.origin}/client/cotisations?payment=failed`,
+          return_url:  `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
+          notify_url:  `${BASE}/api/payments/paydunya/notify`,
+        }),
+      });
+
+      const initData = await initRes.json();
+      const paymentUrl =
+        initData?.data?.payment_url ||
+        initData?.payment_url       ||
+        null;
+
+      if (!paymentUrl) {
+        console.error("[ClientCotisations] PayDunya réponse:", initData);
+        throw new Error(initData?.error || "URL de paiement PayDunya non reçue");
+      }
+
+      window.location.href = paymentUrl;
+
+    } catch (e) {
+      setPayError(e.message || "Le paiement PayDunya a échoué. Veuillez réessayer.");
+      setPayLoading(false);
+    }
+  };
+
+  const handlePay = () => payMethod === "paydunya" ? handlePayDunya() : handleCinetPay();
+
   return (
     <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -342,72 +395,111 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* ── Bloc paiement CinetPay ───────────────────────────────── */}
+      {/* ── Bloc paiement — CinetPay + PayDunya ──────────────────── */}
       <Card style={{
         marginBottom: 20,
-        border: `2px solid ${isUpToDate ? C.primary : C.cinet}`,
-        background: isUpToDate ? C.primaryL : C.cinetL,
+        border: `2px solid ${isUpToDate ? C.primary : (payMethod === "paydunya" ? C.pdunya : C.cinet)}`,
+        background: isUpToDate ? C.primaryL : (payMethod === "paydunya" ? C.pdunyaL : C.cinetL),
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
-          <div>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: C.slate, fontWeight: 600 }}>
-              {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "COTISATION EN COURS"}
+
+        {/* Montant + badge à jour */}
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ margin: "0 0 4px", fontSize: 13, color: C.slate, fontWeight: 600 }}>
+            {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "COTISATION EN COURS"}
+          </p>
+
+          {isUpToDate && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, borderRadius: 20, padding: "4px 12px", marginBottom: 8 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>À JOUR</span>
+            </div>
+          )}
+
+          {pending && (
+            <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 900, color: C.dark }}>
+              {pending.month}
             </p>
+          )}
 
-            {isUpToDate && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, borderRadius: 20, padding: "4px 12px", marginBottom: 8 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>À JOUR</span>
-              </div>
-            )}
+          <p style={{ margin: 0, fontSize: 22, fontWeight: 900, color: isUpToDate ? C.primary : (payMethod === "paydunya" ? C.pdunya : C.cinet) }}>
+            {fmt(pending?.amount || monthly)}
+          </p>
 
-            {pending && (
-              <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 900, color: C.dark }}>
-                {pending.month}
-              </p>
-            )}
-
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: isUpToDate ? C.primary : C.cinet }}>
-              {fmt(pending?.amount || monthly)}
+          {monthsAhead > 0 && (
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: C.primary, fontWeight: 600 }}>
+              ⏩ Vous êtes en avance de <strong>{monthsAhead} mois</strong>
             </p>
-
-            {monthsAhead > 0 && (
-              <p style={{ margin: "6px 0 0", fontSize: 12, color: C.primary, fontWeight: 600 }}>
-                ⏩ Vous êtes en avance de <strong>{monthsAhead} mois</strong>
-              </p>
-            )}
-          </div>
-
-          {/* Bouton CinetPay */}
-          <button
-            onClick={handleCinetPay}
-            disabled={payLoading}
-            style={{
-              padding: "12px 22px",
-              background: payLoading
-                ? "#94a3b8"
-                : isUpToDate
-                  ? "linear-gradient(135deg,#059669,#047857)"
-                  : "linear-gradient(135deg,#0072C6,#005A9E)",
-              color: "#fff", fontWeight: 900, fontSize: 14,
-              border: "none", borderRadius: 12,
-              cursor: payLoading ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              display: "flex", alignItems: "center", gap: 8,
-              boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
-              flexShrink: 0, transition: "all .2s",
-            }}
-          >
-            {payLoading ? (
-              <>
-                <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
-                Redirection…
-              </>
-            ) : (
-              <>💳 {isUpToDate ? "Payer en avance" : "Payer avec CinetPay"}</>
-            )}
-          </button>
+          )}
         </div>
+
+        {/* ── Sélecteur de méthode de paiement ─────────────────────── */}
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 12, color: C.slate, fontWeight: 700 }}>
+            CHOISIR LA MÉTHODE DE PAIEMENT
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {[
+              { id: "cinetpay", label: "💳 CinetPay",  desc: "MTN, Orange, Moov, Wave, carte…", color: C.cinet,  bg: C.cinetL  },
+              { id: "paydunya", label: "🌿 PayDunya",   desc: "Mobile Money, Wave, carte…",       color: C.pdunya, bg: C.pdunyaL },
+            ].map(m => (
+              <button
+                key={m.id}
+                onClick={() => setPayMethod(m.id)}
+                style={{
+                  padding: "10px 16px",
+                  border: `2px solid ${payMethod === m.id ? m.color : C.border}`,
+                  borderRadius: 10,
+                  background: payMethod === m.id ? m.bg : "#fff",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  flex: 1, minWidth: 140,
+                  textAlign: "left",
+                  transition: "all .15s",
+                }}
+              >
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: payMethod === m.id ? m.color : C.dark }}>
+                  {m.label}
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>{m.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Bouton payer ─────────────────────────────────────────── */}
+        <button
+          onClick={handlePay}
+          disabled={payLoading}
+          style={{
+            width: "100%",
+            padding: "13px 22px",
+            background: payLoading
+              ? "#94a3b8"
+              : isUpToDate
+                ? "linear-gradient(135deg,#059669,#047857)"
+                : payMethod === "paydunya"
+                  ? "linear-gradient(135deg,#00B09B,#008a78)"
+                  : "linear-gradient(135deg,#0072C6,#005A9E)",
+            color: "#fff", fontWeight: 900, fontSize: 15,
+            border: "none", borderRadius: 12,
+            cursor: payLoading ? "not-allowed" : "pointer",
+            fontFamily: "inherit",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,0,0,.18)",
+            transition: "all .2s",
+          }}
+        >
+          {payLoading ? (
+            <>
+              <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+              Redirection en cours…
+            </>
+          ) : (
+            <>
+              💳 {isUpToDate ? "Payer en avance" : `Payer avec ${payMethod === "paydunya" ? "PayDunya" : "CinetPay"}`}
+            </>
+          )}
+        </button>
 
         {payError && (
           <div style={{ marginTop:12, background:C.redL, border:`1px solid ${C.red}33`, borderRadius:8, padding:"10px 14px" }}>
@@ -417,14 +509,14 @@ export default function ClientCotisations() {
 
         <div style={{
           marginTop: 14, paddingTop: 12,
-          borderTop: `1px solid ${isUpToDate ? C.primary : C.cinet}44`,
+          borderTop: `1px solid ${C.border}`,
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span style={{ fontSize: 14 }}>ℹ️</span>
           <p style={{ margin: 0, fontSize: 12, color: C.slate }}>
             {isUpToDate
               ? "Votre cotisation est à jour. Vous pouvez payer des mois à l'avance pour rester serein."
-              : "Vous serez redirigé vers CinetPay (MTN, Orange, Moov, Wave, carte…). Paiement 100% sécurisé."
+              : "Vous serez redirigé vers la page de paiement sécurisée. Paiement 100% sécurisé."
             }
           </p>
         </div>
@@ -486,11 +578,13 @@ export default function ClientCotisations() {
                     <Badge label={s.label} color={s.color} bg={s.bg} />
                     {isPending && (
                       <button
-                        onClick={handleCinetPay}
+                        onClick={handlePay}
                         disabled={payLoading}
                         style={{
                           padding: "6px 14px",
-                          background: "linear-gradient(135deg,#0072C6,#005A9E)",
+                          background: payMethod === "paydunya"
+                            ? "linear-gradient(135deg,#00B09B,#008a78)"
+                            : "linear-gradient(135deg,#0072C6,#005A9E)",
                           color: "#fff", fontWeight: 700, fontSize: 12,
                           border: "none", borderRadius: 8,
                           cursor: payLoading ? "not-allowed" : "pointer",
@@ -510,7 +604,7 @@ export default function ClientCotisations() {
       </Card>
 
       <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
-        🔒 Paiements sécurisés via CinetPay · Awoundjô Mutuelle Santé CI<br />
+        🔒 Paiements sécurisés via CinetPay & PayDunya · Awoundjô Mutuelle Santé CI<br />
         En cas de problème : <strong>+225 01 71 72 16 68</strong>
       </p>
     </div>
