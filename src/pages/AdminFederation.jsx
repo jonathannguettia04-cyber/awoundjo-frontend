@@ -45,11 +45,11 @@ const STATUS_CONFIG = {
   PENDING:   { label:"En attente", color:C.gold,  bg:C.goldL  },
 };
 
-// Taux de commission réseau Fédération
+// Taux de commission réseau Fédération (selon les règles définies)
 const COMMISSION_RATES = [
-  { type:"DIRECT",    label:"Recruteur direct",       rate:12, color:C.gold   },
-  { type:"SUPERIEUR", label:"Supérieur hiérarchique", rate:10, color:C.green  },
-  { type:"DIRECTION", label:"Direction",              rate: 5, color:C.purple },
+  { type:"DIRECT",    label:"Enregistrement direct (soi-même)",  rate:10,  color:C.gold   },
+  { type:"INDIRECT1", label:"Filleuls directs (1 niveau)",       rate:2.5, color:C.green  },
+  { type:"INDIRECT2", label:"Filleuls RUM (tous niveaux)",       rate:5,   color:C.purple },
 ];
 
 function RoleBadge({ role }) {
@@ -82,7 +82,127 @@ function StatusBadge({ status }) {
 }
 
 // Modal détail ambassadeur
-function DetailModal({ amb, onClose, onToggleStatus }) {
+const VALIDATION_CONFIG = {
+  pending:  { label:"⏳ À valider", color:C.gold,  bg:C.goldL  },
+  approved: { label:"✅ Validé",    color:C.green, bg:C.greenL },
+  rejected: { label:"❌ Rejeté",    color:C.red,   bg:C.redL   },
+};
+
+function ValidationBadge({ v }) {
+  const s = VALIDATION_CONFIG[v] || VALIDATION_CONFIG.pending;
+  return (
+    <span style={{ background:s.bg, color:s.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+      {s.label}
+    </span>
+  );
+}
+
+// Section comptes en attente de validation (réseau Fédération)
+function PendingValidationSection({ members, onValidate }) {
+  const [cashModes, setCashModes] = useState({});
+  const pending = members.filter(m => m.status_validation === "pending" || !m.status_validation);
+  if (pending.length === 0) return null;
+
+  return (
+    <div style={{ background:"#fff", borderRadius:14, border:`2px solid ${C.gold}`, padding:"18px 20px", marginBottom:20 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+        <span style={{ fontSize:22 }}>⏳</span>
+        <div>
+          <p style={{ margin:0, fontWeight:900, fontSize:15, color:C.dark }}>
+            Comptes en attente de validation
+          </p>
+          <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>
+            {pending.length} membre(s) à traiter — les commissions sont calculées à la validation
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {pending.map(m => {
+          const isCash = !!cashModes[m.id];
+          const rc = ROLE_CONFIG[m.role] || { icon:"👤", color:C.slate, bg:C.bg };
+          return (
+            <div key={m.id} style={{
+              background: isCash ? "#F0FDF4" : C.goldL,
+              borderRadius:10, padding:"12px 16px",
+              border:`1px solid ${isCash ? C.green : C.gold}44`,
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              flexWrap:"wrap", gap:12, transition:"background 0.2s",
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:38, height:38, borderRadius:10, background:rc.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                  {rc.icon}
+                </div>
+                <div>
+                  <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:13 }}>{m.name}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
+                    {m.email} · {m.country} · {fmtDate(m.created_at)}
+                  </p>
+                  <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                    <RoleBadge role={m.role} />
+                    <PlanBadge plan={m.plan} />
+                    {m.membership_fee && (
+                      <span style={{ fontSize:11, color:C.purple, fontWeight:700 }}>
+                        {fmt(m.membership_fee)} FCFA
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color: isCash ? C.green : C.slate }}>
+                    💵 Paiement Cash
+                  </span>
+                  <button
+                    onClick={() => setCashModes(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
+                    style={{
+                      width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+                      background: isCash ? C.green : C.border,
+                      position:"relative", transition:"background 0.2s", padding:0,
+                    }}
+                  >
+                    <span style={{
+                      position:"absolute", top:3, left: isCash ? 22 : 2,
+                      width:18, height:18, borderRadius:"50%", background:"#fff",
+                      transition:"left 0.2s", display:"block",
+                      boxShadow:"0 1px 3px rgba(0,0,0,.2)",
+                    }} />
+                  </button>
+                </div>
+
+                {isCash && (
+                  <p style={{ margin:0, fontSize:10, color:C.green, fontWeight:600, textAlign:"right" }}>
+                    ✓ Commissions calculées automatiquement
+                  </p>
+                )}
+
+                <div style={{ display:"flex", gap:8 }}>
+                  <button
+                    onClick={() => onValidate(m.id, "approve", isCash ? "cash" : null)}
+                    style={{
+                      padding:"7px 16px", borderRadius:8, border:"none",
+                      background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer",
+                    }}
+                  >
+                    ✅ {isCash ? "Valider (Cash)" : "Valider"}
+                  </button>
+                  <button
+                    onClick={() => onValidate(m.id, "reject", null)}
+                    style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${C.red}`, background:"#fff", color:C.red, fontWeight:700, fontSize:12, cursor:"pointer" }}
+                  >
+                    ❌ Rejeter
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
   if (!amb) return null;
   const rc = ROLE_CONFIG[amb.role] || { icon:"👤", color:C.slate, bg:C.bg };
   return (
@@ -182,6 +302,8 @@ export default function AdminFederation() {
   const [roleFilter, setRoleFilter]   = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selected, setSelected]       = useState(null);
+  const [validating, setValidating]   = useState(null);
+  const [cashModes, setCashModes]     = useState({});
 
   const stats = {
     total:      members.length,
@@ -219,11 +341,25 @@ export default function AdminFederation() {
       const { data } = await axios.get(`${API}/api/federation/admin/ambassadors`, {
         headers: { Authorization: `Bearer ${agentToken()}` },
       });
-      // adminGetAmbassadors retourne data.ambassadors
       setMembers(data.ambassadors || data.members || []);
     } catch (e) {
       setError(e.response?.data?.error || "Erreur lors du chargement des membres");
     } finally { setLoading(false); }
+  }
+
+  async function handleValidate(id, action, paymentMethod) {
+    setValidating(id);
+    try {
+      await axios.post(
+        `${API}/api/diaspora/admin/ambassadors/${id}/validate`,
+        { action, paymentMethod },
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      await fetchMembers();
+      setSelected(null);
+    } catch (e) {
+      alert(e.response?.data?.error || "Erreur lors de la validation");
+    } finally { setValidating(null); }
   }
 
   async function toggleStatus(amb) {
@@ -256,6 +392,9 @@ export default function AdminFederation() {
           RUM → Leader → Pasteur → Responsable → Client
         </p>
       </div>
+
+      {/* Comptes en attente de validation */}
+      <PendingValidationSection members={members} onValidate={handleValidate} />
 
       {/* Stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px,1fr))", gap:12, marginBottom:24 }}>

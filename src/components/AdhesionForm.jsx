@@ -3,17 +3,16 @@
 //  Formulaire d'adhésion universel — Awoundjô
 //
 //  Workflow :
-//    [1] Infos personnelles + plan
+//    [1] Infos personnelles + plan (chargé depuis /api/plans)
 //    [2] Création compte → identifiants générés automatiquement
 //    [3] Affichage credentials → bouton paiement CinetPay
-//    [4] Paiement CinetPay (frais adhésion)
-//    [5] Validation admin → compte activé
+//    [4] Paiement CinetPay (frais adhésion selon la formule choisie)
+//    [5] Validation admin → commissions calculées sur la prime réelle
 // ─────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { diasporaBeneAPI } from "../diasporaApi";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const MEMBERSHIP_FEE = 15000;
 
 const C = {
   blue:    "#1B4FD8", blueL:  "#EEF2FF",
@@ -28,11 +27,9 @@ const C = {
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
-const PLANS = [
-  { value:"ESSENTIELLE", label:"🌿 Essentielle", desc:"Couverture de base",  monthly:10000 },
-  { value:"IVOIRIENNE",  label:"🌍 Ivoirienne",  desc:"Couverture élargie", monthly:15000 },
-  { value:"TURQUOISE",   label:"💎 Turquoise",   desc:"Couverture premium", monthly:35000 },
-];
+// Icônes par défaut si l'API n'en fournit pas
+const PLAN_ICONS = { ESSENTIELLE:"🌿", IVOIRIENNE:"🌍", TURQUOISE:"💎" };
+const planIcon = (slug) => PLAN_ICONS[slug?.toUpperCase()] || "📋";
 
 const ROLE_CONFIG = {
   AMBASSADEUR_PAYS: { title:"Adhésion Ambassadeur Pays", icon:"🗺️", color:C.green,  bg:C.greenL,  art:"l'Ambassadeur Pays"  },
@@ -93,7 +90,7 @@ function InputField({ label, type="text", placeholder, value, onChange, required
 }
 
 // ── Écran credentials + paiement CinetPay ────────────────────
-function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
+function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
@@ -110,7 +107,7 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ambassador_id:   ambassadorId,
-          amount:          MEMBERSHIP_FEE,
+          amount:          adhesionFee,
           type:            "adhesion",
           description:     `Adhésion Awoundjô — ${roleLabel}`,
           return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
@@ -195,7 +192,7 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
           💳 Étape suivante — Paiement des frais d'adhésion
         </p>
         <p style={{ margin:"0 0 14px", fontSize:12, color:C.slate }}>
-          Payez maintenant les frais d'adhésion de <strong>15 000 FCFA</strong> via CinetPay pour activer le processus de validation.
+          Payez maintenant les frais d'adhésion de <strong>{Number(adhesionFee).toLocaleString("fr-FR")} FCFA</strong> via CinetPay pour activer le processus de validation.
         </p>
         {payError && (
           <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:12 }}>
@@ -221,7 +218,7 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, onClose }) {
               Redirection…
             </>
           ) : (
-            <>💳 Payer 15 000 FCFA avec CinetPay</>
+            <>💳 Payer {Number(adhesionFee).toLocaleString("fr-FR")} FCFA avec CinetPay</>
           )}
         </button>
         <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
@@ -262,15 +259,38 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
   const [credentials,   setCredentials]   = useState(null);
   const [ambassadorId,  setAmbassadorId]  = useState(null);
 
+  // ── Formules chargées depuis /api/plans (comme dans Clients.jsx) ──
+  const [plans,        setPlans]        = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
+    fetch(`${BASE}/api/plans`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (data?.length) {
+          setPlans(data);
+          setForm(prev => ({ ...prev, plan: prev.plan || data[0].slug.toUpperCase() }));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setPlansLoading(false));
+  }, []);
+
   const [form, setForm] = useState({
     name:    "",
     email:   "",
     phone:   "",
     country: "Côte d'Ivoire",
-    plan:    "ESSENTIELLE",
+    plan:    "",
   });
 
-  const selectedPlan = PLANS.find(p => p.value === form.plan) || PLANS[0];
+  // Formule sélectionnée — objet API complet
+  const selectedPlan = plans.find(p => p.slug.toUpperCase() === form.plan) || plans[0];
+  // Frais d'adhésion réels selon la formule
+  const adhesionFee = selectedPlan ? Number(selectedPlan.adhesion_price) : 0;
 
   function setField(key) {
     return (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -294,12 +314,13 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
     setStep("submitting");
     try {
       const { data } = await diasporaBeneAPI.createAmbassador({
-        name:    form.name,
-        email:   form.email,
-        phone:   form.phone,
-        country: form.country,
-        role:    targetRole,
-        plan:    form.plan,
+        name:           form.name,
+        email:          form.email,
+        phone:          form.phone,
+        country:        form.country,
+        role:           targetRole,
+        plan:           form.plan,
+        membership_fee: adhesionFee,  // frais réels selon la formule choisie en DB
         // status_validation et status_payment = 'pending'/'unpaid' par défaut en DB
       });
 
@@ -353,7 +374,8 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
           ambassadorId={ambassadorId}
           roleLabel={rc.art}
           rc={rc}
-          onClose={() => { setStep("form"); setCredentials(null); setAmbassadorId(null); setForm({ name:"", email:"", phone:"", country:"Côte d'Ivoire", plan:"ESSENTIELLE" }); }}
+          adhesionFee={adhesionFee}
+          onClose={() => { setStep("form"); setCredentials(null); setAmbassadorId(null); setForm({ name:"", email:"", phone:"", country:"Côte d'Ivoire", plan: plans[0]?.slug.toUpperCase() || "" }); }}
         />
       </div>
     );
@@ -399,57 +421,93 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
           </div>
         </div>
 
-        {/* Section 2 : Plan mensuel */}
+        {/* Section 2 : Plan mensuel — chargé depuis /api/plans */}
         <div>
           <SectionTitle step={2} label="Choisissez le plan mensuel" color={rc.color} />
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {PLANS.map(p => {
-              const selected = form.plan === p.value;
-              return (
-                <div
-                  key={p.value}
-                  onClick={() => setForm(prev => ({ ...prev, plan: p.value }))}
-                  style={{
-                    padding:"14px 16px", borderRadius:10,
-                    border:`2px solid ${selected ? rc.color : C.border}`,
-                    background: selected ? rc.bg : "#fff",
-                    cursor:"pointer", display:"flex",
-                    alignItems:"center", justifyContent:"space-between",
-                    transition:"all .15s",
-                  }}
-                >
-                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{
-                      width:18, height:18, borderRadius:"50%",
-                      border:`2px solid ${selected ? rc.color : C.border}`,
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      flexShrink:0,
-                    }}>
-                      {selected && <div style={{ width:9, height:9, borderRadius:"50%", background:rc.color }} />}
+          {plansLoading ? (
+            <div style={{ textAlign:"center", padding:"20px", color:C.slate, fontSize:13 }}>
+              <div style={{ width:24, height:24, border:`2px solid ${rc.bg}`, borderTop:`2px solid ${rc.color}`, borderRadius:"50%", animation:"spin .7s linear infinite", margin:"0 auto 8px" }} />
+              Chargement des formules…
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {plans.map(p => {
+                const slug = p.slug.toUpperCase();
+                const isSelected = form.plan === slug;
+                return (
+                  <div
+                    key={slug}
+                    onClick={() => setForm(prev => ({ ...prev, plan: slug }))}
+                    style={{
+                      padding:"14px 16px", borderRadius:10,
+                      border:`2px solid ${isSelected ? rc.color : C.border}`,
+                      background: isSelected ? rc.bg : "#fff",
+                      cursor:"pointer", display:"flex",
+                      alignItems:"center", justifyContent:"space-between",
+                      transition:"all .15s",
+                    }}
+                  >
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <div style={{
+                        width:18, height:18, borderRadius:"50%",
+                        border:`2px solid ${isSelected ? rc.color : C.border}`,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        flexShrink:0,
+                      }}>
+                        {isSelected && <div style={{ width:9, height:9, borderRadius:"50%", background:rc.color }} />}
+                      </div>
+                      <div>
+                        <p style={{ margin:0, fontWeight:700, fontSize:14, color:isSelected ? rc.color : C.dark }}>
+                          {planIcon(slug)} {p.name}
+                        </p>
+                        <p style={{ margin:0, fontSize:12, color:C.slate }}>
+                          {p.coverage_percent}% de couverture
+                          {p.adhesion_price === 0 ? " · Adhésion gratuite 🎉" : ` · Adhésion ${Number(p.adhesion_price).toLocaleString("fr-FR")} FCFA`}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p style={{ margin:0, fontWeight:700, fontSize:14, color:selected ? rc.color : C.dark }}>{p.label}</p>
-                      <p style={{ margin:0, fontSize:12, color:C.slate }}>{p.desc}</p>
+                    <div style={{ textAlign:"right" }}>
+                      <p style={{ margin:0, fontWeight:800, fontSize:15, color:isSelected ? rc.color : C.dark }}>
+                        {fmt(p.monthly_price)}
+                      </p>
+                      <p style={{ margin:0, fontSize:11, color:C.slate }}>/ mois</p>
                     </div>
                   </div>
-                  <div style={{ textAlign:"right" }}>
-                    <p style={{ margin:0, fontWeight:800, fontSize:15, color:selected ? rc.color : C.dark }}>{fmt(p.monthly)}</p>
-                    <p style={{ margin:0, fontSize:11, color:C.slate }}>/ mois</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Section 3 : Récapitulatif */}
+        {/* Section 3 : Récapitulatif — avec les vrais prix de la formule */}
         <div>
           <SectionTitle step={3} label="Récapitulatif" color={rc.color} />
           <div style={{ background:C.bg, borderRadius:12, border:`1px solid ${C.border}`, overflow:"hidden" }}>
             {[
-              { label:`Plan mensuel — ${selectedPlan.label}`, value:fmt(selectedPlan.monthly) + " / mois", highlight:false },
-              { label:"Frais d'adhésion (payés après validation)", value:"À définir", highlight:false },
-              { label:"À payer maintenant",                        value:"0 FCFA — après validation admin", highlight:true  },
+              {
+                label: selectedPlan ? `Plan mensuel — ${planIcon(selectedPlan.slug)} ${selectedPlan.name}` : "Plan mensuel",
+                value: selectedPlan ? fmt(selectedPlan.monthly_price) + " / mois" : "—",
+                highlight: false,
+              },
+              {
+                label: "Frais d'adhésion",
+                value: selectedPlan
+                  ? adhesionFee === 0 ? "Gratuit 🎉" : fmt(adhesionFee)
+                  : "—",
+                highlight: false,
+              },
+              {
+                label: "Base de calcul des commissions",
+                value: selectedPlan
+                  ? adhesionFee === 0 ? "Aucune commission" : `50% × ${fmt(adhesionFee)} = ${fmt(adhesionFee * 0.5)}`
+                  : "—",
+                highlight: false,
+              },
+              {
+                label: "À payer maintenant",
+                value: "0 FCFA — après validation admin",
+                highlight: true,
+              },
             ].map((row, i) => (
               <div key={i} style={{
                 display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -460,7 +518,7 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
                 <p style={{ margin:0, fontSize:13, color:row.highlight ? rc.color : C.slate, fontWeight:row.highlight ? 700 : 400 }}>
                   {row.label}
                 </p>
-                <p style={{ margin:0, fontSize:row.highlight ? 14 : 14, fontWeight:row.highlight ? 900 : 600, color:row.highlight ? rc.color : C.dark }}>
+                <p style={{ margin:0, fontWeight:row.highlight ? 900 : 600, fontSize:14, color:row.highlight ? rc.color : C.dark }}>
                   {row.value}
                 </p>
               </div>
