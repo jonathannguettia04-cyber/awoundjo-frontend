@@ -66,8 +66,10 @@ export default function ClientDossier({ clientId: propClientId }) {
         clientProfileAPI.get(),
         clientMedicalAPI.get().catch(() => ({ data: null })),
       ]);
-      setClient(clientRes.data.client || clientRes.data);
-      setMedical(medicalRes.data || null);
+      setClient(clientRes.data.client || clientRes.data.data || clientRes.data);
+      // La route retourne { client, dependents, stats, consultations }
+      const d = medicalRes.data?.data || medicalRes.data || null;
+      setMedical(d);
     } catch (e) {
       setError("Impossible de charger le dossier médical");
     } finally {
@@ -240,22 +242,30 @@ export default function ClientDossier({ clientId: propClientId }) {
                 <div key={c.id} className="border border-slate-100 rounded-xl p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="font-semibold text-slate-800 text-sm">{c.reason}</p>
-                      {c.doctor_name && <p className="text-xs text-slate-500">Dr. {c.doctor_name}</p>}
-                      {(c.provider_name || c.provider_name_full) && (
-                        <p className="text-xs text-slate-400">🏥 {c.provider_name_full || c.provider_name}</p>
+                      <p className="font-semibold text-slate-800 text-sm">
+                        {c.type?.replace(/_/g, " ")?.replace(/\b\w/g, l => l.toUpperCase())}
+                      </p>
+                      {c.diagnosis && (
+                        <p className="text-xs text-slate-500">👨‍⚕️ {c.diagnosis}</p>
+                      )}
+                      {c.provider_name && (
+                        <p className="text-xs text-slate-400">🏥 {c.provider_name}</p>
                       )}
                     </div>
-                    <span className="text-xs text-slate-400 flex-shrink-0 ml-2">{fmtDate(c.consultation_date)}</span>
+                    <span className="text-xs text-slate-400 flex-shrink-0 ml-2">{fmtDate(c.created_at)}</span>
                   </div>
-                  {c.diagnosis && (
+                  {c.observations && (
                     <div className="bg-blue-50 rounded-lg px-3 py-2 mt-2">
-                      <p className="text-xs font-semibold text-blue-700">Diagnostic</p>
-                      <p className="text-xs text-blue-600">{c.diagnosis}</p>
+                      <p className="text-xs font-semibold text-blue-700">Observations</p>
+                      <p className="text-xs text-blue-600">{c.observations}</p>
                     </div>
                   )}
-                  {c.notes && <p className="text-xs text-slate-500 mt-2">{c.notes}</p>}
-                  <p className="text-xs text-slate-400 mt-2">Enregistré par {c.created_by_name}</p>
+                  {c.treatment && (
+                    <div className="bg-green-50 rounded-lg px-3 py-2 mt-2">
+                      <p className="text-xs font-semibold text-green-700">Traitement</p>
+                      <p className="text-xs text-green-600">{c.treatment}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

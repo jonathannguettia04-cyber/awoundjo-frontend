@@ -73,6 +73,7 @@ export default function ProviderScan() {
 
   // Acte
   const [description, setDescription]= useState("");
+  const [doctorName,  setDoctorName]  = useState("");
   const [totalAmount, setTotalAmount]= useState("");
   const [saving,      setSaving]     = useState(false);
   const [service,     setService]    = useState(null);
@@ -133,12 +134,14 @@ export default function ProviderScan() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!client || !selectedCat || !totalAmount) return;
+    if (!doctorName.trim()) { setError("Le nom du praticien est obligatoire"); return; }
     setSaving(true); setError("");
     try {
       const { data } = await providerServiceAPI.create({
         client_id:    client.id,
         catalog_code: selectedCat.code,
         description,
+        doctor_name:  doctorName.trim(),
         total_amount: Number(totalAmount),
       });
       setService(data.service);
@@ -178,7 +181,7 @@ export default function ProviderScan() {
   function reset() {
     setStep(1); setQuery(""); setClient(null); setEligibility(null);
     setCatalog([]); setSelectedCat(null); setError("");
-    setDescription(""); setTotalAmount(""); setService(null);
+    setDescription(""); setDoctorName(""); setTotalAmount(""); setService(null);
     setPrescription(""); setPrescDone(false); setPrescriptionRequired(false);
   }
 
@@ -407,6 +410,15 @@ export default function ProviderScan() {
           </div>
 
           <div style={s.card}>
+            <div style={{ marginBottom: 16 }}>
+              <label style={s.label}>Nom du praticien *</label>
+              <input
+                required
+                value={doctorName} onChange={e => setDoctorName(e.target.value)}
+                placeholder="Dr. Konan Aya, Infirmier Bamba…"
+                style={{ ...s.input }}
+              />
+            </div>
             <div style={{ marginBottom: 16 }}>
               <label style={s.label}>Description / détail de l'acte</label>
               <textarea
