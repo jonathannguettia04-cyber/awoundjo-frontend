@@ -376,6 +376,11 @@ export default function ProviderScan() {
                         Plafond mensuel : {fmt(eligibility.cap_monthly)}
                       </p>
                     )}
+                    {eligibility.warning && (
+                      <p style={{ color: "#B45309", fontSize: 11, margin: "4px 0 0", fontWeight: 600 }}>
+                        {eligibility.warning}
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
