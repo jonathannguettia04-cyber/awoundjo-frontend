@@ -1,237 +1,237 @@
 // src/pages/provider/ProviderServices.jsx
-import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { providerClientAPI, providerServiceAPI } from "../../providerApi";
+// Historique des actes enregistrés — lecture seule
+// L'enregistrement se fait uniquement via ProviderScan
 
-const fmt = (n) => Number(n||0).toLocaleString("fr-FR") + " FCFA";
-const SERVICE_TYPES = [
-  { id: "consultation",    icon: "🩺", label: "Consultation" },
-  { id: "pharmacy",        icon: "💊", label: "Pharmacie" },
-  { id: "laboratory",      icon: "🔬", label: "Laboratoire" },
-  { id: "hospitalization", icon: "🏨", label: "Hospitalisation" },
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { providerServiceAPI } from "../../providerApi";
+
+const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
+const CATEGORY_CONFIG = {
+  consultation_generale:    { icon: "🩺", label: "Consultation générale",    color: "#2563EB", bg: "#EFF6FF" },
+  consultation_specialiste: { icon: "👨‍⚕️", label: "Consultation spécialiste", color: "#7C3AED", bg: "#F5F3FF" },
+  hospitalization:          { icon: "🏥", label: "Hospitalisation",           color: "#DC2626", bg: "#FEF2F2" },
+  pharmacy:                 { icon: "💊", label: "Pharmacie",                 color: "#059669", bg: "#ECFDF5" },
+  laboratory:               { icon: "🔬", label: "Laboratoire",              color: "#0891B2", bg: "#ECFEFF" },
+  optical:                  { icon: "👓", label: "Optique",                   color: "#D97706", bg: "#FFFBEB" },
+  dental:                   { icon: "🦷", label: "Dentaire",                  color: "#64748B", bg: "#F8FAFC" },
+  maternity:                { icon: "🤱", label: "Maternité",                 color: "#DB2777", bg: "#FDF2F8" },
+};
+
+const CATEGORIES = [
+  { id: "",                         label: "Tous les actes" },
+  { id: "consultation_generale",    label: "Cons. générale" },
+  { id: "consultation_specialiste", label: "Spécialiste" },
+  { id: "hospitalization",          label: "Hospitalisation" },
+  { id: "pharmacy",                 label: "Pharmacie" },
+  { id: "laboratory",               label: "Laboratoire" },
+  { id: "optical",                  label: "Optique" },
+  { id: "dental",                   label: "Dentaire" },
+  { id: "maternity",                label: "Maternité" },
 ];
 
 export default function ProviderServices() {
-  const navigate   = useNavigate();
-  const [params]   = useSearchParams();
-  const clientId   = params.get("client");
+  const navigate = useNavigate();
+  const [services,  setServices]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState("");
+  const [selected,  setSelected]  = useState(null);
+  const [category,  setCategory]  = useState("");
+  const [from,      setFrom]      = useState("");
+  const [to,        setTo]        = useState("");
+  const [page,      setPage]      = useState(1);
+  const [total,     setTotal]     = useState(0);
+  const LIMIT = 20;
 
-  const [step,          setStep]         = useState(clientId ? 2 : 1);
-  const [searchQ,       setSearchQ]      = useState("");
-  const [client,        setClient]       = useState(null);
-  const [eligibility,   setEligibility]  = useState(null);
-  const [serviceType,   setServiceType]  = useState("consultation");
-  const [description,   setDescription] = useState("");
-  const [totalAmount,   setTotalAmount]  = useState("");
-  const [loading,       setLoading]      = useState(false);
-  const [saving,        setSaving]       = useState(false);
-  const [error,         setError]        = useState("");
-  const [success,       setSuccess]      = useState(null);
-
-  // Charger client si passé en param
-  useEffect(() => {
-    if (clientId) {
-      setLoading(true);
-      providerClientAPI.eligibility(clientId, "consultation")
-        .then(r => { setClient(r.data.client); setEligibility(r.data); })
-        .catch(() => setError("Client introuvable"))
-        .finally(() => setLoading(false));
-    }
-  }, [clientId]);
-
-  // Mise à jour éligibilité quand type change
-  useEffect(() => {
-    if (!client) return;
-    providerClientAPI.eligibility(client.id, serviceType)
-      .then(r => setEligibility(r.data))
-      .catch(() => {});
-  }, [serviceType, client]);
-
-  async function handleSearch(e) {
-    e.preventDefault();
-    if (!searchQ.trim()) return;
+  async function load(reset = false) {
     setLoading(true); setError("");
+    const p = reset ? 1 : page;
     try {
-      const { data } = await providerClientAPI.search(searchQ);
-      if (!data.clients.length) { setError("Client introuvable"); return; }
-      const c = data.clients[0];
-      const { data: elig } = await providerClientAPI.eligibility(c.id, serviceType);
-      setClient(elig.client); setEligibility(elig); setStep(2);
-    } catch { setError("Erreur de recherche"); }
+      const { data } = await providerServiceAPI.getAll({
+        page: p, limit: LIMIT,
+        ...(category && { category }),
+        ...(from && { from }),
+        ...(to   && { to: to + "T23:59:59" }),
+      });
+      setServices(data.services || []);
+      setTotal(data.total || 0);
+      if (reset) setPage(1);
+    } catch { setError("Impossible de charger les actes"); }
     finally { setLoading(false); }
   }
 
-  async function handleSubmit(e) {
+  useEffect(() => { load(); }, [page]);
+
+  function handleFilter(e) {
     e.preventDefault();
-    if (!client || !totalAmount) return;
-    setSaving(true); setError("");
-    try {
-      const { data } = await providerServiceAPI.create({
-        client_id:    client.id,
-        service_type: serviceType,
-        description,
-        total_amount: Number(totalAmount),
-      });
-      setSuccess(data.service);
-      setStep(3);
-    } catch (err) {
-      setError(err.response?.data?.error || "Erreur enregistrement");
-    } finally { setSaving(false); }
+    load(true);
   }
 
-  const amount     = Number(totalAmount) || 0;
-  const mutualPart = eligibility ? Math.round(amount * eligibility.coverage_pct / 100) : 0;
-  const clientPart = amount - mutualPart;
+  // KPIs rapides
+  const totalAmount  = services.reduce((s, r) => s + Number(r.total_amount), 0);
+  const totalMutual  = services.reduce((s, r) => s + Number(r.mutual_part),  0);
+  const totalPages   = Math.ceil(total / LIMIT);
 
   return (
-    <div style={{ fontFamily: "'DM Sans',system-ui,sans-serif", paddingBottom: 20 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", marginBottom: 18 }}>Enregistrer un acte</h2>
+    <div style={{ fontFamily: "'DM Sans',system-ui,sans-serif", paddingBottom: 24 }}>
 
-      {error && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: 0 }}>Historique des actes</h2>
+          <p style={{ color: "#64748B", fontSize: 13, margin: "2px 0 0" }}>{total} acte{total > 1 ? "s" : ""} enregistré{total > 1 ? "s" : ""}</p>
+        </div>
+        <button onClick={() => navigate("/etablissement/scan")}
+          style={{ background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          + Nouvel acte
+        </button>
+      </div>
 
-      {/* STEP 1 — Chercher patient */}
-      {step === 1 && (
-        <form onSubmit={handleSearch}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 20, boxShadow: "0 4px 16px rgba(0,0,0,.06)", marginBottom: 14 }}>
-            <p style={{ fontWeight: 700, color: "#0f2942", marginBottom: 12 }}>Identifier le patient</p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
-                placeholder="N° mutuelle ou téléphone…"
-                style={{ flex: 1, border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "13px 14px", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-              <button type="submit" disabled={loading} style={{ background: "#0f2942", color: "#fff", border: "none", borderRadius: 12, padding: "13px 18px", fontSize: 18, cursor: "pointer" }}>🔍</button>
-            </div>
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
+        {[
+          { label: "Actes (page)",       value: services.length,    icon: "📝", color: "#2563EB", bg: "#EFF6FF" },
+          { label: "Total facturé",      value: fmt(totalAmount),   icon: "💰", color: "#D97706", bg: "#FFFBEB" },
+          { label: "Part mutuelle",      value: fmt(totalMutual),   icon: "🏥", color: "#059669", bg: "#ECFDF5" },
+        ].map((k, i) => (
+          <div key={i} style={{ background: k.bg, borderRadius: 14, padding: "14px", border: `1px solid ${k.color}20` }}>
+            <p style={{ fontSize: 10, color: "#64748B", margin: "0 0 4px", fontWeight: 700, textTransform: "uppercase", letterSpacing: .8 }}>{k.icon} {k.label}</p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: k.color, margin: 0 }}>{k.value}</p>
           </div>
-          <button type="button" onClick={() => navigate("/etablissement/scan")}
-            style={{ width: "100%", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", border: "none", borderRadius: 14, padding: "14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            📷 Scanner le QR code du patient
-          </button>
-        </form>
+        ))}
+      </div>
+
+      {/* Filtres */}
+      <form onSubmit={handleFilter} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 16, border: "1px solid #E2E8F0" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 140px" }}>
+            <label style={sty.label}>Catégorie</label>
+            <select value={category} onChange={e => setCategory(e.target.value)} style={sty.select}>
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 120px" }}>
+            <label style={sty.label}>Du</label>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={sty.input} />
+          </div>
+          <div style={{ flex: "1 1 120px" }}>
+            <label style={sty.label}>Au</label>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={sty.input} />
+          </div>
+          <button type="submit" style={{ ...sty.btn, flexShrink: 0 }}>Filtrer</button>
+        </div>
+      </form>
+
+      {error && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 }}>
+          {error}
+        </div>
       )}
 
-      {/* STEP 2 — Formulaire acte */}
-      {step === 2 && client && (
-        <form onSubmit={handleSubmit}>
-          {/* Client info */}
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 14, display: "flex", alignItems: "center", gap: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
-            <div style={{ width: 44, height: 44, background: "#EFF6FF", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#1565C0", fontSize: 18 }}>
-              {client.name?.charAt(0)}
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 700, color: "#0f2942", margin: "0 0 2px" }}>{client.name}</p>
-              <p style={{ color: "#64748B", fontSize: 12, margin: 0 }}>{client.mutual_number} · {client.plan}</p>
-            </div>
-            {eligibility && (
-              <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
-                background: eligibility.eligible ? "#F0FDF4" : "#FEF2F2",
-                color: eligibility.eligible ? "#22C55E" : "#EF4444",
-                border: `1px solid ${eligibility.eligible ? "#BBF7D0" : "#FECACA"}`,
-              }}>
-                {eligibility.eligible ? `✅ Éligible ${eligibility.coverage_pct}%` : "❌ Non éligible"}
-              </span>
-            )}
-          </div>
+      {/* Liste */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#64748B" }}>Chargement…</div>
+      ) : services.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 20, color: "#94A3B8" }}>
+          <p style={{ fontSize: 36 }}>📋</p>
+          <p>Aucun acte enregistré sur cette période</p>
+          <button onClick={() => navigate("/etablissement/scan")}
+            style={{ background: "#2563EB", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginTop: 8 }}>
+            + Enregistrer un acte
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {services.map(svc => {
+            const cat = CATEGORY_CONFIG[svc.category] || { icon: "📋", label: svc.category, color: "#64748B", bg: "#F8FAFC" };
+            const isOpen = selected?.id === svc.id;
+            return (
+              <div key={svc.id}
+                onClick={() => setSelected(isOpen ? null : svc)}
+                style={{ background: "#fff", borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,.04)", cursor: "pointer", border: `1.5px solid ${isOpen ? "#2563EB" : "#F1F5F9"}`, transition: "border-color .15s" }}>
 
-          {!eligibility?.eligible && (
-            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
-              <p style={{ fontWeight: 700, color: "#DC2626", margin: "0 0 4px" }}>⚠️ Attention</p>
-              <p style={{ color: "#B91C1C", fontSize: 13, margin: 0 }}>
-                {!eligibility?.is_active && "Adhésion inactive. "}
-                {!eligibility?.up_to_date && `${eligibility?.late_months} mois de cotisation en retard. `}
-                La couverture mutuelle ne s'applique pas.
-              </p>
-            </div>
-          )}
-
-          {/* Type de service */}
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
-            <p style={{ fontWeight: 700, color: "#0f2942", marginBottom: 12 }}>Type de service</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {SERVICE_TYPES.map(t => (
-                <button key={t.id} type="button" onClick={() => setServiceType(t.id)}
-                  style={{ padding: "12px 10px", borderRadius: 12, border: "2px solid", cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
-                    borderColor: serviceType === t.id ? "#00BCD4" : "#E2E8F0",
-                    background:  serviceType === t.id ? "#E0F7FA" : "#fff",
-                    color: "#0f2942", fontWeight: 600, fontSize: 13,
-                  }}>
-                  <span style={{ fontSize: 20, display: "block", marginBottom: 4 }}>{t.icon}</span>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description + montant */}
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, display: "block", marginBottom: 6 }}>Description</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)}
-                placeholder="Détail de l'acte ou du médicament…"
-                style={{ width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical", minHeight: 80, boxSizing: "border-box" }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, display: "block", marginBottom: 6 }}>Montant total (FCFA) *</label>
-              <input required type="number" min="0" value={totalAmount} onChange={e => setTotalAmount(e.target.value)}
-                placeholder="Ex : 15000"
-                style={{ width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 16, fontWeight: 700, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-              />
-            </div>
-          </div>
-
-          {/* Calcul couverture */}
-          {amount > 0 && (
-            <div style={{ background: "#E0F7FA", borderRadius: 16, padding: 16, marginBottom: 16 }}>
-              <p style={{ fontWeight: 700, color: "#0f2942", marginBottom: 10, fontSize: 13 }}>Répartition des coûts</p>
-              {[
-                { label: "Coût total",               value: fmt(amount),     color: "#0f2942" },
-                { label: `Prise en charge mutuelle (${eligibility?.coverage_pct||0}%)`, value: fmt(mutualPart), color: "#0097A7" },
-                { label: "Part patient",              value: fmt(clientPart), color: "#DC2626" },
-              ].map((row, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.06)" : "none" }}>
-                  <span style={{ color: "#64748B", fontSize: 13 }}>{row.label}</span>
-                  <span style={{ fontWeight: 800, color: row.color, fontSize: 13 }}>{row.value}</span>
+                {/* Ligne principale */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: cat.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                    {cat.icon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, color: "#0f2942", margin: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {svc.catalog_label || svc.catalog_code}
+                    </p>
+                    <p style={{ color: "#64748B", fontSize: 12, margin: 0 }}>
+                      {svc.client_name} · {svc.mutual_number}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <p style={{ fontWeight: 800, color: "#0f2942", margin: 0, fontSize: 13 }}>{fmt(svc.total_amount)}</p>
+                    <p style={{ color: "#94A3B8", fontSize: 11, margin: 0 }}>{fmtDate(svc.created_at)}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <button type="button" onClick={() => { setStep(1); setClient(null); }}
-              style={{ padding: "14px", borderRadius: 14, border: "1.5px solid #CBD5E1", background: "#fff", color: "#64748B", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              ← Retour
-            </button>
-            <button type="submit" disabled={saving || !totalAmount}
-              style={{ padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 14, opacity: (!totalAmount) ? .6 : 1 }}>
-              {saving ? "Enregistrement…" : "✅ Valider l'acte"}
-            </button>
-          </div>
-        </form>
+                {/* Détail déroulant */}
+                {isOpen && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      {[
+                        { label: "Code acte",     value: svc.catalog_code },
+                        { label: "Catégorie",     value: cat.label },
+                        { label: "Part mutuelle", value: fmt(svc.mutual_part),  color: "#0097A7" },
+                        { label: "Reste patient", value: fmt(svc.client_part),  color: "#DC2626" },
+                        { label: "Couverture",    value: `${svc.coverage_pct}%` },
+                        { label: "Statut facture",value: svc.invoice_id ? "✅ Facturé" : "⏳ En attente" },
+                      ].map((row, i) => (
+                        <div key={i}>
+                          <p style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: .6, margin: "0 0 2px" }}>{row.label}</p>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: row.color || "#1E293B", margin: 0 }}>{row.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {svc.description && (
+                      <div style={{ background: "#F8FAFC", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#475569" }}>
+                        {svc.description}
+                      </div>
+                    )}
+                    {svc.prescription_content && (
+                      <div style={{ marginTop: 8, background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, padding: "8px 12px" }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: .6, margin: "0 0 4px" }}>📋 Ordonnance</p>
+                        <p style={{ fontSize: 12, color: "#78350F", margin: 0, whiteSpace: "pre-line" }}>{svc.prescription_content}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/etablissement/medical/${svc.client_id}`); }}
+                      style={{ marginTop: 10, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#2563EB", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                      📂 Voir dossier médical
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* STEP 3 — Succès */}
-      {step === 3 && success && (
-        <div style={{ textAlign: "center", padding: "30px 20px" }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-          <h3 style={{ color: "#0f2942", fontWeight: 800, marginBottom: 8 }}>Acte enregistré !</h3>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 20, textAlign: "left" }}>
-            {[
-              { label: "Montant total",    value: fmt(success.total_amount) },
-              { label: "Part mutuelle",    value: fmt(success.mutual_part) },
-              { label: "Part patient",     value: fmt(success.client_part) },
-              { label: "Couverture",       value: `${success.coverage_pct}%` },
-            ].map((row, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < 3 ? "1px solid #F1F5F9" : "none" }}>
-                <span style={{ color: "#64748B", fontSize: 13 }}>{row.label}</span>
-                <span style={{ fontWeight: 700, color: "#0f2942" }}>{row.value}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => { setStep(1); setClient(null); setTotalAmount(""); setDescription(""); setSuccess(null); }}
-            style={{ width: "100%", background: "#0f2942", color: "#fff", border: "none", borderRadius: 14, padding: "14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            + Enregistrer un autre acte
-          </button>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
+          <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+            style={{ ...sty.btn, opacity: page === 1 ? 0.4 : 1 }}>← Préc.</button>
+          <span style={{ padding: "10px 16px", fontSize: 13, color: "#64748B" }}>
+            {page} / {totalPages}
+          </span>
+          <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
+            style={{ ...sty.btn, opacity: page === totalPages ? 0.4 : 1 }}>Suiv. →</button>
         </div>
       )}
     </div>
   );
 }
+
+const sty = {
+  label:  { display: "block", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .6, marginBottom: 4 },
+  input:  { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
+  select: { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", background: "#fff" },
+  btn:    { background: "#0f2942", color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+};

@@ -6,7 +6,7 @@ import { providerLogout, getProviderData } from "../../providerApi";
 const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬" };
 const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire" };
 
-const NAV = [
+const NAV_BASE = [
   { path: "/etablissement/dashboard", icon: "🏠", label: "Tableau de bord" },
   { path: "/etablissement/scan",      icon: "🔍", label: "Prise en charge" },
   { path: "/etablissement/services",  icon: "📝", label: "Actes enregistrés" },
@@ -14,11 +14,18 @@ const NAV = [
   { path: "/etablissement/billing",   icon: "💰", label: "Facturation" },
 ];
 
+const NAV_PHARMACY = [
+  { path: "/etablissement/prescriptions", icon: "📋", label: "Ordonnances patients" },
+];
+
 export default function ProviderLayout() {
   const navigate     = useNavigate();
   const { pathname } = useLocation();
   const provider     = getProviderData();
   const [collapsed, setCollapsed] = useState(false);
+  const NAV = provider?.type === "pharmacy"
+    ? [...NAV_BASE, ...NAV_PHARMACY]
+    : NAV_BASE;
 
   return (
     <div style={s.root}>

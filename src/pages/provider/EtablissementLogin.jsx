@@ -8,45 +8,47 @@ const TYPES = [
   { id: "clinic",   label: "Clinique",     icon: "🏥" },
   { id: "hospital", label: "Hôpital",      icon: "🏨" },
   { id: "lab",      label: "Laboratoire",  icon: "🔬" },
+  { id: "optician", label: "Opticien",     icon: "👓" },
+  { id: "dentist",  label: "Dentiste",     icon: "🦷" },
+  { id: "midwife",  label: "Sage-femme",   icon: "🤱" },
 ];
 
 const S = {
-  root: { minHeight: "100vh", background: "linear-gradient(160deg,#0f2942 0%,#0a3d62 50%,#0f2942 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'DM Sans',system-ui,sans-serif", position: "relative", overflow: "hidden" },
-  blob1: { position: "absolute", top: -120, right: -120, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,188,212,.15),transparent 70%)", pointerEvents: "none" },
-  blob2: { position: "absolute", bottom: -100, left: -100, width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,150,136,.12),transparent 70%)", pointerEvents: "none" },
-  logo:  { display: "flex", alignItems: "center", gap: 12, marginBottom: 32 },
-  logoImg: { width: 48, height: 48, objectFit: "contain", borderRadius: 12, background: "rgba(255,255,255,.1)", padding: 6 },
-  logoText: { color: "#fff", fontSize: 22, fontWeight: 800, letterSpacing: -.5 },
-  logoSub:  { color: "rgba(255,255,255,.55)", fontSize: 12, marginTop: 2 },
-  card:  { background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 24, padding: "32px 28px", width: "100%", maxWidth: 440 },
-  tabs:  { display: "flex", background: "rgba(255,255,255,.06)", borderRadius: 14, padding: 4, marginBottom: 28, gap: 4 },
-  tab:   { flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all .25s", fontFamily: "inherit" },
-  tabActive:   { background: "#00BCD4", color: "#fff", boxShadow: "0 4px 12px rgba(0,188,212,.3)" },
-  tabInactive: { background: "transparent", color: "rgba(255,255,255,.55)" },
-  label: { display: "block", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.6)", marginBottom: 6, textTransform: "uppercase", letterSpacing: .8 },
-  input: { width: "100%", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color .2s" },
-  select: { width: "100%", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
-  field: { marginBottom: 16 },
-  btn:   { width: "100%", padding: "14px", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8, fontFamily: "inherit", boxShadow: "0 6px 20px rgba(0,188,212,.35)", transition: "transform .2s, box-shadow .2s" },
-  err:   { background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: "10px 14px", color: "#FCA5A5", fontSize: 13, marginBottom: 16 },
-  suc:   { background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.3)", borderRadius: 10, padding: "10px 14px", color: "#86EFAC", fontSize: 13, marginBottom: 16 },
-  title: { color: "#fff", fontSize: 20, fontWeight: 800, marginBottom: 4 },
-  sub:   { color: "rgba(255,255,255,.5)", fontSize: 13, marginBottom: 24 },
-  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  root:       { minHeight: "100vh", background: "linear-gradient(160deg,#0f2942 0%,#0a3d62 50%,#0f2942 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'DM Sans',system-ui,sans-serif", position: "relative", overflow: "hidden" },
+  blob1:      { position: "absolute", top: -120, right: -120, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,188,212,.15),transparent 70%)", pointerEvents: "none" },
+  blob2:      { position: "absolute", bottom: -100, left: -100, width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,150,136,.12),transparent 70%)", pointerEvents: "none" },
+  logo:       { display: "flex", alignItems: "center", gap: 12, marginBottom: 32 },
+  logoImg:    { width: 48, height: 48, objectFit: "contain", borderRadius: 12, background: "rgba(255,255,255,.1)", padding: 6 },
+  logoText:   { color: "#fff", fontSize: 22, fontWeight: 800, letterSpacing: -.5 },
+  logoSub:    { color: "rgba(255,255,255,.55)", fontSize: 12, marginTop: 2 },
+  card:       { background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 24, padding: "32px 28px", width: "100%", maxWidth: 440 },
+  tabs:       { display: "flex", background: "rgba(255,255,255,.06)", borderRadius: 14, padding: 4, marginBottom: 28, gap: 4 },
+  tab:        { flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all .25s", fontFamily: "inherit" },
+  tabActive:  { background: "#00BCD4", color: "#fff", boxShadow: "0 4px 12px rgba(0,188,212,.3)" },
+  tabInactive:{ background: "transparent", color: "rgba(255,255,255,.55)" },
+  label:      { display: "block", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.6)", marginBottom: 6, textTransform: "uppercase", letterSpacing: .8 },
+  input:      { width: "100%", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color .2s" },
+  select:     { width: "100%", background: "rgba(30,50,80,.8)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
+  field:      { marginBottom: 16 },
+  btn:        { width: "100%", padding: "14px", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8, fontFamily: "inherit", boxShadow: "0 6px 20px rgba(0,188,212,.35)", transition: "transform .2s, box-shadow .2s" },
+  err:        { background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: "10px 14px", color: "#FCA5A5", fontSize: 13, marginBottom: 16 },
+  suc:        { background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.3)", borderRadius: 10, padding: "10px 14px", color: "#86EFAC", fontSize: 13, marginBottom: 16 },
+  title:      { color: "#fff", fontSize: 20, fontWeight: 800, marginBottom: 4 },
+  sub:        { color: "rgba(255,255,255,.5)", fontSize: 13, marginBottom: 24 },
+  grid2:      { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  typeGrid:   { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 },
+  typeBtn:    { padding: "10px 8px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, transition: "all .2s", textAlign: "center" },
 };
 
 export default function EtablissementLogin() {
   const navigate = useNavigate();
-  const [tab, setTab]     = useState("login");
+  const [tab,     setTab]     = useState("login");
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState("");
+  const [error,   setError]   = useState("");
   const [success, setSuccess] = useState("");
 
-  // Login
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
-
-  // Request
-  const [reqForm, setReqForm] = useState({
+  const [reqForm,   setReqForm]   = useState({
     name: "", type: "pharmacy", phone: "", email: "",
     address: "", city: "", manager_name: "",
   });
@@ -57,11 +59,7 @@ export default function EtablissementLogin() {
     try {
       const { data } = await providerAuthAPI.login(loginForm);
       providerLogin(data.token, data.provider);
-      if (data.temp_password) {
-        navigate("/etablissement/change-password");
-      } else {
-        navigate("/etablissement/dashboard");
-      }
+      navigate(data.temp_password ? "/etablissement/change-password" : "/etablissement/dashboard");
     } catch (err) {
       setError(err.response?.data?.error || "Identifiants incorrects");
     } finally { setLoading(false); }
@@ -93,12 +91,12 @@ export default function EtablissementLogin() {
         </div>
       </div>
 
-      {/* Card */}
       <div style={S.card}>
         {/* Tabs */}
         <div style={S.tabs}>
           {[{ id: "login", label: "🔑 Connexion" }, { id: "request", label: "📋 Demande d'accès" }].map(t => (
-            <button key={t.id} style={{ ...S.tab, ...(tab === t.id ? S.tabActive : S.tabInactive) }}
+            <button key={t.id}
+              style={{ ...S.tab, ...(tab === t.id ? S.tabActive : S.tabInactive) }}
               onClick={() => { setTab(t.id); setError(""); setSuccess(""); }}>
               {t.label}
             </button>
@@ -108,7 +106,7 @@ export default function EtablissementLogin() {
         {error   && <div style={S.err}>{error}</div>}
         {success && <div style={S.suc}>{success}</div>}
 
-        {/* LOGIN */}
+        {/* ── LOGIN ── */}
         {tab === "login" && (
           <>
             <div style={S.title}>Bon retour 👋</div>
@@ -135,11 +133,11 @@ export default function EtablissementLogin() {
           </>
         )}
 
-        {/* REQUEST ACCESS */}
+        {/* ── DEMANDE D'ACCÈS ── */}
         {tab === "request" && (
           <>
             <div style={S.title}>Rejoindre le réseau 🏥</div>
-            <div style={S.sub}>Remplissez ce formulaire — nous validerons votre demande</div>
+            <div style={S.sub}>Remplissez ce formulaire — nous validerons votre demande sous 48h</div>
             <form onSubmit={handleRequest}>
               <div style={S.field}>
                 <label style={S.label}>Nom de l'établissement *</label>
@@ -147,23 +145,37 @@ export default function EtablissementLogin() {
                   value={reqForm.name}
                   onChange={e => setReqForm({ ...reqForm, name: e.target.value })} />
               </div>
+
+              {/* Type — grille visuelle */}
               <div style={S.field}>
-                <label style={S.label}>Type *</label>
-                <select style={S.select} required value={reqForm.type}
-                  onChange={e => setReqForm({ ...reqForm, type: e.target.value })}>
-                  {TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-                </select>
+                <label style={S.label}>Type d'établissement *</label>
+                <div style={S.typeGrid}>
+                  {TYPES.map(t => (
+                    <button key={t.id} type="button"
+                      onClick={() => setReqForm({ ...reqForm, type: t.id })}
+                      style={{
+                        ...S.typeBtn,
+                        background: reqForm.type === t.id ? "rgba(0,188,212,.2)" : "rgba(255,255,255,.04)",
+                        borderColor: reqForm.type === t.id ? "#00BCD4" : "rgba(255,255,255,.12)",
+                        color: reqForm.type === t.id ? "#00BCD4" : "rgba(255,255,255,.7)",
+                      }}>
+                      <span style={{ fontSize: 20, display: "block", marginBottom: 4 }}>{t.icon}</span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
               <div style={{ ...S.grid2, marginBottom: 0 }}>
                 <div style={S.field}>
                   <label style={S.label}>Téléphone *</label>
-                  <input style={S.input} required placeholder="0707..."
+                  <input style={S.input} required placeholder="0707…"
                     value={reqForm.phone}
                     onChange={e => setReqForm({ ...reqForm, phone: e.target.value })} />
                 </div>
                 <div style={S.field}>
                   <label style={S.label}>Email</label>
-                  <input style={S.input} type="email" placeholder="contact@..."
+                  <input style={S.input} type="email" placeholder="contact@…"
                     value={reqForm.email}
                     onChange={e => setReqForm({ ...reqForm, email: e.target.value })} />
                 </div>
@@ -177,7 +189,7 @@ export default function EtablissementLogin() {
                 </div>
                 <div style={S.field}>
                   <label style={S.label}>Quartier / Adresse</label>
-                  <input style={S.input} placeholder="Plateau..."
+                  <input style={S.input} placeholder="Plateau…"
                     value={reqForm.address}
                     onChange={e => setReqForm({ ...reqForm, address: e.target.value })} />
                 </div>
@@ -188,6 +200,12 @@ export default function EtablissementLogin() {
                   value={reqForm.manager_name}
                   onChange={e => setReqForm({ ...reqForm, manager_name: e.target.value })} />
               </div>
+
+              {/* Info partenaire */}
+              <div style={{ background: "rgba(0,188,212,.08)", border: "1px solid rgba(0,188,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "rgba(255,255,255,.6)" }}>
+                ℹ️ Le statut <strong style={{ color: "#00BCD4" }}>clinique partenaire</strong> (donnant accès à la formule BASIQUE) sera défini par l'équipe Awoundjô lors de la validation.
+              </div>
+
               <button style={S.btn} type="submit" disabled={loading}
                 onMouseEnter={e => { e.target.style.transform = "translateY(-2px)"; }}
                 onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}>

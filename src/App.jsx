@@ -60,7 +60,8 @@ const ProviderDashboard   = lazy(() => import("./pages/provider/ProviderDashboar
 const ProviderScan        = lazy(() => import("./pages/provider/ProviderScan"));
 const ProviderServices    = lazy(() => import("./pages/provider/ProviderServices"));
 const ProviderMedical     = lazy(() => import("./pages/provider/ProviderMedical"));
-const ProviderBilling     = lazy(() => import("./pages/provider/ProviderBilling"));
+const ProviderBilling              = lazy(() => import("./pages/provider/ProviderBilling"));
+const ProviderPharmacyPrescriptions = lazy(() => import("./pages/provider/ProviderPharmacyPrescriptions"));
 
 // ── Pages DIASPORA ───────────────────────────────────────────
 const DiasporaAuth        = lazy(() => import("./pages/diaspora/DiasporaAuth"));
@@ -277,6 +278,7 @@ export default function App() {
               <Route path="billing"           element={<ProviderBilling />} />
               <Route path="history"           element={<ProviderServices />} />
               <Route path="profile"           element={<ProviderDashboard />} />
+              <Route path="prescriptions"     element={<ProviderPharmacyPrescriptions />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════
