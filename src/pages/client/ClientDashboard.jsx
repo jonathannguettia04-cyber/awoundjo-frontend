@@ -36,7 +36,7 @@ export default function ClientDashboard() {
   if (!profile) return null;
 
   const plan     = PLANS[profile.plan] || PLANS.ESSENTIELLE;
-  const status   = STATUS_LABELS[profile.status] || STATUS_LABELS.active;
+  const status   = STATUS_LABELS[profile.status] || STATUS_LABELS["actif"] || STATUS_LABELS.active || { label: "Actif", color: "#16A34A" };
   const gradient = PLAN_GRADIENTS[profile.plan] || PLAN_GRADIENTS.ESSENTIELLE;
 
   const expiry = profile.expiration_date
@@ -90,7 +90,7 @@ export default function ClientDashboard() {
         <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,.12)", borderRadius: 14, overflow: "hidden", backdropFilter: "blur(8px)" }}>
           {[
             { label: "Formule", value: plan.name },
-            { label: "Statut",  value: profile.status === "active" ? "✅ Actif" : "⚠️ " + status.label },
+            { label: "Statut",  value: ["actif","active","ACTIVE"].includes(profile.status) ? "✅ Actif" : "⚠️ " + status.label },
             { label: "Expire",  value: expiry },
           ].map((item, i) => (
             <div key={i} style={{ flex: 1, padding: "12px 10px", borderRight: i < 2 ? "1px solid rgba(255,255,255,.15)" : "none", textAlign: "center" }}>
