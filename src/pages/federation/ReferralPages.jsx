@@ -110,6 +110,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
+  const [payMethod,  setPayMethod]  = useState("cinetpay"); // "cinetpay" | "paydunya"
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
   const fee = Number(adhesionFee) || 0;
 
@@ -117,21 +118,34 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
     setPayLoading(true); setPayError("");
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+      const endpoint = payMethod === "paydunya"
+        ? `${BASE}/api/payments/paydunya/init-web`
+        : `${BASE}/api/payments/cinetpay/init-web`;
+      const body = payMethod === "paydunya"
+        ? {
+            ambassador_id: ambassadorId,
+            amount:        fee,
+            type:          "adhesion",
+            description:   `Adhésion Awoundjô — ${targetLabel}`,
+            success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
+            failed_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+          }
+        : {
+            ambassador_id: ambassadorId,
+            amount:        fee,
+            type:          "adhesion",
+            description:   `Adhésion Awoundjô — ${targetLabel}`,
+            return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
+            cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
+          };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ambassador_id: ambassadorId,
-          amount:        fee,
-          type:          "adhesion",
-          description:   `Adhésion Awoundjô — ${targetLabel}`,
-          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       const url  = data?.data?.payment_url || data?.payment_url;
-      if (!url) throw new Error("URL de paiement non reçue du serveur");
+      if (!url) throw new Error(data?.error || "URL de paiement non reçue du serveur");
       window.location.href = url;
     } catch (e) {
       setPayError(e.message || "Erreur lors de l'initialisation du paiement");
@@ -196,14 +210,39 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           </a>
         </div>
 
-        {/* Paiement CinetPay */}
-        <div style={{ background:"#EFF6FF", border:"1.5px solid #0072C644", borderRadius:12, padding:"16px 18px", marginBottom:14 }}>
-          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:"#0072C6" }}>
+        {/* Paiement — choix méthode */}
+        <div style={{ background:"#F8FAFC", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"16px 18px", marginBottom:14 }}>
+          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:C.dark }}>
             💳 Étape suivante — Paiement des frais d'adhésion
           </p>
           <p style={{ margin:"0 0 12px", fontSize:12, color:C.slate }}>
-            Payez maintenant les frais d'adhésion de <strong>{fee.toLocaleString("fr-FR")} FCFA</strong> via CinetPay pour activer le processus de validation.
+            Payez maintenant les frais d'adhésion de <strong>{fee.toLocaleString("fr-FR")} FCFA</strong> pour activer le processus de validation.
           </p>
+
+          {/* Sélecteur méthode */}
+          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+            {[
+              { id:"cinetpay", label:"💳 CinetPay",  sub:"Orange · Wave · MTN · Carte" },
+              { id:"paydunya", label:"🏦 PayDunya",   sub:"Orange · Wave · MTN · Moov"  },
+            ].map(m => (
+              <button key={m.id} onClick={() => setPayMethod(m.id)}
+                style={{
+                  flex:1, padding:"10px 8px", borderRadius:10, border:"none", cursor:"pointer",
+                  background: payMethod === m.id ? (m.id === "cinetpay" ? "#EFF6FF" : "#ECFDF5") : "#fff",
+                  outline: payMethod === m.id
+                    ? `2px solid ${m.id === "cinetpay" ? "#0072C6" : "#059669"}`
+                    : "1.5px solid #E2E8F0",
+                  textAlign:"center", fontFamily:"inherit",
+                }}>
+                <p style={{ margin:0, fontSize:13, fontWeight:800,
+                  color: payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.slate }}>
+                  {m.label}
+                </p>
+                <p style={{ margin:"2px 0 0", fontSize:10, color:C.slate }}>{m.sub}</p>
+              </button>
+            ))}
+          </div>
+
           {payError && (
             <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
               <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
@@ -212,11 +251,17 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           <button onClick={handlePay} disabled={payLoading}
             style={{
               width:"100%", padding:"13px 0", borderRadius:10, border:"none",
-              background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+              background: payLoading ? "#94a3b8"
+                : payMethod === "paydunya"
+                ? "linear-gradient(135deg,#059669,#047857)"
+                : "linear-gradient(135deg,#0072C6,#005A9E)",
               color:"#fff", fontWeight:900, fontSize:14,
               cursor: payLoading ? "not-allowed" : "pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+              boxShadow: payLoading ? "none"
+                : payMethod === "paydunya"
+                ? "0 4px 16px rgba(5,150,105,.35)"
+                : "0 4px 16px rgba(0,114,198,.35)",
               fontFamily:"inherit",
             }}>
             {payLoading ? (
@@ -224,10 +269,14 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
                 <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
                 Redirection…
               </>
-            ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>}
+            ) : payMethod === "paydunya" ? (
+              <>🏦 Payer {fee.toLocaleString("fr-FR")} FCFA avec PayDunya</>
+            ) : (
+              <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>
+            )}
           </button>
           <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
-            MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+            Paiement 100% sécurisé
           </p>
         </div>
 
@@ -357,7 +406,7 @@ export function ReferralRegisterLeader() {
       window.history.replaceState({}, "", window.location.pathname);
     }
     federationMemberAPI.getAll({ role:"LEADER" })
-      .then(r => setList(r.data.members || []))
+      .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
@@ -368,7 +417,7 @@ export function ReferralRegisterLeader() {
     setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     federationMemberAPI.getAll({ role:"LEADER" })
-      .then(r => setList(r.data.members || []));
+      .then(r => setList(r.data.ambassadors || []));
   }
 
   return (
@@ -456,7 +505,7 @@ export function ReferralRegisterPasteur() {
       window.history.replaceState({}, "", window.location.pathname);
     }
     federationMemberAPI.getAll({ role:"PASTEUR" })
-      .then(r => setList(r.data.members || []))
+      .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
@@ -467,7 +516,7 @@ export function ReferralRegisterPasteur() {
     setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     federationMemberAPI.getAll({ role:"PASTEUR" })
-      .then(r => setList(r.data.members || []));
+      .then(r => setList(r.data.ambassadors || []));
   }
 
   return (
@@ -555,7 +604,7 @@ export function ReferralRegisterResponsable() {
       window.history.replaceState({}, "", window.location.pathname);
     }
     federationMemberAPI.getAll({ role:"RESPONSABLE" })
-      .then(r => setList(r.data.members || []))
+      .then(r => setList(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
@@ -566,7 +615,7 @@ export function ReferralRegisterResponsable() {
     setCredsAdhesionFee(fee || 0);
     setShowForm(false);
     federationMemberAPI.getAll({ role:"RESPONSABLE" })
-      .then(r => setList(r.data.members || []));
+      .then(r => setList(r.data.ambassadors || []));
   }
 
   return (
@@ -745,7 +794,7 @@ export function ReferralClients() {
 
   useEffect(() => {
     federationMemberAPI.getAll({ role:"CLIENT" })
-      .then(r => setClients(r.data.members || []))
+      .then(r => setClients(r.data.ambassadors || []))
       .finally(() => setLoading(false));
   }, []);
 
@@ -1317,7 +1366,7 @@ export function ReferralCards() {
       federationMemberAPI.getAll({ role:"CLIENT" }),
     ]).then(([s, c]) => {
       setStats(s.data);
-      setClients(c.data.members || []);
+      setClients(c.data.ambassadors || []);
     }).finally(() => setLoading(false));
   }, []);
 
