@@ -19,6 +19,7 @@ const fmtDate = (d) => d
   : "—";
 
 const PLAN_PRICES = {
+  BASIQUE:     5000,
   ESSENTIELLE: 10000,
   IVOIRIENNE:  15000,
   TURQUOISE:   35000,
@@ -186,7 +187,7 @@ export default function ClientCotisations() {
   }
 
   const plan    = client?.plan || "IVOIRIENNE";
-  const monthly = PLAN_PRICES[plan] || 15000;
+  const monthly = PLAN_PRICES[plan] ?? PLAN_PRICES['IVOIRIENNE'];
 
   const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
