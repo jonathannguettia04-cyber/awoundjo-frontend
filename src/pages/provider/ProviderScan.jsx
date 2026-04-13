@@ -376,11 +376,6 @@ export default function ProviderScan() {
                         Plafond mensuel : {fmt(eligibility.cap_monthly)}
                       </p>
                     )}
-                    {eligibility.warning && (
-                      <p style={{ color: "#B45309", fontSize: 11, margin: "4px 0 0", fontWeight: 600 }}>
-                        {eligibility.warning}
-                      </p>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -549,12 +544,51 @@ export default function ProviderScan() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto 12px" }}>
             <button onClick={reset} style={{ ...s.btnPrimary, flex: 1 }}>
               + Nouvelle prise en charge
             </button>
             <button onClick={() => navigate("/etablissement/billing")} style={s.btnSecondary}>
               Facturation →
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto" }}>
+            <button onClick={() => {
+              const w = window.open('', '_blank');
+              const now = new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' });
+              w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'>
+              <title>Reçu Awoundjô</title>
+              <style>
+                body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; color: #1E293B; }
+                h1 { font-size: 22px; font-weight: 900; color: #0f2942; margin: 0 0 4px; }
+                .sub { color: #64748B; font-size: 13px; margin: 0 0 20px; }
+                .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9; font-size: 14px; }
+                .row span:last-child { font-weight: 700; }
+                .mutual { color: #0097A7; } .patient { color: #DC2626; }
+                .footer { margin-top: 24px; font-size: 11px; color: #94A3B8; text-align: center; }
+                .logo { text-align: center; margin-bottom: 16px; font-size: 28px; }
+                .badge { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; text-align:center; color:#15803D; font-weight:700; margin-bottom:16px; }
+              </style></head><body>
+              <div class='logo'>🏥</div>
+              <h1>Awoundjô</h1>
+              <p class='sub'>Reçu de prise en charge · ${now}</p>
+              <div class='badge'>✅ Prise en charge validée</div>
+              <div class='row'><span>Assuré</span><span>${client?.name}</span></div>
+              <div class='row'><span>N° mutualiste</span><span>${client?.mutual_number}</span></div>
+              <div class='row'><span>Formule</span><span>${client?.plan}</span></div>
+              <div class='row'><span>Acte</span><span>${selectedCat?.label}</span></div>
+              <div class='row'><span>Code</span><span>${selectedCat?.code}</span></div>
+              <div class='row'><span>Établissement</span><span>${service?.provider_name || 'Établissement partenaire'}</span></div>
+              <div class='row'><span>Coût total</span><span>${Number(service?.total_amount||0).toLocaleString('fr-FR')} FCFA</span></div>
+              <div class='row'><span>Prise en charge mutuelle (${service?.coverage_pct}%)</span><span class='mutual'>${Number(service?.mutual_part||0).toLocaleString('fr-FR')} FCFA</span></div>
+              <div class='row'><span>Reste à charge patient</span><span class='patient'>${Number(service?.client_part||0).toLocaleString('fr-FR')} FCFA</span></div>
+              ${prescDone ? "<div class='row'><span>Ordonnance</span><span>✅ Saisie</span></div>" : ''}
+              <div class='footer'>Mutuelle Santé Awoundjô · Côte d'Ivoire<br>Ce document est un reçu officiel de prise en charge.</div>
+              </body></html>`);
+              w.document.close();
+              w.print();
+            }} style={{ ...s.btnSecondary, flex: 1, borderColor: '#0097A7', color: '#0097A7', fontWeight: 700 }}>
+              🖨️ Imprimer le reçu
             </button>
           </div>
         </div>
