@@ -3,29 +3,69 @@ import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { providerLogout, getProviderData } from "../../providerApi";
 
-const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬" };
-const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire" };
+const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬", optician: "👓", dentist: "🦷", midwife: "🤱" };
+const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire", optician: "Opticien", dentist: "Dentiste", midwife: "Sage-femme" };
 
-const NAV_BASE = [
-  { path: "/etablissement/dashboard", icon: "🏠", label: "Tableau de bord" },
-  { path: "/etablissement/scan",      icon: "🔍", label: "Prise en charge" },
-  { path: "/etablissement/services",  icon: "📝", label: "Actes enregistrés" },
-  { path: "/etablissement/medical",   icon: "📋", label: "Dossiers médicaux" },
-  { path: "/etablissement/billing",   icon: "💰", label: "Facturation" },
-];
-
-const NAV_PHARMACY = [
-  { path: "/etablissement/prescriptions", icon: "📋", label: "Ordonnances patients" },
-];
+// Menu par type de prestataire
+const NAV_BY_TYPE = {
+  // Pharmacie : voit les ordonnances émises par les cliniques → exécute des bons
+  pharmacy: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/prescriptions",icon: "💊", label: "Ordonnances patients" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  // Clinique / Hôpital : prise en charge + dossier médical + ordonnances émises
+  clinic: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/medical",      icon: "📋", label: "Dossiers médicaux" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  hospital: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/medical",      icon: "📋", label: "Dossiers médicaux" },
+    { path: "/etablissement/prescriptions",icon: "💊", label: "Ordonnances émises" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  // Labo / Opticien / Dentiste / Sage-femme : prise en charge simple, pas de dossier médical
+  lab: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  optician: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  dentist: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+  midwife: [
+    { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
+    { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
+    { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/medical",      icon: "📋", label: "Dossiers médicaux" },
+    { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
+  ],
+};
 
 export default function ProviderLayout() {
   const navigate     = useNavigate();
   const { pathname } = useLocation();
   const provider     = getProviderData();
   const [collapsed, setCollapsed] = useState(false);
-  const NAV = provider?.type === "pharmacy"
-    ? [...NAV_BASE, ...NAV_PHARMACY]
-    : NAV_BASE;
+  // Menu adapté au type de prestataire (fallback = menu clinique)
+  const NAV = NAV_BY_TYPE[provider?.type] || NAV_BY_TYPE.clinic;
 
   return (
     <div style={s.root}>

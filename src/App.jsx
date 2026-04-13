@@ -62,6 +62,13 @@ const ProviderServices    = lazy(() => import("./pages/provider/ProviderServices
 const ProviderMedical     = lazy(() => import("./pages/provider/ProviderMedical"));
 const ProviderBilling              = lazy(() => import("./pages/provider/ProviderBilling"));
 const ProviderPharmacyPrescriptions = lazy(() => import("./pages/provider/ProviderPharmacyPrescriptions"));
+// ── Redirect scan selon type de prestataire ──────────────────
+// Pharmacie → ordonnances patients | Autres → prise en charge classique
+function ScanRoute() {
+  const data = (() => { try { return JSON.parse(localStorage.getItem('provider_data')); } catch { return null; } })();
+  if (data?.type === 'pharmacy') return <Navigate to='/etablissement/prescriptions' replace />;
+  return <ProviderScan />;
+}
 
 // ── Pages DIASPORA ───────────────────────────────────────────
 const DiasporaAuth        = lazy(() => import("./pages/diaspora/DiasporaAuth"));
@@ -269,12 +276,12 @@ export default function App() {
             <Route path="/etablissement" element={<ProviderRoute><ProviderLayout /></ProviderRoute>}>
               <Route index element={<Navigate to="/etablissement/dashboard" replace />} />
               <Route path="dashboard"         element={<ProviderDashboard />} />
-              <Route path="scan"              element={<ProviderScan />} />
-              <Route path="search"            element={<ProviderScan />} />
+              <Route path="scan"              element={<ScanRoute />} />
+              <Route path="search"            element={<ScanRoute />} />
               <Route path="services"          element={<ProviderServices />} />
               <Route path="services/new"      element={<ProviderServices />} />
               <Route path="medical/:clientId" element={<ProviderMedical />} />
-              <Route path="medical"           element={<ProviderScan />} />
+              <Route path="medical"           element={<ScanRoute />} />
               <Route path="billing"           element={<ProviderBilling />} />
               <Route path="history"           element={<ProviderServices />} />
               <Route path="profile"           element={<ProviderDashboard />} />
