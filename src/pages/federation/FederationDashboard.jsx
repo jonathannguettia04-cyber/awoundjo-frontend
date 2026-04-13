@@ -82,7 +82,12 @@ function CreateClientInline({ onSuccess, onCancel }) {
     setLoading(true); setError("");
     try {
       const { data } = await federationMemberAPI.createClient(form);
-      onSuccess?.(data);
+      // data = { beneficiary, credentials: { mutual_number, temp_password }, source_type }
+      onSuccess?.({
+        beneficiary:  data.beneficiary,
+        credentials:  data.credentials,
+        source_type:  data.source_type,
+      });
     } catch(e) {
       setError(e.response?.data?.error || "Erreur lors de la création");
     } finally { setLoading(false); }
@@ -140,7 +145,9 @@ function CreateClientInline({ onSuccess, onCancel }) {
 
 // ── Bannière succès après création client ─────────────────────
 function ClientCreatedBanner({ result, onClose }) {
-  const creds = result?.credentials;
+  // Le contrôleur retourne { beneficiary, credentials: { mutual_number, temp_password } }
+  // onSuccess passe l'objet complet { beneficiary, credentials, source_type }
+  const creds = result?.credentials ?? result;
   const [copied, setCopied] = useState(false);
   const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
   return (

@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDiasporaData } from "../../diasporaApi";
 import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI } from "../../federationApi";
+import { diasporaBeneAPI } from "../../diasporaApi";
 import AdhesionForm from "../../components/AdhesionForm";
 import { usePlans, planIcon } from "../../hooks/usePlans";
 
@@ -734,8 +735,9 @@ export function ReferralRegisterClient() {
   async function submit(e) {
     e.preventDefault(); setError(""); setLoading(true);
     try {
-      const { data } = await federationMemberAPI.create({ ...form, role:"CLIENT" });
-      setSuccess(data.client);
+      const { data } = await diasporaBeneAPI.create({ ...form });
+      // data = { beneficiary, credentials: { mutual_number, temp_password } }
+      setSuccess({ ...data.beneficiary, temp_password: data.credentials?.temp_password });
     } catch(err) {
       setError(err.response?.data?.error || "Erreur création client");
     } finally { setLoading(false); }
@@ -750,13 +752,29 @@ export function ReferralRegisterClient() {
             Compte créé — en attente de validation
           </h2>
           <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 20px", margin:"20px 0" }}>
-            <p style={{ margin:"0 0 6px", fontSize:13, color:C.slate }}>Numéro mutualiste</p>
-            <p style={{ margin:0, fontSize:24, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
+            <div style={{ marginBottom:10 }}>
+              <p style={{ margin:"0 0 4px", fontSize:12, color:C.slate }}>Numéro mutualiste</p>
+              <p style={{ margin:0, fontSize:22, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.mutual_number}</p>
+            </div>
+            {success.temp_password && (
+              <div style={{ borderTop:"1px solid #eee", paddingTop:10 }}>
+                <p style={{ margin:"0 0 4px", fontSize:12, color:C.slate }}>Mot de passe temporaire</p>
+                <p style={{ margin:0, fontSize:18, fontWeight:900, color:C.dark, fontFamily:"monospace" }}>{success.temp_password}</p>
+              </div>
+            )}
           </div>
           <p style={{ fontSize:13, color:C.slate, marginBottom:20 }}>
             Un administrateur doit valider ce compte avant que le client puisse effectuer son paiement d'adhésion.
           </p>
-          <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+          <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
+            <button onClick={() => { const t = `Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`; navigator.clipboard.writeText(t); }}              style={{ padding:"8px 14px", borderRadius:8, border:`1.5px solid ${C.gold}`, background:C.goldL, color:C.dark, fontWeight:700, fontSize:12, cursor:"pointer" }}>
+              📋 Copier
+            </button>
+            {success.temp_password && (
+              <a href={`https://wa.me/?text=${encodeURIComponent(`Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`)}`}                target="_blank" rel="noreferrer"                style={{ padding:"8px 14px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:12, textDecoration:"none" }}>
+                📱 WhatsApp
+              </a>
+            )}
             <Btn onClick={() => setSuccess(null)}>➕ Nouveau client</Btn>
             <Btn outline onClick={() => navigate("/referral/clients")}>Voir mes clients</Btn>
           </div>
