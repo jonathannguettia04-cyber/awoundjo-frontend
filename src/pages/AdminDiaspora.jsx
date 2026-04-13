@@ -214,6 +214,10 @@ export default function AdminDiaspora() {
   const [deleteError, setDeleteError]       = useState("");
   const [deleting, setDeleting]             = useState(false);
 
+  // 🔑 Réinitialisation MDP ambassadeur
+  const [resetLoading, setResetLoading]     = useState(null);   // id en cours
+  const [resetResult, setResetResult]       = useState(null);   // { name, username, temp_password }
+
   const stats = {
     total:      ambassadors.length,
     actifs:     ambassadors.filter(a => a.status === "ACTIVE").length,
@@ -331,6 +335,28 @@ export default function AdminDiaspora() {
     } catch (e) {
       setDeleteError(e.response?.data?.error || "Erreur suppression");
     } finally { setDeleting(false); }
+  }
+
+  async function handleResetPassword(amb, e) {
+    e.stopPropagation();
+    if (!window.confirm(`Réinitialiser le mot de passe de ${amb.name} ?\n\nUn mot de passe temporaire sera généré — communiquez-le à l'ambassadeur.`)) return;
+    setResetLoading(amb.id);
+    try {
+      const { data } = await axios.post(
+        `${API}/api/diaspora/admin/ambassadors/${amb.id}/reset-password`,
+        {},
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      setResetResult({
+        name:          amb.name,
+        username:      data.credentials?.username || amb.username,
+        temp_password: data.credentials?.temp_password,
+      });
+    } catch (err) {
+      alert(err.response?.data?.error || "Erreur lors de la réinitialisation");
+    } finally {
+      setResetLoading(null);
+    }
   }
 
   return (
@@ -569,6 +595,14 @@ export default function AdminDiaspora() {
                         {amb.status === "ACTIVE" ? "🚫 Suspendre" : "✅ Réactiver"}
                       </button>
 
+                      {/* Réinitialiser MDP */}
+                      <button
+                        onClick={e => handleResetPassword(amb, e)}
+                        disabled={resetLoading === amb.id}
+                        style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.gold}`, background:C.goldL, color:C.gold, fontWeight:700, fontSize:12, cursor: resetLoading === amb.id ? "not-allowed" : "pointer", opacity: resetLoading === amb.id ? 0.6 : 1 }}>
+                        {resetLoading === amb.id ? "⏳ Réinit…" : "🔑 Réinit. MDP"}
+                      </button>
+
                       {/* Recalculer commissions — visible uniquement si validé */}
                       {amb.status_validation === "approved" && (
                         <button onClick={e => handleRecalc(amb, e)}
@@ -606,6 +640,59 @@ export default function AdminDiaspora() {
         <p style={{ marginTop:16, textAlign:"center", color:C.slate, fontSize:12 }}>
           {filtered.length} ambassadeur(s) sur {ambassadors.length} au total
         </p>
+      )}
+
+      {/* ── Modal résultat réinitialisation MDP ── */}
+      {resetResult && (
+        <div
+          style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.6)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:500, padding:20 }}
+          onClick={() => setResetResult(null)}
+        >
+          <div style={{ background:"#fff", borderRadius:20, padding:"28px 24px", width:"100%", maxWidth:420 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
+              <span style={{ fontSize:28 }}>🔑</span>
+              <div>
+                <h3 style={{ margin:0, fontSize:17, fontWeight:800, color:C.dark }}>Mot de passe réinitialisé</h3>
+                <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{resetResult.name}</p>
+              </div>
+            </div>
+
+            <div style={{ background:C.goldL, border:`1.5px solid ${C.gold}44`, borderRadius:12, padding:"16px 18px", marginBottom:18, display:"flex", flexDirection:"column", gap:12 }}>
+              <div>
+                <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.5 }}>Identifiant</p>
+                <p style={{ margin:0, fontSize:15, fontWeight:800, color:C.dark, fontFamily:"monospace", background:"#fff", padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, userSelect:"all" }}>
+                  {resetResult.username}
+                </p>
+              </div>
+              <div>
+                <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.5 }}>Mot de passe temporaire</p>
+                <p style={{ margin:0, fontSize:17, fontWeight:900, color:C.gold, fontFamily:"monospace", background:"#fff", padding:"8px 12px", borderRadius:8, border:`1.5px solid ${C.gold}`, userSelect:"all", letterSpacing:1 }}>
+                  {resetResult.temp_password}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", borderRadius:8, padding:"10px 14px", marginBottom:18 }}>
+              <p style={{ margin:0, fontSize:12, color:"#C2410C", fontWeight:600 }}>
+                ⚠️ Communiquez ces informations directement à l'ambassadeur. Ce MDP ne sera plus affiché.
+              </p>
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button
+                onClick={() => { navigator.clipboard?.writeText(`Login: ${resetResult.username}\nMDP: ${resetResult.temp_password}`); }}
+                style={{ padding:"10px 18px", borderRadius:10, border:`1.5px solid ${C.gold}`, background:C.goldL, color:C.gold, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                📋 Copier
+              </button>
+              <button
+                onClick={() => setResetResult(null)}
+                style={{ padding:"10px 18px", borderRadius:10, border:"none", background:C.dark, color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal suppression ambassadeur ── */}
