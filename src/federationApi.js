@@ -65,7 +65,7 @@ export const federationRecruitAPI = {
 
 // ── Membres / Adhérents recrutés ──────────────────────────────
 export const federationMemberAPI = {
-  getAll:  (params) => api.get("/beneficiaries", { params }),
+  getAll:  (params) => api.get("/ambassadors", { params }),   // /beneficiaries ne filtre pas par role
   getById: (id)     => api.get(`/beneficiaries/${id}`),
   create:  (data)   => api.post("/beneficiaries", data),
 };
