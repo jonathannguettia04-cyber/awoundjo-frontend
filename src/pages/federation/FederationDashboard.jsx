@@ -403,7 +403,7 @@ export default function FederationDashboard() {
     ...(role === "RUM" ? [
       {
         icon:"⭐", label:"Mes Leaders", color:C.purple, bg:C.purpleL,
-        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        value: stats.direct_leaders ?? stats.referrals ?? stats.direct_recruits ?? 0,
         sub:   "Leaders directs recrutés",
         path:  "/referral/register-leader",
       },
@@ -416,7 +416,7 @@ export default function FederationDashboard() {
     ] : role === "LEADER" ? [
       {
         icon:"⛪", label:"Mes Pasteurs", color:C.blue, bg:C.blueL,
-        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        value: stats.direct_pasteurs ?? stats.referrals ?? stats.direct_recruits ?? 0,
         sub:   "Pasteurs recrutés par vous",
         path:  "/referral/register-pasteur",
       },
@@ -429,7 +429,7 @@ export default function FederationDashboard() {
     ] : role === "PASTEUR" ? [
       {
         icon:"🤝", label:"Mes Responsables", color:C.purple, bg:C.purpleL,
-        value: stats.referrals ?? stats.direct_recruits ?? 0,
+        value: stats.direct_responsables ?? stats.referrals ?? stats.direct_recruits ?? 0,
         sub:   "Responsables sous vous",
         path:  "/referral/register-responsable",
       },
@@ -793,6 +793,35 @@ export default function FederationDashboard() {
         </div>
       )}
 
+      {/* ── Leaders directs (RUM uniquement) ── */}
+      {stats?.direct_ambassadors?.length > 0 && (
+        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"18px 20px", marginBottom:16 }}>
+          <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark, fontSize:15 }}>
+            ⭐ Mes {role === "RUM" ? "Leaders" : role === "LEADER" ? "Pasteurs" : "Responsables"} directs
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {stats.direct_ambassadors.map(a => (
+              <div key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:C.bg, borderRadius:10 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, color:C.purple, fontSize:15 }}>
+                    {a.name?.charAt(0)}
+                  </div>
+                  <div>
+                    <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{a.name}</p>
+                    <p style={{ margin:0, fontSize:11, color:C.slate }}>{a.role} · Inscrit le {new Date(a.created_at).toLocaleDateString("fr-FR")}</p>
+                  </div>
+                </div>
+                <span style={{ fontSize:11, fontWeight:700, padding:"3px 8px", borderRadius:8,
+                  background: a.status === "ACTIVE" ? "#F0FDF4" : "#FEF9C3",
+                  color:      a.status === "ACTIVE" ? "#15803D" : "#92400E" }}>
+                  {a.status === "ACTIVE" ? "✅ Actif" : "⏳ " + a.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Résumé réseau ── */}
       {stats && (
         <div onClick={() => navigate("/referral/network")}
@@ -806,7 +835,7 @@ export default function FederationDashboard() {
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10 }}>
             {[
               { label:"Total",      value:stats.network_size ?? stats.total_network ?? 0,        color:C.purple },
-              { label:"Directs",    value:stats.referrals    ?? stats.direct_recruits ?? 0,       color:C.blue   },
+              { label:"Directs",    value:stats.direct_leaders ?? stats.direct_pasteurs ?? stats.direct_responsables ?? stats.referrals ?? 0, color:C.blue },
               { label:"Actifs",     value:stats.clients?.active ?? stats.active_clients ?? 0,    color:C.teal   },
               { label:"En attente", value:stats.clients?.pending ?? stats.pending_clients ?? 0,  color:C.slate  },
             ].map(s => (

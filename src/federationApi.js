@@ -52,8 +52,8 @@ export const federationProfileAPI = {
 
 // ── Réseau hiérarchique MLM ───────────────────────────────────
 export const federationNetAPI = {
-  getHierarchy: () => api.get("/hierarchy"),   // arbre complet
-  getTeam:      () => api.get("/team"),         // recrutés directs
+  getHierarchy: () => api.get("/network"),     // arbre complet
+  getTeam:      () => api.get("/ambassadors"),  // recrutés directs
   getNetwork:   () => api.get("/network"),      // réseau étendu
 };
 
@@ -65,9 +65,9 @@ export const federationRecruitAPI = {
 
 // ── Membres / Adhérents recrutés ──────────────────────────────
 export const federationMemberAPI = {
-  getAll:  (params) => api.get("/members", { params }),
-  getById: (id)     => api.get(`/members/${id}`),
-  create:  (data)   => api.post("/members", data),
+  getAll:  (params) => api.get("/beneficiaries", { params }),
+  getById: (id)     => api.get(`/beneficiaries/${id}`),
+  create:  (data)   => api.post("/beneficiaries", data),
 };
 
 // ── Primes & Commissions ──────────────────────────────────────
@@ -75,7 +75,7 @@ export const federationMemberAPI = {
 // Recruteur direct : 12% | Supérieur : 10% | Direction : 5%
 export const federationCommAPI = {
   getAll:    (params) => api.get("/commissions", { params }),
-  getSummary: ()      => api.get("/commissions/summary"),
+  getSummary: ()      => api.get("/commissions"),
   // Simuler le calcul avant validation
   simulate:  (prime)  => {
     const base = prime * 0.5;
