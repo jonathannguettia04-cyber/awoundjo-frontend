@@ -197,23 +197,17 @@ function getNavItems(role) {
   ];
 
   if (role === "RUM") {
-    // RUM : crée des Leaders uniquement + peut créer Clients
+    // RUM : crée des Leaders uniquement (ne crée plus de clients directs)
     base.push({ path:"/referral/register-leader",     icon:"⭐", label:"Mes Leaders"         });
     base.push({ path:"/referral/register-leader/new", icon:"➕", label:"Enregistrer Leader"   });
-    base.push({ path:"/referral/clients",             icon:"👤", label:"Mes clients directs" });
-    base.push({ path:"/referral/clients/new",         icon:"➕", label:"Enregistrer client"   });
   } else if (role === "LEADER") {
-    // LEADER : crée des Pasteurs uniquement + peut créer Clients
+    // LEADER : crée des Pasteurs uniquement (ne crée plus de clients directs)
     base.push({ path:"/referral/register-pasteur",     icon:"⛪", label:"Mes Pasteurs"         });
     base.push({ path:"/referral/register-pasteur/new", icon:"➕", label:"Enregistrer Pasteur"  });
-    base.push({ path:"/referral/clients",              icon:"👤", label:"Mes clients directs" });
-    base.push({ path:"/referral/clients/new",          icon:"➕", label:"Enregistrer client"   });
   } else if (role === "PASTEUR") {
-    // PASTEUR : crée des Responsables + peut créer Clients directement
+    // PASTEUR : crée des Responsables uniquement (ne crée plus de clients directs)
     base.push({ path:"/referral/register-responsable",     icon:"🤝", label:"Mes Responsables"        });
     base.push({ path:"/referral/register-responsable/new", icon:"➕", label:"Enregistrer Responsable" });
-    base.push({ path:"/referral/clients",                  icon:"👤", label:"Mes clients directs"    });
-    base.push({ path:"/referral/clients/new",              icon:"➕", label:"Enregistrer client"      });
     base.push({ path:"/referral/cards",                    icon:"💳", label:"Cartes vendues"          });
   } else {
     // RESPONSABLE : crée Clients + vend cartes
@@ -498,9 +492,9 @@ export default function FederationDashboard() {
     { icon:"🏆", label:"Récompenses",        path:"/referral/rewards",               color:C.green  },
   ] : role === "PASTEUR" ? [
     { icon:"🤝", label:"Nouveau Responsable", path:"/referral/register-responsable/new", color:C.purple },
-    { icon:"👤", label:"Enregistrer client", path:"/referral/clients/new",               color:C.teal   },
     { icon:"📊", label:"Mes gains",          path:"/referral/earnings",                  color:C.gold   },
     { icon:"🏆", label:"Récompenses",        path:"/referral/rewards",                   color:C.green  },
+    { icon:"🌐", label:"Mon réseau",         path:"/referral/network",                   color:C.teal   },
   ] : [
     // RESPONSABLE
     { icon:"➕", label:"Enregistrer client", path:"/referral/clients/new", color:C.purple },
@@ -542,28 +536,35 @@ export default function FederationDashboard() {
         </div>
       </div>
 
-      {/* ── Mode Pasteur (2 modes d'action) ── */}
+      {/* ── Mode Pasteur — uniquement création Responsable ── */}
       {role === "PASTEUR" && (
         <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, padding:"16px 20px", marginBottom:24 }}>
-          <p style={{ margin:"0 0 12px", fontWeight:800, color:C.dark, fontSize:14 }}>⛪ Mode d'action Pasteur</p>
-          <div style={{ display:"flex", gap:10 }}>
-            {[
-              { id:"responsable", label:"🤝 Enregistrer un Responsable", desc:"Créer un nouveau Responsable sous vous" },
-              { id:"client",      label:"👤 Enregistrer un Client",       desc:"Inscrire directement un client final"  },
-            ].map(m => (
-              <button key={m.id} onClick={() => setPasteurMode(m.id)}
-                style={{ flex:1, padding:"12px 14px", borderRadius:10, border:`2px solid ${pasteurMode===m.id?C.purple:C.border}`, background:pasteurMode===m.id?C.purpleL:"#fff", cursor:"pointer", textAlign:"left", transition:"all .2s" }}>
-                <p style={{ margin:"0 0 3px", fontSize:13, fontWeight:700, color:pasteurMode===m.id?C.purple:C.dark }}>{m.label}</p>
-                <p style={{ margin:0, fontSize:11, color:C.slate }}>{m.desc}</p>
-              </button>
-            ))}
-          </div>
+          <p style={{ margin:"0 0 12px", fontWeight:800, color:C.dark, fontSize:14 }}>⛪ Action Pasteur</p>
           <button
-            onClick={() => navigate(pasteurMode==="responsable" ? "/referral/register-responsable/new" : "/referral/clients/new")}
-            style={{ marginTop:12, padding:"10px 20px", background:C.purple, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            ➕ {pasteurMode==="responsable" ? "Créer un Responsable" : "Enregistrer un Client"}
+            onClick={() => navigate("/referral/register-responsable/new")}
+            style={{ padding:"10px 20px", background:C.purple, color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+            ➕ Créer un Responsable
           </button>
         </div>
+      )}
+
+      {/* ── Créer un client final — uniquement pour RESPONSABLE ── */}
+      {role === "RESPONSABLE" && (
+        clientResult ? (
+          <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
+        ) : showCreateClient ? (
+          <CreateClientInline
+            onSuccess={r => { setClientResult(r); setShowCreateClient(false); }}
+            onCancel={() => setShowCreateClient(false)}
+          />
+        ) : (
+          <div style={{ marginBottom:24 }}>
+            <button onClick={() => setShowCreateClient(true)}
+              style={{ padding:"10px 20px", borderRadius:10, border:`2px solid ${C.purple}`, background:C.purpleL, color:C.purple, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+              👤 Créer un client final directement
+            </button>
+          </div>
+        )
       )}
 
       {/* ── KPI Cards ── */}
@@ -627,22 +628,6 @@ export default function FederationDashboard() {
         </div>
       </div>
 
-      {/* ── Créer un client final — disponible pour TOUS les rôles ── */}
-      {clientResult ? (
-        <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
-      ) : showCreateClient ? (
-        <CreateClientInline
-          onSuccess={r => { setClientResult(r); setShowCreateClient(false); }}
-          onCancel={() => setShowCreateClient(false)}
-        />
-      ) : (
-        <div style={{ marginBottom:24 }}>
-          <button onClick={() => setShowCreateClient(true)}
-            style={{ padding:"10px 20px", borderRadius:10, border:`2px solid ${C.purple}`, background:C.purpleL, color:C.purple, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
-            👤 Créer un client final directement
-          </button>
-        </div>
-      )}
 
       {/* ── Commissions — section adaptée par rôle ──
           RUM         : toute la chaîne — commissions groupées par niveau (Leaders → Pasteurs → Responsables → Clients)

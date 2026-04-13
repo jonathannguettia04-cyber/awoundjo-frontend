@@ -184,19 +184,15 @@ function getNavItems(role) {
   ];
 
   if (role === "AMBASSADEUR_DIASPORA") {
-    // Crée Ambassadeurs Pays + RUM + peut créer Clients
+    // Crée Ambassadeurs Pays + RUM uniquement (ne crée plus de clients directs)
     base.push({ path:"/diaspora/register-pays",     icon:"🗺️", label:"Mes Ambassadeurs Pays" });
     base.push({ path:"/diaspora/register-pays/new", icon:"➕", label:"Enregistrer Amb. Pays"  });
     base.push({ path:"/diaspora/register-rum",      icon:"👑", label:"Mes RUM"                });
     base.push({ path:"/diaspora/register-rum/new",  icon:"➕", label:"Enregistrer RUM"         });
-    base.push({ path:"/diaspora/clients",           icon:"👤", label:"Mes clients directs"    });
-    base.push({ path:"/diaspora/clients/new",       icon:"➕", label:"Enregistrer client"      });
   } else if (role === "AMBASSADEUR_PAYS") {
-    // Crée Recruteurs + peut créer Clients
+    // Crée Recruteurs uniquement (ne crée plus de clients directs)
     base.push({ path:"/diaspora/register-recruiter",     icon:"🤝", label:"Mes Recruteurs"       });
     base.push({ path:"/diaspora/register-recruiter/new", icon:"➕", label:"Enregistrer Recruteur" });
-    base.push({ path:"/diaspora/clients",                icon:"👤", label:"Mes clients directs"  });
-    base.push({ path:"/diaspora/clients/new",            icon:"➕", label:"Enregistrer client"    });
   } else {
     // RECRUTEUR — crée Clients + vend cartes
     base.push({ path:"/diaspora/clients",     icon:"👤", label:"Mes clients"          });
@@ -565,21 +561,23 @@ export default function DiasporaDashboard() {
         </div>
       </div>
 
-      {/* ── Créer un client final — disponible pour TOUS les rôles ── */}
-      {clientResult ? (
-        <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
-      ) : showCreateClient ? (
-        <CreateClientInline
-          onSuccess={r => { setClientResult(r); setShowCreateClient(false); }}
-          onCancel={() => setShowCreateClient(false)}
-        />
-      ) : (
-        <div style={{ marginBottom:24 }}>
-          <button onClick={() => setShowCreateClient(true)}
-            style={{ padding:"10px 20px", borderRadius:10, border:`2px solid ${C.blue}`, background:C.blueL, color:C.blue, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
-            👤 Créer un client final directement
-          </button>
-        </div>
+      {/* ── Créer un client final — uniquement pour RECRUTEUR ── */}
+      {role === "RECRUTEUR" && (
+        clientResult ? (
+          <ClientCreatedBanner result={clientResult} onClose={() => { setClientResult(null); fetchStats(); }} />
+        ) : showCreateClient ? (
+          <CreateClientInline
+            onSuccess={r => { setClientResult(r); setShowCreateClient(false); }}
+            onCancel={() => setShowCreateClient(false)}
+          />
+        ) : (
+          <div style={{ marginBottom:24 }}>
+            <button onClick={() => setShowCreateClient(true)}
+              style={{ padding:"10px 20px", borderRadius:10, border:`2px solid ${C.blue}`, background:C.blueL, color:C.blue, fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+              👤 Créer un client final directement
+            </button>
+          </div>
+        )
       )}
 
       {/* ── Commissions — section adaptée par rôle ──
