@@ -293,23 +293,29 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
 function PaymentModal({ member, roleLabel, onClose }) {
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
+  const [payMethod,  setPayMethod]  = useState("cinetpay"); // "cinetpay" | "paydunya"
   const fee = Number(member.membership_fee) || 0;
 
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+      const token    = localStorage.getItem("diaspora_token") || localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const endpoint = payMethod === "paydunya"
+        ? `${BASE}/api/payments/paydunya/init-web`
+        : `${BASE}/api/payments/cinetpay/init-web`;
+      const body = payMethod === "paydunya"
+        ? { ambassador_id: member.id, amount: fee, currency: "XOF", type: "adhesion",
+            description: `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
+            return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+            cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed` }
+        : { ambassador_id: member.id, amount: fee, type: "adhesion",
+            description: `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
+            return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+            cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed` };
+      const res  = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ambassador_id: member.id,
-          amount:        fee,
-          type:          "adhesion",
-          description:   `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
-          return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       const url  = data?.data?.payment_url || data?.payment_url;
@@ -320,6 +326,11 @@ function PaymentModal({ member, roleLabel, onClose }) {
       setPayLoading(false);
     }
   }
+
+  const methods = [
+    { id:"cinetpay", label:"💳 CinetPay",  sub:"Carte · Mobile Money CI" },
+    { id:"paydunya", label:"🏦 PayDunya",   sub:"Orange · Wave · MTN · Moov" },
+  ];
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
@@ -347,6 +358,24 @@ function PaymentModal({ member, roleLabel, onClose }) {
           </div>
         </div>
 
+        {/* Sélecteur méthode de paiement */}
+        <p style={{ margin:"0 0 8px", fontSize:12, fontWeight:700, color:C.slate }}>Choisir le mode de paiement</p>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+          {methods.map(m => (
+            <button key={m.id} onClick={() => setPayMethod(m.id)}
+              style={{
+                padding:"10px 8px", borderRadius:10, cursor:"pointer", textAlign:"left",
+                background: payMethod === m.id ? (m.id === "cinetpay" ? "#EFF6FF" : "#ECFDF5") : "#fff",
+                border: `2px solid ${payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.border}`,
+                fontFamily:"inherit", transition:"all .15s",
+              }}>
+              <p style={{ margin:0, fontWeight:800, fontSize:13,
+                color: payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.dark }}>{m.label}</p>
+              <p style={{ margin:"2px 0 0", fontSize:10, color:C.slate }}>{m.sub}</p>
+            </button>
+          ))}
+        </div>
+
         {payError && (
           <div style={{ background:C.redL, borderRadius:8, padding:"10px 12px", marginBottom:14 }}>
             <p style={{ margin:0, fontSize:13, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
@@ -356,19 +385,24 @@ function PaymentModal({ member, roleLabel, onClose }) {
         <button onClick={handlePay} disabled={payLoading}
           style={{
             width:"100%", padding:"14px 0", borderRadius:10, border:"none",
-            background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0072C6,#005A9E)",
+            background: payLoading ? "#94a3b8"
+              : payMethod === "paydunya" ? "linear-gradient(135deg,#059669,#047857)"
+              : "linear-gradient(135deg,#0072C6,#005A9E)",
             color:"#fff", fontWeight:900, fontSize:15,
             cursor: payLoading ? "not-allowed" : "pointer",
             display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,114,198,.35)",
+            boxShadow: payLoading ? "none" : payMethod === "paydunya" ? "0 4px 16px rgba(5,150,105,.35)" : "0 4px 16px rgba(0,114,198,.35)",
             fontFamily:"inherit", marginBottom:10,
           }}>
           {payLoading ? (
             <>
               <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
-              Redirection vers CinetPay…
+              {payMethod === "paydunya" ? "Redirection vers PayDunya…" : "Redirection vers CinetPay…"}
             </>
-          ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>}
+          ) : payMethod === "paydunya"
+            ? <>🏦 Payer {fee.toLocaleString("fr-FR")} FCFA avec PayDunya</>
+            : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>
+          }
         </button>
         <p style={{ margin:"0 0 12px", fontSize:11, color:C.slate, textAlign:"center" }}>
           MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
