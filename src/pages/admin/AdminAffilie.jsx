@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const agentToken = () => localStorage.getItem("token") || localStorage.getItem("agent_token");
+const agentToken = () => localStorage.getItem("token");
 
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF", purpleD: "#5B21B6",
