@@ -4,6 +4,7 @@
 //  Deux réseaux ambassadeurs :
 //    DIASPORA  : /diaspora/*  (Amb. Diaspora → Amb. Pays → Recruteur → Client)
 //    REFERRAL  : /referral/*  (RUM → Leader → Pasteur → Responsable → Client)
+//    AFFILIE   : /affilie/*   (Directrice → Leader → Superviseur → Recruteur)
 //  Auth partagée via DiasporaAuth + même token JWT
 // ─────────────────────────────────────────────────────────────
 import { lazy, Suspense } from "react";
@@ -40,6 +41,9 @@ const AdminCredentials          = lazy(() => import("./pages/AdminCredentials"))
 const AdminExports              = lazy(() => import("./pages/AdminExports"));
 const AdminValidationClients    = lazy(() => import("./pages/AdminValidationClients"));
 const AdminResetPassword        = lazy(() => import("./pages/AdminResetPassword"));
+
+// ── Pages ADMIN — Affilié ────────────────────────────────────
+const AdminAffilie              = lazy(() => import("./pages/admin/AdminAffilie"));
 
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin         = lazy(() => import("./pages/client/ClientLogin"));
@@ -120,6 +124,10 @@ const ReferralRegisterClient      = referralPage("ReferralRegisterClient");
 const ReferralClients             = referralPage("ReferralClients");
 const ReferralCards               = referralPage("ReferralCards");
 
+// ── Pages AFFILIÉ ─────────────────────────────────────────────
+const AffilieAuth         = lazy(() => import("./pages/affilie/AffilieAuth"));
+// const AffilieDashboard = lazy(() => import("./pages/affilie/AffilieDashboard")); // à créer
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -172,6 +180,13 @@ function DiasporaGuard({ children }) {
   return children;
 }
 
+// Guard Affilié — token dédié
+function AffilieGuard({ children }) {
+  const token = safeLocalStorage("getItem", "affilie_token");
+  if (!token) return <Navigate to="/affilie/login" replace />;
+  return children;
+}
+
 // ── App ──────────────────────────────────────────────────────
 export default function App() {
   const { user } = useAuth();
@@ -183,7 +198,8 @@ export default function App() {
   const isProviderPage = pathname.startsWith("/etablissement");
   const isDiasporaPage = pathname.startsWith("/diaspora");
   const isReferralPage = pathname.startsWith("/referral");
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage;
+  const isAffiliePage  = pathname.startsWith("/affilie");
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -250,6 +266,11 @@ export default function App() {
             } />
             <Route path="/admin/clients/reset-password" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminResetPassword /></ProtectedRoute>
+            } />
+
+            {/* ── ADMIN — Affilié ──────────────────────────── */}
+            <Route path="/admin/affilie" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminAffilie /></ProtectedRoute>
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}
@@ -343,6 +364,17 @@ export default function App() {
               <Route path="notifications"              element={<ReferralNotifications />} />
               <Route path="profile"                    element={<ReferralProfile />} />
             </Route>
+
+            {/* ═══════════════════════════════════════════════
+                RÉSEAU AFFILIÉ
+            ══════════════════════════════════════════════════*/}
+            <Route path="/affilie/login"    element={<AffilieAuth />} />
+            <Route path="/affilie/register" element={<AffilieAuth />} />
+            {/* Dashboard affilié — décommenter quand AffilieDashboard sera créé */}
+            {/* <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
+              <Route index element={<Navigate to="/affilie/dashboard" replace />} />
+              <Route path="dashboard" element={<AffilieDashboard />} />
+            </Route> */}
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
