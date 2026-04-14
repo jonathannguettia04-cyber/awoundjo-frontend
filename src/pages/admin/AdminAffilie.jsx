@@ -14,7 +14,14 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const agentToken = () => localStorage.getItem("token");
+const agentToken = () => {
+  const t =
+    localStorage.getItem("token") ||
+    localStorage.getItem("agent_token") ||
+    localStorage.getItem("adminToken") ||
+    sessionStorage.getItem("token");
+  return t;
+};
 
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF", purpleD: "#5B21B6",
@@ -199,14 +206,23 @@ export default function AdminAffilie() {
   const loadMembers = useCallback(async () => {
     setLoading(true); setError("");
     try {
+      const tok = agentToken();
+      if (!tok) {
+        setError("Token admin introuvable — veuillez vous reconnecter.");
+        setLoading(false);
+        return;
+      }
       const params = new URLSearchParams();
       if (filterRole)   params.append("role",   filterRole);
       if (filterStatus) params.append("status", filterStatus);
-      const { data } = await axios.get(`${API}/api/affilie/admin/members?${params}`, { headers: headers() });
+      const { data } = await axios.get(`${API}/api/affilie/admin/members?${params}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
       setMembers(data.data?.members || []);
       setStats(data.data?.stats || null);
     } catch (e) {
-      setError(e.response?.data?.error || "Erreur chargement");
+      const msg = e.response?.data?.error || e.message || "Erreur chargement";
+      setError(`Erreur ${e.response?.status || ""}: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -218,7 +234,7 @@ export default function AdminAffilie() {
       const { data } = await axios.get(`${API}/api/affilie/admin/commissions`, { headers: headers() });
       setCommissions(data.data?.commissions || []);
     } catch (e) {
-      setError(e.response?.data?.error || "Erreur chargement commissions");
+      setError(`Erreur ${e.response?.status || ""}: ${e.response?.data?.error || e.message || "Erreur chargement commissions"}`);
     } finally {
       setLoading(false);
     }
