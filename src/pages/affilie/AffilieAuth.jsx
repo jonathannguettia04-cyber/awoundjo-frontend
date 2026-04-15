@@ -22,7 +22,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+// APRÈS
+const BASE = "https://awoundjo-backend-production-ba8c.up.railway.app";
 
 const COUNTRIES = [
   "Côte d'Ivoire","France","Belgique","Suisse","Canada","États-Unis","Royaume-Uni",
