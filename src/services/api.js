@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://awoundjo-backend-production-ba8c.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // ── Instance AGENT (token agent) ─────────────────────────────────
 const api = axios.create({

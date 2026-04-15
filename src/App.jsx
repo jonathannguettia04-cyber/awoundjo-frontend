@@ -126,7 +126,17 @@ const ReferralCards               = referralPage("ReferralCards");
 
 // ── Pages AFFILIÉ ─────────────────────────────────────────────
 const AffilieAuth         = lazy(() => import("./pages/affilie/AffilieAuth"));
-// const AffilieDashboard = lazy(() => import("./pages/affilie/AffilieDashboard")); // à créer
+const AffilieLayout       = lazy(() => import("./pages/affilie/AffilieLayout"));
+
+const affiliePage = (name) =>
+  lazy(() => import("./pages/affilie/AffiliePages").then(m => ({ default: m[name] })));
+
+const AffilieDashboard    = affiliePage("AffilieDashboard");
+const AffilieCommissions  = affiliePage("AffilieCommissions");
+const AffilieReseau       = affiliePage("AffilieReseau");
+const AffilieNotifications= affiliePage("AffilieNotifications");
+const AffilieProfil       = affiliePage("AffilieProfil");
+const AffilieMembers      = affiliePage("AffilieMembers");
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
@@ -370,11 +380,15 @@ export default function App() {
             ══════════════════════════════════════════════════*/}
             <Route path="/affilie/login"    element={<AffilieAuth />} />
             <Route path="/affilie/register" element={<AffilieAuth />} />
-            {/* Dashboard affilié — décommenter quand AffilieDashboard sera créé */}
-            {/* <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
-              <Route index element={<Navigate to="/affilie/dashboard" replace />} />
-              <Route path="dashboard" element={<AffilieDashboard />} />
-            </Route> */}
+            <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
+              <Route index                   element={<Navigate to="/affilie/dashboard" replace />} />
+              <Route path="dashboard"        element={<AffilieDashboard />} />
+              <Route path="commissions"      element={<AffilieCommissions />} />
+              <Route path="reseau"           element={<AffilieReseau />} />
+              <Route path="notifications"    element={<AffilieNotifications />} />
+              <Route path="profil"           element={<AffilieProfil />} />
+              <Route path="membres"          element={<AffilieMembers />} />
+            </Route>
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
