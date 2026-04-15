@@ -9,19 +9,74 @@
 //    - Réinitialisation mot de passe
 //    - Suppression avec confirmation mot de passe admin
 //    - Gestion des commissions
+//
+//  ✅ FIXES v2 :
+//    - Détection automatique de la clé token dans localStorage/sessionStorage
+//    - Panneau de diagnostic intégré (visible si "Aucun membre trouvé")
+//    - Affichage de l'erreur HTTP réelle (401/403/500) au lieu de silence
+//    - Logs console structurés pour déboguer facilement
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const agentToken = () => {
-  const t =
-    localStorage.getItem("token") ||
-    localStorage.getItem("agent_token") ||
-    localStorage.getItem("adminToken") ||
-    sessionStorage.getItem("token");
-  return t;
-};
+
+// ✅ FIX 1 : Détection automatique du token — on scanne TOUTES les clés connues
+//            et on prend la première qui ressemble à un JWT (commence par "eyJ")
+const KNOWN_TOKEN_KEYS = [
+  "token", "agent_token", "adminToken", "admin_token",
+  "agentToken", "accessToken", "access_token", "jwt", "auth_token",
+];
+
+function agentToken() {
+  // 1. Chercher dans localStorage avec les clés connues
+  for (const key of KNOWN_TOKEN_KEYS) {
+    const val = localStorage.getItem(key);
+    if (val && val.startsWith("eyJ")) {
+      console.log(`[agentToken] ✅ Token trouvé → localStorage["${key}"]`);
+      return val;
+    }
+  }
+  // 2. Chercher dans sessionStorage avec les clés connues
+  for (const key of KNOWN_TOKEN_KEYS) {
+    const val = sessionStorage.getItem(key);
+    if (val && val.startsWith("eyJ")) {
+      console.log(`[agentToken] ✅ Token trouvé → sessionStorage["${key}"]`);
+      return val;
+    }
+  }
+  // 3. Scan complet localStorage (au cas où la clé est inconnue)
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const val = localStorage.getItem(key);
+    if (val && val.startsWith("eyJ") && val.length > 50) {
+      console.warn(`[agentToken] ⚠️ Token trouvé dans clé inattendue → localStorage["${key}"]`);
+      return val;
+    }
+  }
+  console.error("[agentToken] ❌ Aucun token JWT trouvé dans localStorage ni sessionStorage");
+  return null;
+}
+
+// Retourne un résumé des clés disponibles pour le panneau de diagnostic
+function debugStorageKeys() {
+  const result = { localStorage: {}, sessionStorage: {} };
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const val = localStorage.getItem(key);
+    result.localStorage[key] = val?.startsWith("eyJ")
+      ? `JWT (${val.length} chars) → ${val.substring(0, 25)}...`
+      : (val?.length > 60 ? val.substring(0, 40) + "..." : val);
+  }
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    const val = sessionStorage.getItem(key);
+    result.sessionStorage[key] = val?.startsWith("eyJ")
+      ? `JWT (${val.length} chars) → ${val.substring(0, 25)}...`
+      : (val?.length > 60 ? val.substring(0, 40) + "..." : val);
+  }
+  return result;
+}
 
 const C = {
   purple:  "#7C3AED", purpleL: "#F5F3FF", purpleD: "#5B21B6",
@@ -39,16 +94,16 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-dig
 const headers = () => ({ Authorization: `Bearer ${agentToken()}` });
 
 const ROLE_CONFIG = {
-  DIRECTRICE:      { label: "Directrice",      icon: "👑", color: C.purple, bg: C.purpleL },
-  LEADER_AFF:      { label: "Leader",           icon: "⭐", color: C.blue,   bg: C.blueL   },
-  SUPERVISEUR_AFF: { label: "Superviseur",      icon: "🎯", color: C.teal,   bg: C.tealL   },
-  RECRUTEUR_AFF:   { label: "Recruteur",        icon: "🤝", color: C.green,  bg: C.greenL  },
+  DIRECTRICE:      { label: "Directrice",  icon: "👑", color: C.purple, bg: C.purpleL },
+  LEADER_AFF:      { label: "Leader",      icon: "⭐", color: C.blue,   bg: C.blueL   },
+  SUPERVISEUR_AFF: { label: "Superviseur", icon: "🎯", color: C.teal,   bg: C.tealL   },
+  RECRUTEUR_AFF:   { label: "Recruteur",   icon: "🤝", color: C.green,  bg: C.greenL  },
 };
 
 const STATUS_CONFIG = {
-  ACTIVE:    { label: "Actif",      color: C.green,  bg: C.greenL },
-  SUSPENDED: { label: "Suspendu",   color: C.red,    bg: C.redL   },
-  PENDING:   { label: "En attente", color: C.gold,   bg: C.goldL  },
+  ACTIVE:    { label: "Actif",      color: C.green, bg: C.greenL },
+  SUSPENDED: { label: "Suspendu",   color: C.red,   bg: C.redL   },
+  PENDING:   { label: "En attente", color: C.gold,  bg: C.goldL  },
 };
 
 const VALIDATION_CONFIG = {
@@ -72,6 +127,88 @@ const Badge = ({ config, value }) => {
     </span>
   );
 };
+
+// ── Panneau de diagnostic ─────────────────────────────────────
+function DiagnosticPanel({ apiError, apiUrl }) {
+  const [show, setShow] = useState(false);
+  const [storageInfo] = useState(() => debugStorageKeys());
+  const tok = agentToken();
+
+  return (
+    <div style={{ background: "#FFFBEB", border: `1.5px solid ${C.gold}`, borderRadius: 12, padding: "14px 18px", marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={{ margin: 0, fontWeight: 800, color: C.gold, fontSize: 14 }}>
+          🔍 Diagnostic — Pourquoi aucun membre ne s'affiche ?
+        </p>
+        <button onClick={() => setShow(p => !p)}
+          style={{ padding: "4px 12px", borderRadius: 7, border: `1px solid ${C.gold}`, background: "transparent", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+          {show ? "Masquer" : "Afficher détails"}
+        </button>
+      </div>
+
+      {/* Résumé rapide */}
+      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        <DiagLine
+          ok={!!tok}
+          label="Token admin détecté"
+          detail={tok ? `${tok.substring(0, 30)}...` : "❌ Aucun token JWT trouvé dans localStorage/sessionStorage"}
+        />
+        <DiagLine
+          ok={!apiError}
+          label="Réponse API OK"
+          detail={apiError || "✅ L'API répond correctement"}
+        />
+        <DiagLine
+          ok={apiUrl?.includes("/api/affilie/admin/members")}
+          label="URL appelée"
+          detail={apiUrl || "—"}
+        />
+      </div>
+
+      {show && (
+        <div style={{ marginTop: 14, background: "#fff", borderRadius: 8, padding: 12, fontSize: 11, fontFamily: "monospace", color: C.dark, border: `1px solid ${C.border}` }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 800, fontSize: 12 }}>📦 Contenu localStorage :</p>
+          {Object.keys(storageInfo.localStorage).length === 0
+            ? <p style={{ color: C.slate, margin: 0 }}>localStorage vide</p>
+            : Object.entries(storageInfo.localStorage).map(([k, v]) => (
+                <div key={k} style={{ marginBottom: 4 }}>
+                  <span style={{ color: C.purple, fontWeight: 700 }}>{k}</span>
+                  <span style={{ color: C.slate }}> → </span>
+                  <span style={{ color: C.dark }}>{String(v)}</span>
+                </div>
+              ))
+          }
+          <p style={{ margin: "10px 0 8px", fontWeight: 800, fontSize: 12 }}>📦 Contenu sessionStorage :</p>
+          {Object.keys(storageInfo.sessionStorage).length === 0
+            ? <p style={{ color: C.slate, margin: 0 }}>sessionStorage vide</p>
+            : Object.entries(storageInfo.sessionStorage).map(([k, v]) => (
+                <div key={k} style={{ marginBottom: 4 }}>
+                  <span style={{ color: C.teal, fontWeight: 700 }}>{k}</span>
+                  <span style={{ color: C.slate }}> → </span>
+                  <span style={{ color: C.dark }}>{String(v)}</span>
+                </div>
+              ))
+          }
+          <p style={{ margin: "12px 0 4px", fontWeight: 800, fontSize: 12, color: C.slate }}>
+            💡 Si votre token est dans une clé qui n'est pas listée ci-dessus, ajoutez-la dans <code>KNOWN_TOKEN_KEYS</code> en haut du fichier.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiagLine({ ok, label, detail }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12 }}>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>{ok ? "✅" : "❌"}</span>
+      <div>
+        <span style={{ fontWeight: 700, color: C.dark }}>{label} : </span>
+        <span style={{ color: ok ? C.slate : C.red }}>{detail}</span>
+      </div>
+    </div>
+  );
+}
 
 // ── Section comptes en attente de validation ──────────────────
 function PendingSection({ members, onValidate, loading }) {
@@ -188,15 +325,19 @@ function DeleteModal({ member, onClose, onConfirm, loading }) {
 //  COMPOSANT PRINCIPAL
 // ═════════════════════════════════════════════════════════════
 export default function AdminAffilie() {
-  const [activeTab,   setActiveTab]   = useState("members");
-  const [members,     setMembers]     = useState([]);
-  const [commissions, setCommissions] = useState([]);
-  const [stats,       setStats]       = useState(null);
-  const [loading,     setLoading]     = useState(false);
+  const [activeTab,     setActiveTab]     = useState("members");
+  const [members,       setMembers]       = useState([]);
+  const [commissions,   setCommissions]   = useState([]);
+  const [stats,         setStats]         = useState(null);
+  const [loading,       setLoading]       = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error,       setError]       = useState("");
-  const [success,     setSuccess]     = useState("");
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [error,         setError]         = useState("");
+  const [success,       setSuccess]       = useState("");
+  const [deleteTarget,  setDeleteTarget]  = useState(null);
+
+  // ✅ FIX 2 : États pour le diagnostic
+  const [apiError,  setApiError]  = useState("");
+  const [lastApiUrl, setLastApiUrl] = useState("");
 
   // Filtres
   const [filterRole,   setFilterRole]   = useState("");
@@ -204,25 +345,74 @@ export default function AdminAffilie() {
 
   // ── Chargement ─────────────────────────────────────────────
   const loadMembers = useCallback(async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
+    setApiError("");
+
+    const tok = agentToken();
+
+    // ✅ FIX 3 : Log structuré pour debug
+    console.group("[AdminAffilie] loadMembers()");
+    console.log("API base URL :", API);
+    console.log("Token présent :", !!tok);
+    if (tok) console.log("Token (début) :", tok.substring(0, 40) + "...");
+
+    if (!tok) {
+      const msg = "❌ Token admin introuvable — vérifiez que vous êtes bien connecté en tant qu'admin. Ouvrez le panneau de diagnostic ci-dessous.";
+      setError(msg);
+      setApiError(msg);
+      setLoading(false);
+      console.error("[AdminAffilie] Aucun token JWT trouvé dans le storage");
+      console.groupEnd();
+      return;
+    }
+
     try {
-      const tok = agentToken();
-      if (!tok) {
-        setError("Token admin introuvable — veuillez vous reconnecter.");
-        setLoading(false);
-        return;
-      }
       const params = new URLSearchParams();
       if (filterRole)   params.append("role",   filterRole);
       if (filterStatus) params.append("status", filterStatus);
-      const { data } = await axios.get(`${API}/api/affilie/admin/members?${params}&_t=${Date.now()}`, {
+
+      const url = `${API}/api/affilie/admin/members?${params}&_t=${Date.now()}`;
+      setLastApiUrl(url);
+      console.log("URL appelée :", url);
+
+      const { data } = await axios.get(url, {
         headers: { Authorization: `Bearer ${tok}` },
       });
+
+      console.log("✅ Réponse API :", data);
+      console.log("Membres reçus :", data.data?.members?.length ?? 0);
+      console.groupEnd();
+
       setMembers(data.data?.members || []);
       setStats(data.data?.stats || null);
+
     } catch (e) {
-      const msg = e.response?.data?.error || e.message || "Erreur chargement";
-      setError(`Erreur ${e.response?.status || ""}: ${msg}`);
+      const status  = e.response?.status;
+      const apiMsg  = e.response?.data?.error || e.message || "Erreur inconnue";
+
+      // ✅ FIX 4 : Messages d'erreur explicites selon le code HTTP
+      let friendlyMsg = "";
+      if (status === 401) {
+        friendlyMsg = `401 Non autorisé — Le token est invalide ou expiré. Reconnectez-vous en tant qu'admin.`;
+      } else if (status === 403) {
+        friendlyMsg = `403 Accès refusé — Votre compte n'a pas le rôle ADMIN. Vérifiez que vous utilisez bien un compte agent/admin (table "agents"), pas un compte affilié.`;
+      } else if (status === 404) {
+        friendlyMsg = `404 Route introuvable — Vérifiez que /api/affilie/admin/members existe dans votre serveur.`;
+      } else if (status === 500) {
+        friendlyMsg = `500 Erreur serveur — ${apiMsg}`;
+      } else if (!status) {
+        friendlyMsg = `Impossible de joindre le serveur (${API}). Vérifiez que le backend tourne.`;
+      } else {
+        friendlyMsg = `Erreur ${status} : ${apiMsg}`;
+      }
+
+      console.error("[AdminAffilie] ❌ Erreur API :", status, apiMsg);
+      console.error("[AdminAffilie] Réponse complète :", e.response?.data);
+      console.groupEnd();
+
+      setError(friendlyMsg);
+      setApiError(friendlyMsg);
     } finally {
       setLoading(false);
     }
@@ -234,22 +424,24 @@ export default function AdminAffilie() {
       const { data } = await axios.get(`${API}/api/affilie/admin/commissions`, { headers: headers() });
       setCommissions(data.data?.commissions || []);
     } catch (e) {
-      setError(`Erreur ${e.response?.status || ""}: ${e.response?.data?.error || e.message || "Erreur chargement commissions"}`);
+      const status = e.response?.status;
+      const msg    = e.response?.data?.error || e.message || "Erreur chargement commissions";
+      setError(`Erreur ${status || ""}: ${msg}`);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab === "members") loadMembers();
+    if (activeTab === "members")     loadMembers();
     if (activeTab === "commissions") loadCommissions();
   }, [activeTab, loadMembers, loadCommissions]);
 
   // ── Actions ────────────────────────────────────────────────
   const flash = (msg, isErr = false) => {
     if (isErr) { setError(msg); setSuccess(""); }
-    else { setSuccess(msg); setError(""); }
-    setTimeout(() => { setError(""); setSuccess(""); }, 4000);
+    else       { setSuccess(msg); setError(""); }
+    setTimeout(() => { setError(""); setSuccess(""); }, 5000);
   };
 
   async function handleValidate(id, action, paymentMethod) {
@@ -260,10 +452,12 @@ export default function AdminAffilie() {
         { action, paymentMethod },
         { headers: headers() }
       );
-      flash(data.data?.message || "Fait !");
+      flash(data.data?.message || "Opération réussie !");
       loadMembers();
     } catch (e) {
-      flash(e.response?.data?.error || "Erreur", true);
+      const status = e.response?.status;
+      const msg    = e.response?.data?.error || e.message || "Erreur";
+      flash(`Erreur ${status || ""}: ${msg}`, true);
     } finally {
       setActionLoading(false);
     }
@@ -345,13 +539,13 @@ export default function AdminAffilie() {
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
           {[
-            { label: "Total membres",    value: fmt(stats.total),              color: C.purple },
-            { label: "Actifs",           value: fmt(stats.active),             color: C.green  },
+            { label: "Total membres",     value: fmt(stats.total),              color: C.purple },
+            { label: "Actifs",            value: fmt(stats.active),             color: C.green  },
             { label: "En attente valid.", value: fmt(stats.pending_validation), color: C.gold   },
-            { label: "Directrices",      value: fmt(stats.directrices),        color: C.purple },
-            { label: "Leaders",          value: fmt(stats.leaders),            color: C.blue   },
-            { label: "Superviseurs",     value: fmt(stats.superviseurs),       color: C.teal   },
-            { label: "Recruteurs",       value: fmt(stats.recruteurs),         color: C.green  },
+            { label: "Directrices",       value: fmt(stats.directrices),        color: C.purple },
+            { label: "Leaders",           value: fmt(stats.leaders),            color: C.blue   },
+            { label: "Superviseurs",      value: fmt(stats.superviseurs),       color: C.teal   },
+            { label: "Recruteurs",        value: fmt(stats.recruteurs),         color: C.green  },
           ].map(s => (
             <div key={s.label} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: `1.5px solid ${C.border}` }}>
               <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</p>
@@ -362,7 +556,7 @@ export default function AdminAffilie() {
       )}
 
       {/* Alertes flash */}
-      {error   && <div style={{ background: C.redL,   color: C.red,   border: `1px solid ${C.red}44`,   borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 13, fontWeight: 700 }}>{error}</div>}
+      {error   && <div style={{ background: C.redL,   color: C.red,   border: `1px solid ${C.red}44`,   borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 13, fontWeight: 700, whiteSpace: "pre-wrap" }}>{error}</div>}
       {success && <div style={{ background: C.greenL, color: C.green, border: `1px solid ${C.green}44`, borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 13, fontWeight: 700 }}>{success}</div>}
 
       {/* Onglets */}
@@ -403,18 +597,27 @@ export default function AdminAffilie() {
               <option value="approved">✅ Approuvé</option>
               <option value="rejected">❌ Rejeté</option>
             </select>
-            <button onClick={loadMembers} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, color: C.purple }}>
+            <button onClick={loadMembers}
+              style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, color: C.purple }}>
               🔄 Actualiser
             </button>
           </div>
 
           {/* Liste membres */}
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: C.slate }}>Chargement...</div>
+            <div style={{ textAlign: "center", padding: 40, color: C.slate }}>
+              <p style={{ fontSize: 24, margin: "0 0 8px" }}>⏳</p>
+              <p style={{ margin: 0, fontWeight: 700 }}>Chargement en cours...</p>
+            </div>
           ) : members.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: C.slate }}>
               <p style={{ fontSize: 32, margin: "0 0 8px" }}>👥</p>
               <p style={{ margin: 0, fontWeight: 700 }}>Aucun membre trouvé</p>
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>
+                {apiError ? "Une erreur s'est produite lors du chargement." : "La table affilie_members semble vide, ou les filtres ne correspondent à aucun résultat."}
+              </p>
+              {/* ✅ FIX 5 : Panneau de diagnostic visible dès qu'il n'y a rien */}
+              <DiagnosticPanel apiError={apiError} apiUrl={lastApiUrl} />
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -431,15 +634,27 @@ export default function AdminAffilie() {
                         <div>
                           <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: C.dark }}>{m.name}</p>
                           <p style={{ margin: "1px 0", fontSize: 12, color: C.slate }}>{m.email}</p>
-                          <p style={{ margin: "1px 0", fontSize: 11, color: C.slate }}>{m.country}{m.city ? ` · ${m.city}` : ""} · {fmtDate(m.created_at)}</p>
-                          {m.referrer_name && <p style={{ margin: "1px 0", fontSize: 11, color: C.purple }}>Parrain : {m.referrer_name} ({ROLE_CONFIG[m.referrer_role]?.label || m.referrer_role})</p>}
+                          <p style={{ margin: "1px 0", fontSize: 11, color: C.slate }}>
+                            {m.country}{m.city ? ` · ${m.city}` : ""} · {fmtDate(m.created_at)}
+                          </p>
+                          {m.referrer_name && (
+                            <p style={{ margin: "1px 0", fontSize: 11, color: C.purple }}>
+                              Parrain : {m.referrer_name} ({ROLE_CONFIG[m.referrer_role]?.label || m.referrer_role})
+                            </p>
+                          )}
                           <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                             <Badge config={ROLE_CONFIG}       value={m.role} />
                             <Badge config={STATUS_CONFIG}     value={m.status} />
                             <Badge config={VALIDATION_CONFIG} value={m.status_validation || "pending"} />
                             <Badge config={PAYMENT_CONFIG}    value={m.status_payment} />
-                            {m.plan && <span style={{ fontSize: 11, background: C.bg, color: C.slate, padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{m.plan}</span>}
-                            {m.team_size > 0 && <span style={{ fontSize: 11, background: C.purpleL, color: C.purple, padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>Équipe : {m.team_size}</span>}
+                            {m.plan && (
+                              <span style={{ fontSize: 11, background: C.bg, color: C.slate, padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{m.plan}</span>
+                            )}
+                            {m.team_size > 0 && (
+                              <span style={{ fontSize: 11, background: C.purpleL, color: C.purple, padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>
+                                Équipe : {m.team_size}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
