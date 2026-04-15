@@ -186,8 +186,9 @@ export default function ClientCotisations() {
     return <ValidationRejectedScreen />;
   }
 
-  const plan    = client?.plan || "IVOIRIENNE";
-  const monthly = PLAN_PRICES[plan] ?? PLAN_PRICES['IVOIRIENNE'];
+  // On transforme le plan en majuscules avant de chercher le prix
+const planKey = profile?.plan ? profile.plan.toUpperCase() : "ESSENTIELLE";
+const monthly = PLAN_PRICES[planKey] || 10000; // 10 000 par défaut (Essentielle) au lieu de 35 000
 
   const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
