@@ -157,21 +157,26 @@ export default function AffilieAuth() {
       const data = await res.json();
 
       if (!res.ok) {
-        const code = data.error_data?.code || null;
+        // FIX : le backend retourne { success, error, code, member_id, plan, membership_fee }
+        // directement à la racine (pas dans data.error_data)
+        const code = data.code || null;
         setErrorCode(code);
         if (code === "PAYMENT_REQUIRED") {
-          setErrorMemberId(data.error_data?.member_id || null);
-          setErrorPlan(data.error_data?.plan || null);
-          setErrorFee(data.error_data?.membership_fee || null);
+          setErrorMemberId(data.member_id || null);
+          setErrorPlan(data.plan || null);
+          setErrorFee(data.membership_fee || null);
         }
         setError(data.error || "Erreur de connexion");
         return;
       }
 
-      localStorage.setItem("affilie_token", data.data.token);
-      localStorage.setItem("affilie_member", JSON.stringify(data.data.member));
+      // FIX : le backend retourne { success, token, member, ... } à la racine
+      // (pas wrappé dans data.data)
+      localStorage.setItem("affilie_token",  data.token);
+      localStorage.setItem("affilie_member", JSON.stringify(data.member));
       navigate("/affilie/dashboard");
-    } catch {
+    } catch (e) {
+      console.error("[handleLogin] erreur fetch:", e);
       setError("Impossible de contacter le serveur");
     } finally {
       setLoading(false);
@@ -189,11 +194,12 @@ export default function AffilieAuth() {
         body: JSON.stringify({ member_id: errorMemberId }),
       });
       const data = await res.json();
-      if (!res.ok || !data.data?.payment_url) {
+      // FIX : payment_url à la racine (pas dans data.data)
+      if (!res.ok || !data.payment_url) {
         setError("Impossible d'initier le paiement. Contactez le support.");
         return;
       }
-      window.location.href = data.data.payment_url;
+      window.location.href = data.payment_url;
     } catch {
       setError("Erreur réseau");
     } finally {
