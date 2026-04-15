@@ -142,9 +142,11 @@ export default function AffilieAuth() {
     if (token) navigate("/affilie/dashboard");
   }, []);
 
+  // ── Helper champs ─────────────────────────────────────────
+  const inp = (field, form, setter) => (e) => setter(p => ({ ...p, [field]: e.target.value }));
+
   // ── Login ──────────────────────────────────────────────────
-  async function handleLogin(e) {
-    e.preventDefault();
+  async function handleLogin() {
     setError(""); setErrorCode(null); setLoading(true);
     try {
       const res = await fetch(`${BASE}/api/affilie/login`, {
@@ -200,8 +202,7 @@ export default function AffilieAuth() {
   }
 
   // ── Register Directrice ────────────────────────────────────
-  async function handleRegister(e) {
-    e.preventDefault();
+  async function handleRegister() {
     setError(""); setSuccess(""); setLoading(true);
 
     if (!regForm.name || !regForm.email || !regForm.password)
@@ -243,8 +244,6 @@ export default function AffilieAuth() {
   }
 
   // ── Rendu ──────────────────────────────────────────────────
-  const inp = (field, form, setter) => (e) => setter(p => ({ ...p, [field]: e.target.value }));
-
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(135deg, ${C.primaryL} 0%, #fff 60%)`, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ width: "100%", maxWidth: 460 }}>
