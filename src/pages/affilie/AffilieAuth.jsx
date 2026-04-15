@@ -172,12 +172,19 @@ export default function AffilieAuth() {
 
       // FIX : le backend retourne { success, token, member, ... } à la racine
       // (pas wrappé dans data.data)
-      localStorage.setItem("affilie_token",  data.token);
-      localStorage.setItem("affilie_member", JSON.stringify(data.member));
-      navigate("/affilie/dashboard");
+     // Remplace tes lignes 137-138 par ceci :
+if (data.token && data.member) {
+    localStorage.setItem("affilie_token", data.token);
+    localStorage.setItem("affilie_member", JSON.stringify(data.member));
+    navigate("/affilie/dashboard");
+} else {
+    setError("Erreur : Le serveur n'a pas renvoyé toutes les données utilisateur.");
+}
+    // Ligne 140 à remplacer :
     } catch (e) {
-      console.error("[handleLogin] erreur fetch:", e);
-      setError("Impossible de contacter le serveur");
+      console.error("[handleLogin] erreur détaillée:", e);
+      // On affiche l'erreur réelle pour savoir si c'est le réseau ou ton code JS
+      setError(`Erreur : ${e.message}`); 
     } finally {
       setLoading(false);
     }
