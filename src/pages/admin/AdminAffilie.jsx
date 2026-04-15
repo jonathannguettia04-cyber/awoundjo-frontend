@@ -1,35 +1,20 @@
 // src/pages/admin/AdminAffilie.jsx
 // ─────────────────────────────────────────────────────────────
-//  Vue admin — Réseau AFFILIÉ
-//  Gestion : Directrices, Leaders, Superviseurs, Recruteurs
-//  Fonctionnalités :
-//    - Liste membres avec filtres par rôle / statut de validation
-//    - Validation / rejet avec option "paiement cash"
-//    - Suspension / réactivation
-//    - Réinitialisation mot de passe
-//    - Suppression avec confirmation mot de passe admin
-//    - Gestion des commissions
-//
-//  ✅ FIXES v2 :
-//    - Détection automatique de la clé token dans localStorage/sessionStorage
-//    - Panneau de diagnostic intégré (visible si "Aucun membre trouvé")
-//    - Affichage de l'erreur HTTP réelle (401/403/500) au lieu de silence
-//    - Logs console structurés pour déboguer facilement
+//  ✅ FIX v3 : Lecture réponse API corrigée
+//     L'API retourne { success, members, stats } directement
+//     (pas { data: { members, stats } })
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// ✅ FIX 1 : Détection automatique du token — on scanne TOUTES les clés connues
-//            et on prend la première qui ressemble à un JWT (commence par "eyJ")
 const KNOWN_TOKEN_KEYS = [
   "token", "agent_token", "adminToken", "admin_token",
   "agentToken", "accessToken", "access_token", "jwt", "auth_token",
 ];
 
 function agentToken() {
-  // 1. Chercher dans localStorage avec les clés connues
   for (const key of KNOWN_TOKEN_KEYS) {
     const val = localStorage.getItem(key);
     if (val && val.startsWith("eyJ")) {
@@ -37,7 +22,6 @@ function agentToken() {
       return val;
     }
   }
-  // 2. Chercher dans sessionStorage avec les clés connues
   for (const key of KNOWN_TOKEN_KEYS) {
     const val = sessionStorage.getItem(key);
     if (val && val.startsWith("eyJ")) {
@@ -45,7 +29,6 @@ function agentToken() {
       return val;
     }
   }
-  // 3. Scan complet localStorage (au cas où la clé est inconnue)
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     const val = localStorage.getItem(key);
@@ -54,11 +37,10 @@ function agentToken() {
       return val;
     }
   }
-  console.error("[agentToken] ❌ Aucun token JWT trouvé dans localStorage ni sessionStorage");
+  console.error("[agentToken] ❌ Aucun token JWT trouvé");
   return null;
 }
 
-// Retourne un résumé des clés disponibles pour le panneau de diagnostic
 function debugStorageKeys() {
   const result = { localStorage: {}, sessionStorage: {} };
   for (let i = 0; i < localStorage.length; i++) {
@@ -118,7 +100,6 @@ const PAYMENT_CONFIG = {
   cash:   { label: "💵 Cash",     color: C.gold,  bg: C.goldL  },
 };
 
-// ── Badges ────────────────────────────────────────────────────
 const Badge = ({ config, value }) => {
   const s = config[value] || { label: value, color: C.slate, bg: C.bg };
   return (
@@ -128,7 +109,6 @@ const Badge = ({ config, value }) => {
   );
 };
 
-// ── Panneau de diagnostic ─────────────────────────────────────
 function DiagnosticPanel({ apiError, apiUrl }) {
   const [show, setShow] = useState(false);
   const [storageInfo] = useState(() => debugStorageKeys());
@@ -145,53 +125,29 @@ function DiagnosticPanel({ apiError, apiUrl }) {
           {show ? "Masquer" : "Afficher détails"}
         </button>
       </div>
-
-      {/* Résumé rapide */}
       <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-        <DiagLine
-          ok={!!tok}
-          label="Token admin détecté"
-          detail={tok ? `${tok.substring(0, 30)}...` : "❌ Aucun token JWT trouvé dans localStorage/sessionStorage"}
-        />
-        <DiagLine
-          ok={!apiError}
-          label="Réponse API OK"
-          detail={apiError || "✅ L'API répond correctement"}
-        />
-        <DiagLine
-          ok={apiUrl?.includes("/api/affilie/admin/members")}
-          label="URL appelée"
-          detail={apiUrl || "—"}
-        />
+        <DiagLine ok={!!tok} label="Token admin détecté" detail={tok ? `${tok.substring(0, 30)}...` : "❌ Aucun token JWT trouvé"} />
+        <DiagLine ok={!apiError} label="Réponse API OK" detail={apiError || "✅ L'API répond correctement"} />
+        <DiagLine ok={apiUrl?.includes("/api/affilie/admin/members")} label="URL appelée" detail={apiUrl || "—"} />
       </div>
-
       {show && (
         <div style={{ marginTop: 14, background: "#fff", borderRadius: 8, padding: 12, fontSize: 11, fontFamily: "monospace", color: C.dark, border: `1px solid ${C.border}` }}>
           <p style={{ margin: "0 0 8px", fontWeight: 800, fontSize: 12 }}>📦 Contenu localStorage :</p>
-          {Object.keys(storageInfo.localStorage).length === 0
-            ? <p style={{ color: C.slate, margin: 0 }}>localStorage vide</p>
-            : Object.entries(storageInfo.localStorage).map(([k, v]) => (
-                <div key={k} style={{ marginBottom: 4 }}>
-                  <span style={{ color: C.purple, fontWeight: 700 }}>{k}</span>
-                  <span style={{ color: C.slate }}> → </span>
-                  <span style={{ color: C.dark }}>{String(v)}</span>
-                </div>
-              ))
-          }
+          {Object.entries(storageInfo.localStorage).map(([k, v]) => (
+            <div key={k} style={{ marginBottom: 4 }}>
+              <span style={{ color: C.purple, fontWeight: 700 }}>{k}</span>
+              <span style={{ color: C.slate }}> → </span>
+              <span style={{ color: C.dark }}>{String(v)}</span>
+            </div>
+          ))}
           <p style={{ margin: "10px 0 8px", fontWeight: 800, fontSize: 12 }}>📦 Contenu sessionStorage :</p>
-          {Object.keys(storageInfo.sessionStorage).length === 0
-            ? <p style={{ color: C.slate, margin: 0 }}>sessionStorage vide</p>
-            : Object.entries(storageInfo.sessionStorage).map(([k, v]) => (
-                <div key={k} style={{ marginBottom: 4 }}>
-                  <span style={{ color: C.teal, fontWeight: 700 }}>{k}</span>
-                  <span style={{ color: C.slate }}> → </span>
-                  <span style={{ color: C.dark }}>{String(v)}</span>
-                </div>
-              ))
-          }
-          <p style={{ margin: "12px 0 4px", fontWeight: 800, fontSize: 12, color: C.slate }}>
-            💡 Si votre token est dans une clé qui n'est pas listée ci-dessus, ajoutez-la dans <code>KNOWN_TOKEN_KEYS</code> en haut du fichier.
-          </p>
+          {Object.entries(storageInfo.sessionStorage).map(([k, v]) => (
+            <div key={k} style={{ marginBottom: 4 }}>
+              <span style={{ color: C.teal, fontWeight: 700 }}>{k}</span>
+              <span style={{ color: C.slate }}> → </span>
+              <span style={{ color: C.dark }}>{String(v)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -210,7 +166,6 @@ function DiagLine({ ok, label, detail }) {
   );
 }
 
-// ── Section comptes en attente de validation ──────────────────
 function PendingSection({ members, onValidate, loading }) {
   const [cashModes, setCashModes] = useState({});
   const pending = members.filter(m => m.status_validation === "pending" || !m.status_validation);
@@ -229,7 +184,6 @@ function PendingSection({ members, onValidate, loading }) {
           </p>
         </div>
       </div>
-
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {pending.map(m => {
           const isCash = !!cashModes[m.id];
@@ -255,32 +209,21 @@ function PendingSection({ members, onValidate, loading }) {
                   </div>
                 </div>
               </div>
-
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                {/* Toggle Cash */}
                 <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, color: isCash ? C.green : C.slate }}>
                   <input type="checkbox" checked={isCash}
                     onChange={() => setCashModes(p => ({ ...p, [m.id]: !p[m.id] }))}
                     style={{ accentColor: C.green }} />
                   💵 Paiement cash
                 </label>
-
                 <button disabled={loading}
                   onClick={() => onValidate(m.id, "approve", isCash ? "cash" : null)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 8, border: "none",
-                    background: isCash ? C.green : C.purple, color: "#fff",
-                    fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  }}>
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: isCash ? C.green : C.purple, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                   ✅ {isCash ? "Valider + Cash" : "Valider"}
                 </button>
                 <button disabled={loading}
                   onClick={() => onValidate(m.id, "reject", null)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 8, border: "none",
-                    background: C.redL, color: C.red,
-                    fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  }}>
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: C.redL, color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                   ❌ Rejeter
                 </button>
               </div>
@@ -292,7 +235,6 @@ function PendingSection({ members, onValidate, loading }) {
   );
 }
 
-// ── Modal suppression ─────────────────────────────────────────
 function DeleteModal({ member, onClose, onConfirm, loading }) {
   const [adminPassword, setAdminPassword] = useState("");
   if (!member) return null;
@@ -334,16 +276,12 @@ export default function AdminAffilie() {
   const [error,         setError]         = useState("");
   const [success,       setSuccess]       = useState("");
   const [deleteTarget,  setDeleteTarget]  = useState(null);
+  const [apiError,      setApiError]      = useState("");
+  const [lastApiUrl,    setLastApiUrl]    = useState("");
 
-  // ✅ FIX 2 : États pour le diagnostic
-  const [apiError,  setApiError]  = useState("");
-  const [lastApiUrl, setLastApiUrl] = useState("");
-
-  // Filtres
   const [filterRole,   setFilterRole]   = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  // ── Chargement ─────────────────────────────────────────────
   const loadMembers = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -351,18 +289,16 @@ export default function AdminAffilie() {
 
     const tok = agentToken();
 
-    // ✅ FIX 3 : Log structuré pour debug
     console.group("[AdminAffilie] loadMembers()");
     console.log("API base URL :", API);
     console.log("Token présent :", !!tok);
     if (tok) console.log("Token (début) :", tok.substring(0, 40) + "...");
 
     if (!tok) {
-      const msg = "❌ Token admin introuvable — vérifiez que vous êtes bien connecté en tant qu'admin. Ouvrez le panneau de diagnostic ci-dessous.";
+      const msg = "❌ Token admin introuvable — vérifiez que vous êtes bien connecté en tant qu'admin.";
       setError(msg);
       setApiError(msg);
       setLoading(false);
-      console.error("[AdminAffilie] Aucun token JWT trouvé dans le storage");
       console.groupEnd();
       return;
     }
@@ -380,35 +316,34 @@ export default function AdminAffilie() {
         headers: { Authorization: `Bearer ${tok}` },
       });
 
-      console.log("✅ Réponse API :", data);
-      console.log("Membres reçus :", data.data?.members?.length ?? 0);
+      console.log("✅ Réponse API complète :", data);
+
+      // ✅ FIX v3 : L'API retourne { success, members, stats }
+      //             (pas { data: { members, stats } })
+      //             On supporte les deux formats par sécurité
+      const membersArr = data.members ?? data.data?.members ?? [];
+      const statsObj   = data.stats   ?? data.data?.stats   ?? null;
+
+      console.log("Membres reçus :", membersArr.length);
+      console.log("Stats :", statsObj);
       console.groupEnd();
 
-      setMembers(data.data?.members || []);
-      setStats(data.data?.stats || null);
+      setMembers(membersArr);
+      setStats(statsObj);
 
     } catch (e) {
       const status  = e.response?.status;
       const apiMsg  = e.response?.data?.error || e.message || "Erreur inconnue";
 
-      // ✅ FIX 4 : Messages d'erreur explicites selon le code HTTP
       let friendlyMsg = "";
-      if (status === 401) {
-        friendlyMsg = `401 Non autorisé — Le token est invalide ou expiré. Reconnectez-vous en tant qu'admin.`;
-      } else if (status === 403) {
-        friendlyMsg = `403 Accès refusé — Votre compte n'a pas le rôle ADMIN. Vérifiez que vous utilisez bien un compte agent/admin (table "agents"), pas un compte affilié.`;
-      } else if (status === 404) {
-        friendlyMsg = `404 Route introuvable — Vérifiez que /api/affilie/admin/members existe dans votre serveur.`;
-      } else if (status === 500) {
-        friendlyMsg = `500 Erreur serveur — ${apiMsg}`;
-      } else if (!status) {
-        friendlyMsg = `Impossible de joindre le serveur (${API}). Vérifiez que le backend tourne.`;
-      } else {
-        friendlyMsg = `Erreur ${status} : ${apiMsg}`;
-      }
+      if (status === 401)    friendlyMsg = `401 Non autorisé — Token invalide ou expiré. Reconnectez-vous.`;
+      else if (status === 403) friendlyMsg = `403 Accès refusé — Votre compte n'a pas le rôle ADMIN.`;
+      else if (status === 404) friendlyMsg = `404 Route introuvable — /api/affilie/admin/members n'existe pas.`;
+      else if (status === 500) friendlyMsg = `500 Erreur serveur — ${apiMsg}`;
+      else if (!status)        friendlyMsg = `Impossible de joindre le serveur (${API}).`;
+      else                     friendlyMsg = `Erreur ${status} : ${apiMsg}`;
 
-      console.error("[AdminAffilie] ❌ Erreur API :", status, apiMsg);
-      console.error("[AdminAffilie] Réponse complète :", e.response?.data);
+      console.error("[AdminAffilie] ❌ Erreur :", status, apiMsg);
       console.groupEnd();
 
       setError(friendlyMsg);
@@ -422,7 +357,8 @@ export default function AdminAffilie() {
     setLoading(true); setError("");
     try {
       const { data } = await axios.get(`${API}/api/affilie/admin/commissions`, { headers: headers() });
-      setCommissions(data.data?.commissions || []);
+      const commissionsArr = data.commissions ?? data.data?.commissions ?? [];
+      setCommissions(commissionsArr);
     } catch (e) {
       const status = e.response?.status;
       const msg    = e.response?.data?.error || e.message || "Erreur chargement commissions";
@@ -437,7 +373,6 @@ export default function AdminAffilie() {
     if (activeTab === "commissions") loadCommissions();
   }, [activeTab, loadMembers, loadCommissions]);
 
-  // ── Actions ────────────────────────────────────────────────
   const flash = (msg, isErr = false) => {
     if (isErr) { setError(msg); setSuccess(""); }
     else       { setSuccess(msg); setError(""); }
@@ -452,7 +387,7 @@ export default function AdminAffilie() {
         { action, paymentMethod },
         { headers: headers() }
       );
-      flash(data.data?.message || "Opération réussie !");
+      flash(data.message || data.data?.message || "Opération réussie !");
       loadMembers();
     } catch (e) {
       const status = e.response?.status;
@@ -484,7 +419,7 @@ export default function AdminAffilie() {
         `${API}/api/affilie/admin/members/${id}/reset-password`, {},
         { headers: headers() }
       );
-      flash(`Nouveau mot de passe temporaire : ${data.data?.temp_password}`);
+      flash(`Nouveau mot de passe temporaire : ${data.data?.temp_password || data.temp_password}`);
     } catch (e) {
       flash(e.response?.data?.error || "Erreur", true);
     } finally {
@@ -522,11 +457,8 @@ export default function AdminAffilie() {
     }
   }
 
-  // ── Rendu ──────────────────────────────────────────────────
   return (
     <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
-
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: C.purpleL, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>💜</div>
         <div>
@@ -535,7 +467,6 @@ export default function AdminAffilie() {
         </div>
       </div>
 
-      {/* Stats globales */}
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
           {[
@@ -555,16 +486,11 @@ export default function AdminAffilie() {
         </div>
       )}
 
-      {/* Alertes flash */}
       {error   && <div style={{ background: C.redL,   color: C.red,   border: `1px solid ${C.red}44`,   borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 13, fontWeight: 700, whiteSpace: "pre-wrap" }}>{error}</div>}
       {success && <div style={{ background: C.greenL, color: C.green, border: `1px solid ${C.green}44`, borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 13, fontWeight: 700 }}>{success}</div>}
 
-      {/* Onglets */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, background: C.bg, borderRadius: 12, padding: 6 }}>
-        {[
-          ["members",     "👥 Membres"],
-          ["commissions", "💰 Commissions"],
-        ].map(([key, label]) => (
+        {[["members", "👥 Membres"], ["commissions", "💰 Commissions"]].map(([key, label]) => (
           <button key={key} onClick={() => setActiveTab(key)} style={{
             padding: "9px 18px", borderRadius: 8, border: "none", cursor: "pointer",
             fontWeight: 700, fontSize: 13,
@@ -575,13 +501,10 @@ export default function AdminAffilie() {
         ))}
       </div>
 
-      {/* ─── ONGLET MEMBRES ─── */}
       {activeTab === "members" && (
         <>
-          {/* Section en attente */}
           <PendingSection members={members} onValidate={handleValidate} loading={actionLoading} />
 
-          {/* Filtres */}
           <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
             <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
               style={{ padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: "#fff", cursor: "pointer" }}>
@@ -603,7 +526,6 @@ export default function AdminAffilie() {
             </button>
           </div>
 
-          {/* Liste membres */}
           {loading ? (
             <div style={{ textAlign: "center", padding: 40, color: C.slate }}>
               <p style={{ fontSize: 24, margin: "0 0 8px" }}>⏳</p>
@@ -616,7 +538,6 @@ export default function AdminAffilie() {
               <p style={{ margin: "6px 0 0", fontSize: 12, color: C.slate }}>
                 {apiError ? "Une erreur s'est produite lors du chargement." : "La table affilie_members semble vide, ou les filtres ne correspondent à aucun résultat."}
               </p>
-              {/* ✅ FIX 5 : Panneau de diagnostic visible dès qu'il n'y a rien */}
               <DiagnosticPanel apiError={apiError} apiUrl={lastApiUrl} />
             </div>
           ) : (
@@ -626,7 +547,6 @@ export default function AdminAffilie() {
                 return (
                   <div key={m.id} style={{ background: "#fff", borderRadius: 12, border: `1.5px solid ${C.border}`, padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                      {/* Infos membre */}
                       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                         <div style={{ width: 40, height: 40, borderRadius: 10, background: rc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
                           {rc.icon}
@@ -647,9 +567,7 @@ export default function AdminAffilie() {
                             <Badge config={STATUS_CONFIG}     value={m.status} />
                             <Badge config={VALIDATION_CONFIG} value={m.status_validation || "pending"} />
                             <Badge config={PAYMENT_CONFIG}    value={m.status_payment} />
-                            {m.plan && (
-                              <span style={{ fontSize: 11, background: C.bg, color: C.slate, padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{m.plan}</span>
-                            )}
+                            {m.plan && <span style={{ fontSize: 11, background: C.bg, color: C.slate, padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{m.plan}</span>}
                             {m.team_size > 0 && (
                               <span style={{ fontSize: 11, background: C.purpleL, color: C.purple, padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>
                                 Équipe : {m.team_size}
@@ -658,8 +576,6 @@ export default function AdminAffilie() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Actions */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {m.status_validation !== "approved" && (
                           <>
@@ -698,8 +614,6 @@ export default function AdminAffilie() {
                         </button>
                       </div>
                     </div>
-
-                    {/* Stats rapides si disponibles */}
                     {Number(m.total_earned) > 0 && (
                       <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, fontSize: 12, color: C.slate }}>
                         💰 Commissions totales : <strong style={{ color: C.green }}>{fmt(m.total_earned)} FCFA</strong>
@@ -713,7 +627,6 @@ export default function AdminAffilie() {
         </>
       )}
 
-      {/* ─── ONGLET COMMISSIONS ─── */}
       {activeTab === "commissions" && (
         <div>
           {loading ? (
@@ -754,7 +667,6 @@ export default function AdminAffilie() {
         </div>
       )}
 
-      {/* Modal suppression */}
       <DeleteModal
         member={deleteTarget}
         onClose={() => setDeleteTarget(null)}
