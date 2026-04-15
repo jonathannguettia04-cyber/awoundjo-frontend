@@ -215,8 +215,8 @@ export default function AdminAffilie() {
       const params = new URLSearchParams();
       if (filterRole)   params.append("role",   filterRole);
       if (filterStatus) params.append("status", filterStatus);
-      const { data } = await axios.get(`${API}/api/affilie/admin/members?${params}`, {
-        headers: { Authorization: `Bearer ${tok}` },
+      const { data } = await axios.get(`${API}/api/affilie/admin/members?${params}&_t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${tok}`, "Cache-Control": "no-cache" },
       });
       setMembers(data.data?.members || []);
       setStats(data.data?.stats || null);
