@@ -29,6 +29,8 @@ const adminProviderAPI = {
   resetPassword: (id)     => api.post(`/provider/admin/providers/${id}/reset-password`),
   delete:        (id)     => api.delete(`/provider/admin/providers/${id}`),
   getActes:      (id)     => api.get(`/provider/admin/providers/${id}/actes`),
+  getInvoices:   ()       => api.get("/provider/admin/invoices"),
+  payInvoice:    (id)     => api.post(`/provider/admin/invoices/${id}/pay`),
 };
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -261,6 +263,7 @@ export default function AdminProviders() {
   const [reqStatus,  setReqStatus] = useState("PENDING");
   const [requests,   setRequests]  = useState([]);
   const [providers,  setProviders] = useState([]);
+  const [invoices,   setInvoices]  = useState([]);
   const [loading,    setLoading]   = useState(false);
   const [selected,   setSelected]  = useState(null);   // expanded row id
   const [rejectNote, setRejectNote]= useState("");
@@ -277,7 +280,6 @@ export default function AdminProviders() {
   const [filterType,  setFilterType] = useState("ALL");
   const [filterStatus,setFilterStatus]=useState("ALL");
 
-  // ── loaders ────────────────────────────────────────────────
   async function loadRequests() {
     setLoading(true);
     try {
@@ -296,10 +298,20 @@ export default function AdminProviders() {
     finally { setLoading(false); }
   }
 
+  async function loadInvoices() {
+    setLoading(true);
+    try {
+      const { data } = await adminProviderAPI.getInvoices();
+      setInvoices(data.invoices || []);
+    } catch { setError("Erreur chargement factures"); }
+    finally { setLoading(false); }
+  }
+
   useEffect(() => {
-  loadProviders(); // toujours charger pour les KPIs
-  if (tab === "requests") loadRequests();
-}, [tab, reqStatus]);
+    loadProviders(); // toujours charger pour les KPIs
+    if (tab === "requests") loadRequests();
+    if (tab === "invoices") loadInvoices();
+  }, [tab, reqStatus]);
 
   // ── KPIs (computed from providers list) ───────────────────
   const kpis = useMemo(() => {
@@ -384,6 +396,16 @@ export default function AdminProviders() {
     }
   }
 
+  async function handlePayInvoice(invoice) {
+    try {
+      await adminProviderAPI.payInvoice(invoice.id);
+      setSuccess(`Facture de ${invoice.provider_name} validée et marquée PAYÉE ✅`);
+      loadInvoices();
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur validation paiement");
+    }
+  }
+
   // ── render ─────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
@@ -424,6 +446,7 @@ export default function AdminProviders() {
         {[
           { id: "requests",  label: "📋 Demandes d'accès" },
           { id: "providers", label: "🏥 Établissements actifs" },
+          { id: "invoices",  label: "💳 Factures" },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === t.id ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}>
@@ -688,6 +711,120 @@ export default function AdminProviders() {
             <p className="text-xs text-slate-400 mt-3 text-right">
               {filtered.length} établissement{filtered.length > 1 ? "s" : ""} affiché{filtered.length > 1 ? "s" : ""}
               {providers.length !== filtered.length && ` sur ${providers.length}`}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          TAB : FACTURES
+      ══════════════════════════════════════════════════════════ */}
+      {tab === "invoices" && (
+        <>
+          {/* Compteurs rapides */}
+          {(() => {
+            const submitted = invoices.filter(i => i.status === "SUBMITTED").length;
+            const paid      = invoices.filter(i => i.status === "PAID").length;
+            const pending   = invoices.filter(i => i.status === "PENDING").length;
+            const totalDue  = invoices.filter(i => i.status === "SUBMITTED")
+                                .reduce((s, i) => s + Number(i.mutual_amount || 0), 0);
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <KpiCard icon="📨" label="À valider"    value={submitted} accent="#F59E0B" />
+                <KpiCard icon="✅" label="Payées"       value={paid}      accent="#22C55E" />
+                <KpiCard icon="🕐" label="Non soumises" value={pending}   accent="#94A3B8" />
+                <KpiCard icon="💸" label="Montant dû"   value={fmt(totalDue)} accent="#EF4444" />
+              </div>
+            );
+          })()}
+
+          {loading ? (
+            <div className="text-center py-16 text-slate-400">Chargement…</div>
+          ) : invoices.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 text-slate-400">
+              <p className="text-4xl mb-3">🧾</p>
+              <p>Aucune facture enregistrée</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              {/* Header tableau */}
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Établissement</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Période</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total actes</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Part mutuelle</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Statut</span>
+                <span />
+              </div>
+
+              {invoices.map((inv, idx) => {
+                const INV_STATUS = {
+                  PENDING:   { label: "Non soumise", color: "#94A3B8", bg: "#F1F5F9" },
+                  SUBMITTED: { label: "À valider",   color: "#F59E0B", bg: "#FFFBEB" },
+                  PAID:      { label: "Payée",        color: "#22C55E", bg: "#F0FDF4" },
+                };
+                const st = INV_STATUS[inv.status] || INV_STATUS.PENDING;
+                return (
+                  <div key={inv.id} className={idx < invoices.length - 1 ? "border-b border-slate-50" : ""}>
+                    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 items-center px-5 py-4 hover:bg-slate-50 transition-colors">
+
+                      {/* Établissement */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base flex-shrink-0">
+                          {TYPE_ICONS[inv.provider_type] || "🏥"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 truncate text-sm">{inv.provider_name}</p>
+                          <p className="text-xs text-slate-400">{TYPE_LABELS[inv.provider_type]} · {inv.provider_city || "—"}</p>
+                        </div>
+                      </div>
+
+                      {/* Période */}
+                      <div className="text-xs text-slate-600">
+                        <p>{fmtDate(inv.period_start)}</p>
+                        <p className="text-slate-400">→ {fmtDate(inv.period_end)}</p>
+                      </div>
+
+                      {/* Total actes */}
+                      <p className="font-semibold text-slate-700 text-sm">{fmt(inv.total_amount)}</p>
+
+                      {/* Part mutuelle */}
+                      <p className="font-bold text-indigo-700 text-sm">{fmt(inv.mutual_amount)}</p>
+
+                      {/* Statut */}
+                      <span style={{ background: st.bg, color: st.color }}
+                        className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap w-fit">
+                        {st.label}
+                      </span>
+
+                      {/* Action */}
+                      <div className="flex-shrink-0">
+                        {inv.status === "SUBMITTED" && (
+                          <button
+                            onClick={() => handlePayInvoice(inv)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors whitespace-nowrap">
+                            ✅ Valider cash
+                          </button>
+                        )}
+                        {inv.status === "PAID" && (
+                          <span className="text-xs text-slate-400">
+                            Payé le {fmtDate(inv.paid_at)}
+                          </span>
+                        )}
+                        {inv.status === "PENDING" && (
+                          <span className="text-xs text-slate-300 italic">En attente clinique</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {invoices.length > 0 && (
+            <p className="text-xs text-slate-400 mt-3 text-right">
+              {invoices.length} facture{invoices.length > 1 ? "s" : ""} au total
             </p>
           )}
         </>

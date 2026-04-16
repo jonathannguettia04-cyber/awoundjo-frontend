@@ -1,31 +1,44 @@
 // src/pages/provider/ProviderBilling.jsx
+// Facturation prestataire :
+//   - Générer une facture (actes non facturés → PENDING)
+//   - Demander le paiement (PENDING → SUBMITTED)
+//   - Suivre le statut (SUBMITTED → PAID)
+
 import { useState, useEffect } from "react";
 import { providerBillingAPI } from "../../providerApi";
 
-const fmt     = (n) => Number(n||0).toLocaleString("fr-FR") + " FCFA";
+const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-const STATUS_MAP = {
-  PENDING:   { label: "En attente",  color: "#F59E0B", bg: "#FFFBEB" },
-  SUBMITTED: { label: "Soumise",     color: "#3B82F6", bg: "#EFF6FF" },
-  PAID:      { label: "Payée ✅",    color: "#22C55E", bg: "#F0FDF4" },
-  REJECTED:  { label: "Rejetée",     color: "#EF4444", bg: "#FEF2F2" },
+
+const STATUS_CONFIG = {
+  PENDING:   { label: "Brouillon",      icon: "📝", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D" },
+  SUBMITTED: { label: "Soumise",        icon: "📤", color: "#2563EB", bg: "#EFF6FF", border: "#93C5FD" },
+  PAID:      { label: "Payée ✅",       icon: "💳", color: "#059669", bg: "#ECFDF5", border: "#6EE7B7" },
+  REJECTED:  { label: "Rejetée",        icon: "❌", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
 };
 
 export default function ProviderBilling() {
-  const [invoices, setInvoices] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [showGen,  setShowGen]  = useState(false);
-  const [period,   setPeriod]   = useState({ start: "", end: "" });
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState("");
-  const [selected, setSelected] = useState(null);
+  const [invoices,  setInvoices]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState("");
+  const [success,   setSuccess]   = useState("");
+  const [showGen,   setShowGen]   = useState(false);
+  const [selected,  setSelected]  = useState(null);
+  const [detail,    setDetail]    = useState(null);  // { invoice, services }
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Formulaire génération
+  const today = new Date().toISOString().slice(0, 10);
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const [form, setForm]     = useState({ period_start: firstOfMonth, period_end: today });
+  const [genLoading, setGenLoading] = useState(false);
 
   async function load() {
-    setLoading(true);
+    setLoading(true); setError("");
     try {
       const { data } = await providerBillingAPI.getInvoices();
       setInvoices(data.invoices || []);
-    } catch { setError("Erreur chargement factures"); }
+    } catch { setError("Impossible de charger les factures"); }
     finally { setLoading(false); }
   }
 
@@ -33,85 +46,199 @@ export default function ProviderBilling() {
 
   async function handleGenerate(e) {
     e.preventDefault();
-    setSaving(true); setError("");
+    setGenLoading(true); setError(""); setSuccess("");
     try {
-      await providerBillingAPI.generateInvoice({ period_start: period.start, period_end: period.end });
+      await providerBillingAPI.generate(form);
+      setSuccess("✅ Facture générée avec succès !");
       setShowGen(false);
       load();
     } catch (err) {
       setError(err.response?.data?.error || "Erreur génération facture");
-    } finally { setSaving(false); }
+    } finally { setGenLoading(false); }
   }
 
-  // Totaux
-  const totalPending = invoices.filter(i => ["PENDING","SUBMITTED"].includes(i.status)).reduce((s, i) => s + Number(i.mutual_amount), 0);
-  const totalPaid    = invoices.filter(i => i.status === "PAID").reduce((s, i) => s + Number(i.mutual_amount), 0);
+  async function handleRequestPayment(invoice) {
+    if (!window.confirm(`Soumettre la facture ${fmtDate(invoice.period_start)} – ${fmtDate(invoice.period_end)} pour paiement ?`)) return;
+    setError(""); setSuccess("");
+    try {
+      await providerBillingAPI.requestPayment(invoice.id);
+      setSuccess("✅ Demande de paiement envoyée à Awoundjô !");
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de la soumission");
+    }
+  }
+
+  async function handleViewDetail(invoice) {
+    if (selected?.id === invoice.id) { setSelected(null); setDetail(null); return; }
+    setSelected(invoice); setDetail(null); setDetailLoading(true);
+    try {
+      const { data } = await providerBillingAPI.getById(invoice.id);
+      setDetail(data);
+    } catch { setDetail({ error: "Impossible de charger le détail" }); }
+    finally { setDetailLoading(false); }
+  }
+
+  // KPIs
+  const kpis = [
+    { label: "Total facturé",   value: fmt(invoices.reduce((s, i) => s + Number(i.mutual_amount), 0)), icon: "💰", color: "#2563EB" },
+    { label: "En attente",      value: invoices.filter(i => i.status === "PENDING").length,             icon: "📝", color: "#D97706" },
+    { label: "Soumises",        value: invoices.filter(i => i.status === "SUBMITTED").length,           icon: "📤", color: "#7C3AED" },
+    { label: "Payées",          value: invoices.filter(i => i.status === "PAID").length,                icon: "✅", color: "#059669" },
+  ];
 
   return (
-    <div style={{ fontFamily: "'DM Sans',system-ui,sans-serif", paddingBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: 0 }}>Facturation</h2>
-        <button onClick={() => setShowGen(true)}
-          style={{ background: "#0f2942", color: "#fff", border: "none", borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          + Générer facture
+    <div style={{ fontFamily: "'DM Sans',system-ui,sans-serif", paddingBottom: 32 }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: 0 }}>Facturation</h2>
+          <p style={{ color: "#64748B", fontSize: 13, margin: "2px 0 0" }}>{invoices.length} facture{invoices.length > 1 ? "s" : ""}</p>
+        </div>
+        <button onClick={() => { setShowGen(true); setError(""); setSuccess(""); }}
+          style={s.btnPrimary}>
+          + Générer une facture
         </button>
       </div>
 
-      {error && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {/* Alertes */}
+      {error   && <div style={s.alertError}>{error}</div>}
+      {success && <div style={s.alertSuccess}>{success}</div>}
 
-      {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
-        {[
-          { label: "À recevoir",    value: fmt(totalPending), color: "#F59E0B", bg: "#FFFBEB", icon: "⏳" },
-          { label: "Total reçu",   value: fmt(totalPaid),    color: "#22C55E", bg: "#F0FDF4", icon: "✅" },
-        ].map((k, i) => (
-          <div key={i} style={{ background: k.bg, borderRadius: 16, padding: "16px", border: `1px solid ${k.color}30` }}>
-            <p style={{ fontSize: 10, color: "#64748B", margin: "0 0 6px", fontWeight: 700, textTransform: "uppercase", letterSpacing: .8 }}>{k.icon} {k.label}</p>
-            <p style={{ fontSize: 16, fontWeight: 800, color: k.color, margin: 0 }}>{k.value}</p>
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: "1px solid #E2E8F0", borderTop: `3px solid ${k.color}` }}>
+            <p style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: .8, margin: "0 0 6px" }}>{k.icon} {k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: k.color, margin: 0 }}>{k.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Liste factures */}
+      {/* Explication du flux */}
+      <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 14, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0369A1" }}>
+        <strong>Comment ça marche :</strong> Générez une facture regroupant vos actes non facturés →
+        Cliquez <strong>"Demander le paiement"</strong> pour la soumettre à Awoundjô →
+        L'équipe valide et procède au virement.
+      </div>
+
+      {/* Liste */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#64748B" }}>Chargement…</div>
+        <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>Chargement…</div>
       ) : invoices.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 20, color: "#94A3B8" }}>
-          <p style={{ fontSize: 36 }}>📄</p>
-          <p>Aucune facture générée</p>
-          <button onClick={() => setShowGen(true)} style={{ background: "#00BCD4", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
-            Générer ma première facture
+        <div style={{ textAlign: "center", padding: 48, background: "#fff", borderRadius: 20, color: "#94A3B8", border: "1px solid #E2E8F0" }}>
+          <p style={{ fontSize: 36, marginBottom: 8 }}>🧾</p>
+          <p style={{ fontWeight: 600 }}>Aucune facture générée</p>
+          <p style={{ fontSize: 13, marginBottom: 16 }}>Générez votre première facture pour demander un remboursement à Awoundjô.</p>
+          <button onClick={() => setShowGen(true)} style={s.btnPrimary}>
+            + Générer ma première facture
           </button>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {invoices.map(inv => {
-            const s = STATUS_MAP[inv.status] || STATUS_MAP.PENDING;
+            const st   = STATUS_CONFIG[inv.status] || STATUS_CONFIG.PENDING;
+            const open = selected?.id === inv.id;
             return (
-              <div key={inv.id} onClick={() => setSelected(selected?.id === inv.id ? null : inv)}
-                style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,.06)", cursor: "pointer", border: `1.5px solid ${selected?.id === inv.id ? "#00BCD4" : "#F1F5F9"}` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <p style={{ fontWeight: 700, color: "#0f2942", margin: 0, fontSize: 14 }}>
-                    📄 Facture du {fmtDate(inv.created_at)}
-                  </p>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8, background: s.bg, color: s.color }}>{s.label}</span>
+              <div key={inv.id} style={{ background: "#fff", borderRadius: 16, border: `1.5px solid ${open ? "#2563EB" : "#E2E8F0"}`, overflow: "hidden", transition: "border-color .15s" }}>
+
+                {/* Ligne principale */}
+                <div onClick={() => handleViewDetail(inv)}
+                  style={{ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
+
+                  {/* Statut */}
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: st.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, border: `1px solid ${st.border}` }}>
+                    {st.icon}
+                  </div>
+
+                  {/* Infos */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 14, margin: 0 }}>
+                      Période du {fmtDate(inv.period_start)} au {fmtDate(inv.period_end)}
+                    </p>
+                    <p style={{ color: "#64748B", fontSize: 12, margin: "2px 0 0" }}>
+                      Générée le {fmtDate(inv.created_at)}
+                      {inv.submitted_at ? ` · Soumise le ${fmtDate(inv.submitted_at)}` : ""}
+                      {inv.paid_at      ? ` · Payée le ${fmtDate(inv.paid_at)}`      : ""}
+                    </p>
+                  </div>
+
+                  {/* Montants */}
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <p style={{ fontWeight: 800, color: "#0f2942", fontSize: 15, margin: 0 }}>{fmt(inv.mutual_amount)}</p>
+                    <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>part mutuelle</p>
+                  </div>
+
+                  {/* Badge statut */}
+                  <div style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                    {st.label}
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B", fontSize: 13 }}>
-                  <span>Période : {fmtDate(inv.period_start)} → {fmtDate(inv.period_end)}</span>
-                  <span style={{ fontWeight: 800, color: "#0f2942" }}>{fmt(inv.mutual_amount)}</span>
-                </div>
-                {selected?.id === inv.id && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    {[
-                      { label: "Total actes",    value: fmt(inv.total_amount) },
-                      { label: "Part mutuelle",  value: fmt(inv.mutual_amount) },
-                      { label: "Part patients",  value: fmt(inv.client_amount) },
-                    ].map((row, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-                        <span style={{ color: "#64748B" }}>{row.label}</span>
-                        <span style={{ fontWeight: 700, color: "#0f2942" }}>{row.value}</span>
-                      </div>
-                    ))}
+
+                {/* Actions */}
+                {inv.status === "PENDING" && (
+                  <div style={{ padding: "0 16px 14px", display: "flex", gap: 10 }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRequestPayment(inv); }}
+                      style={{ ...s.btnPrimary, fontSize: 13 }}>
+                      📤 Demander le paiement
+                    </button>
+                  </div>
+                )}
+
+                {/* Détail actes */}
+                {open && (
+                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "14px 16px", background: "#F8FAFC" }}>
+                    {detailLoading ? (
+                      <p style={{ color: "#94A3B8", fontSize: 13, textAlign: "center" }}>Chargement du détail…</p>
+                    ) : detail?.error ? (
+                      <p style={{ color: "#DC2626", fontSize: 13 }}>{detail.error}</p>
+                    ) : detail ? (
+                      <>
+                        {/* Récap financier */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                          {[
+                            { label: "Total actes",    value: fmt(inv.total_amount),  color: "#0f2942" },
+                            { label: "Part mutuelle",  value: fmt(inv.mutual_amount), color: "#059669" },
+                            { label: "Part patient",   value: fmt(inv.client_amount), color: "#DC2626" },
+                          ].map((r, i) => (
+                            <div key={i} style={{ background: "#fff", borderRadius: 10, padding: "10px 12px", border: "1px solid #E2E8F0" }}>
+                              <p style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: .6, margin: "0 0 4px" }}>{r.label}</p>
+                              <p style={{ fontSize: 14, fontWeight: 800, color: r.color, margin: 0 }}>{r.value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Tableau actes */}
+                        {detail.services?.length > 0 ? (
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                              <thead>
+                                <tr style={{ borderBottom: "2px solid #E2E8F0" }}>
+                                  {["Date", "Patient", "Acte", "Montant", "Part mutuelle"].map(h => (
+                                    <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: .6, whiteSpace: "nowrap" }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detail.services.map((svc, i) => (
+                                  <tr key={svc.id} style={{ borderBottom: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                                    <td style={{ padding: "7px 8px", color: "#475569", whiteSpace: "nowrap" }}>{fmtDate(svc.created_at)}</td>
+                                    <td style={{ padding: "7px 8px", color: "#1E293B", fontWeight: 600 }}>{svc.client_name || "—"}</td>
+                                    <td style={{ padding: "7px 8px", color: "#475569" }}>{svc.catalog_label || svc.catalog_code}</td>
+                                    <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.total_amount)}</td>
+                                    <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.mutual_part)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p style={{ color: "#94A3B8", fontSize: 13, textAlign: "center", padding: 12 }}>Aucun acte associé</p>
+                        )}
+                      </>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -123,38 +250,38 @@ export default function ProviderBilling() {
       {/* Modal génération */}
       {showGen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", padding: "24px 20px", width: "100%", maxWidth: 768 }}>
+          <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ fontWeight: 800, color: "#0f2942", margin: 0 }}>Générer une facture</h3>
-              <button onClick={() => setShowGen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+              <button onClick={() => setShowGen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94A3B8" }}>✕</button>
             </div>
+
+            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 20 }}>
+              Sélectionnez la période. Tous les actes non encore facturés dans cette période seront regroupés.
+            </p>
+
             <form onSubmit={handleGenerate}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, display: "block", marginBottom: 6 }}>Début de période *</label>
-                  <input required type="date" value={period.start} onChange={e => setPeriod({ ...period, start: e.target.value })}
-                    style={{ width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <label style={s.label}>Début de période</label>
+                  <input type="date" value={form.period_start}
+                    onChange={e => setForm({ ...form, period_start: e.target.value })}
+                    style={s.input} required />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, display: "block", marginBottom: 6 }}>Fin de période *</label>
-                  <input required type="date" value={period.end} onChange={e => setPeriod({ ...period, end: e.target.value })}
-                    style={{ width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <label style={s.label}>Fin de période</label>
+                  <input type="date" value={form.period_end}
+                    onChange={e => setForm({ ...form, period_end: e.target.value })}
+                    style={s.input} required />
                 </div>
               </div>
-              <div style={{ background: "#F0F7FF", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
-                <p style={{ color: "#1565C0", fontSize: 13, margin: 0 }}>
-                  ℹ️ Tous les actes enregistrés sur cette période et non encore facturés seront inclus.
-                </p>
-              </div>
-              {error && <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 10 }}>{error}</div>}
+
+              {error && <div style={s.alertError}>{error}</div>}
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <button type="button" onClick={() => setShowGen(false)}
-                  style={{ padding: "14px", borderRadius: 14, border: "1.5px solid #CBD5E1", background: "#fff", color: "#64748B", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  Annuler
-                </button>
-                <button type="submit" disabled={saving}
-                  style={{ padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  {saving ? "Génération…" : "📄 Générer"}
+                <button type="button" onClick={() => setShowGen(false)} style={s.btnSecondary}>Annuler</button>
+                <button type="submit" disabled={genLoading} style={s.btnPrimary}>
+                  {genLoading ? "Génération…" : "🧾 Générer"}
                 </button>
               </div>
             </form>
@@ -164,3 +291,12 @@ export default function ProviderBilling() {
     </div>
   );
 }
+
+const s = {
+  btnPrimary:   { background: "linear-gradient(135deg,#0f2942,#1a4a7a)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  btnSecondary: { background: "#fff", color: "#64748B", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  alertError:   { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 },
+  alertSuccess: { background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: "10px 14px", color: "#059669", fontSize: 13, marginBottom: 14 },
+  label:        { display: "block", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .6, marginBottom: 6 },
+  input:        { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 10, padding: "10px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
+};

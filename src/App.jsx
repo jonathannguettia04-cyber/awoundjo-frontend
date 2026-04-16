@@ -317,6 +317,7 @@ export default function App() {
               <Route path="history"           element={<ProviderServices />} />
               <Route path="profile"           element={<ProviderDashboard />} />
               <Route path="prescriptions"     element={<ProviderPharmacyPrescriptions />} />
+              <Route path="billing" element={<ProviderBilling />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════

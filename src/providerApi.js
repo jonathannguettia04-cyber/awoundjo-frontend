@@ -104,6 +104,12 @@ export function providerLogout() {
   localStorage.removeItem("provider_data");
   window.location.href = "/etablissement";
 }
+export const providerBillingAPI = {
+  getInvoices:    ()        => providerAxios.get("/invoices"),
+  generate:       (body)    => providerAxios.post("/invoices/generate", body),
+  getById:        (id)      => providerAxios.get(`/invoices/${id}`),
+  requestPayment: (id)      => providerAxios.post(`/invoices/${id}/request-payment`),
+};
 
 export function getProviderData() {
   try { return JSON.parse(localStorage.getItem("provider_data")); }
