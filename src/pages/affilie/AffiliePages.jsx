@@ -141,15 +141,13 @@ export function AffilieDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BASE}/api/affilie/dashboard`, { headers: authHeaders() })
+    fetch(`${BASE}/api/affilie/dashboard`, { headers: authHeaders(),cache: "no-store"  // ← ajoute ça 
+      })
       .then(r => r.json())
       .then(d => { setStats(d?.data || null); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    console.log("Le Dashboard est bien chargé");
-  }, []);
+  
 
   if (loading) return <Loader />;
 
@@ -305,7 +303,8 @@ export function AffilieReseau() {
   const [filter,  setFilter]  = useState("ALL");
 
   useEffect(() => {
-    fetch(`${BASE}/api/affilie/network`, { headers: authHeaders() })
+    fetch(`${BASE}/api/affilie/network`, { headers: authHeaders(),cache: "no-store"  // ← ajoute ça
+       })
       .then(r => r.json())
       .then(d => { setNetwork(d?.data?.network || []); setLoading(false); })
       .catch(() => setLoading(false));
