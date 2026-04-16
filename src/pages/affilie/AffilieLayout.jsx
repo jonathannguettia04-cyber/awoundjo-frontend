@@ -99,18 +99,40 @@ export default function AffilieLayout() {
   }, []);
 
   // Compteur de notifications non lues
-  useEffect(() => {
-    if (!token) return;
-    fetch(`${BASE}/api/affilie/notifications`, {
-      headers: { Authorization: `Bearer ${token}` },
+  // Dans AffilieLayout, dans le useEffect du compteur notifications
+useEffect(() => {
+  if (!token) { navigate("/affilie/login"); return; }
+  
+  // Vérifier si token expiré avant même de faire la requête
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (new Date(payload.exp * 1000) < new Date()) {
+      safe("removeItem", "affilie_token");
+      safe("removeItem", "affilie_member");
+      navigate("/affilie/login");
+      return;
+    }
+  } catch {}
+
+  fetch(`${BASE}/api/affilie/notifications`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then(r => {
+      if (r.status === 401) {
+        safe("removeItem", "affilie_token");
+        safe("removeItem", "affilie_member");
+        navigate("/affilie/login");
+        return null;
+      }
+      return r.json();
     })
-      .then(r => r.json())
-      .then(d => {
-        const list = d?.data?.notifications || [];
-        setUnread(list.filter(n => !n.is_read).length);
-      })
-      .catch(() => {});
-  }, []);
+    .then(d => {
+      if (!d) return;
+      const list = d?.data?.notifications || [];
+      setUnread(list.filter(n => !n.is_read).length);
+    })
+    .catch(() => {});
+}, []);
 
   function logout() {
     safe("removeItem", "affilie_token");

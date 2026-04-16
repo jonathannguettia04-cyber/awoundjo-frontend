@@ -46,8 +46,22 @@ function getMember() {
 }
 function getToken() { return safe("getItem", "affilie_token"); }
 function fcfa(n) { return Number(n || 0).toLocaleString("fr-FR") + " FCFA"; }
-function authHeaders() { return { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }; }
+function authHeaders() { 
+  return { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }; 
+}
 
+// Ajouter cette fonction
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, { ...options, headers: authHeaders() });
+  if (res.status === 401) {
+    // Token expiré → déconnexion automatique
+    safe("removeItem", "affilie_token");
+    safe("removeItem", "affilie_member");
+    window.location.href = "/affilie/login";
+    return null;
+  }
+  return res;
+}
 // ── Composants partagés ────────────────────────────────────────
 function PageTitle({ children }) {
   return <h1 style={{ margin: "0 0 24px", fontSize: 22, fontWeight: 800, color: C.dark }}>{children}</h1>;
@@ -141,8 +155,7 @@ export function AffilieDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BASE}/api/affilie/dashboard`, { headers: authHeaders(),cache: "no-store"  // ← ajoute ça 
-      })
+    apiFetch(`${BASE}/api/affilie/dashboard`)
       .then(r => r.json())
       .then(d => { setStats(d?.data || null); setLoading(false); })
       .catch(() => setLoading(false));
