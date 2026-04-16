@@ -155,25 +155,26 @@ export default function ClientCotisations() {
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
     Promise.all([
-      fetch(`${BASE}/api/client/me`,          { headers }).then(r => r.json()),
-      fetch(`${BASE}/api/client/cotisations`,  { headers }).then(r => r.json()),
-    ]).then(([me, cots]) => {
-      setClient(me.client || me);
-      setCotisations(cots.cotisations || cots.payments || []);
-    }).catch(() => {
-      // Données de démo si l'API n'est pas disponible
-      setClient({
-        name: "Jean Koua", mutual_number: "AWJ-2024-0042",
-        plan: "IVOIRIENNE", status: "actif",
-        status_validation: "approved", status_payment: "paid",
-      });
-      setCotisations([
-        { id:1, createdAt:"2024-12-05", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"cinetpay" },
-        { id:2, createdAt:"2025-01-07", amount:15000, status:"payé",    paid_at:"2025-01-07", method:"cinetpay" },
-        { id:3, createdAt:"2025-02-04", amount:15000, status:"payé",    paid_at:"2025-02-04", method:"cinetpay" },
-        { id:4, createdAt:"2025-03-01", amount:15000, status:"attente", paid_at:null,         method:null       },
-      ]);
-    }).finally(() => setLoading(false));
+  fetch(`${BASE}/api/client/profile`,       { headers }).then(r => r.json()),
+  fetch(`${BASE}/api/client/contributions`, { headers }).then(r => r.json()),
+]).then(([me, cots]) => {
+  setClient(me.data || me);
+  setCotisations(cots.data?.payments || []);
+}).catch(() => {
+  // Données de démo
+  setClient({
+    name: "Jean Koua", mutual_number: "AWJ-2024-0042",
+    plan: "IVOIRIENNE", status: "actif",
+    status_validation: "approved", status_payment: "paid",
+    monthly_amount: 15000,
+  });
+  setCotisations([
+    { id:1, created_at:"2024-12-05", amount:15000, status:"paid",    paid_at:"2024-12-05", payment_method:"cinetpay" },
+    { id:2, created_at:"2025-01-07", amount:15000, status:"paid",    paid_at:"2025-01-07", payment_method:"cinetpay" },
+    { id:3, created_at:"2025-02-04", amount:15000, status:"paid",    paid_at:"2025-02-04", payment_method:"cinetpay" },
+    { id:4, created_at:"2025-03-01", amount:15000, status:"pending", paid_at:null,         payment_method:null       },
+  ]);
+}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loader />;
@@ -187,8 +188,7 @@ export default function ClientCotisations() {
   }
 
   const plan    = client?.plan || "IVOIRIENNE";
-  const monthly = PLAN_PRICES[plan] ?? PLAN_PRICES['IVOIRIENNE'];
-
+  const monthly = client?.monthly_amount ?? PLAN_PRICES[plan] ?? 15000;
   const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
   const totalPaid = cotisations
