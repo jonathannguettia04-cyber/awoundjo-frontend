@@ -183,9 +183,9 @@ export default function AdminProviders() {
   }
 
   useEffect(() => {
-    if (tab === "requests") loadRequests();
-    else loadProviders();
-  }, [tab, reqStatus]);
+  loadProviders(); // toujours charger pour les KPIs
+  if (tab === "requests") loadRequests();
+}, [tab, reqStatus]);
 
   // ── KPIs (computed from providers list) ───────────────────
   const kpis = useMemo(() => {
