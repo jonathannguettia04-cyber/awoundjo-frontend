@@ -28,6 +28,7 @@ const adminProviderAPI = {
   suspend:       (id, suspend) => api.put(`/provider/admin/providers/${id}/suspend`, { suspend }),
   resetPassword: (id)     => api.post(`/provider/admin/providers/${id}/reset-password`),
   delete:        (id)     => api.delete(`/provider/admin/providers/${id}`),
+  getActes:      (id)     => api.get(`/provider/admin/providers/${id}/actes`),
 };
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -57,7 +58,119 @@ function MiniBar({ value, max, color = "#6366F1" }) {
   );
 }
 
-// ── Provider expanded detail ─────────────────────────────────────────────────
+// ── Provider Detail Modal (qui a fait quoi + coûts) ─────────────────────────
+function ProviderDetailModal({ provider, onClose }) {
+  const [actes,   setActes]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data } = await adminProviderAPI.getActes(provider.id);
+        setActes(data.actes || []);
+      } catch {
+        setError("Impossible de charger l'historique des actes.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [provider.id]);
+
+  const totalMontant = actes.reduce((s, a) => s + Number(a.montant || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl"
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100">
+          <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">
+            {TYPE_ICONS[provider.type] || "🏥"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-slate-800 text-base truncate">{provider.name}</h3>
+            <p className="text-xs text-slate-400">{TYPE_LABELS[provider.type]} · {provider.city || "—"} · {provider.phone}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold px-2">✕</button>
+        </div>
+
+        {/* KPI summary */}
+        <div className="grid grid-cols-3 gap-3 px-6 py-4 bg-slate-50 border-b border-slate-100">
+          <div className="bg-white rounded-xl border border-slate-100 px-4 py-3 text-center">
+            <p className="text-xs text-slate-400 mb-1">Actes ce mois</p>
+            <p className="font-extrabold text-slate-800 text-lg">{Number(provider.actes_month || 0).toLocaleString("fr-FR")}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-100 px-4 py-3 text-center">
+            <p className="text-xs text-slate-400 mb-1">Montant du mois</p>
+            <p className="font-extrabold text-slate-800 text-base">{fmt(provider.montant_month)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-100 px-4 py-3 text-center">
+            <p className="text-xs text-slate-400 mb-1">Total historique</p>
+            <p className="font-extrabold text-indigo-600 text-base">{fmt(totalMontant)}</p>
+          </div>
+        </div>
+
+        {/* Actes list */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Historique des actes</p>
+
+          {loading && (
+            <div className="text-center py-10 text-slate-400 text-sm">Chargement…</div>
+          )}
+          {error && (
+            <div className="bg-red-50 text-red-600 rounded-xl p-4 text-sm">{error}</div>
+          )}
+          {!loading && !error && actes.length === 0 && (
+            <div className="text-center py-10 text-slate-400 text-sm">
+              <p className="text-3xl mb-2">📋</p>
+              <p>Aucun acte enregistré pour cet établissement.</p>
+            </div>
+          )}
+          {!loading && actes.length > 0 && (
+            <div className="space-y-2">
+              {/* Table header */}
+              <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 px-3 py-2 bg-slate-50 rounded-xl">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bénéficiaire</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Type d'acte</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Montant</span>
+              </div>
+              {actes.map((a, i) => (
+                <div key={a.id || i}
+                  className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center px-3 py-2.5 rounded-xl border border-slate-50 hover:bg-slate-50 transition-colors">
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm truncate">{a.beneficiary_name || "—"}</p>
+                    {a.member_id && <p className="text-xs text-slate-400">#{a.member_id}</p>}
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700">
+                      {a.act_type || a.type || "—"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">{fmtDate(a.created_at || a.date)}</p>
+                  <p className="font-bold text-slate-800 text-sm text-right whitespace-nowrap">{fmt(a.montant)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer total */}
+        {!loading && actes.length > 0 && (
+          <div className="border-t border-slate-100 px-6 py-3 flex justify-between items-center bg-slate-50 rounded-b-2xl">
+            <span className="text-xs text-slate-400">{actes.length} acte{actes.length > 1 ? "s" : ""} au total</span>
+            <span className="font-bold text-slate-800 text-sm">Total : {fmt(totalMontant)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function ProviderDetail({ p, onSuspend, onResetPassword, onDelete }) {
   return (
     <div className="px-5 pb-5 pt-4 border-t border-slate-50 bg-slate-50/50">
@@ -152,6 +265,7 @@ export default function AdminProviders() {
   const [selected,   setSelected]  = useState(null);   // expanded row id
   const [rejectNote, setRejectNote]= useState("");
   const [modal,      setModal]     = useState(null);   // { type, item, provider? }
+  const [detailModal,setDetailModal]=useState(null);   // provider object for detail modal
   const [processing, setProcessing]= useState(false);
   const [error,      setError]     = useState("");
   const [success,    setSuccess]   = useState("");
@@ -464,11 +578,12 @@ export default function AdminProviders() {
           ) : (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               {/* Table header */}
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Établissement</span>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Actes / mois</span>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Montant engagé</span>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Statut</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Actions</span>
                 <span />
               </div>
 
@@ -479,20 +594,20 @@ export default function AdminProviders() {
                 return (
                   <div key={p.id} className={idx < filtered.length - 1 ? "border-b border-slate-50" : ""}>
                     {/* Main row */}
-                    <button
-                      onClick={() => setSelected(open ? null : p.id)}
-                      className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-4 hover:bg-slate-50 transition-colors text-left">
+                    <div className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 items-center px-5 py-4 hover:bg-slate-50 transition-colors">
 
-                      {/* Name + type */}
-                      <div className="flex items-center gap-3 min-w-0">
+                      {/* Name + type — cliquable pour voir le détail */}
+                      <button
+                        onClick={() => setDetailModal(p)}
+                        className="flex items-center gap-3 min-w-0 text-left group">
                         <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-lg flex-shrink-0">
                           {TYPE_ICONS[p.type] || "🏥"}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-800 truncate text-sm">{p.name}</p>
+                          <p className="font-bold text-indigo-600 group-hover:text-indigo-800 underline underline-offset-2 truncate text-sm">{p.name}</p>
                           <p className="text-xs text-slate-400 truncate">{TYPE_LABELS[p.type]} · {p.city || "—"}</p>
                         </div>
-                      </div>
+                      </button>
 
                       {/* Actes mois + mini bar */}
                       <div className="flex flex-col gap-1">
@@ -515,9 +630,43 @@ export default function AdminProviders() {
                         </span>
                       </div>
 
-                      {/* Chevron */}
-                      <span className="text-slate-300 text-xs">{open ? "▲" : "▼"}</span>
-                    </button>
+                      {/* Actions inline */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleResetPassword(p)}
+                          title="Réinitialiser le mot de passe"
+                          className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors whitespace-nowrap">
+                          🔑 MDP
+                        </button>
+                        {p.status === "ACTIVE" ? (
+                          <button
+                            onClick={() => handleSuspend(p, true)}
+                            title="Suspendre l'établissement"
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors whitespace-nowrap">
+                            ⏸ Suspendre
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSuspend(p, false)}
+                            title="Réactiver l'établissement"
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-green-200 text-green-600 hover:bg-green-50 transition-colors whitespace-nowrap">
+                            ▶ Réactiver
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setModal({ type: "delete_confirm", item: p })}
+                          title="Supprimer l'établissement"
+                          className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+                          🗑️
+                        </button>
+                      </div>
+
+                      {/* Chevron pour détail expand */}
+                      <button onClick={() => setSelected(open ? null : p.id)}
+                        className="text-slate-300 hover:text-slate-500 text-xs px-1">
+                        {open ? "▲" : "▼"}
+                      </button>
+                    </div>
 
                     {/* Expanded detail panel */}
                     {open && (
@@ -696,6 +845,14 @@ export default function AdminProviders() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Provider Detail Modal — qui a fait quoi + coûts */}
+      {detailModal && (
+        <ProviderDetailModal
+          provider={detailModal}
+          onClose={() => setDetailModal(null)}
+        />
       )}
 
     </div>
