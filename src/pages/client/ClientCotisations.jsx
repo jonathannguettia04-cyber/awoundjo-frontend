@@ -168,10 +168,10 @@ export default function ClientCotisations() {
         status_validation: "approved", status_payment: "paid",
       });
       setCotisations([
-        { id:1, month:"Décembre 2024", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"cinetpay" },
-        { id:2, month:"Janvier 2025",  amount:15000, status:"payé",    paid_at:"2025-01-07", method:"cinetpay" },
-        { id:3, month:"Février 2025",  amount:15000, status:"payé",    paid_at:"2025-02-04", method:"cinetpay" },
-        { id:4, month:"Mars 2025",     amount:15000, status:"attente", paid_at:null,         method:null       },
+        { id:1, createdAt:"2024-12-05", amount:15000, status:"payé",    paid_at:"2024-12-05", method:"cinetpay" },
+        { id:2, createdAt:"2025-01-07", amount:15000, status:"payé",    paid_at:"2025-01-07", method:"cinetpay" },
+        { id:3, createdAt:"2025-02-04", amount:15000, status:"payé",    paid_at:"2025-02-04", method:"cinetpay" },
+        { id:4, createdAt:"2025-03-01", amount:15000, status:"attente", paid_at:null,         method:null       },
       ]);
     }).finally(() => setLoading(false));
   }, []);
@@ -420,7 +420,7 @@ export default function ClientCotisations() {
 
           {pending && (
             <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 900, color: C.dark }}>
-              {pending.month}
+              {fmtDate(pending.createdAt)}
             </p>
           )}
 
@@ -563,7 +563,7 @@ export default function ClientCotisations() {
                     </div>
                     <div>
                       <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.dark }}>
-                        {cot.month}
+                        {fmtDate(cot.createdAt)}
                       </p>
                       <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>
                         {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
