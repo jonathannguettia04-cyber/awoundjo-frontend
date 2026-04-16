@@ -146,10 +146,10 @@ export function AffilieDashboard() {
       .then(d => { setStats(d?.data || null); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
   useEffect(() => {
-    console.log("Composant Dashboard monté, tentative de fetch...");
-    fetchStats();
-  }, []); // Le tableau vide [] signifie "au chargement de la page"
+    console.log("Le Dashboard est bien chargé");
+  }, []);
 
   if (loading) return <Loader />;
 
