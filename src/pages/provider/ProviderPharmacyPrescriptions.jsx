@@ -192,7 +192,7 @@ export default function ProviderPharmacyPrescriptions() {
               </p>
               {result.prescriptions.map(presc => {
                 const isSelected = selected?.id === presc.id;
-                const canDispense = elig?.bons_remaining_this_month !== 0;
+                const canDispense = elig?.eligible && elig?.bons_remaining_this_month !== 0;
                 return (
                   <div key={presc.id} style={{ ...s.card, marginBottom: 12, border: `2px solid ${isSelected ? "#2563EB" : "#E2E8F0"}` }}>
                     {/* En-tête ordonnance */}

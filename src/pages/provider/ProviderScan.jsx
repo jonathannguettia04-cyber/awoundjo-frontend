@@ -25,30 +25,34 @@ const PLAN_CONFIG = {
   TURQUOISE:   { color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC", label: "Turquoise" },
 };
 
+// ProviderScan.jsx — CATEGORY_LABELS à corriger
 const CATEGORY_LABELS = {
-  consultation_generale:    { icon: "🩺", label: "Consultation générale" },
-  consultation_specialiste: { icon: "👨‍⚕️", label: "Consultation spécialiste" },
-  hospitalization:          { icon: "🏥", label: "Hospitalisation" },
-  pharmacy:                 { icon: "💊", label: "Pharmacie" },
-  laboratory:               { icon: "🔬", label: "Laboratoire" },
-  radiology:                { icon: "🩻", label: "Radiologie" },
-  optical:                  { icon: "👓", label: "Optique" },
-  dental:                   { icon: "🦷", label: "Dentaire" },
-  maternity:                { icon: "🤱", label: "Maternité" },
-  maternity_simple:         { icon: "🤱", label: "Maternité — Accouchement simple" },
-  maternity_multiple:       { icon: "🤱", label: "Maternité — Gémellaire" },
-  maternity_surgical:       { icon: "🤱", label: "Maternité — Chirurgicale" },
-  transport:                { icon: "🚑", label: "Transport sanitaire" },
+  consultation_generaliste:    { icon: "🩺",  label: "Consultation générale" },
+  consultation_specialiste:    { icon: "👨‍⚕️", label: "Consultation spécialiste" },
+  consultation_urgence:        { icon: "🚨",  label: "Urgence" },
+  hospitalisation_hebergement: { icon: "🏥",  label: "Hospitalisation" },
+  hospitalisation_chirurgie:   { icon: "🔪",  label: "Chirurgie" },
+  pharmacie:                   { icon: "💊",  label: "Pharmacie" },
+  radiologie_imagerie:         { icon: "🩻",  label: "Radiologie / Imagerie" },
+  analyses_biologiques:        { icon: "🔬",  label: "Analyses biologiques" },
+  optique:                     { icon: "👓",  label: "Optique" },
+  dentisterie:                 { icon: "🦷",  label: "Dentaire" },
+  maternite_simple:            { icon: "🤱",  label: "Maternité — Accouchement simple" },
+  maternite_multiple:          { icon: "🤱",  label: "Maternité — Gémellaire" },
+  maternite_chirurgicale:      { icon: "🤱",  label: "Maternité — Césarienne" },
+  transport_ambulance:         { icon: "🚑",  label: "Transport sanitaire" },
 };
 
-// Catégories nécessitant une ordonnance après l'acte
+// Et PRESCRIPTION_REQUIRED_CATEGORIES :
 const PRESCRIPTION_REQUIRED_CATEGORIES = [
-  "consultation_generale",
+  "consultation_generaliste",
   "consultation_specialiste",
-  "hospitalization",
-  "maternity_simple",
-  "maternity_multiple",
-  "maternity_surgical",
+  "consultation_urgence",
+  "hospitalisation_hebergement",
+  "hospitalisation_chirurgie",
+  "maternite_simple",
+  "maternite_multiple",
+  "maternite_chirurgicale",
 ];
 
 const STEPS = [
@@ -378,10 +382,10 @@ export default function ProviderScan() {
                     <p style={{ fontWeight: 700, color: "#15803D", margin: 0, fontSize: 13 }}>
                       Éligible — Couverture {eligibility.coverage_pct}%
                     </p>
-                    {eligibility.cap_monthly && (
-                      <p style={{ color: "#16A34A", fontSize: 11, margin: 0 }}>
-                        Plafond mensuel : {fmt(eligibility.cap_monthly)}
-                      </p>
+                    {eligibility?.cap_monthly_acts && (
+                    <p style={{ color: "#16A34A", fontSize: 11, margin: 0 }}>
+                     Max {eligibility.cap_monthly_acts} bons/mois
+                     </p>
                     )}
                   </div>
                 </div>

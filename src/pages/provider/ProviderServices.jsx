@@ -10,26 +10,36 @@ const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
 const CATEGORY_CONFIG = {
-  consultation_generale:    { icon: "🩺", label: "Consultation générale",    color: "#2563EB", bg: "#EFF6FF" },
-  consultation_specialiste: { icon: "👨‍⚕️", label: "Consultation spécialiste", color: "#7C3AED", bg: "#F5F3FF" },
-  hospitalization:          { icon: "🏥", label: "Hospitalisation",           color: "#DC2626", bg: "#FEF2F2" },
-  pharmacy:                 { icon: "💊", label: "Pharmacie",                 color: "#059669", bg: "#ECFDF5" },
-  laboratory:               { icon: "🔬", label: "Laboratoire",              color: "#0891B2", bg: "#ECFEFF" },
-  optical:                  { icon: "👓", label: "Optique",                   color: "#D97706", bg: "#FFFBEB" },
-  dental:                   { icon: "🦷", label: "Dentaire",                  color: "#64748B", bg: "#F8FAFC" },
-  maternity:                { icon: "🤱", label: "Maternité",                 color: "#DB2777", bg: "#FDF2F8" },
+  consultation_generaliste:    { icon: "🩺",  label: "Consultation générale",    color: "#2563EB", bg: "#EFF6FF" },
+  consultation_specialiste:    { icon: "👨‍⚕️", label: "Consultation spécialiste", color: "#7C3AED", bg: "#F5F3FF" },
+  consultation_urgence:        { icon: "🚨",  label: "Urgence",                  color: "#DC2626", bg: "#FEF2F2" },
+  hospitalisation_hebergement: { icon: "🏥",  label: "Hospitalisation",          color: "#DC2626", bg: "#FEF2F2" },
+  hospitalisation_chirurgie:   { icon: "🔪",  label: "Chirurgie",                color: "#DC2626", bg: "#FEF2F2" },
+  pharmacie:                   { icon: "💊",  label: "Pharmacie",                color: "#059669", bg: "#ECFDF5" },
+  radiologie_imagerie:         { icon: "🩻",  label: "Radiologie / Imagerie",    color: "#0891B2", bg: "#ECFEFF" },
+  analyses_biologiques:        { icon: "🔬",  label: "Analyses biologiques",     color: "#0891B2", bg: "#ECFEFF" },
+  optique:                     { icon: "👓",  label: "Optique",                  color: "#D97706", bg: "#FFFBEB" },
+  dentisterie:                 { icon: "🦷",  label: "Dentaire",                 color: "#64748B", bg: "#F8FAFC" },
+  maternite_simple:            { icon: "🤱",  label: "Maternité — Simple",       color: "#DB2777", bg: "#FDF2F8" },
+  maternite_multiple:          { icon: "🤱",  label: "Maternité — Gémellaire",   color: "#DB2777", bg: "#FDF2F8" },
+  maternite_chirurgicale:      { icon: "🤱",  label: "Maternité — Césarienne",   color: "#DB2777", bg: "#FDF2F8" },
+  transport_ambulance:         { icon: "🚑",  label: "Transport sanitaire",      color: "#7C3AED", bg: "#F5F3FF" },
 };
 
 const CATEGORIES = [
-  { id: "",                         label: "Tous les actes" },
-  { id: "consultation_generale",    label: "Cons. générale" },
-  { id: "consultation_specialiste", label: "Spécialiste" },
-  { id: "hospitalization",          label: "Hospitalisation" },
-  { id: "pharmacy",                 label: "Pharmacie" },
-  { id: "laboratory",               label: "Laboratoire" },
-  { id: "optical",                  label: "Optique" },
-  { id: "dental",                   label: "Dentaire" },
-  { id: "maternity",                label: "Maternité" },
+  { id: "",                          label: "Tous les actes" },
+  { id: "consultation_generaliste",  label: "Cons. générale" },
+  { id: "consultation_specialiste",  label: "Spécialiste" },
+  { id: "consultation_urgence",      label: "Urgence" },
+  { id: "hospitalisation_hebergement", label: "Hospitalisation" },
+  { id: "hospitalisation_chirurgie", label: "Chirurgie" },
+  { id: "pharmacie",                 label: "Pharmacie" },
+  { id: "radiologie_imagerie",       label: "Radiologie" },
+  { id: "analyses_biologiques",      label: "Biologie" },
+  { id: "optique",                   label: "Optique" },
+  { id: "dentisterie",               label: "Dentaire" },
+  { id: "maternite_simple",          label: "Maternité" },
+  { id: "transport_ambulance",       label: "Transport" },
 ];
 
 export default function ProviderServices() {
