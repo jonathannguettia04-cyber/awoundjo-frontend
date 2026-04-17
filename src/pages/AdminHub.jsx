@@ -27,7 +27,7 @@ const SECTIONS = [
       { icon: "💰", label: "Commissions globales",           path: "/commissions",                   desc: "Toutes les commissions agents" },
       { icon: "🌍", label: "Ambassadeurs Diaspora",          path: "/admin/diaspora",                desc: "Gérer le réseau ambassadeurs diaspora" },
       { icon: "⛪", label: "Ambassadeurs Fédérations",       path: "/admin/federation",              desc: "Gérer le réseau fédérations & églises" },
-      { icon: "💜", label: "Réseau Affilié",                 path: "/admin/affilie",                 desc: "Directrices, Leaders, Superviseurs, Recruteurs" },
+      { icon: "💼", label: "Réseau Business",                path: "/admin/business",                desc: "Directrices, Leaders, Superviseurs, Recruteurs" },
     ],
   },
 
@@ -88,9 +88,9 @@ const SECTIONS = [
     links: [
       { icon: "🌍", label: "Admin Diaspora",                path: "/admin/diaspora",               desc: "Gérer ambassadeurs diaspora" },
       { icon: "⛪", label: "Admin Fédérations",             path: "/admin/federation",             desc: "Gérer ambassadeurs fédérations" },
-      { icon: "💜", label: "Admin Affiliés",                path: "/admin/affilie",                desc: "Directrices, Leaders, Superviseurs, Recruteurs" },
+      { icon: "💼", label: "Admin Business",                path: "/admin/business",               desc: "Directrices, Leaders, Superviseurs, Recruteurs" },
       { icon: "🚪", label: "Portail Ambassadeurs",          path: "/diaspora/login",               desc: "Accéder au portail unifié", external: true },
-      { icon: "🔐", label: "Portail Affilié",               path: "/affilie/login",                desc: "Espace membres réseau affilié", external: true },
+      { icon: "🔐", label: "Portail Business",              path: "/business/login",               desc: "Espace membres réseau business", external: true },
       { icon: "🏆", label: "Classement Global",             path: "/admin/ambassador-leaderboard", desc: "Classement diaspora + fédérations" },
       { icon: "💰", label: "Commissions Ambassadeurs",      path: "/admin/ambassador-commissions", desc: "Toutes les commissions réseau" },
     ],
@@ -109,7 +109,7 @@ const SECTIONS = [
       { icon: "🔐", label: "Connexion Admin/Agent",         path: "/login",           desc: "Connexion espace commercial",      external: true },
       { icon: "🌍", label: "Portail Diaspora",              path: "/diaspora/login",  desc: "Espace ambassadeurs diaspora",     external: true },
       { icon: "⛪", label: "Portail Fédération",            path: "/diaspora/login",  desc: "Espace ambassadeurs fédération",   external: true },
-      { icon: "💜", label: "Portail Affilié",               path: "/affilie/login",   desc: "Espace membres réseau affilié",    external: true },
+      { icon: "💼", label: "Portail Business",              path: "/business/login",  desc: "Espace membres réseau business",   external: true },
     ],
   },
 ];

@@ -1,7 +1,7 @@
 // src/pages/diaspora/DiasporaAuth.jsx
 // ─────────────────────────────────────────────────────────────
 //  Portail d'authentification unifié Awoundjô
-//  Réseaux : DIASPORA | REFERRAL (RUM/Leader/Pasteur/Responsable)
+//  Réseaux : DIASPORA | REFERRAL (RUM/Leader/Pasteur/Responsable) | BUSINESS (Directrice)
 //
 //  MODIFICATIONS (FIX) :
 //  1. handleLogin() gère les 3 codes d'erreur backend :
@@ -10,10 +10,12 @@
 //       ACCOUNT_REJECTED   → message rouge définitif
 //  2. handleRetryPayment() : relance CinetPay sans token
 //     via POST /api/payments/cinetpay/retry-adhesion
-//  3. handleRegister() : après inscription, redirige vers login
+//  3. handleRegister() : après inscription Diaspora/Referral, redirige vers login
 //     (le compte n'est pas encore payé donc pas de token valide
 //      pour accéder au dashboard)
 //  4. URL ?payment=success|failed gérée au retour de CinetPay
+//  5. BUSINESS — Directrice peut s'inscrire directement sans code
+//     via POST /api/business/register (sans paiement CinetPay)
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -34,6 +36,9 @@ const SELF_REGISTER_ROLES = {
   REFERRAL: [
     { value: "RUM", label: "👑 RUM", desc: "Responsable Unifié de Mission" },
   ],
+  BUSINESS: [
+    { value: "DIRECTRICE", label: "💼 Directrice", desc: "Fondatrice du réseau Business" },
+  ],
 };
 
 const NETWORK_CONFIG = {
@@ -53,11 +58,21 @@ const NETWORK_CONFIG = {
     desc:  "RUM → Leader → Pasteur → Responsable → Client",
     dashPath: "/referral/dashboard",
   },
+  BUSINESS: {
+    label: "Réseau Business",
+    icon:  "💼",
+    color: "#059669",
+    light: "#ECFDF5",
+    desc:  "Directrice → Manager → Vendeuse → Cliente",
+    dashPath: "/business/dashboard",
+  },
 };
 
 function getDashPath(ambassador) {
   if (!ambassador) return "/diaspora/login";
-  return ambassador.network_type === "REFERRAL" ? "/referral/dashboard" : "/diaspora/dashboard";
+  if (ambassador.network_type === "REFERRAL") return "/referral/dashboard";
+  if (ambassador.network_type === "BUSINESS") return "/business/dashboard";
+  return "/diaspora/dashboard";
 }
 
 export default function DiasporaAuth() {
@@ -76,7 +91,7 @@ export default function DiasporaAuth() {
   const [payLoading,        setPayLoading]         = useState(false);
 
   // FIX — retour CinetPay : ?payment=success ou ?payment=failed
-  const [paymentResult, setPaymentResult] = useState(null); // "success" | "failed" | null
+  const [paymentResult, setPaymentResult] = useState(null); // "success" | "failed" | "registered" | "registered_business" | null
 
   useEffect(() => {
     const result = params.get("payment");
@@ -179,28 +194,46 @@ export default function DiasporaAuth() {
   }
 
   // ── Inscription ───────────────────────────────────────────
-  // FIX — Après inscription, on NE connecte PAS directement l'ambassadeur.
-  // Le compte est créé (status_payment=unpaid, status_validation=pending).
-  // On bascule sur l'onglet login avec un message d'info.
   async function handleRegister(e) {
     e.preventDefault();
     resetErrorState();
     setLoading(true);
     try {
-      await diasporaAuthAPI.register(regForm);
-      // Compte créé — l'utilisateur doit passer par le paiement AVANT de se connecter.
-      // On bascule sur l'onglet login avec un message de succès.
-      setTab("login");
-      setError(""); // pas une erreur
-      setPaymentResult("registered"); // message spécial "compte créé"
+      // BUSINESS — Directrice : inscription directe sans paiement CinetPay
+      if (regForm.network_type === "BUSINESS") {
+        const res = await fetch(`${BASE}/api/business/register`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name:            regForm.name,
+            email:           regForm.email,
+            password:        regForm.password,
+            phone:           regForm.phone   || undefined,
+            country:         regForm.country || undefined,
+            invitation_code: regForm.referral_code || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || data.error || "Erreur d'inscription Business");
+        setTab("login");
+        setError("");
+        setPaymentResult("registered_business");
+      } else {
+        // DIASPORA / REFERRAL — flux habituel avec paiement
+        await diasporaAuthAPI.register(regForm);
+        setTab("login");
+        setError("");
+        setPaymentResult("registered");
+      }
     } catch (err) {
-      setError(err?.response?.data?.error || "Erreur d'inscription. Vérifiez vos informations.");
+      setError(err?.message || err?.response?.data?.error || "Erreur d'inscription. Vérifiez vos informations.");
     } finally {
       setLoading(false);
     }
   }
 
   const net = NETWORK_CONFIG[regForm.network_type];
+  const isBusiness = regForm.network_type === "BUSINESS";
 
   return (
     <div style={{
@@ -259,7 +292,7 @@ export default function DiasporaAuth() {
           ))}
         </div>
 
-        {/* FIX — Bandeau retour paiement CinetPay */}
+        {/* Bandeau retour paiement CinetPay */}
         {paymentResult === "success" && (
           <div style={{ background:"rgba(5,150,105,.2)", border:"1px solid rgba(5,150,105,.4)", borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"flex-start", gap:10 }}>
             <span style={{ fontSize:20, flexShrink:0 }}>✅</span>
@@ -284,7 +317,7 @@ export default function DiasporaAuth() {
           </div>
         )}
 
-        {/* FIX — Compte créé, pas encore payé */}
+        {/* Compte Diaspora/Referral créé, pas encore payé */}
         {paymentResult === "registered" && tab === "login" && (
           <div style={{ background:"rgba(0,188,212,.12)", border:"1px solid rgba(0,188,212,.3)", borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"flex-start", gap:10 }}>
             <span style={{ fontSize:20, flexShrink:0 }}>🎉</span>
@@ -292,6 +325,20 @@ export default function DiasporaAuth() {
               <p style={{ margin:0, color:"#00BCD4", fontWeight:700, fontSize:13 }}>Compte créé avec succès !</p>
               <p style={{ margin:"3px 0 0", color:"rgba(255,255,255,.55)", fontSize:12 }}>
                 Connectez-vous pour finaliser votre paiement d'adhésion (15 000 FCFA) et soumettre votre dossier à l'administrateur.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Compte Directrice Business créé — pas de paiement requis */}
+        {paymentResult === "registered_business" && tab === "login" && (
+          <div style={{ background:"rgba(5,150,105,.15)", border:"1px solid rgba(5,150,105,.35)", borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"flex-start", gap:10 }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>🎉</span>
+            <div>
+              <p style={{ margin:0, color:"#6EE7B7", fontWeight:700, fontSize:13 }}>Compte Directrice créé !</p>
+              <p style={{ margin:"3px 0 0", color:"rgba(255,255,255,.55)", fontSize:12 }}>
+                Votre compte Business est actif. Connectez-vous sur le{" "}
+                <a href="/business/login" style={{ color:"#6EE7B7", fontWeight:700 }}>portail Business →</a>
               </p>
             </div>
           </div>
@@ -312,7 +359,7 @@ export default function DiasporaAuth() {
           </div>
         )}
 
-        {/* FIX — Bouton relance paiement */}
+        {/* Bouton relance paiement */}
         {errorCode === "PAYMENT_REQUIRED" && (
           <button
             onClick={handleRetryPayment}
@@ -339,7 +386,7 @@ export default function DiasporaAuth() {
           </button>
         )}
 
-        {/* FIX — Bandeau validation admin en attente */}
+        {/* Bandeau validation admin en attente */}
         {errorCode === "PENDING_VALIDATION" && (
           <div style={{ background:"rgba(217,119,6,.1)", border:"1px solid rgba(217,119,6,.3)", borderRadius:10, padding:"10px 14px", marginBottom:16, fontSize:12, color:"rgba(255,255,255,.65)" }}>
             ⏳ Votre dossier est en cours d'examen. L'administrateur vous contactera par WhatsApp ou email sous 24–48h.
@@ -381,15 +428,15 @@ export default function DiasporaAuth() {
           <>
             <h2 style={{ color:"#fff", fontSize:20, fontWeight:800, margin:"0 0 6px" }}>Rejoignez notre réseau 🌍</h2>
             <p style={{ color:"rgba(255,255,255,.5)", fontSize:13, margin:"0 0 20px" }}>
-              Inscription réservée aux rôles fondateurs (Ambassadeur Diaspora, RUM)
+              Inscription réservée aux rôles fondateurs (Ambassadeur Diaspora, RUM, Directrice Business)
             </p>
 
-            {/* Sélecteur réseau */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+            {/* Sélecteur réseau — grille 3 colonnes */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:20 }}>
               {Object.entries(NETWORK_CONFIG).map(([key, cfg]) => (
                 <button key={key} type="button" onClick={() => handleNetworkChange(key)}
                   style={{
-                    padding:"14px 10px", borderRadius:14, border:"none", cursor:"pointer",
+                    padding:"12px 8px", borderRadius:14, border:"none", cursor:"pointer",
                     fontFamily:"inherit", transition:"all .2s",
                     background: regForm.network_type === key
                       ? `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)`
@@ -397,9 +444,9 @@ export default function DiasporaAuth() {
                     boxShadow: regForm.network_type === key ? `0 6px 20px ${cfg.color}44` : "none",
                     transform: regForm.network_type === key ? "translateY(-2px)" : "none",
                   }}>
-                  <div style={{ fontSize:26, marginBottom:6 }}>{cfg.icon}</div>
-                  <div style={{ color:"#fff", fontWeight:800, fontSize:13 }}>{cfg.label}</div>
-                  <div style={{ color:"rgba(255,255,255,.6)", fontSize:10, marginTop:3 }}>{cfg.desc}</div>
+                  <div style={{ fontSize:22, marginBottom:5 }}>{cfg.icon}</div>
+                  <div style={{ color:"#fff", fontWeight:800, fontSize:11 }}>{cfg.label}</div>
+                  <div style={{ color:"rgba(255,255,255,.6)", fontSize:9, marginTop:3, lineHeight:1.3 }}>{cfg.desc}</div>
                 </button>
               ))}
             </div>
@@ -417,21 +464,32 @@ export default function DiasporaAuth() {
               </div>
             </div>
 
-            {/* FIX — Info workflow paiement + validation */}
+            {/* Info workflow — différent selon réseau */}
             <div style={{ background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:12, padding:"10px 14px", marginBottom:20 }}>
-              <p style={{ margin:"0 0 6px", color:"rgba(255,255,255,.8)", fontSize:12, fontWeight:700 }}>📋 Étapes après inscription</p>
-              {[
-                { step:"1", label:"Compte créé",            done:true  },
-                { step:"2", label:"Paiement 15 000 FCFA",   done:false },
-                { step:"3", label:"Validation administrateur", done:false },
-              ].map(s => (
-                <div key={s.step} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                  <div style={{ width:18, height:18, borderRadius:"50%", background: s.done ? "#059669" : "rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:"#fff", flexShrink:0 }}>
-                    {s.step}
-                  </div>
-                  <span style={{ fontSize:12, color: s.done ? "#6EE7B7" : "rgba(255,255,255,.5)" }}>{s.label}</span>
-                </div>
-              ))}
+              {isBusiness ? (
+                <>
+                  <p style={{ margin:"0 0 6px", color:"rgba(255,255,255,.8)", fontSize:12, fontWeight:700 }}>✅ Inscription instantanée</p>
+                  <p style={{ margin:0, color:"rgba(255,255,255,.5)", fontSize:12 }}>
+                    Aucun paiement requis. Votre compte Directrice est activé immédiatement après inscription.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin:"0 0 6px", color:"rgba(255,255,255,.8)", fontSize:12, fontWeight:700 }}>📋 Étapes après inscription</p>
+                  {[
+                    { step:"1", label:"Compte créé",               done:true  },
+                    { step:"2", label:"Paiement 15 000 FCFA",       done:false },
+                    { step:"3", label:"Validation administrateur",  done:false },
+                  ].map(s => (
+                    <div key={s.step} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                      <div style={{ width:18, height:18, borderRadius:"50%", background: s.done ? "#059669" : "rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:"#fff", flexShrink:0 }}>
+                        {s.step}
+                      </div>
+                      <span style={{ fontSize:12, color: s.done ? "#6EE7B7" : "rgba(255,255,255,.5)" }}>{s.label}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             {refCode && (
@@ -468,11 +526,14 @@ export default function DiasporaAuth() {
                 </select>
               </div>
 
+              {/* Code parrainage — label adapté selon réseau */}
               <div>
-                <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>Code parrainage</label>
+                <label style={{ display:"block", fontSize:12, fontWeight:600, color:"rgba(255,255,255,.6)", marginBottom:6, textTransform:"uppercase", letterSpacing:.8 }}>
+                  {isBusiness ? "Code d'invitation (optionnel)" : "Code parrainage"}
+                </label>
                 <input className="unif-input" value={regForm.referral_code}
                   onChange={e => setRegForm({ ...regForm, referral_code: e.target.value })}
-                  placeholder="AWJ-AMB-XXXXX (optionnel)"
+                  placeholder={isBusiness ? "Laissez vide pour créer votre propre réseau" : "AWJ-AMB-XXXXX (optionnel)"}
                   style={{ color: regForm.referral_code ? "#00BCD4" : "rgba(255,255,255,.4)", fontWeight: regForm.referral_code ? 700 : 400 }} />
               </div>
 
