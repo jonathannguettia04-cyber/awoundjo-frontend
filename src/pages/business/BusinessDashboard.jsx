@@ -1,13 +1,32 @@
 // src/pages/BusinessDashboard.jsx
 // ═══════════════════════════════════════════════════════════════
-//  AWOUNDJÔ BUSINESS — Dashboard membre
-//  Tabs : Accueil · Mon Réseau · Commissions · Bonus · Inviter
+//  AWOUNDJÔ BUSINESS — Dashboard membre (version standalone)
+//  Utilisé si vous préférez un dashboard tout-en-un
+//  plutôt que les pages séparées de BusinessPages.jsx
+//
+//  CORRECTIONS APPLIQUÉES :
+//  1. authHeaders() lit uniquement "business_token"
+//  2. apiFetch() appelle /api/business/* (pas /api/business/dashboard)
+//  3. Champs TabAccueil alignés sur getDashboardStats() :
+//       stats.commissions.total_earned (pas total_gains)
+//       stats.commissions.pending      (pas gains_pending)
+//       stats.commissions.paid         (pas gains_payes)
+//       stats.network.network_size     (pas reseau.total)
+//       stats.network.direct_members   (pas reseau.niveau_1/2)
+//  4. TabReseau : data.reseau → data.network.level1 / level2
+//  5. TabCommissions : /commissions pagination OK
+//     champs : montant / rate_pct / niveau / status / amount_xof
+//  6. TabBonus : /bonus-pool → data.history + data.current_pool
+//     champs mois/annee/montant_total (pas nb_payments / statut)
+//  7. TabInviter : data.code / data.link / data.child_role
+//     (pas data.lien_invitation, pas data.member.code_invitation)
+//  8. member.inscription → member.created_at
 // ═══════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from "react";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// ── Palette ────────────────────────────────────────────────────
+// ── Palette ─────────────────────────────────────────────────────
 const T = {
   gold:    "#C9933A",
   goldL:   "#FBF3E3",
@@ -35,24 +54,26 @@ const ROLE_META = {
   RECRUTEUR:   { icon: "🤝", label: "Recruteur",    color: "#22C55E" },
 };
 
-const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const fmt    = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtNum = (n) => Number(n || 0).toLocaleString("fr-FR");
 
+// FIX : lit uniquement "business_token"
 function authHeaders() {
-  const token = localStorage.getItem("token") ||
-                localStorage.getItem("agent_token") ||
-                localStorage.getItem("business_token");
-  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  const token = localStorage.getItem("business_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 async function apiFetch(path) {
-  const res = await fetch(`${BASE}/api/business${path}`, { headers: authHeaders() });
+  const res  = await fetch(`${BASE}/api/business${path}`, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || data.message || "Erreur API");
   return data;
 }
 
-// ── Spinner ────────────────────────────────────────────────────
+// ── Spinner ──────────────────────────────────────────────────────
 function Spin({ size = 24 }) {
   return (
     <div style={{
@@ -60,20 +81,20 @@ function Spin({ size = 24 }) {
       border: `2px solid ${T.border}`,
       borderTop: `2px solid ${T.gold}`,
       borderRadius: "50%",
-      animation: "spin .7s linear infinite",
+      animation: "biz-spin .7s linear infinite",
       margin: "0 auto",
     }} />
   );
 }
 
-// ── Badge statut ───────────────────────────────────────────────
+// ── Badge statut ─────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const map = {
-    ACTIVE:    { label: "Actif",       bg: T.greenL, color: T.green  },
+    ACTIVE:    { label: "Actif",       bg: T.greenL, color: T.green   },
     PENDING:   { label: "En attente",  bg: "#1A1A00", color: "#EAB308" },
-    SUSPENDED: { label: "Suspendu",    bg: T.redL,   color: T.red    },
-    VALIDATED: { label: "Validé",      bg: T.greenL, color: T.green  },
-    PAID:      { label: "Payé",        bg: T.blueL,  color: T.blue   },
+    SUSPENDED: { label: "Suspendu",    bg: T.redL,   color: T.red     },
+    VALIDATED: { label: "Validé",      bg: T.greenL, color: T.green   },
+    PAID:      { label: "Payé",        bg: T.blueL,  color: T.blue    },
   };
   const s = map[status] || { label: status, bg: T.border, color: T.muted };
   return (
@@ -85,18 +106,14 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Carte stat ─────────────────────────────────────────────────
+// ── Carte stat ────────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, accent }) {
   return (
     <div style={{
-      background: T.card,
-      border: `1px solid ${T.border}`,
-      borderRadius: 14,
-      padding: "20px 22px",
-      display: "flex", flexDirection: "column", gap: 8,
+      background: T.card, border: `1px solid ${T.border}`, borderRadius: 14,
+      padding: "20px 22px", display: "flex", flexDirection: "column", gap: 8,
       position: "relative", overflow: "hidden",
     }}>
-      {/* Glow accent */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 2,
         background: `linear-gradient(90deg, transparent, ${accent || T.gold}, transparent)`,
@@ -113,19 +130,33 @@ function StatCard({ icon, label, value, sub, accent }) {
   );
 }
 
-// ── Onglets ────────────────────────────────────────────────────
+// ── Onglets ───────────────────────────────────────────────────────
 const TABS = [
-  { id: "accueil",      label: "Accueil",      icon: "🏠" },
-  { id: "reseau",       label: "Mon Réseau",   icon: "🌐" },
-  { id: "commissions",  label: "Commissions",  icon: "💰" },
-  { id: "bonus",        label: "Bonus Pool",   icon: "🎯" },
-  { id: "inviter",      label: "Inviter",      icon: "🔗" },
+  { id: "accueil",     label: "Accueil",     icon: "🏠" },
+  { id: "reseau",      label: "Mon Réseau",  icon: "🌐" },
+  { id: "commissions", label: "Commissions", icon: "💰" },
+  { id: "bonus",       label: "Bonus Pool",  icon: "🎯" },
+  { id: "inviter",     label: "Inviter",     icon: "🔗" },
 ];
 
-// ── Tab Accueil ────────────────────────────────────────────────
+// ── Tab Accueil ───────────────────────────────────────────────────
+// FIX : tous les champs viennent de getDashboardStats()
 function TabAccueil({ data }) {
-  const { member, stats, commissions_recentes } = data;
-  const rm = ROLE_META[member.role] || ROLE_META.RECRUTEUR;
+  const { member, stats } = data;
+  const comm = stats?.commissions || {};
+  const net  = stats?.network     || {};
+  const rm   = ROLE_META[member.role] || ROLE_META.RECRUTEUR;
+
+  // Commissions récentes : on les charge séparément
+  const [recentes, setRecentes] = useState([]);
+  useEffect(() => {
+    apiFetch("/commissions")
+      .then(d => setRecentes((d.commissions || []).slice(0, 5)))
+      .catch(() => {});
+  }, []);
+
+  const totalDirect = Object.values(net.direct_members || {})
+    .reduce((acc, r) => acc + Number(r.total || 0), 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -133,8 +164,7 @@ function TabAccueil({ data }) {
       {/* Profil card */}
       <div style={{
         background: `linear-gradient(135deg, ${T.card}, #1E1830)`,
-        border: `1px solid ${T.border}`,
-        borderRadius: 16, padding: "24px 28px",
+        border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px 28px",
         display: "flex", alignItems: "center", gap: 20,
         position: "relative", overflow: "hidden",
       }}>
@@ -153,72 +183,48 @@ function TabAccueil({ data }) {
           <div style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>
             RÉSEAU AWOUNDJÔ BUSINESS
           </div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: T.text }}>
-            {rm.label}
-          </div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: T.text }}>{rm.label}</div>
+          <div style={{ fontSize: 16, color: T.textSub, fontWeight: 600, marginTop: 2 }}>{member.name}</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
             <StatusBadge status={member.status} />
-            <span style={{ fontSize: 11, color: T.muted }}>
-              Depuis {new Date(member.inscription).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-            </span>
+            {/* FIX : created_at (pas inscription) */}
+            {member.created_at && (
+              <span style={{ fontSize: 11, color: T.muted }}>
+                Depuis {new Date(member.created_at).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Stats principales */}
+      {/* Stats principales — FIX champs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
-        <StatCard
-          icon="💰" label="Total gains"
-          value={fmt(stats.commissions.total_gains)}
-          sub={`${fmtNum(stats.commissions.nb_total)} commission(s)`}
-          accent={T.gold}
-        />
-        <StatCard
-          icon="⏳" label="En attente"
-          value={fmt(stats.commissions.gains_pending)}
-          sub="À valider"
-          accent="#EAB308"
-        />
-        <StatCard
-          icon="✅" label="Payé"
-          value={fmt(stats.commissions.gains_payes)}
-          accent={T.green}
-        />
-        <StatCard
-          icon="🌐" label="Mon réseau"
-          value={fmtNum(stats.reseau.total)}
-          sub={`Niv.1: ${stats.reseau.niveau_1} · Niv.2: ${stats.reseau.niveau_2}`}
-          accent={T.blue}
-        />
+        <StatCard icon="💰" label="Total gains"    value={fmt(comm.total_earned)} sub={`${fmtNum(Number(comm.direct_count || 0) + Number(comm.network_count || 0))} commission(s)`} accent={T.gold} />
+        <StatCard icon="⏳" label="En attente"     value={fmt(comm.pending)}      sub="À valider"           accent="#EAB308" />
+        <StatCard icon="✅" label="Payé"           value={fmt(comm.paid)}                                   accent={T.green} />
+        <StatCard icon="🌐" label="Mon réseau"     value={fmtNum(net.network_size || 0)} sub={`Directs : ${totalDirect}`}    accent={T.blue} />
       </div>
 
       {/* Règle commissions */}
-      <div style={{
-        background: T.card, border: `1px solid ${T.border}`,
-        borderRadius: 14, padding: "20px 24px",
-      }}>
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 24px" }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
           📋 <span>Règle de commission Business</span>
         </div>
         {[
-          { niveau: "Niveau 1", desc: "Vous apportez un client", taux: "10%", color: T.gold },
-          { niveau: "Niveau 2", desc: "Votre parrain (sur vos clients)", taux: "5%", color: "#8B5CF6" },
-          { niveau: "Pool global", desc: "Bonus mensuel partagé", taux: "2%", color: T.blue },
+          { niveau: "Niveau 1",    desc: "Vous apportez un client",          taux: "10%", color: T.gold     },
+          { niveau: "Niveau 2",    desc: "Votre parrain (sur vos clients)",   taux: "5%",  color: "#8B5CF6" },
+          { niveau: "Pool global", desc: "Bonus mensuel partagé",             taux: "2%",  color: T.blue    },
         ].map((r, i) => (
           <div key={i} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "10px 14px", borderRadius: 10, marginBottom: 6,
-            background: "#12121A",
-            border: `1px solid ${T.border}`,
+            background: "#12121A", border: `1px solid ${T.border}`,
           }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{r.niveau}</div>
               <div style={{ fontSize: 11, color: T.muted }}>{r.desc}</div>
             </div>
-            <div style={{
-              fontSize: 20, fontWeight: 900, color: r.color,
-              fontFamily: "'DM Mono', monospace",
-            }}>{r.taux}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: r.color, fontFamily: "'DM Mono', monospace" }}>{r.taux}</div>
           </div>
         ))}
         <div style={{
@@ -230,31 +236,32 @@ function TabAccueil({ data }) {
         </div>
       </div>
 
-      {/* Dernières commissions */}
-      {commissions_recentes.length > 0 && (
+      {/* Dernières commissions — FIX champs : montant / rate_pct / niveau / status / amount_xof */}
+      {recentes.length > 0 && (
         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 13, fontWeight: 800, color: T.text }}>
             📈 Dernières commissions
           </div>
-          {commissions_recentes.slice(0, 5).map((c, i) => (
+          {recentes.map((c, i) => (
             <div key={i} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "12px 20px",
-              borderBottom: i < 4 ? `1px solid ${T.border}` : "none",
+              borderBottom: i < recentes.length - 1 ? `1px solid ${T.border}` : "none",
             }}>
               <div>
                 <div style={{ fontSize: 12, color: T.text, fontWeight: 600 }}>
-                  Niveau {c.niveau} — {c.taux}%
+                  Niveau {c.niveau} — {c.rate_pct}%
                 </div>
                 <div style={{ fontSize: 11, color: T.muted }}>
-                  {new Date(c.created_at).toLocaleDateString("fr-FR")} · Base {fmt(c.base_montant)}
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                  {c.amount_xof ? ` · Base ${fmt(c.amount_xof)}` : ""}
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 <span style={{ fontWeight: 900, color: T.gold, fontFamily: "monospace" }}>
                   +{fmt(c.montant)}
                 </span>
-                <StatusBadge status={c.statut} />
+                <StatusBadge status={c.status} />
               </div>
             </div>
           ))}
@@ -264,19 +271,20 @@ function TabAccueil({ data }) {
   );
 }
 
-// ── Tab Réseau ─────────────────────────────────────────────────
-function TabReseau({ reseau }) {
-  const { niveau1 = [], niveau2 = [] } = reseau || {};
+// ── Tab Réseau ────────────────────────────────────────────────────
+// FIX : data.network.level1 / level2 (pas data.reseau.niveau1/2)
+//       Champs membres : name / role / status / created_at (pas nom)
+function TabReseau({ network }) {
+  const niveau1 = network?.level1 || [];
+  const niveau2 = network?.level2 || [];
 
   function MemberRow({ m, level }) {
     const rm = ROLE_META[m.role] || {};
     return (
       <div style={{
         display: "flex", alignItems: "center", gap: 14,
-        padding: "12px 20px",
-        borderBottom: `1px solid ${T.border}`,
-        background: "transparent",
-        transition: "background .15s",
+        padding: "12px 20px", borderBottom: `1px solid ${T.border}`,
+        background: "transparent", transition: "background .15s",
       }}
         onMouseEnter={e => e.currentTarget.style.background = "#18181F"}
         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -284,19 +292,18 @@ function TabReseau({ reseau }) {
         {level === 2 && <div style={{ width: 2, height: 36, background: T.border, borderRadius: 2, marginLeft: 16 }} />}
         <div style={{
           width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-          background: `${rm.color || T.gold}20`,
-          border: `1.5px solid ${rm.color || T.gold}50`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 18,
+          background: `${rm.color || T.gold}20`, border: `1.5px solid ${rm.color || T.gold}50`,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
         }}>{rm.icon || "👤"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* FIX : m.name (pas m.nom) */}
           <div style={{ fontSize: 13, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {m.nom || m.email}
+            {m.name || m.email}
           </div>
           <div style={{ fontSize: 11, color: T.muted }}>
             {rm.label || m.role}
-            {m.parent_nom && <span> · via {m.parent_nom}</span>}
-            {" · "}{new Date(m.created_at).toLocaleDateString("fr-FR")}
+            {m.parent_name && <span> · via {m.parent_name}</span>}
+            {m.created_at && " · " + new Date(m.created_at).toLocaleDateString("fr-FR")}
           </div>
         </div>
         <StatusBadge status={m.status} />
@@ -316,14 +323,12 @@ function TabReseau({ reseau }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Stats réseau */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <StatCard icon="🤝" label="Total réseau" value={fmtNum(niveau1.length + niveau2.length)} accent={T.gold} />
-        <StatCard icon="1️⃣" label="Niveau 1" value={fmtNum(niveau1.length)} accent="#8B5CF6" sub="Directs" />
-        <StatCard icon="2️⃣" label="Niveau 2" value={fmtNum(niveau2.length)} accent={T.blue} sub="Indirects" />
+        <StatCard icon="1️⃣" label="Niveau 1"    value={fmtNum(niveau1.length)} accent="#8B5CF6" sub="Directs" />
+        <StatCard icon="2️⃣" label="Niveau 2"    value={fmtNum(niveau2.length)} accent={T.blue}  sub="Indirects" />
       </div>
 
-      {/* Niveau 1 */}
       {niveau1.length > 0 && (
         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
@@ -336,7 +341,6 @@ function TabReseau({ reseau }) {
         </div>
       )}
 
-      {/* Niveau 2 */}
       {niveau2.length > 0 && (
         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
@@ -352,11 +356,12 @@ function TabReseau({ reseau }) {
   );
 }
 
-// ── Tab Commissions ────────────────────────────────────────────
+// ── Tab Commissions ────────────────────────────────────────────────
+// FIX : champs montant / rate_pct / niveau / status / amount_xof
 function TabCommissions() {
-  const [data, setData]     = useState(null);
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage]     = useState(1);
+  const [page,    setPage]    = useState(1);
 
   useEffect(() => {
     setLoading(true);
@@ -367,17 +372,15 @@ function TabCommissions() {
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}><Spin /></div>;
   if (!data)   return <div style={{ color: T.red, padding: 20 }}>Erreur de chargement</div>;
 
-  const { commissions = [], pagination } = data;
+  const { commissions = [], totals = {} } = data;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Résumé */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <StatCard icon="📊" label="Total commissions" value={fmt(pagination.total_montant)} accent={T.gold} />
-        <StatCard icon="🔢" label="Nb transactions" value={fmtNum(pagination.total)} accent={T.blue} />
+        <StatCard icon="📊" label="Total commissions" value={fmt(totals.total_earned)} accent={T.gold} />
+        <StatCard icon="🔢" label="Ce mois"           value={fmt(totals.this_month)}   accent={T.blue} />
       </div>
 
-      {/* Table */}
       <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
         {commissions.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: T.muted, fontSize: 14 }}>
@@ -400,148 +403,143 @@ function TabCommissions() {
                 {c.niveau === 1 ? "1️⃣" : "2️⃣"}
               </div>
               <div>
+                {/* FIX : rate_pct (pas taux) */}
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>
-                  Commission niveau {c.niveau} ({c.taux}%)
+                  Commission niveau {c.niveau} ({c.rate_pct}%)
                 </div>
+                {/* FIX : amount_xof (pas base_montant) */}
                 <div style={{ fontSize: 11, color: T.muted }}>
-                  Base: {fmt(c.base_montant)} · {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                  {c.amount_xof ? ` · Base ${fmt(c.amount_xof)}` : ""}
                 </div>
-                {c.payment_ref && (
-                  <div style={{ fontSize: 10, color: T.muted, fontFamily: "monospace" }}>
-                    Réf: {c.payment_ref.slice(0, 20)}…
-                  </div>
+                {c.source_name && (
+                  <div style={{ fontSize: 11, color: T.muted }}>Source : {c.source_name}</div>
                 )}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-              <span style={{
-                fontWeight: 900, color: T.gold, fontSize: 15,
-                fontFamily: "'DM Mono', monospace",
-              }}>+{fmt(c.montant)}</span>
-              <StatusBadge status={c.statut} />
+              <span style={{ fontWeight: 900, color: T.gold, fontSize: 15, fontFamily: "monospace" }}>
+                +{fmt(c.montant)}
+              </span>
+              {/* FIX : status (pas statut) */}
+              <StatusBadge status={c.status} />
             </div>
           </div>
         ))}
       </div>
 
-      {/* Pagination */}
-      {pagination.total > pagination.limit && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            style={{
-              padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`,
-              background: page === 1 ? T.surface : T.card,
-              color: page === 1 ? T.muted : T.text, cursor: page === 1 ? "default" : "pointer",
-              fontSize: 13, fontWeight: 600,
-            }}
-          >← Préc.</button>
-          <span style={{ fontSize: 13, color: T.muted }}>
-            Page {page} / {Math.ceil(pagination.total / pagination.limit)}
-          </span>
-          <button
-            onClick={() => setPage(p => p + 1)}
-            disabled={page >= Math.ceil(pagination.total / pagination.limit)}
-            style={{
-              padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`,
-              background: T.card, color: T.text, cursor: "pointer",
-              fontSize: 13, fontWeight: 600,
-            }}
-          >Suiv. →</button>
-        </div>
-      )}
+      {/* Pagination simple */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
+        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+          style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`, background: page===1?T.surface:T.card, color: page===1?T.muted:T.text, cursor: page===1?"default":"pointer", fontSize: 13 }}>
+          ← Préc.
+        </button>
+        <span style={{ fontSize: 13, color: T.muted }}>Page {page}</span>
+        <button onClick={() => setPage(p => p + 1)} disabled={commissions.length < 15}
+          style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: T.text, cursor: commissions.length<15?"default":"pointer", fontSize: 13 }}>
+          Suiv. →
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Tab Bonus Pool ─────────────────────────────────────────────
+// ── Tab Bonus Pool ─────────────────────────────────────────────────
+// FIX : data.history[]{mois/annee/montant_total} + data.current_pool
+//       Pas de champ nb_payments ni statut dans le schéma
 function TabBonus() {
-  const [pool, setPool]     = useState(null);
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch("/bonus-pool")
-      .then(d => setPool(d.pool)).catch(console.error).finally(() => setLoading(false));
+      .then(d => setData(d)).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const MONTHS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+  const now    = new Date();
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}><Spin /></div>;
 
+  const history = data?.history      || [];
+  const current = data?.current_pool || 0;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Explication pool */}
       <div style={{
         background: `linear-gradient(135deg, ${T.gold}15, ${T.card})`,
-        border: `1px solid ${T.gold}40`,
-        borderRadius: 14, padding: "20px 24px",
+        border: `1px solid ${T.gold}40`, borderRadius: 14, padding: "20px 24px",
       }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: T.gold, marginBottom: 10 }}>
           🎯 Comment fonctionne le Bonus Pool ?
         </div>
         <div style={{ fontSize: 13, color: T.textSub, lineHeight: 1.7 }}>
           À chaque paiement client validé, <strong style={{ color: T.gold }}>2%</strong> sont ajoutés automatiquement dans le pool mensuel global.
-          En fin de mois, le pool est distribué entre les membres actifs selon des règles définies par l'administration.
+          En fin de mois, le pool est distribué entre les membres actifs selon les règles de performance.
         </div>
-        <div style={{
-          marginTop: 14, display: "flex", gap: 6, flexWrap: "wrap",
-        }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["Accumulation automatique", "Distribution mensuelle", "Règles admin"].map((t, i) => (
             <span key={i} style={{
               padding: "4px 12px", borderRadius: 99,
-              background: `${T.gold}20`, color: T.gold,
-              fontSize: 11, fontWeight: 700,
+              background: `${T.gold}20`, color: T.gold, fontSize: 11, fontWeight: 700,
             }}>✦ {t}</span>
           ))}
         </div>
       </div>
 
-      {/* Historique pool */}
-      {!pool || pool.length === 0 ? (
+      {/* Pool courant */}
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+          Pool {MONTHS[now.getMonth()]} {now.getFullYear()} (en cours)
+        </div>
+        <div style={{ fontSize: 32, fontWeight: 900, color: T.gold, fontFamily: "monospace" }}>
+          {fmt(current)}
+        </div>
+      </div>
+
+      {history.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px", color: T.muted }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-          <div style={{ fontSize: 15, color: T.textSub }}>Aucun bonus pool disponible pour l'instant</div>
+          <div style={{ fontSize: 15, color: T.textSub }}>Aucun historique disponible</div>
         </div>
       ) : (
         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Historique Bonus Pool
           </div>
-          {pool.map((p, i) => {
-            const statutColor = p.statut === "DISTRIBUTED" ? T.green : p.statut === "CLOSED" ? T.blue : T.gold;
+          {history.map((p, i) => {
+            const isCurrent = p.mois === (now.getMonth() + 1) && p.annee === now.getFullYear();
             return (
               <div key={i} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "14px 20px",
-                borderBottom: i < pool.length - 1 ? `1px solid ${T.border}` : "none",
+                borderBottom: i < history.length - 1 ? `1px solid ${T.border}` : "none",
               }}>
                 <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                   <div style={{
                     width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-                    background: `${statutColor}15`,
-                    border: `1.5px solid ${statutColor}40`,
+                    background: `${T.gold}15`, border: `1.5px solid ${T.gold}40`,
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   }}>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: statutColor }}>
-                      {MONTHS[p.mois - 1]}
+                    <div style={{ fontSize: 14, fontWeight: 900, color: T.gold }}>
+                      {MONTHS[(p.mois || 1) - 1]}
                     </div>
                     <div style={{ fontSize: 10, color: T.muted }}>{p.annee}</div>
                   </div>
                   <div>
+                    {/* FIX : montant_total (pas montant) */}
                     <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>
                       {fmt(p.montant_total)}
                     </div>
-                    <div style={{ fontSize: 11, color: T.muted }}>
-                      {p.nb_payments} paiement(s) comptabilisé(s)
-                    </div>
                   </div>
                 </div>
+                {/* FIX : pas de champ "statut" → on déduit du mois courant */}
                 <span style={{
                   padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
-                  background: `${statutColor}20`, color: statutColor,
+                  background: isCurrent ? `${T.gold}20` : `${T.blue}20`,
+                  color:      isCurrent ? T.gold         : T.blue,
                 }}>
-                  {p.statut === "DISTRIBUTED" ? "Distribué" : p.statut === "CLOSED" ? "Clôturé" : "Ouvert"}
+                  {isCurrent ? "En cours" : "Clôturé"}
                 </span>
               </div>
             );
@@ -552,27 +550,28 @@ function TabBonus() {
   );
 }
 
-// ── Tab Inviter ────────────────────────────────────────────────
-function TabInviter({ member, lien_invitation }) {
-  const [copied, setCopied] = useState(false);
-  const rm = ROLE_META[member?.role] || {};
-  const childRole = { DIRECTRICE: "Leader", LEADER: "Superviseur", SUPERVISEUR: "Recruteur", RECRUTEUR: null }[member?.role];
+// ── Tab Inviter ────────────────────────────────────────────────────
+// FIX : data.code / data.link / data.child_role / data.whatsapp_message
+//       (pas data.lien_invitation ni data.member.code_invitation)
+function TabInviter() {
+  const [data,   setData]   = useState(null);
+  const [copied, setCopied] = useState(null);
+  const [loading,setLoading]= useState(true);
 
-  function copyLink() {
-    navigator.clipboard.writeText(lien_invitation).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+  useEffect(() => {
+    apiFetch("/invitation-link")
+      .then(d => setData(d)).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  function copy(text, key) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2500);
     });
   }
 
-  function shareWhatsApp() {
-    const text = encodeURIComponent(
-      `🌟 Rejoins le réseau Awoundjô Business !\n` +
-      `Code d'invitation : ${member?.code_invitation}\n` +
-      `${lien_invitation}`
-    );
-    window.open(`https://wa.me/?text=${text}`, "_blank");
-  }
+  if (loading) return <div style={{ padding: 40, textAlign: "center" }}><Spin /></div>;
+  if (!data)   return <div style={{ color: T.red, padding: 20 }}>Erreur de chargement</div>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -580,43 +579,43 @@ function TabInviter({ member, lien_invitation }) {
       {/* Code d'invitation */}
       <div style={{
         background: `linear-gradient(135deg, #14141F, #1A1430)`,
-        border: `1px solid ${T.gold}40`,
-        borderRadius: 16, padding: "28px",
-        textAlign: "center",
+        border: `1px solid ${T.gold}40`, borderRadius: 16, padding: "28px", textAlign: "center",
         position: "relative", overflow: "hidden",
       }}>
-        {/* Déco */}
-        <div style={{
-          position: "absolute", top: -40, right: -40, width: 150, height: 150,
-          borderRadius: "50%", background: `${T.gold}08`,
-          border: `1px solid ${T.gold}15`,
-        }} />
+        <div style={{ position: "absolute", top: -40, right: -40, width: 150, height: 150, borderRadius: "50%", background: `${T.gold}08`, border: `1px solid ${T.gold}15` }} />
         <div style={{ fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
           Mon code d'invitation
         </div>
+        {/* FIX : data.code */}
         <div style={{
-          fontSize: 32, fontWeight: 900, letterSpacing: "0.15em",
-          color: T.gold, fontFamily: "monospace",
-          background: `${T.gold}10`, borderRadius: 12,
-          padding: "14px 28px", display: "inline-block",
-          border: `2px dashed ${T.gold}40`,
-          marginBottom: 8,
+          fontSize: 32, fontWeight: 900, letterSpacing: "0.15em", color: T.gold,
+          fontFamily: "monospace", background: `${T.gold}10`, borderRadius: 12,
+          padding: "14px 28px", display: "inline-block", border: `2px dashed ${T.gold}40`, marginBottom: 8,
         }}>
-          {member?.code_invitation}
+          {data.code}
         </div>
-        {childRole && (
+        {/* FIX : data.child_role */}
+        {data.child_role ? (
           <div style={{ fontSize: 12, color: T.textSub, marginBottom: 20 }}>
-            Invite des <strong style={{ color: T.gold }}>{childRole}s</strong> dans votre réseau
+            Invitez des <strong style={{ color: T.gold }}>{data.child_role}s</strong> dans votre réseau
           </div>
-        )}
-        {!childRole && (
+        ) : (
           <div style={{ fontSize: 12, color: T.muted, marginBottom: 20 }}>
-            En tant que Recruteur, vous ne pouvez pas inviter d'autres membres du réseau Business
+            En tant que Recruteur, vous ne pouvez pas inviter d'autres membres
           </div>
         )}
+        <button onClick={() => copy(data.code, "code")} style={{
+          padding: "10px 24px", borderRadius: 10, border: "none", cursor: "pointer",
+          background: copied==="code" ? T.greenL : `${T.gold}20`,
+          color:      copied==="code" ? T.green   : T.gold,
+          border: `1px solid ${copied==="code" ? T.green : T.gold}40`,
+          fontWeight: 800, fontSize: 13, transition: "all .2s",
+        }}>
+          {copied==="code" ? "✅ Copié !" : "📋 Copier le code"}
+        </button>
       </div>
 
-      {/* Lien */}
+      {/* Lien — FIX : data.link */}
       <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 800, color: T.text }}>
           🔗 Lien d'invitation
@@ -628,76 +627,60 @@ function TabInviter({ member, lien_invitation }) {
             fontSize: 12, color: T.muted, fontFamily: "monospace",
             wordBreak: "break-all", lineHeight: 1.6,
           }}>
-            {lien_invitation}
+            {data.link}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={copyLink}
-              style={{
-                flex: 1, padding: "12px", borderRadius: 10, border: "none",
-                background: copied ? T.greenL : `${T.gold}20`,
-                color: copied ? T.green : T.gold,
-                fontWeight: 800, fontSize: 13, cursor: "pointer",
-                border: `1px solid ${copied ? T.green : T.gold}40`,
-                transition: "all .2s",
-              }}
-            >
-              {copied ? "✅ Copié !" : "📋 Copier le lien"}
+            <button onClick={() => copy(data.link, "link")} style={{
+              flex: 1, padding: "12px", borderRadius: 10, cursor: "pointer",
+              background: copied==="link" ? T.greenL : `${T.gold}20`,
+              color:      copied==="link" ? T.green   : T.gold,
+              border: `1px solid ${copied==="link" ? T.green : T.gold}40`,
+              fontWeight: 800, fontSize: 13, transition: "all .2s",
+            }}>
+              {copied==="link" ? "✅ Copié !" : "📋 Copier le lien"}
             </button>
-            <button
-              onClick={shareWhatsApp}
-              style={{
-                flex: 1, padding: "12px", borderRadius: 10, border: "none",
+            {/* FIX : data.whatsapp_message */}
+            {data.whatsapp_message && (
+              <a href={data.whatsapp_message} target="_blank" rel="noreferrer" style={{
+                flex: 1, padding: "12px", borderRadius: 10, textDecoration: "none",
                 background: "#0D2318", color: "#22C55E",
-                fontWeight: 800, fontSize: 13, cursor: "pointer",
                 border: "1px solid #22C55E40",
-                transition: "all .2s",
-              }}
-            >
-              📲 Partager WhatsApp
-            </button>
+                fontWeight: 800, fontSize: 13, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}>
+                📲 Partager WhatsApp
+              </a>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Hiérarchie visuelle */}
+      {/* Hiérarchie */}
       <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16 }}>
           🏗️ Hiérarchie du réseau Business
         </div>
         {[
-          { role: "DIRECTRICE", icon: "👑", color: "#C9933A", note: "Sommet" },
-          { role: "LEADER",     icon: "⭐", color: "#8B5CF6", note: "" },
-          { role: "SUPERVISEUR",icon: "🔷", color: "#3B82F6", note: "" },
-          { role: "RECRUTEUR",  icon: "🤝", color: "#22C55E", note: "Apporteur" },
+          { role: "DIRECTRICE",  icon: "👑", color: "#C9933A", note: "Sommet"   },
+          { role: "LEADER",      icon: "⭐", color: "#8B5CF6", note: ""         },
+          { role: "SUPERVISEUR", icon: "🔷", color: "#3B82F6", note: ""         },
+          { role: "RECRUTEUR",   icon: "🤝", color: "#22C55E", note: "Apporteur" },
         ].map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: i < 3 ? 0 : 0 }}>
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              width: 30, flexShrink: 0,
-            }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 30, flexShrink: 0 }}>
               <div style={{
                 width: 30, height: 30, borderRadius: "50%",
                 background: `${r.color}20`, border: `2px solid ${r.color}60`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16,
-                outline: r.role === member?.role ? `3px solid ${r.color}` : "none",
-                outlineOffset: 2,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+                outline: data.role === r.role ? `3px solid ${r.color}` : "none", outlineOffset: 2,
               }}>{r.icon}</div>
-              {i < 3 && (
-                <div style={{ width: 2, height: 16, background: T.border, margin: "2px 0" }} />
-              )}
+              {i < 3 && <div style={{ width: 2, height: 16, background: T.border, margin: "2px 0" }} />}
             </div>
-            <div style={{ fontSize: 13 }}>
-              <span style={{ fontWeight: r.role === member?.role ? 900 : 600, color: r.role === member?.role ? r.color : T.textSub }}>
+            <div style={{ fontSize: 13, paddingBottom: i < 3 ? 18 : 0 }}>
+              <span style={{ fontWeight: data.role===r.role ? 900 : 600, color: data.role===r.role ? r.color : T.textSub }}>
                 {r.role}
               </span>
-              {r.role === member?.role && (
-                <span style={{ fontSize: 11, color: T.muted, marginLeft: 8 }}>← Vous</span>
-              )}
-              {r.note && (
-                <span style={{ fontSize: 11, color: T.muted, marginLeft: 8 }}>· {r.note}</span>
-              )}
+              {data.role === r.role && <span style={{ fontSize: 11, color: T.muted, marginLeft: 8 }}>← Vous</span>}
+              {r.note && <span style={{ fontSize: 11, color: T.muted, marginLeft: 8 }}>· {r.note}</span>}
             </div>
           </div>
         ))}
@@ -706,17 +689,21 @@ function TabInviter({ member, lien_invitation }) {
   );
 }
 
-// ── Composant principal ────────────────────────────────────────
+// ── Composant principal ────────────────────────────────────────────
 export default function BusinessDashboard() {
-  const [tab, setTab]       = useState("accueil");
-  const [data, setData]     = useState(null);
+  const [tab,     setTab]     = useState("accueil");
+  const [data,    setData]    = useState(null);
+  const [network, setNetwork] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [error,   setError]   = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    apiFetch("/dashboard")
-      .then(d => { setData(d); setError(""); })
+    Promise.all([
+      apiFetch("/dashboard"),
+      apiFetch("/network"),
+    ])
+      .then(([dash, net]) => { setData(dash); setNetwork(net); setError(""); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -725,39 +712,35 @@ export default function BusinessDashboard() {
 
   return (
     <div style={{
-      minHeight: "100vh",
-      background: T.darker,
-      fontFamily: "'Outfit', 'Segoe UI', sans-serif",
-      color: T.text,
+      minHeight: "100vh", background: "#060608",
+      fontFamily: "'Outfit', 'Segoe UI', sans-serif", color: "#E8E8F0",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes biz-spin    { to { transform: rotate(360deg); } }
+        @keyframes biz-fade-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #2A2A38; border-radius: 4px; }
       `}</style>
 
       {/* Header */}
       <div style={{
-        background: T.surface,
-        borderBottom: `1px solid ${T.border}`,
-        padding: "16px 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#14141A", borderBottom: "1px solid #2A2A38",
+        padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 12,
-            background: `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+            background: "linear-gradient(135deg, #C9933A, #8B6520)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, boxShadow: `0 4px 16px ${T.gold}40`,
+            fontSize: 20, boxShadow: "0 4px 16px #C9933A40",
           }}>💼</div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: T.gold, letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "#C9933A", letterSpacing: "-0.01em" }}>
               Awoundjô Business
             </div>
-            <div style={{ fontSize: 11, color: T.muted }}>Réseau MLM · Tableau de bord</div>
+            <div style={{ fontSize: 11, color: "#6B6B85" }}>Réseau MLM · Tableau de bord</div>
           </div>
         </div>
         {data?.member && (
@@ -765,70 +748,60 @@ export default function BusinessDashboard() {
             padding: "6px 14px", borderRadius: 99,
             background: `${ROLE_META[data.member.role]?.color || T.gold}20`,
             color: ROLE_META[data.member.role]?.color || T.gold,
-            fontSize: 12, fontWeight: 700, border: `1px solid ${ROLE_META[data.member.role]?.color || T.gold}40`,
+            fontSize: 12, fontWeight: 700,
+            border: `1px solid ${ROLE_META[data.member.role]?.color || T.gold}40`,
           }}>
-            {ROLE_META[data.member.role]?.icon} {ROLE_META[data.member.role]?.label || data.member.role}
+            {ROLE_META[data.member.role]?.icon} {data.member.name}
           </div>
         )}
       </div>
 
       {/* Tabs */}
       <div style={{
-        background: T.surface,
-        borderBottom: `1px solid ${T.border}`,
-        display: "flex", gap: 2, padding: "0 16px",
-        overflowX: "auto",
+        background: "#14141A", borderBottom: "1px solid #2A2A38",
+        display: "flex", gap: 2, padding: "0 16px", overflowX: "auto",
       }}>
         {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              padding: "14px 16px", border: "none", background: "transparent",
-              color: tab === t.id ? T.gold : T.muted,
-              fontWeight: tab === t.id ? 800 : 500,
-              fontSize: 13, cursor: "pointer", whiteSpace: "nowrap",
-              borderBottom: `2px solid ${tab === t.id ? T.gold : "transparent"}`,
-              transition: "all .15s",
-            }}
-          >
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "14px 16px", border: "none", background: "transparent",
+            color: tab===t.id ? "#C9933A" : "#6B6B85",
+            fontWeight: tab===t.id ? 800 : 500, fontSize: 13, cursor: "pointer",
+            whiteSpace: "nowrap",
+            borderBottom: `2px solid ${tab===t.id ? "#C9933A" : "transparent"}`,
+            transition: "all .15s",
+          }}>
             <span style={{ marginRight: 6 }}>{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
 
       {/* Contenu */}
-      <div style={{ padding: "24px 20px", maxWidth: 700, margin: "0 auto", animation: "fadeIn .3s ease" }}>
+      <div style={{ padding: "24px 20px", maxWidth: 760, margin: "0 auto", animation: "biz-fade-in .3s ease" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 60 }}>
             <Spin size={40} />
-            <div style={{ color: T.muted, fontSize: 13, marginTop: 16 }}>Chargement du tableau de bord…</div>
+            <div style={{ color: "#6B6B85", fontSize: 13, marginTop: 16 }}>Chargement…</div>
           </div>
         ) : error ? (
           <div style={{
-            background: T.redL, border: `1px solid ${T.red}40`,
+            background: "#2D1010", border: "1px solid #EF444440",
             borderRadius: 12, padding: "20px 24px", textAlign: "center",
           }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
-            <div style={{ color: T.red, fontWeight: 700, marginBottom: 8 }}>{error}</div>
-            <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>
-              Vous devez être inscrit au réseau Awoundjô Business pour accéder à ce tableau de bord.
-            </div>
-            <button
-              onClick={load}
-              style={{
-                padding: "8px 20px", borderRadius: 8, border: "none",
-                background: T.card, color: T.text, cursor: "pointer", fontSize: 13, fontWeight: 600,
-              }}
-            >Réessayer</button>
+            <div style={{ color: "#EF4444", fontWeight: 700, marginBottom: 8 }}>{error}</div>
+            <button onClick={load} style={{
+              padding: "8px 20px", borderRadius: 8, border: "none",
+              background: "#1C1C26", color: "#E8E8F0", cursor: "pointer", fontSize: 13,
+            }}>Réessayer</button>
           </div>
         ) : data ? (
           <>
+            {/* FIX : passer data.network (pas data.reseau) */}
             {tab === "accueil"     && <TabAccueil data={data} />}
-            {tab === "reseau"      && <TabReseau reseau={data.reseau} />}
+            {tab === "reseau"      && <TabReseau  network={network?.network} />}
             {tab === "commissions" && <TabCommissions />}
             {tab === "bonus"       && <TabBonus />}
-            {tab === "inviter"     && <TabInviter member={data.member} lien_invitation={data.lien_invitation} />}
+            {tab === "inviter"     && <TabInviter />}
           </>
         ) : null}
       </div>

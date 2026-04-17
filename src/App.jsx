@@ -11,6 +11,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
+import BusinessAuth from "./pages/business/BusinessAuth";
 
 import Navbar from "./components/Navbar";
 
@@ -217,11 +218,8 @@ function AffilieGuard({ children }) {
 
 // Guard Business — même token JWT que Diaspora/Referral
 function BizGuard({ children }) {
-  if (!isDiasporaTokenValid()) {
-    safeLocalStorage("removeItem", "diaspora_token");
-    safeLocalStorage("removeItem", "diaspora_data");
-    return <Navigate to="/business/login" replace />;
-  }
+  const token = safeLocalStorage("getItem", "business_token");
+  if (!token) return <Navigate to="/business/login" replace />;
   return children;
 }
 
@@ -413,8 +411,8 @@ export default function App() {
             {/* ═══════════════════════════════════════════════
                 RÉSEAU AFFILIÉ
             ══════════════════════════════════════════════════*/}
-            <Route path="/affilie/login"    element={<AffilieAuth />} />
-            <Route path="/affilie/register" element={<AffilieAuth />} />
+            <Route path="/business/login"    element={<BusinessAuth />} />
+            s<Route path="/business/register" element={<BusinessAuth />} />
             <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
               <Route index                   element={<Navigate to="/affilie/dashboard" replace />} />
               <Route path="dashboard"        element={<AffilieDashboard />} />
