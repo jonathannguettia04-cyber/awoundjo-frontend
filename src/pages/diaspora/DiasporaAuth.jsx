@@ -131,9 +131,33 @@ export default function DiasporaAuth() {
     resetErrorState();
     setLoading(true);
     try {
-      const { data } = await diasporaAuthAPI.login(loginForm);
-      diasporaLogin(data.token, data.ambassador);
-      navigate(getDashPath(data.ambassador));
+      let token, ambassador;
+
+      if (netParam === "BUSINESS") {
+        // Login Business — route dédiée /api/business/login
+        const res  = await fetch(`${BASE}/api/business/login`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(loginForm),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw Object.assign(
+            new Error(data?.error || "Identifiants incorrects"),
+            { response: { status: res.status, data } }
+          );
+        }
+        token      = data.token;
+        ambassador = data.member; // businessController renvoie { member }
+      } else {
+        // Diaspora / Referral — flux habituel
+        const { data } = await diasporaAuthAPI.login(loginForm);
+        token      = data.token;
+        ambassador = data.ambassador;
+      }
+
+      diasporaLogin(token, ambassador);
+      navigate(getDashPath(ambassador));
     } catch (err) {
       const response = err?.response;
       const body     = response?.data || {};
