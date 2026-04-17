@@ -148,30 +148,25 @@ export default function DiasporaAuth() {
       }
       token      = data.token;
       ambassador = data.member;
-    // ✅ APRÈS
     } else {
-      // Diaspora / Referral — on envoie network_type pour le backend
       const { data } = await diasporaAuthAPI.login({
         ...loginForm,
         network_type: netParam in NETWORK_CONFIG ? netParam : "DIASPORA",
       });
-      token      = data.token;
-      ambassador = data.ambassador || data.member;
 
-      // Cas : le backend a reconnu un membre Business via le login Diaspora
+      // Membre Business détecté via le login Diaspora
       if (data.network === "BUSINESS") {
         localStorage.setItem("business_token", data.token);
         localStorage.setItem("business_data", JSON.stringify(data.member));
         navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
-        return;
+        return; // ← STOP ici, ne pas continuer
       }
+
+      token      = data.token;
+      ambassador = data.ambassador || data.member;
     }
 
-    // Diaspora / Referral — comportement normal
-    diasporaLogin(token, ambassador);
-    navigate(getDashPath(ambassador));
-
-    // diasporaLogin = saveDiasporaSession (stockage localStorage)
+    // Diaspora / Referral / Business via ?network=BUSINESS
     diasporaLogin(token, ambassador);
     navigate(getDashPath(ambassador));
 
