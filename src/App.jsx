@@ -138,6 +138,21 @@ const AffilieNotifications= affiliePage("AffilieNotifications");
 const AffilieProfil       = affiliePage("AffilieProfil");
 const AffilieMembers      = affiliePage("AffilieMembers");
 
+// ── Pages BUSINESS ───────────────────────────────────────────
+import { BizAuthProvider as BizAuthProviderComp } from "./pages/BusinessPages";
+
+const bizPage = (name) =>
+  lazy(() => import("./pages/BusinessPages").then(m => ({ default: m[name] })));
+
+const BizLayout         = bizPage("BizLayout");
+const BizDashboardPage  = bizPage("BizDashboardPage");
+const BizNetworkPage    = bizPage("BizNetworkPage");
+const BizCommissionsPage= bizPage("BizCommissionsPage");
+const BizBonusPage      = bizPage("BizBonusPage");
+const BizInvitationPage = bizPage("BizInvitationPage");
+const BizLeaderboardPage= bizPage("BizLeaderboardPage");
+const BizMembersPage    = bizPage("BizMembersPage");
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -197,7 +212,17 @@ function AffilieGuard({ children }) {
   return children;
 }
 
-// ── App ──────────────────────────────────────────────────────
+// Guard Business — même token JWT que Diaspora/Referral
+function BizGuard({ children }) {
+  if (!isDiasporaTokenValid()) {
+    safeLocalStorage("removeItem", "diaspora_token");
+    safeLocalStorage("removeItem", "diaspora_data");
+    return <Navigate to="/business/login" replace />;
+  }
+  return children;
+}
+
+
 export default function App() {
   const { user } = useAuth();
   // FIX : useLocation() au lieu de window.location.pathname
@@ -209,7 +234,8 @@ export default function App() {
   const isDiasporaPage = pathname.startsWith("/diaspora");
   const isReferralPage = pathname.startsWith("/referral");
   const isAffiliePage  = pathname.startsWith("/affilie");
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage;
+  const isBusinessPage = pathname.startsWith("/business");
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage && !isBusinessPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -390,6 +416,20 @@ export default function App() {
               <Route path="profil"           element={<AffilieProfil />} />
               <Route path="membres"          element={<AffilieMembers />} />
             </Route>
+
+            {/* ═══════════════════════════════════════════════
+                RÉSEAU BUSINESS
+            ══════════════════════════════════════════════════*/}
+            <Route path="/business/login"    element={<DiasporaAuth />} />
+            <Route path="/business/register" element={<DiasporaAuth />} />
+            <Route path="/business/dashboard"   element={<BizGuard><BizAuthProviderComp><BizDashboardPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/network"     element={<BizGuard><BizAuthProviderComp><BizNetworkPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/commissions" element={<BizGuard><BizAuthProviderComp><BizCommissionsPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/bonus"       element={<BizGuard><BizAuthProviderComp><BizBonusPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/invitation"  element={<BizGuard><BizAuthProviderComp><BizInvitationPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/leaderboard" element={<BizGuard><BizAuthProviderComp><BizLeaderboardPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/members"     element={<BizGuard><BizAuthProviderComp><BizMembersPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business" element={<Navigate to="/business/dashboard" replace />} />
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
