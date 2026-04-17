@@ -36,6 +36,7 @@ api.interceptors.response.use(
 );
 
 // ── Token helpers ─────────────────────────────────────────────
+// ── Token helpers ─────────────────────────────────────────────
 export function getDiasporaToken() {
   return localStorage.getItem("diaspora_token");
 }
@@ -47,10 +48,6 @@ export function getDiasporaData() {
   } catch { return null; }
 }
 
-/**
- * Valide le token JWT côté client (existence + non-expiré).
- * Utilisé par DiasporaGuard dans App.jsx pour les deux réseaux.
- */
 export function isDiasporaTokenValid() {
   const token = getDiasporaToken();
   if (!token) return false;
@@ -60,10 +57,15 @@ export function isDiasporaTokenValid() {
   } catch { return false; }
 }
 
+// ── Session ───────────────────────────────────────────────────
+// Sauvegarde token + données ambassadeur en localStorage
 export function diasporaLogin(token, data) {
   localStorage.setItem("diaspora_token", token);
   localStorage.setItem("diaspora_data", JSON.stringify(data));
 }
+
+// Alias explicite (même comportement)
+export const saveDiasporaSession = diasporaLogin;
 
 export function diasporaLogout() {
   localStorage.removeItem("diaspora_token");
@@ -71,12 +73,13 @@ export function diasporaLogout() {
   window.location.href = "/diaspora/login";
 }
 
-// ── Auth ──────────────────────────────────────────────────────
+// ── Auth API ──────────────────────────────────────────────────
 export const diasporaAuthAPI = {
   register: (data) => api.post("/register", data),
-  login:    (data) => api.post("/login",    data),
+  // network_type est transmis au backend pour traçabilité/filtrage futur
+  login:    (data) => api.post("/login", data),
   me:       ()     => api.get("/me"),
-  update:   (data) => api.put("/me",        data),
+  update:   (data) => api.put("/me", data),
 };
 
 // ── Dashboard ─────────────────────────────────────────────────

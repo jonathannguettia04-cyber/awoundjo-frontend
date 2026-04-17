@@ -127,67 +127,64 @@ export default function DiasporaAuth() {
 
   // ── Connexion ─────────────────────────────────────────────
   async function handleLogin(e) {
-    e.preventDefault();
-    resetErrorState();
-    setLoading(true);
-    try {
-      let token, ambassador;
+  e.preventDefault();
+  resetErrorState();
+  setLoading(true);
+  try {
+    let token, ambassador;
 
-      if (netParam === "BUSINESS") {
-        // Login Business — route dédiée /api/business/login
-        const res  = await fetch(`${BASE}/api/business/login`, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(loginForm),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw Object.assign(
-            new Error(data?.error || "Identifiants incorrects"),
-            { response: { status: res.status, data } }
-          );
-        }
-        token      = data.token;
-        ambassador = data.member; // businessController renvoie { member }
-      } else {
-        // Diaspora / Referral — flux habituel
-        const { data } = await diasporaAuthAPI.login(loginForm);
-        token      = data.token;
-        ambassador = data.ambassador;
+    if (netParam === "BUSINESS") {
+      const res  = await fetch(`${BASE}/api/business/login`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(loginForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw Object.assign(
+          new Error(data?.error || "Identifiants incorrects"),
+          { response: { status: res.status, data } }
+        );
       }
-
-      diasporaLogin(token, ambassador);
-      navigate(getDashPath(ambassador));
-    } catch (err) {
-      const response = err?.response;
-      const body     = response?.data || {};
-      // Le backend renvoie le code dans body.data.code (voir diasporaController)
-      const code     = body?.data?.code || body?.code || null;
-      const status   = response?.status;
-
-      // FIX 1 — Paiement requis (HTTP 402)
-      if (status === 402 || code === "PAYMENT_REQUIRED") {
-        setErrorCode("PAYMENT_REQUIRED");
-        setErrorAmbassadorId(body?.data?.ambassador_id || null);
-        setError("Votre paiement d'adhésion n'a pas été reçu. Finalisez-le pour activer votre compte.");
-
-      // FIX 2 — En attente validation admin
-      } else if (code === "PENDING_VALIDATION") {
-        setErrorCode("PENDING_VALIDATION");
-        setError("Votre compte est en attente de validation par un administrateur. Vous serez contacté(e) dès son activation.");
-
-      // FIX 3 — Compte rejeté
-      } else if (code === "ACCOUNT_REJECTED") {
-        setErrorCode("ACCOUNT_REJECTED");
-        setError("Votre compte a été refusé. Contactez l'équipe Awoundjô pour plus d'informations.");
-
-      } else {
-        setError(body?.error || "Identifiants incorrects");
-      }
-    } finally {
-      setLoading(false);
+      token      = data.token;
+      ambassador = data.member;
+    } else {
+      // Diaspora / Referral — on envoie network_type pour le backend
+      const { data } = await diasporaAuthAPI.login({
+        ...loginForm,
+        network_type: netParam in NETWORK_CONFIG ? netParam : "DIASPORA",
+      });
+      token      = data.token;
+      ambassador = data.ambassador;
     }
+
+    // diasporaLogin = saveDiasporaSession (stockage localStorage)
+    diasporaLogin(token, ambassador);
+    navigate(getDashPath(ambassador));
+
+  } catch (err) {
+    const response = err?.response;
+    const body     = response?.data || {};
+    const code     = body?.data?.code || body?.code || null;
+    const status   = response?.status;
+
+    if (status === 402 || code === "PAYMENT_REQUIRED") {
+      setErrorCode("PAYMENT_REQUIRED");
+      setErrorAmbassadorId(body?.data?.ambassador_id || null);
+      setError("Votre paiement d'adhésion n'a pas été reçu. Finalisez-le pour activer votre compte.");
+    } else if (code === "PENDING_VALIDATION") {
+      setErrorCode("PENDING_VALIDATION");
+      setError("Votre compte est en attente de validation par un administrateur. Vous serez contacté(e) dès son activation.");
+    } else if (code === "ACCOUNT_REJECTED") {
+      setErrorCode("ACCOUNT_REJECTED");
+      setError("Votre compte a été refusé. Contactez l'équipe Awoundjô pour plus d'informations.");
+    } else {
+      setError(body?.error || "Identifiants incorrects");
+    }
+  } finally {
+    setLoading(false);
   }
+}
 
   // ── FIX — Relance paiement depuis la page login (sans token) ──
   async function handleRetryPayment() {
