@@ -45,6 +45,9 @@ const AdminResetPassword        = lazy(() => import("./pages/AdminResetPassword"
 // ── Pages ADMIN — Affilié ────────────────────────────────────
 const AdminAffilie              = lazy(() => import("./pages/admin/AdminAffilie"));
 
+// ── Pages ADMIN — Business ───────────────────────────────────
+const AdminBusiness             = lazy(() => import("./pages/AdminBusiness"));
+
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin         = lazy(() => import("./pages/client/ClientLogin"));
 const ClientLayout        = lazy(() => import("./pages/client/ClientLayout"));
@@ -307,6 +310,11 @@ export default function App() {
             {/* ── ADMIN — Affilié ──────────────────────────── */}
             <Route path="/admin/affilie" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminAffilie /></ProtectedRoute>
+            } />
+
+            {/* ── ADMIN — Business ─────────────────────── */}
+            <Route path="/admin/business" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminBusiness /></ProtectedRoute>
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}

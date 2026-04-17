@@ -52,9 +52,10 @@ export function AuthProvider({ children }) {
 
   const isAdmin = user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
+  const token   = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, initializing, login, logout, isAdmin, isAgent }}>
+    <AuthContext.Provider value={{ user, token, loading, initializing, login, logout, isAdmin, isAgent }}>
       {children}
     </AuthContext.Provider>
   );
