@@ -41,7 +41,7 @@ const fmtNum = (n) => Number(n || 0).toLocaleString("fr-FR");
 function authHeaders() {
   const token = localStorage.getItem("token") ||
                 localStorage.getItem("agent_token") ||
-                localStorage.getItem("diaspora_token");
+                localStorage.getItem("business_token");
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 

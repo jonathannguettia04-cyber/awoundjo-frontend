@@ -12,7 +12,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_URL || "https://awoundjo-backend.up.railway.app";
 
 async function apiBiz(path, options = {}) {
-  const token = localStorage.getItem("diaspora_token");
+  const token = localStorage.getItem("business_token");
   const res = await fetch(`${API_BASE}/api/business${path}`, {
     headers: {
       "Content-Type": "application/json",
@@ -33,13 +33,13 @@ export function BizAuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const token = localStorage.getItem("diaspora_token");
+    const token = localStorage.getItem("business_token");
     if (!token) { setLoading(false); return; }
     try {
       const { member: m } = await apiBiz("/me");
       setMember(m);
     } catch {
-      localStorage.removeItem("diaspora_token");
+      localStorage.removeItem("business_token");
     } finally {
       setLoading(false);
     }
@@ -48,11 +48,11 @@ export function BizAuthProvider({ children }) {
   useEffect(() => { load(); }, [load]);
 
   const loginCtx = (token, m) => {
-    localStorage.setItem("diaspora_token", token);
+    localStorage.setItem("business_token", token);
     setMember(m);
   };
   const logoutCtx = () => {
-    localStorage.removeItem("diaspora_token");
+    localStorage.removeItem("business_token");
     setMember(null);
   };
 
