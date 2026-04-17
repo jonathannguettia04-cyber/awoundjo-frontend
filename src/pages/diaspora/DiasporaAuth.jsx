@@ -131,10 +131,8 @@ export default function DiasporaAuth() {
   resetErrorState();
   setLoading(true);
   try {
-    let token, ambassador;
-
     if (netParam === "BUSINESS") {
-      const res  = await fetch(`${BASE}/api/business/login`, {
+      const res = await fetch(`${BASE}/api/business/login`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(loginForm),
@@ -146,29 +144,28 @@ export default function DiasporaAuth() {
           { response: { status: res.status, data } }
         );
       }
-      token      = data.token;
-      ambassador = data.member;
-    } else {
-      const { data } = await diasporaAuthAPI.login({
-        ...loginForm,
-        network_type: netParam in NETWORK_CONFIG ? netParam : "DIASPORA",
-      });
-
-      // Membre Business détecté via le login Diaspora
-      if (data.network === "BUSINESS") {
-        localStorage.setItem("business_token", data.token);
-        localStorage.setItem("business_data", JSON.stringify(data.member));
-        navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
-        return; // ← STOP ici, ne pas continuer
-      }
-
-      token      = data.token;
-      ambassador = data.ambassador || data.member;
+      localStorage.setItem("business_token", data.token);
+      localStorage.setItem("business_data", JSON.stringify(data.member));
+      navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
+      return;
     }
 
-    // Diaspora / Referral / Business via ?network=BUSINESS
-    diasporaLogin(token, ambassador);
-    navigate(getDashPath(ambassador));
+    // Diaspora / Referral
+    const { data } = await diasporaAuthAPI.login({
+      ...loginForm,
+      network_type: netParam in NETWORK_CONFIG ? netParam : "DIASPORA",
+    });
+
+    // Membre Business détecté via login Diaspora (fallback)
+    if (data.network === "BUSINESS") {
+      localStorage.setItem("business_token", data.token);
+      localStorage.setItem("business_data", JSON.stringify(data.member));
+      navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
+      return;
+    }
+
+    diasporaLogin(data.token, data.ambassador || data.member);
+    navigate(getDashPath(data.ambassador || data.member));
 
   } catch (err) {
     const response = err?.response;
