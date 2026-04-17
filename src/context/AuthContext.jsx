@@ -7,8 +7,11 @@ const AuthContext = createContext(null);
 const ISOLATED_PREFIXES = ["/etablissement", "/client", "/diaspora", "/referral"];
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [user,         setUser]         = useState(null);
+  // FIX : token est maintenant dans le state React (plus de lecture directe
+  //       de localStorage à chaque render → plus de valeur null transitoire)
+  const [token,        setToken]        = useState(null);
+  const [loading,      setLoading]      = useState(false);
   const [initializing, setInitializing] = useState(true);
 
   // Lecture localStorage au montage — async-safe sur mobile
@@ -22,8 +25,11 @@ export function AuthProvider({ children }) {
       );
 
       if (!isIsolatedPage) {
-        const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
+        const stored      = localStorage.getItem("user");
+        const storedToken = localStorage.getItem("token");
+        if (stored)      setUser(JSON.parse(stored));
+        // FIX : token chargé en même temps que user — plus de désynchronisation
+        if (storedToken) setToken(storedToken);
       }
     } catch {}
     setInitializing(false);
@@ -35,7 +41,9 @@ export function AuthProvider({ children }) {
       const { data } = await authAPI.login({ phone, password });
       localStorage.setItem("token", data.token);
       localStorage.setItem("user",  JSON.stringify(data.user));
+      // FIX : mise à jour simultanée de user ET token dans le state
       setUser(data.user);
+      setToken(data.token);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.response?.data?.error || "Erreur de connexion" };
@@ -48,11 +56,13 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
+    // FIX : token remis à null au logout — état cohérent garanti
+    setToken(null);
   }, []);
 
   const isAdmin = user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
-  const token   = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  // token est maintenant un vrai état React — stable, réactif, jamais null par surprise
 
   return (
     <AuthContext.Provider value={{ user, token, loading, initializing, login, logout, isAdmin, isAgent }}>
