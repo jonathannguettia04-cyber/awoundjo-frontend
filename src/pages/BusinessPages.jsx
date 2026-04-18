@@ -854,11 +854,11 @@ export function BizMembersPage() {
     if (!form.name || !form.email) return setError("Nom et email requis.");
     setBusy(true);
     try {
-      const { member: m, credentials } = await apiBiz("/create-member", {
+      const { member: m, credentials } = await apiBiz("/members", {
         method: "POST",
         body:   JSON.stringify(form),
       });
-      setCreds(credentials);
+      setCreds({ ...credentials, member_id: m?.id });
       setForm({ name: "", email: "", phone: "", country: "CI", city: "" });
       setShowForm(false);
       load();
@@ -907,15 +907,37 @@ export function BizMembersPage() {
       )}
 
       {creds && (
-        <Card style={{ marginBottom: 20, background: "#F0FDF4", border: "1px solid #BBF7D0" }}>
-          <h3 style={{ margin: "0 0 10px", color: "#065F46" }}>✅ Membre créé — Identifiants à transmettre</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 14 }}>
-            <div><strong>Identifiant :</strong> {creds.username}</div>
-            <div><strong>Mot de passe :</strong> <code style={{ background: "#fff", padding: "2px 6px", borderRadius: 4 }}>{creds.temp_password}</code></div>
-            <div><strong>Code invitation :</strong> {creds.invitation_code}</div>
-            <div><strong>Lien :</strong> <a href={creds.login_url} style={{ color: "#2563EB" }} target="_blank" rel="noreferrer">{creds.login_url}</a></div>
+        <Card style={{ marginBottom: 20, background: "#F0FDF4", border: "2px solid #6EE7B7" }}>
+          <h3 style={{ margin: "0 0 14px", color: "#065F46", fontSize: 16 }}>✅ Membre créé — Identifiants à transmettre</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 14 }}>
+            {[
+              { label: "🪪 ID membre",       value: creds.member_id || m?.id || "—" },
+              { label: "👤 Identifiant",     value: creds.username },
+              { label: "🔑 Mot de passe",    value: creds.temp_password },
+              { label: "🎫 Code invitation", value: creds.invitation_code },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ background: "#fff", border: "1px solid #A7F3D0", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>{label}</div>
+                <code style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{value}</code>
+              </div>
+            ))}
           </div>
-          <button onClick={() => setCreds(null)} style={{ ...btnSecondary, marginTop: 10 }}>Fermer</button>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button
+              onClick={() => {
+                const txt = `ID membre : ${creds.member_id || "—"}\nIdentifiant : ${creds.username}\nMot de passe : ${creds.temp_password}\nCode invitation : ${creds.invitation_code}\nLien connexion : ${creds.login_url}`;
+                navigator.clipboard.writeText(txt);
+                alert("✅ Identifiants copiés !");
+              }}
+              style={{ ...btnPrimary, background: "#059669" }}
+            >
+              📋 Copier tout
+            </button>
+            <button onClick={() => setCreds(null)} style={btnSecondary}>Fermer</button>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "#6B7280" }}>
+            ⚠️ Transmettez ces identifiants au membre — le mot de passe est temporaire.
+          </div>
         </Card>
       )}
 
