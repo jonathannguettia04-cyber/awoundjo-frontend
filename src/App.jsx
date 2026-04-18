@@ -11,7 +11,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
-const BusinessAuth = lazy(() => import("./pages/business/BusinessAuth"));
+import BusinessAuth from "./pages/business/BusinessAuth";
 
 import Navbar from "./components/Navbar";
 
@@ -426,8 +426,7 @@ export default function App() {
             {/* ═══════════════════════════════════════════════
                 RÉSEAU BUSINESS
             ══════════════════════════════════════════════════*/}
-            <Route path="/business/login"    element={<DiasporaAuth />} />
-            <Route path="/business/register" element={<DiasporaAuth />} />
+            {/* /business/login et /business/register définis plus haut avec BusinessAuth */}
             <Route path="/business/dashboard"   element={<BizGuard><BizAuthProviderComp><BizDashboardPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/network"     element={<BizGuard><BizAuthProviderComp><BizNetworkPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/commissions" element={<BizGuard><BizAuthProviderComp><BizCommissionsPage /></BizAuthProviderComp></BizGuard>} />
