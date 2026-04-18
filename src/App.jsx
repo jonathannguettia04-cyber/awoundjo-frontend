@@ -11,7 +11,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
-import BusinessAuth from "./pages/business/BusinessAuth";
+const BusinessAuth = lazy(() => import("./pages/business/BusinessAuth"));
 
 import Navbar from "./components/Navbar";
 
@@ -412,7 +412,7 @@ export default function App() {
                 RÉSEAU AFFILIÉ
             ══════════════════════════════════════════════════*/}
             <Route path="/business/login"    element={<BusinessAuth />} />
-            s<Route path="/business/register" element={<BusinessAuth />} />
+            <Route path="/business/register" element={<BusinessAuth />} />
             <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
               <Route index                   element={<Navigate to="/affilie/dashboard" replace />} />
               <Route path="dashboard"        element={<AffilieDashboard />} />
