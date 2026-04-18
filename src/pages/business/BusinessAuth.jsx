@@ -109,6 +109,9 @@ export default function BusinessAuth() {
 
       safeLS("setItem", "business_token", data.token);
       safeLS("setItem", "business_data",  JSON.stringify(data.member));
+      // Effacer le token admin pour éviter que ProtectedRoute intercepte la navigation
+      safeLS("removeItem", "token");
+      safeLS("removeItem", "user");
       navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
     } catch {
       setError("Erreur réseau. Vérifiez votre connexion.");

@@ -174,6 +174,14 @@ const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CL
 
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user, initializing } = useAuth();
+  const { pathname } = useLocation();
+
+  // Ne pas interférer avec les portails indépendants
+  const isIndependentPortal = pathname.startsWith("/business") ||
+    pathname.startsWith("/diaspora") || pathname.startsWith("/referral") ||
+    pathname.startsWith("/affilie") || pathname.startsWith("/client") ||
+    pathname.startsWith("/etablissement");
+  if (isIndependentPortal) return children;
 
   // Attend que le localStorage soit lu avant de décider
   if (initializing) return <PageLoader />;
@@ -412,7 +420,7 @@ export default function App() {
                 RÉSEAU AFFILIÉ
             ══════════════════════════════════════════════════*/}
             <Route path="/business/login"    element={<BusinessAuth />} />
-            <Route path="/business/register" element={<BusinessAuth />} />
+            s<Route path="/business/register" element={<BusinessAuth />} />
             <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
               <Route index                   element={<Navigate to="/affilie/dashboard" replace />} />
               <Route path="dashboard"        element={<AffilieDashboard />} />
@@ -426,7 +434,8 @@ export default function App() {
             {/* ═══════════════════════════════════════════════
                 RÉSEAU BUSINESS
             ══════════════════════════════════════════════════*/}
-            {/* /business/login et /business/register définis plus haut avec BusinessAuth */}
+            <Route path="/business/login"    element={<DiasporaAuth />} />
+            <Route path="/business/register" element={<DiasporaAuth />} />
             <Route path="/business/dashboard"   element={<BizGuard><BizAuthProviderComp><BizDashboardPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/network"     element={<BizGuard><BizAuthProviderComp><BizNetworkPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/commissions" element={<BizGuard><BizAuthProviderComp><BizCommissionsPage /></BizAuthProviderComp></BizGuard>} />
