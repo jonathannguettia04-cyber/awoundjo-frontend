@@ -89,8 +89,11 @@ export const providerMedicalAPI = {
 // ── Facturation ───────────────────────────────────────────────
 export const providerBillingAPI = {
   getInvoices:     ()     => providerApi.get("/invoices"),
+  generate:        (data) => providerApi.post("/invoices/generate", data),
   generateInvoice: (data) => providerApi.post("/invoices/generate", data),
+  getById:         (id)   => providerApi.get(`/invoices/${id}`),
   getInvoice:      (id)   => providerApi.get(`/invoices/${id}`),
+  requestPayment:  (id)   => providerApi.post(`/invoices/${id}/request-payment`),
 };
 
 // ── Helpers auth ─────────────────────────────────────────────
