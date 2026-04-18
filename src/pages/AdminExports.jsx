@@ -118,7 +118,7 @@ const EXPORTS = [
     color: "#DB2777",
     bg: "#FDF2F8",
     border: "#FBCFE8",
-    endpoint: "/api/healthcare",
+    endpoint: "/api/healthcare/providers",
     filename: "awoundjo_etablissements",
     mapper: (data) => {
       const rows = data.providers || data.etablissements || data;
