@@ -107,18 +107,12 @@ export default function BusinessAuth() {
         return;
       }
 
-      // ok() peut envelopper dans data.data ou retourner directement
-      const payload = data.data || data;
-      const bizToken = payload.token || data.token;
-      const bizMember = payload.member || data.member;
-      const mustChange = payload.must_change_password ?? data.must_change_password;
-
-      safeLS("setItem", "business_token", bizToken);
-      safeLS("setItem", "business_data",  JSON.stringify(bizMember));
-      // Effacer le token admin pour éviter que ProtectedRoute intercepte
+      safeLS("setItem", "business_token", data.token);
+      safeLS("setItem", "business_data",  JSON.stringify(data.member));
       safeLS("removeItem", "token");
       safeLS("removeItem", "user");
-      navigate(mustChange ? "/business/change-password" : "/business/dashboard");
+      // must_change_password géré depuis le dashboard (route change-password non définie)
+      navigate("/business/dashboard");
     } catch {
       setError("Erreur réseau. Vérifiez votre connexion.");
     } finally {
