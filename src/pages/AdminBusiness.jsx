@@ -147,6 +147,29 @@ export default function AdminBusiness() {
     setModal(null);
   }
 
+  // ── Suppression membre ────────────────────────────────────
+  const [adminPassword, setAdminPassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete(id) {
+    if (!adminPassword.trim()) return showToast("Mot de passe admin requis", true);
+    setDeleting(true);
+    try {
+      const r = await fetch(`${API}/api/business/admin/members/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ adminPassword }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || "Erreur suppression");
+      showToast("🗑️ Membre supprimé définitivement");
+      setAdminPassword("");
+      loadMembers();
+    } catch (e) { showToast(e.message, true); }
+    setDeleting(false);
+    setModal(null);
+  }
+
   // ── Actions commissions ────────────────────────────────────
   async function handleCommAction(id, action) {
     try {
@@ -282,36 +305,21 @@ export default function AdminBusiness() {
                           }
                         </td>
                         <td style={s.td}>
-                          <div style={s.actions}>
+                          <div style={s.actionsCol}>
+                            {/* Groupe validation — visible seulement si en attente */}
                             {m.status_validation === "pending" && (
-                              <>
-                                <ActionBtn
-                                  label="✅ Approuver"
-                                  color="#059669"
-                                  onClick={() => setModal({ type: "approve", member: m })}
-                                />
-                                <ActionBtn
-                                  label="✅ Cash"
-                                  color="#0891B2"
-                                  onClick={() => setModal({ type: "cash", member: m })}
-                                />
-                                <ActionBtn
-                                  label="❌ Rejeter"
-                                  color="#DC2626"
-                                  onClick={() => setModal({ type: "reject", member: m })}
-                                />
-                              </>
+                              <div style={s.actionGroup}>
+                                <ActionBtn label="✅ Approuver" color="#059669" onClick={() => setModal({ type: "approve", member: m })} />
+                                <ActionBtn label="💵 Cash"      color="#0891B2" onClick={() => setModal({ type: "cash",    member: m })} />
+                                <ActionBtn label="❌ Rejeter"   color="#DC2626" onClick={() => setModal({ type: "reject",  member: m })} />
+                              </div>
                             )}
-                            <ActionBtn
-                              label="🔑 MDP"
-                              color="#7C3AED"
-                              onClick={() => setModal({ type: "password", member: m })}
-                            />
-                            <ActionBtn
-                              label="♻️"
-                              color="#D97706"
-                              onClick={() => setModal({ type: "recalc", member: m })}
-                            />
+                            {/* Groupe outils */}
+                            <div style={s.actionGroup}>
+                              <ActionBtn label="🔑 Réinit. MDP"   color="#7C3AED" onClick={() => setModal({ type: "password", member: m })} />
+                              <ActionBtn label="♻️ Commissions"   color="#D97706" onClick={() => setModal({ type: "recalc",   member: m })} />
+                              <ActionBtn label="🗑️ Supprimer"     color="#DC2626" onClick={() => { setAdminPassword(""); setModal({ type: "delete", member: m }); }} />
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -506,6 +514,37 @@ export default function AdminBusiness() {
                 <button style={s.btnPrimary}   onClick={() => handleRecalc(modal.member.id)}>Recalculer</button>
               </div>
             </>}
+            {modal.type === "delete" && <>
+              <h3 style={{ ...s.modalTitle, color: "#DC2626" }}>🗑️ Supprimer le membre</h3>
+              <p style={s.modalText}>
+                Vous allez supprimer définitivement <strong>{modal.member.name}</strong> ({modal.member.role}).<br/>
+                <span style={{ color: "#DC2626", fontWeight: 700 }}>⚠️ Cette action est irréversible.</span><br/>
+                Toutes ses données (commissions, paiements, membres liés) seront effacées.
+              </p>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                  🔐 Confirmez avec votre mot de passe admin :
+                </label>
+                <input
+                  type="password"
+                  placeholder="Mot de passe admin"
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleDelete(modal.member.id)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #FCA5A5", fontSize: 14, boxSizing: "border-box", outline: "none" }}
+                />
+              </div>
+              <div style={s.modalActions}>
+                <button style={s.btnSecondary} onClick={() => { setModal(null); setAdminPassword(""); }}>Annuler</button>
+                <button
+                  style={{ ...s.btnDanger, opacity: deleting ? 0.6 : 1 }}
+                  disabled={deleting}
+                  onClick={() => handleDelete(modal.member.id)}
+                >
+                  {deleting ? "Suppression…" : "🗑️ Supprimer définitivement"}
+                </button>
+              </div>
+            </>}
           </div>
         </div>
       )}
@@ -566,6 +605,8 @@ const s = {
   memberSub:   { fontSize: 11, color: "#94A3B8" },
   badge:       { fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, display: "inline-block" },
   actions:     { display: "flex", flexWrap: "wrap", gap: 4 },
+  actionsCol:  { display: "flex", flexDirection: "column", gap: 6, minWidth: 200 },
+  actionGroup: { display: "flex", flexWrap: "wrap", gap: 4 },
   pagination:  { display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 },
   btnSecondary:{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   btnPrimary:  { padding: "8px 18px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
