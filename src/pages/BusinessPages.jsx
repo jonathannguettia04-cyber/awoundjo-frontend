@@ -228,7 +228,7 @@ export function BizLayout({ children }) {
           .biz-main { margin-left: 0 !important; padding: 16px !important; }
           .biz-overlay { display: block !important; }
           .biz-hamburger { display: flex !important; }
-          .biz-topbar { padding: 12px 16px !important; }
+          .biz-topbar { padding: 12px 16px !important; display: flex !important; }
           .biz-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
           .biz-stats-grid { grid-template-columns: 1fr 1fr !important; }
           .biz-stats-grid-3 { grid-template-columns: 1fr !important; }
@@ -243,6 +243,9 @@ export function BizLayout({ children }) {
           width: 36px; height: 36px; background: #1E1B4B; border: none; border-radius: 8px;
           color: #fff; cursor: pointer; font-size: 18px; flex-shrink: 0; }
         .biz-sidebar { transition: transform .25s ease; }
+        @media (min-width: 769px) {
+          .biz-topbar { display: none !important; }
+        }
       `}</style>
 
       {/* Overlay mobile */}
@@ -928,7 +931,7 @@ export function BizMembersPage() {
         <Card style={{ marginBottom: 20, border: "2px solid #EDE9FE" }}>
           <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Nouveau {targetRole}</h3>
           {error && <Alert type="error" style={{ marginBottom: 12 }}>{error}</Alert>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
             <input placeholder="Nom complet *" value={form.name}  onChange={setF("name")}  style={inputStyle} />
             <input placeholder="Email *"        value={form.email} onChange={setF("email")} style={inputStyle} />
             <input placeholder="Téléphone"      value={form.phone} onChange={setF("phone")} style={inputStyle} />
@@ -951,7 +954,7 @@ export function BizMembersPage() {
       {creds && (
         <Card style={{ marginBottom: 20, background: "#F0FDF4", border: "2px solid #6EE7B7" }}>
           <h3 style={{ margin: "0 0 14px", color: "#065F46", fontSize: 16 }}>✅ Membre créé — Identifiants à transmettre</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, fontSize: 14 }}>
             {[
               { label: "🪪 ID membre",       value: creds.member_id || m?.id || "—" },
               { label: "👤 Identifiant",     value: creds.username },
@@ -1058,7 +1061,9 @@ const btnSecondary = {
   fontWeight: 600, fontSize: 14, fontFamily: "inherit",
 };
 const grid4 = {
-  display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 16,
 };
 const quickBtn = color => ({
   padding: "9px 18px", borderRadius: 8, background: color + "15",

@@ -207,6 +207,9 @@ export default function BusinessAuth() {
           .biz-auth-btn { padding: 12px !important; font-size: 14px !important; }
           .biz-auth-grid2 { grid-template-columns: 1fr !important; }
         }
+        @media (max-width: 360px) {
+          .biz-auth-card { padding: 16px 12px !important; }
+        }
       `}</style>
 
       {/* Halos */}
@@ -337,7 +340,7 @@ export default function BusinessAuth() {
             </p>
 
             {/* Hiérarchie */}
-            <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:16, overflowX:"auto", WebkitOverflowScrolling:"touch", paddingBottom:2 }}>
               {["DIRECTRICE","LEADER","SUPERVISEUR","RECRUTEUR"].map((r, i) => (
                 <div key={r} style={{ display:"flex", alignItems:"center", gap:6 }}>
                   <span style={{

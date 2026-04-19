@@ -165,7 +165,7 @@ function TabAccueil({ data }) {
       <div style={{
         background: `linear-gradient(135deg, ${T.card}, #1E1830)`,
         border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px 28px",
-        display: "flex", alignItems: "center", gap: 20,
+        display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap",
         position: "relative", overflow: "hidden",
       }}>
         <div style={{
@@ -738,7 +738,7 @@ export default function BusinessDashboard() {
         @media (max-width: 480px) {
           .biz-grid-3 { grid-template-columns: 1fr !important; }
           .biz-dash-header-name { display: none; }
-          .biz-dash-tab span:last-child { display: none; }
+          .biz-dash-tab .biz-tab-label { display: none; }
         }
       `}</style>
 
@@ -782,7 +782,7 @@ export default function BusinessDashboard() {
         WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
       }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
+          <button key={t.id} className="biz-dash-tab" onClick={() => setTab(t.id)} style={{
             padding: "14px 16px", border: "none", background: "transparent",
             color: tab===t.id ? "#C9933A" : "#6B6B85",
             fontWeight: tab===t.id ? 800 : 500, fontSize: 13, cursor: "pointer",
@@ -790,7 +790,7 @@ export default function BusinessDashboard() {
             borderBottom: `2px solid ${tab===t.id ? "#C9933A" : "transparent"}`,
             transition: "all .15s",
           }}>
-            <span style={{ marginRight: 6 }}>{t.icon}</span>{t.label}
+            <span style={{ marginRight: 6 }}>{t.icon}</span><span className="biz-tab-label">{t.label}</span>
           </button>
         ))}
       </div>
