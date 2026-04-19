@@ -226,7 +226,6 @@ export function BizLayout({ children }) {
           .biz-sidebar { transform: translateX(-100%); transition: transform .25s ease; }
           .biz-sidebar.open { transform: translateX(0); }
           .biz-main { margin-left: 0 !important; padding: 16px !important; }
-          .biz-overlay { display: block !important; }
           .biz-hamburger { display: flex !important; }
           .biz-topbar { padding: 12px 16px !important; display: flex !important; }
           .biz-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -238,7 +237,7 @@ export function BizLayout({ children }) {
           .biz-stats-grid { grid-template-columns: 1fr !important; }
           .biz-tab-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
         }
-        .biz-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+        .biz-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
         .biz-hamburger { display: none; align-items: center; justify-content: center;
           width: 36px; height: 36px; background: #1E1B4B; border: none; border-radius: 8px;
           color: #fff; cursor: pointer; font-size: 18px; flex-shrink: 0; }
@@ -248,8 +247,8 @@ export function BizLayout({ children }) {
         }
       `}</style>
 
-      {/* Overlay mobile */}
-      <div className="biz-overlay" onClick={() => setSidebarOpen(false)}></div>
+      {/* Overlay mobile — affiché uniquement quand le sidebar est ouvert */}
+      {sidebarOpen && <div className="biz-overlay" onClick={() => setSidebarOpen(false)} />}
 
       <aside className={`biz-sidebar${sidebarOpen ? " open" : ""}`} style={{
         width: 240, background: "#1E1B4B", color: "#fff",
