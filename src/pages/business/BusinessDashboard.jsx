@@ -323,7 +323,7 @@ function TabReseau({ network }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+      <div className="biz-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <StatCard icon="🤝" label="Total réseau" value={fmtNum(niveau1.length + niveau2.length)} accent={T.gold} />
         <StatCard icon="1️⃣" label="Niveau 1"    value={fmtNum(niveau1.length)} accent="#8B5CF6" sub="Directs" />
         <StatCard icon="2️⃣" label="Niveau 2"    value={fmtNum(niveau2.length)} accent={T.blue}  sub="Indirects" />
@@ -376,7 +376,7 @@ function TabCommissions() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="biz-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <StatCard icon="📊" label="Total commissions" value={fmt(totals.total_earned)} accent={T.gold} />
         <StatCard icon="🔢" label="Ce mois"           value={fmt(totals.this_month)}   accent={T.blue} />
       </div>
@@ -722,10 +722,28 @@ export default function BusinessDashboard() {
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #2A2A38; border-radius: 4px; }
+        @media (max-width: 768px) {
+          .biz-dash-header { padding: 12px 14px !important; }
+          .biz-dash-header-title { font-size: 14px !important; }
+          .biz-dash-tabs { padding: 0 8px !important; }
+          .biz-dash-tab { padding: 12px 10px !important; font-size: 12px !important; }
+          .biz-dash-content { padding: 16px 12px !important; }
+          .biz-grid-3 { grid-template-columns: 1fr 1fr !important; }
+          .biz-grid-2 { grid-template-columns: 1fr !important; }
+          .biz-stat-card { padding: 14px 12px !important; }
+          .biz-member-row { padding: 10px 12px !important; }
+          .biz-member-row-right { flex-direction: column !important; align-items: flex-end !important; gap: 2px !important; }
+          .biz-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        }
+        @media (max-width: 480px) {
+          .biz-grid-3 { grid-template-columns: 1fr !important; }
+          .biz-dash-header-name { display: none; }
+          .biz-dash-tab span:last-child { display: none; }
+        }
       `}</style>
 
       {/* Header */}
-      <div style={{
+      <div className="biz-dash-header" style={{
         background: "#14141A", borderBottom: "1px solid #2A2A38",
         padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
@@ -750,6 +768,7 @@ export default function BusinessDashboard() {
             color: ROLE_META[data.member.role]?.color || T.gold,
             fontSize: 12, fontWeight: 700,
             border: `1px solid ${ROLE_META[data.member.role]?.color || T.gold}40`,
+            // responsive
           }}>
             {ROLE_META[data.member.role]?.icon} {data.member.name}
           </div>
@@ -757,9 +776,10 @@ export default function BusinessDashboard() {
       </div>
 
       {/* Tabs */}
-      <div style={{
+      <div className="biz-dash-tabs" style={{
         background: "#14141A", borderBottom: "1px solid #2A2A38",
         display: "flex", gap: 2, padding: "0 16px", overflowX: "auto",
+        WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
       }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -776,7 +796,7 @@ export default function BusinessDashboard() {
       </div>
 
       {/* Contenu */}
-      <div style={{ padding: "24px 20px", maxWidth: 760, margin: "0 auto", animation: "biz-fade-in .3s ease" }}>
+      <div className="biz-dash-content" style={{ padding: "24px 20px", maxWidth: 760, margin: "0 auto", animation: "biz-fade-in .3s ease" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 60 }}>
             <Spin size={40} />

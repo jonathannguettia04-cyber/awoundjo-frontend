@@ -217,9 +217,38 @@ export function BizLayout({ children }) {
 
   const handleLogout = () => { logoutCtx(); nav("/business/login"); };
 
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#F8FAFC" }}>
-      <aside style={{
+      <style>{`
+        @media (max-width: 768px) {
+          .biz-sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+          .biz-sidebar.open { transform: translateX(0); }
+          .biz-main { margin-left: 0 !important; padding: 16px !important; }
+          .biz-overlay { display: block !important; }
+          .biz-hamburger { display: flex !important; }
+          .biz-topbar { padding: 12px 16px !important; }
+          .biz-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .biz-stats-grid { grid-template-columns: 1fr 1fr !important; }
+          .biz-stats-grid-3 { grid-template-columns: 1fr !important; }
+          .biz-card-actions { flex-direction: column !important; gap: 8px !important; }
+        }
+        @media (max-width: 480px) {
+          .biz-stats-grid { grid-template-columns: 1fr !important; }
+          .biz-tab-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+        }
+        .biz-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+        .biz-hamburger { display: none; align-items: center; justify-content: center;
+          width: 36px; height: 36px; background: #1E1B4B; border: none; border-radius: 8px;
+          color: #fff; cursor: pointer; font-size: 18px; flex-shrink: 0; }
+        .biz-sidebar { transition: transform .25s ease; }
+      `}</style>
+
+      {/* Overlay mobile */}
+      <div className="biz-overlay" onClick={() => setSidebarOpen(false)}></div>
+
+      <aside className={`biz-sidebar${sidebarOpen ? " open" : ""}`} style={{
         width: 240, background: "#1E1B4B", color: "#fff",
         display: "flex", flexDirection: "column",
         position: "fixed", top: 0, left: 0, height: "100vh",
@@ -267,7 +296,16 @@ export function BizLayout({ children }) {
         </div>
       </aside>
 
-      <main style={{ marginLeft: 240, flex: 1, padding: "28px 32px", minWidth: 0 }}>
+      <main className="biz-main" style={{ marginLeft: 240, flex: 1, padding: "28px 32px", minWidth: 0 }}>
+        {/* Topbar mobile */}
+        <div className="biz-topbar" style={{
+          display: "flex", alignItems: "center", gap: 12,
+          marginBottom: 20, paddingBottom: 16,
+          borderBottom: "1px solid #E2E8F0",
+        }}>
+          <button className="biz-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#1E1B4B" }}>💼 Awoundjô Business</span>
+        </div>
         {children}
       </main>
     </div>
@@ -428,7 +466,7 @@ export function BizNetworkPage() {
 
       <Card>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
                 {["Nom", "Rôle", "Pays", "Statut", "Date d'adhésion", "Gains"].map(h => (
@@ -458,6 +496,7 @@ export function BizNetworkPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </Card>
     </BizLayout>
@@ -506,7 +545,7 @@ export function BizCommissionsPage() {
       <Card style={{ marginTop: 16 }}>
         <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Historique des gains</h3>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
                 {["Date", "Source", "Niv.", "Taux", "Base paiement", "Commission", "Statut"].map(h => (
@@ -546,6 +585,7 @@ export function BizCommissionsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </Card>
     </BizLayout>
@@ -592,7 +632,7 @@ export function BizBonusPage() {
 
       <Card>
         <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Historique des pools</h3>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+        <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
               {["Mois", "Année", "Montant pool", "Statut"].map(h => (
@@ -626,6 +666,7 @@ export function BizBonusPage() {
             })}
           </tbody>
         </table>
+        </div>
       </Card>
     </BizLayout>
   );
@@ -784,7 +825,7 @@ export function BizLeaderboardPage() {
       {busy ? <Loader /> : (
         <Card>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
                   {["#", "Nom", "Rôle", "Pays", "Gains (FCFA)", "Recrues"].map(h => (
@@ -812,6 +853,7 @@ export function BizLeaderboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </Card>
       )}
@@ -944,7 +986,7 @@ export function BizMembersPage() {
       {loading ? <Loader /> : (
         <Card>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
                   {["Nom", "Email", "Rôle", "Statut", "Paiement", "Validation", "Inscription"].map(h => (
@@ -989,6 +1031,7 @@ export function BizMembersPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </Card>
       )}

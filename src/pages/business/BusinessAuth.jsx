@@ -197,6 +197,16 @@ export default function BusinessAuth() {
         .biz-auth-input:focus { border-color: rgba(16,185,129,.5); background: rgba(255,255,255,.09); }
         .biz-auth-input::placeholder { color: rgba(255,255,255,.25); }
         .biz-auth-input option { background: #0d2137; color:#fff; }
+        @media (max-width: 480px) {
+          .biz-auth-card { padding: 20px 16px !important; border-radius: 16px !important; }
+          .biz-auth-logo { gap: 10px !important; margin-bottom: 20px !important; }
+          .biz-auth-logo-icon { width: 42px !important; height: 42px !important; font-size: 20px !important; }
+          .biz-auth-logo-title { font-size: 18px !important; }
+          .biz-auth-logo-sub { font-size: 10px !important; }
+          .biz-auth-tab { font-size: 12px !important; padding: 8px 0 !important; }
+          .biz-auth-btn { padding: 12px !important; font-size: 14px !important; }
+          .biz-auth-grid2 { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* Halos */}
@@ -204,25 +214,25 @@ export default function BusinessAuth() {
       <div style={{ position:"absolute", bottom:-140, left:-100, width:360, height:360, borderRadius:"50%", background:"radial-gradient(circle, rgba(5,150,105,.08), transparent 70%)", pointerEvents:"none" }} />
 
       {/* Logo */}
-      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
-        <div style={{
+      <div className="biz-auth-logo" style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <div className="biz-auth-logo-icon" style={{
           width:52, height:52, borderRadius:16,
           background:"linear-gradient(135deg,#059669,#047857)",
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:24, boxShadow:"0 8px 24px rgba(5,150,105,.4)",
         }}>💼</div>
         <div>
-          <div style={{ color:"#fff", fontSize:22, fontWeight:900, letterSpacing:-.5 }}>
+          <div className="biz-auth-logo-title" style={{ color:"#fff", fontSize:22, fontWeight:900, letterSpacing:-.5 }}>
             Awoundjô <span style={{ color:"#34D399" }}>Business</span>
           </div>
-          <div style={{ color:"rgba(255,255,255,.4)", fontSize:12, marginTop:2 }}>
+          <div className="biz-auth-logo-sub" style={{ color:"rgba(255,255,255,.4)", fontSize:12, marginTop:2 }}>
             Directrice · Leader · Superviseur · Recruteur
           </div>
         </div>
       </div>
 
       {/* Carte */}
-      <div style={{
+      <div className="biz-auth-card" style={{
         background:"rgba(255,255,255,.04)", backdropFilter:"blur(24px)",
         border:"1px solid rgba(255,255,255,.09)", borderRadius:24,
         padding:"32px 28px", width:"100%", maxWidth:460,
