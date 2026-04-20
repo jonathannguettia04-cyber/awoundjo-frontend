@@ -52,6 +52,9 @@ const AdminBusiness             = lazy(() => import("./pages/AdminBusiness"));
 // ── Pages ADMIN — CNEPECI ────────────────────────────────────
 const AdminCnepeci              = lazy(() => import("./pages/AdminCnepeci"));
 
+// ── Portail CNEPECI ──────────────────────────────────────────
+const CnepeciApp                = lazy(() => import("./pages/cnepeci/cnepeci-dashboard"));
+
 // ── Pages CLIENT ─────────────────────────────────────────────
 const ClientLogin         = lazy(() => import("./pages/client/ClientLogin"));
 const ClientLayout        = lazy(() => import("./pages/client/ClientLayout"));
@@ -452,6 +455,12 @@ export default function App() {
             <Route path="/business/leaderboard" element={<BizGuard><BizAuthProviderComp><BizLeaderboardPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/members"     element={<BizGuard><BizAuthProviderComp><BizMembersPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business" element={<Navigate to="/business/dashboard" replace />} />
+
+            {/* ═══════════════════════════════════════════════
+                PORTAIL CNEPECI
+            ══════════════════════════════════════════════════*/}
+            <Route path="/cnepeci/login" element={<CnepeciApp />} />
+            <Route path="/cnepeci/*"     element={<CnepeciApp />} />
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
