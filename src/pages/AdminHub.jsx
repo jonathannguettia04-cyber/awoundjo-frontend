@@ -127,6 +127,7 @@ const SECTIONS = [
       { icon: "🌍", label: "Portail Diaspora",              path: "/diaspora/login",  desc: "Espace ambassadeurs diaspora",     external: true },
       { icon: "⛪", label: "Portail Fédération",            path: "/diaspora/login",  desc: "Espace ambassadeurs fédération",   external: true },
       { icon: "💼", label: "Portail Business",              path: "/business/login",  desc: "Espace membres réseau business",   external: true },
+      { icon: "🔐", label: "Portail CNEPECI",               path: "/cnepeci/login",   desc: "Espace membres CNEPECI",           external: true },
     ],
   },
 ];
