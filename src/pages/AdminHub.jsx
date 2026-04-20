@@ -96,6 +96,23 @@ const SECTIONS = [
     ],
   },
 
+  // ── Réseau CNEPECI ───────────────────────────────────────────
+  {
+    title: "⛪ Réseau CNEPECI",
+    roles: ["ADMIN"],
+    color: "#7F77DD",
+    bg: "#EEEDFE",
+    border: "#C4C0F8",
+    links: [
+      { icon: "📊", label: "Admin CNEPECI",          path: "/admin/cnepeci",  desc: "Vue d'ensemble du réseau CNEPECI" },
+      { icon: "👥", label: "Membres CNEPECI",        path: "/admin/cnepeci",  desc: "Bureaux, Coordonnateurs, Pasteurs, Souscripteurs" },
+      { icon: "💰", label: "Paiements CNEPECI",      path: "/admin/cnepeci",  desc: "Adhésions, cotisations, cash" },
+      { icon: "🏆", label: "Commissions & Bonus",    path: "/admin/cnepeci",  desc: "Commissions réseau + bonus 1,5% mensuel" },
+      { icon: "🏛️", label: "Bureau Centrale",        path: "/admin/cnepeci",  desc: "Coordonnateurs généraux et membres bureau" },
+      { icon: "🔐", label: "Portail Membre CNEPECI", path: "/cnepeci/login",  desc: "Accéder au portail membres", external: true },
+    ],
+  },
+
   // ── Portails ─────────────────────────────────────────────────
   {
     title: "🔗 Portails",
