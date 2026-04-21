@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api/cnepeci";
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api/cnepeci";
 
 function apiHeaders() {
   const token = localStorage.getItem("cnepeci_token");
