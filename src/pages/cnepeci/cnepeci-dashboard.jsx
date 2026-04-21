@@ -11,35 +11,59 @@ function apiHeaders() {
   };
 }
 
+// Adapté : gère success/data selon la réponse réelle du contrôleur
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { ...apiHeaders(), ...(options.headers || {}) },
-  });
-  if (res.status === 401) {
-    localStorage.removeItem("cnepeci_token");
-    localStorage.removeItem("cnepeci_membre");
-    window.location.reload();
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { ...apiHeaders(), ...(options.headers || {}) },
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("cnepeci_token");
+      localStorage.removeItem("cnepeci_membre");
+      window.location.reload();
+      return null;
+    }
+    const json = await res.json();
+    // Le contrôleur retourne { success, data, message } ou { success, ...fields }
+    return json;
+  } catch (e) {
+    console.error("[apiFetch]", path, e.message);
     return null;
   }
-  return res.json();
+}
+
+// Helper : extrait les données utiles peu importe la structure de réponse
+function extractData(json) {
+  if (!json) return null;
+  if (json.data !== undefined) return json.data;
+  const { success, message, ...rest } = json;
+  return Object.keys(rest).length ? rest : null;
 }
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 const ROLES = {
   BUREAU_CENTRALE:       { label: "Bureau Centrale",       abbr: "BC", color: "#7F77DD", level: 1 },
   COORDONNATEUR_GENERAL: { label: "Coordonnateur Général", abbr: "CG", color: "#1D9E75", level: 2 },
-  BUREAU_LOCAL:          { label: "Bureau Local",           abbr: "BL", color: "#378ADD", level: 3 },
+  BUREAU_LOCAL:          { label: "Bureau Local",          abbr: "BL", color: "#378ADD", level: 3 },
   COORDONNATEUR_LOCAL:   { label: "Coordonnateur Local",   abbr: "CL", color: "#BA7517", level: 4 },
-  PASTEUR:               { label: "Pasteur d'Église",       abbr: "PA", color: "#D85A30", level: 5 },
-  SOUSCRIPTEUR:          { label: "Souscripteur Final",     abbr: "SF", color: "#888780", level: 6 },
+  PASTEUR:               { label: "Pasteur d'Église",      abbr: "PA", color: "#D85A30", level: 5 },
+  SOUSCRIPTEUR:          { label: "Souscripteur Final",    abbr: "SF", color: "#888780", level: 6 },
+};
+
+// Qui peut créer qui (issu du contrôleur CREATION_MAP)
+const CREATION_MAP = {
+  BUREAU_CENTRALE:       "COORDONNATEUR_GENERAL",
+  COORDONNATEUR_GENERAL: "BUREAU_LOCAL",
+  BUREAU_LOCAL:          "COORDONNATEUR_LOCAL",
+  COORDONNATEUR_LOCAL:   "PASTEUR",
+  PASTEUR:               "SOUSCRIPTEUR",
 };
 
 const TYPE_COLORS = {
   adhesion:   { bg: "#E1F5EE", text: "#0F6E56", label: "Adhésion" },
   cotisation: { bg: "#E6F1FB", text: "#185FA5", label: "Cotisation" },
   bonus:      { bg: "#FAEEDA", text: "#854F0B", label: "Bonus" },
-  bureau:     { bg: "#EEEDFE", text: "#3C3489", label: "Bureau" },
 };
 
 const MONTHS = ["Nov", "Déc", "Jan", "Fév", "Mar", "Avr"];
@@ -114,21 +138,12 @@ const styles = {
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-const fmt = n => {
-  const num = parseFloat(n) || 0;
-  return num.toLocaleString("fr-FR") + " F";
-};
+const fmt = n => (parseFloat(n) || 0).toLocaleString("fr-FR") + " F";
 
 function Spinner() {
   return (
     <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
-      <div style={{
-        width: 28, height: 28,
-        border: "3px solid #e8e7e2",
-        borderTop: "3px solid #7F77DD",
-        borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }} />
+      <div style={{ width: 28, height: 28, border: "3px solid #e8e7e2", borderTop: "3px solid #7F77DD", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -148,7 +163,7 @@ function Alert({ type, msg }) {
   );
 }
 
-// ─── SUBCOMPONENTS ────────────────────────────────────────────────────────────
+// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e8e7e2", borderRadius: 12, padding: "16px 20px", borderTop: `3px solid ${accent}` }}>
@@ -168,37 +183,39 @@ function TypeBadge({ type }) {
   );
 }
 
-function ActiveBadge({ active }) {
+function ActiveBadge({ statut }) {
+  const active = statut === "actif";
   return (
-    <span style={{ background: active ? "#E1F5EE" : "#f0efe9", color: active ? "#0F6E56" : "#888", borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500 }}>
-      {active ? "Actif" : "Inactif"}
+    <span style={{ background: active ? "#E1F5EE" : statut === "suspendu" ? "#FEE2E2" : "#f0efe9", color: active ? "#0F6E56" : statut === "suspendu" ? "#991B1B" : "#888", borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500 }}>
+      {active ? "Actif" : statut === "suspendu" ? "Suspendu" : "Inactif"}
     </span>
   );
 }
 
 function TreeNode({ node }) {
   const [open, setOpen] = useState(false);
-  const memberCount = node.members || 0;
   return (
     <div style={{ background: "#fff", border: "1px solid #e8e7e2", borderRadius: 10, marginBottom: 8 }}>
       <div
-        onClick={() => memberCount > 0 && setOpen(!open)}
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", cursor: memberCount > 0 ? "pointer" : "default" }}
+        onClick={() => setOpen(!open)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", cursor: "pointer" }}
       >
         <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1917" }}>{node.nom || node.name}</div>
-          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{ROLES[node.role]?.label || node.role}</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1917" }}>{node.nom}</div>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{ROLES[node.role]?.label || node.role} · {node.email}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <ActiveBadge active={node.statut === "actif" || node.active} />
-          {memberCount > 0 && (
-            <span style={{ fontSize: 14, color: "#aaa", transform: open ? "rotate(90deg)" : "none", display: "inline-block", transition: "transform .2s" }}>›</span>
-          )}
+          <ActiveBadge statut={node.statut} />
+          <span style={{ fontSize: 14, color: "#aaa", transform: open ? "rotate(90deg)" : "none", display: "inline-block", transition: "transform .2s" }}>›</span>
         </div>
       </div>
       {open && (
-        <div style={{ borderLeft: "2px solid #EEEDFE", marginLeft: 28, marginBottom: 10, paddingLeft: 16 }}>
-          <div style={{ fontSize: 12, color: "#888", padding: "6px 0" }}>{memberCount} membres dans le sous-réseau</div>
+        <div style={{ borderLeft: "2px solid #EEEDFE", marginLeft: 28, marginBottom: 10, paddingLeft: 16, paddingTop: 6, paddingBottom: 6 }}>
+          <div style={{ fontSize: 12, color: "#555" }}>📞 {node.phone || "—"}</div>
+          <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>Inscrit le {new Date(node.created_at).toLocaleDateString("fr-FR")}</div>
+          {node.code_invitation && (
+            <div style={{ fontSize: 12, color: "#7F77DD", marginTop: 4, fontFamily: "monospace" }}>Code : {node.code_invitation}</div>
+          )}
         </div>
       )}
     </div>
@@ -226,18 +243,19 @@ function BarChart({ values }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 1. PAGE AUTH — Login / Inscription
+// PAGE AUTH — Login / Inscription
 // ══════════════════════════════════════════════════════════════════════════════
 function AuthPage({ onAuth }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ nom: "", email: "", phone: "", password: "", code_invitation: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async () => {
-    setError("");
+    setError(""); setSuccessMsg("");
     if (!form.email || !form.password) { setError("Email et mot de passe requis."); return; }
     if (mode === "register" && !form.nom) { setError("Nom requis."); return; }
 
@@ -250,21 +268,24 @@ function AuthPage({ onAuth }) {
 
       const data = await apiFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
 
-      if (!data) return;
-      if (data.error || data.message?.toLowerCase().includes("err")) {
-        setError(data.error || data.message || "Erreur inconnue");
+      if (!data) { setError("Erreur réseau. Réessayez."); return; }
+
+      if (!data.success) {
+        setError(data.message || "Erreur inconnue");
         return;
       }
 
       if (mode === "login") {
-        localStorage.setItem("cnepeci_token", data.data?.token);
-        localStorage.setItem("cnepeci_membre", JSON.stringify(data.data?.membre));
-        onAuth(data.data?.membre);
+        // Contrôleur retourne { success, token, membre }
+        const token  = data.token  || data.data?.token;
+        const membre = data.membre || data.data?.membre;
+        localStorage.setItem("cnepeci_token", token);
+        localStorage.setItem("cnepeci_membre", JSON.stringify(membre));
+        onAuth(membre);
       } else {
+        setSuccessMsg("Inscription réussie ! Connectez-vous.");
         setMode("login");
-        setError("");
         setForm(f => ({ ...f, nom: "", phone: "", password: "", code_invitation: "" }));
-        alert("Inscription réussie ! Connectez-vous.");
       }
     } catch (e) {
       setError("Erreur réseau. Vérifiez votre connexion.");
@@ -296,6 +317,7 @@ function AuthPage({ onAuth }) {
         </div>
 
         <Alert type="error" msg={error} />
+        <Alert type="success" msg={successMsg} />
 
         {fields.map(f => (
           <div key={f.key} style={{ marginBottom: 14 }}>
@@ -336,16 +358,22 @@ function AuthPage({ onAuth }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGES — branchées sur l'API réelle
+// PAGE DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-
 function DashboardPage({ membre }) {
   const [stats, setStats] = useState(null);
+  const [profil, setProfil] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/reseau/stats").then(data => {
-      if (data?.data) setStats(data.data);
+    Promise.all([
+      apiFetch("/reseau/stats"),
+      apiFetch("/profile"),
+    ]).then(([statsRes, profilRes]) => {
+      // GET /reseau/stats → retourne les champs directement ou dans data
+      if (statsRes?.success) setStats(extractData(statsRes) || statsRes);
+      // GET /profile → { success, profil }
+      if (profilRes?.success) setProfil(profilRes.profil || extractData(profilRes));
       setLoading(false);
     });
   }, []);
@@ -356,10 +384,10 @@ function DashboardPage({ membre }) {
   if (loading) return <Spinner />;
 
   const cards = stats ? [
-    { label: "Membres directs", value: stats.membres_directs ?? "—", sub: "dans mon réseau", accent: "#1D9E75" },
-    { label: "CA réseau (mois)", value: fmt(stats.ca_reseau_mois), sub: "paiements validés", accent: "#378ADD" },
-    { label: "Commissions perçues", value: fmt(stats.commissions_total), sub: "total cumulé", accent: "#7F77DD" },
-    { label: "Bonus ce mois", value: fmt(stats.bonus_mois), sub: "1,5% du CA réseau", accent: "#BA7517" },
+    { label: "Membres directs",   value: stats.membres_directs ?? "—",    sub: "dans mon réseau",    accent: "#1D9E75" },
+    { label: "CA réseau (mois)",   value: fmt(stats.ca_reseau_mois),        sub: "paiements validés", accent: "#378ADD" },
+    { label: "Commissions perçues",value: fmt(stats.commissions_total),     sub: "total cumulé",      accent: "#7F77DD" },
+    { label: "Bonus ce mois",      value: fmt(stats.bonus_mois),            sub: "1,5% du CA réseau", accent: "#BA7517" },
   ] : [];
 
   return (
@@ -367,6 +395,29 @@ function DashboardPage({ membre }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 22 }}>
         {cards.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
+
+      {/* Infos profil */}
+      {profil && (
+        <div style={{ ...styles.card, marginBottom: 20 }}>
+          <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Mon profil</span></div>
+          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            {[
+              { label: "Nom", value: profil.nom },
+              { label: "Email", value: profil.email },
+              { label: "Téléphone", value: profil.phone || "—" },
+              { label: "Rôle", value: ROLES[profil.role]?.label || profil.role },
+              { label: "Statut", value: <ActiveBadge statut={profil.statut} /> },
+              { label: "Code invitation", value: profil.code_invitation ? <span style={{ fontFamily: "monospace", color: "#7F77DD" }}>{profil.code_invitation}</span> : "—" },
+            ].map((f, i) => (
+              <div key={i}>
+                <div style={{ fontSize: 11, color: "#888", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>{f.label}</div>
+                <div style={{ fontSize: 13, color: "#1a1917" }}>{f.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={styles.card}>
           <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Commissions (6 mois)</span></div>
@@ -398,13 +449,17 @@ function DashboardPage({ membre }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE RÉSEAU
+// ══════════════════════════════════════════════════════════════════════════════
 function NetworkPage() {
   const [membres, setMembres] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // GET /reseau → { success, membres, total }
     apiFetch("/reseau").then(data => {
-      if (data?.data?.membres) setMembres(data.data.membres);
+      if (data?.success) setMembres(data.membres || extractData(data)?.membres || []);
       setLoading(false);
     });
   }, []);
@@ -419,13 +474,16 @@ function NetworkPage() {
       </div>
       <div style={{ padding: 20 }}>
         {membres.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 32, color: "#aaa", fontSize: 13 }}>Aucun membre direct</div>
+          <div style={{ textAlign: "center", padding: 32, color: "#aaa", fontSize: 13 }}>Aucun membre direct pour l'instant</div>
         ) : membres.map((n, i) => <TreeNode key={i} node={n} />)}
       </div>
     </div>
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE COMMISSIONS
+// ══════════════════════════════════════════════════════════════════════════════
 function CommissionsPage() {
   const [commissions, setCommissions] = useState([]);
   const [stats, setStats] = useState({ adhesion: 0, cotisation: 0, bonus: 0 });
@@ -435,16 +493,17 @@ function CommissionsPage() {
 
   const load = useCallback((p = 1) => {
     setLoading(true);
+    // GET /commissions?page=&limit= → { success, commissions, total, page }
     apiFetch(`/commissions?page=${p}&limit=20`).then(data => {
-      if (data?.data) {
-        setCommissions(data.data.commissions || []);
-        setTotal(data.data.total || 0);
-        // Calculer totaux par type
-        const rows = data.data.commissions || [];
-        const adhesion   = rows.filter(c => c.type === "adhesion").reduce((s, c) => s + parseFloat(c.montant), 0);
-        const cotisation = rows.filter(c => c.type === "cotisation").reduce((s, c) => s + parseFloat(c.montant), 0);
-        const bonus      = rows.filter(c => c.type === "bonus").reduce((s, c) => s + parseFloat(c.montant), 0);
-        setStats({ adhesion, cotisation, bonus });
+      if (data?.success) {
+        const rows = data.commissions || [];
+        setCommissions(rows);
+        setTotal(data.total || 0);
+        setStats({
+          adhesion:   rows.filter(c => c.type === "adhesion").reduce((s, c) => s + parseFloat(c.montant), 0),
+          cotisation: rows.filter(c => c.type === "cotisation").reduce((s, c) => s + parseFloat(c.montant), 0),
+          bonus:      rows.filter(c => c.type === "bonus").reduce((s, c) => s + parseFloat(c.montant), 0),
+        });
       }
       setLoading(false);
     });
@@ -455,9 +514,9 @@ function CommissionsPage() {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <StatCard label="Commissions adhésion" value={fmt(stats.adhesion)} sub="10% / adhésion directe" accent="#1D9E75" />
+        <StatCard label="Commissions adhésion"   value={fmt(stats.adhesion)}   sub="10% / adhésion directe"    accent="#1D9E75" />
         <StatCard label="Commissions cotisation" value={fmt(stats.cotisation)} sub="5% / cotisation mensuelle" accent="#378ADD" />
-        <StatCard label="Bonus réseau" value={fmt(stats.bonus)} sub="1,5% CA mensuel réseau" accent="#BA7517" />
+        <StatCard label="Bonus réseau"           value={fmt(stats.bonus)}      sub="1,5% CA mensuel réseau"    accent="#BA7517" />
       </div>
       <div style={styles.card}>
         <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Détail des commissions</span></div>
@@ -465,19 +524,20 @@ function CommissionsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Date", "Type", "Source", "Montant"].map(h => (
+                {["Date", "Type", "Source", "Rôle source", "Montant"].map(h => (
                   <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {commissions.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucune commission</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucune commission</td></tr>
               ) : commissions.map((c, i) => (
                 <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
                   <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{new Date(c.created_at).toLocaleDateString("fr-FR")}</td>
                   <td style={{ padding: "11px 20px" }}><TypeBadge type={c.type} /></td>
                   <td style={{ padding: "11px 20px", fontSize: 13, color: "#333" }}>{c.source_nom || "—"}</td>
+                  <td style={{ padding: "11px 20px", fontSize: 12, color: "#888" }}>{ROLES[c.source_role]?.label || c.source_role || "—"}</td>
                   <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#1a1917" }}>{fmt(c.montant)}</td>
                 </tr>
               ))}
@@ -496,6 +556,9 @@ function CommissionsPage() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE BONUS
+// ══════════════════════════════════════════════════════════════════════════════
 function BonusPage() {
   const [historique, setHistorique] = useState([]);
   const [statsReseau, setStatsReseau] = useState(null);
@@ -505,9 +568,10 @@ function BonusPage() {
     Promise.all([
       apiFetch("/bonus/historique"),
       apiFetch("/reseau/stats"),
-    ]).then(([bonusData, statsData]) => {
-      if (bonusData?.data?.historique) setHistorique(bonusData.data.historique);
-      if (statsData?.data) setStatsReseau(statsData.data);
+    ]).then(([bonusRes, statsRes]) => {
+      // GET /bonus/historique → { success, historique }
+      if (bonusRes?.success) setHistorique(bonusRes.historique || []);
+      if (statsRes?.success) setStatsReseau(statsRes);
       setLoading(false);
     });
   }, []);
@@ -519,8 +583,8 @@ function BonusPage() {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
-        <StatCard label="CA réseau (mois courant)" value={fmt(statsReseau?.ca_reseau_mois)} sub="" accent="#BA7517" />
-        <StatCard label="Bonus ce mois" value={fmt(statsReseau?.bonus_mois)} sub="= CA × 1,5%" accent="#7F77DD" />
+        <StatCard label="CA réseau (mois courant)" value={fmt(statsReseau?.ca_reseau_mois)}  sub="" accent="#BA7517" />
+        <StatCard label="Bonus ce mois"            value={fmt(statsReseau?.bonus_mois)}       sub="= CA × 1,5%"     accent="#7F77DD" />
       </div>
       <div style={styles.card}>
         <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Historique bonus mensuel</span></div>
@@ -554,115 +618,16 @@ function BonusPage() {
   );
 }
 
-function InvitePage({ membre }) {
-  const [copied, setCopied] = useState(false);
-  const code = membre?.code_invitation || "—";
-  const url  = `https://cnepeci.mutuelleawoundjo.org/join?ref=${code}`;
-
-  const copy = () => {
-    navigator.clipboard?.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div>
-      <div style={{ background: "#EEEDFE", border: "1px solid #CECBF6", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: "#3C3489", marginBottom: 10 }}>Votre lien d'invitation personnel</div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontFamily: "monospace", fontSize: 12, background: "#fff", border: "1px solid #CECBF6", borderRadius: 8, padding: "8px 14px", flex: 1, color: "#534AB7", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {code === "—" ? "Aucun code (rôle Souscripteur)" : url}
-          </span>
-          {code !== "—" && (
-            <button onClick={copy} style={{ ...styles.btn, background: "#7F77DD", color: "#fff", whiteSpace: "nowrap", padding: "8px 14px" }}>
-              {copied ? "Copié !" : "Copier"}
-            </button>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: "#888", marginTop: 10 }}>
-          {code === "—"
-            ? "Les souscripteurs finaux n'ont pas de code d'invitation."
-            : "Partagez ce lien pour recruter directement. Chaque inscription génère automatiquement une commission d'adhésion."}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HistoryPage() {
-  const [paiements, setPaiements] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-
-  useEffect(() => {
-    apiFetch("/paiements?page=1&limit=50").then(data => {
-      if (data?.data?.paiements) setPaiements(data.data.paiements);
-      setLoading(false);
-    });
-  }, []);
-
-  const filtered = filter === "all" ? paiements : paiements.filter(p => p.type === filter);
-
-  return (
-    <div style={styles.card}>
-      <div style={styles.cardHeader}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Historique de mes paiements</span>
-        <select
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          style={{ fontSize: 12, padding: "4px 8px", border: "1px solid #e8e7e2", borderRadius: 6, fontFamily: "inherit", background: "#fff", color: "#333" }}
-        >
-          <option value="all">Tous les types</option>
-          <option value="adhesion">Adhésion</option>
-          <option value="cotisation">Cotisation</option>
-        </select>
-      </div>
-      {loading ? <Spinner /> : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              {["Date", "Type", "Méthode", "Montant", "Statut"].map(h => (
-                <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucun résultat</td></tr>
-            ) : filtered.map((p, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
-                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{new Date(p.created_at).toLocaleDateString("fr-FR")}</td>
-                <td style={{ padding: "11px 20px" }}><TypeBadge type={p.type} /></td>
-                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555", textTransform: "capitalize" }}>{p.payment_method}</td>
-                <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#1a1917" }}>{fmt(p.montant)}</td>
-                <td style={{ padding: "11px 20px" }}>
-                  <span style={{
-                    background: p.statut === "paid" ? "#E1F5EE" : p.statut === "pending" ? "#FAEEDA" : "#FEE2E2",
-                    color: p.statut === "paid" ? "#0F6E56" : p.statut === "pending" ? "#854F0B" : "#991B1B",
-                    borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500
-                  }}>
-                    {p.statut === "paid" ? "Payé" : p.statut === "pending" ? "En attente" : "Échoué"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
-// 2. PAGE PAIEMENT — CinetPay / PayDunya / Cash
+// PAGE PAIEMENT
 // ══════════════════════════════════════════════════════════════════════════════
 function PaiementPage({ membre }) {
-  const [type, setType]           = useState("adhesion");
-  const [montant, setMontant]     = useState(15000);
-  const [methode, setMethode]     = useState("cinetpay");
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [success, setSuccess]     = useState("");
+  const [type, setType]       = useState("adhesion");
+  const [montant, setMontant] = useState(15000);
+  const [methode, setMethode] = useState("cinetpay");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
 
   const handlePayer = async () => {
     setError(""); setSuccess("");
@@ -683,10 +648,11 @@ function PaiementPage({ membre }) {
 
       const data = await apiFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
 
-      if (!data) return;
-      if (data.error) { setError(data.error); return; }
+      if (!data) { setError("Erreur réseau. Réessayez."); return; }
+      if (!data.success) { setError(data.message || "Erreur paiement"); return; }
 
-      const payUrl = data.data?.payment_url;
+      // Contrôleur retourne { success, payment_url, transaction_id }
+      const payUrl = data.payment_url || data.data?.payment_url;
       if (payUrl) {
         setSuccess("Redirection vers la page de paiement…");
         setTimeout(() => { window.location.href = payUrl; }, 1000);
@@ -712,58 +678,30 @@ function PaiementPage({ membre }) {
           <Alert type="error" msg={error} />
           <Alert type="success" msg={success} />
 
-          {/* Type de paiement */}
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 8 }}>Type de paiement</label>
             <div style={{ display: "flex", gap: 10 }}>
               {[{ val: "adhesion", label: "Adhésion" }, { val: "cotisation", label: "Cotisation" }].map(t => (
-                <button
-                  key={t.val}
-                  onClick={() => setType(t.val)}
-                  style={{
-                    ...styles.btn,
-                    flex: 1,
-                    background: type === t.val ? "#7F77DD" : "#f5f4f0",
-                    color: type === t.val ? "#fff" : "#555",
-                    border: `1px solid ${type === t.val ? "#7F77DD" : "#e8e7e2"}`,
-                  }}
-                >{t.label}</button>
+                <button key={t.val} onClick={() => setType(t.val)} style={{ ...styles.btn, flex: 1, background: type === t.val ? "#7F77DD" : "#f5f4f0", color: type === t.val ? "#fff" : "#555", border: `1px solid ${type === t.val ? "#7F77DD" : "#e8e7e2"}` }}>
+                  {t.label}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Montant */}
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 6 }}>Montant (FCFA)</label>
-            <input
-              type="number"
-              value={montant}
-              onChange={e => setMontant(parseFloat(e.target.value) || 0)}
-              style={styles.input}
-              min={100}
-            />
+            <input type="number" value={montant} onChange={e => setMontant(parseFloat(e.target.value) || 0)} style={styles.input} min={100} />
           </div>
 
-          {/* Méthode de paiement */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 8 }}>Méthode de paiement</label>
             <div style={{ display: "flex", gap: 10 }}>
               {[
-                { val: "cinetpay", label: "CinetPay", sub: "Orange, Wave, MTN…" },
-                { val: "paydunya", label: "PayDunya", sub: "Orange, Wave, MTN…" },
+                { val: "cinetpay", label: "CinetPay",  sub: "Orange, Wave, MTN…" },
+                { val: "paydunya", label: "PayDunya",   sub: "Orange, Wave, MTN…" },
               ].map(m => (
-                <div
-                  key={m.val}
-                  onClick={() => setMethode(m.val)}
-                  style={{
-                    flex: 1,
-                    border: `2px solid ${methode === m.val ? "#7F77DD" : "#e8e7e2"}`,
-                    borderRadius: 10,
-                    padding: "12px 14px",
-                    cursor: "pointer",
-                    background: methode === m.val ? "#EEEDFE" : "#fff",
-                  }}
-                >
+                <div key={m.val} onClick={() => setMethode(m.val)} style={{ flex: 1, border: `2px solid ${methode === m.val ? "#7F77DD" : "#e8e7e2"}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", background: methode === m.val ? "#EEEDFE" : "#fff" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: methode === m.val ? "#3C3489" : "#1a1917" }}>{m.label}</div>
                   <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{m.sub}</div>
                 </div>
@@ -771,7 +709,6 @@ function PaiementPage({ membre }) {
             </div>
           </div>
 
-          {/* Récapitulatif */}
           <div style={{ background: "#faf9f6", border: "1px solid #f0efe9", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ fontSize: 13, color: "#555" }}>Montant</span>
@@ -800,11 +737,284 @@ function PaiementPage({ membre }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE INVITATION
+// ══════════════════════════════════════════════════════════════════════════════
+function InvitePage({ membre }) {
+  const [copied, setCopied] = useState(false);
+  const code = membre?.code_invitation || null;
+  const frontUrl = process.env.REACT_APP_FRONTEND_URL || "https://cnepeci.mutuelleawoundjo.org";
+  const url  = `${frontUrl}/join?ref=${code}`;
+
+  const copy = (text) => {
+    navigator.clipboard?.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div>
+      <div style={{ background: "#EEEDFE", border: "1px solid #CECBF6", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: "#3C3489", marginBottom: 10 }}>Votre lien d'invitation personnel</div>
+        {!code ? (
+          <div style={{ fontSize: 13, color: "#888" }}>
+            Les souscripteurs finaux n'ont pas de code d'invitation.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontFamily: "monospace", fontSize: 12, background: "#fff", border: "1px solid #CECBF6", borderRadius: 8, padding: "8px 14px", flex: 1, color: "#534AB7", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {url}
+              </span>
+              <button onClick={() => copy(url)} style={{ ...styles.btn, background: "#7F77DD", color: "#fff", whiteSpace: "nowrap", padding: "8px 14px" }}>
+                {copied ? "Copié !" : "Copier lien"}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "#3C3489" }}>Code seul :</span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#534AB7", fontSize: 14 }}>{code}</span>
+              <button onClick={() => copy(code)} style={{ ...styles.btn, background: "transparent", border: "1px solid #CECBF6", color: "#534AB7", padding: "4px 10px", fontSize: 12 }}>
+                Copier code
+              </button>
+            </div>
+          </>
+        )}
+        <div style={{ fontSize: 12, color: "#888", marginTop: 10 }}>
+          {code
+            ? "Partagez ce lien pour recruter directement. Chaque inscription génère automatiquement une commission d'adhésion."
+            : "Votre rôle ne permet pas de recruter directement."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE HISTORIQUE PAIEMENTS
+// ══════════════════════════════════════════════════════════════════════════════
+function HistoryPage() {
+  const [paiements, setPaiements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    // GET /paiements → { success, paiements, total, page }
+    apiFetch("/paiements?page=1&limit=50").then(data => {
+      if (data?.success) setPaiements(data.paiements || []);
+      setLoading(false);
+    });
+  }, []);
+
+  const filtered = filter === "all" ? paiements : paiements.filter(p => p.type === filter || p.statut === filter);
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.cardHeader}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Historique de mes paiements</span>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ fontSize: 12, padding: "4px 8px", border: "1px solid #e8e7e2", borderRadius: 6, fontFamily: "inherit", background: "#fff", color: "#333" }}>
+          <option value="all">Tous</option>
+          <option value="adhesion">Adhésion</option>
+          <option value="cotisation">Cotisation</option>
+          <option value="paid">Payés</option>
+          <option value="pending">En attente</option>
+          <option value="failed">Échoués</option>
+        </select>
+      </div>
+      {loading ? <Spinner /> : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              {["Date", "Type", "Méthode", "Référence", "Montant", "Statut"].map(h => (
+                <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucun résultat</td></tr>
+            ) : filtered.map((p, i) => (
+              <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
+                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{new Date(p.created_at).toLocaleDateString("fr-FR")}</td>
+                <td style={{ padding: "11px 20px" }}><TypeBadge type={p.type} /></td>
+                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555", textTransform: "capitalize" }}>{p.payment_method}</td>
+                <td style={{ padding: "11px 20px", fontSize: 11, color: "#aaa", fontFamily: "monospace" }}>{(p.transaction_reference || "").substring(0, 16)}…</td>
+                <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#1a1917" }}>{fmt(p.montant)}</td>
+                <td style={{ padding: "11px 20px" }}>
+                  <span style={{
+                    background: p.statut === "paid" ? "#E1F5EE" : p.statut === "pending" ? "#FAEEDA" : "#FEE2E2",
+                    color: p.statut === "paid" ? "#0F6E56" : p.statut === "pending" ? "#854F0B" : "#991B1B",
+                    borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500
+                  }}>
+                    {p.statut === "paid" ? "Payé" : p.statut === "pending" ? "En attente" : "Échoué"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE CRÉER MEMBRE — nouvelle page, issu de CREATION_MAP du contrôleur
+// ══════════════════════════════════════════════════════════════════════════════
+function CreerMembrePage({ membre }) {
+  const [form, setForm] = useState({ nom: "", email: "", phone: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(null); // credentials du nouveau membre
+  const [membresCreés, setMembresCreés] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const roleACreer = CREATION_MAP[membre?.role];
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    // GET /reseau/membres-crees → { success, membres, total }
+    apiFetch("/reseau/membres-crees").then(data => {
+      if (data?.success) setMembresCreés(data.membres || []);
+      setListLoading(false);
+    });
+  }, []);
+
+  const handleCreer = async () => {
+    setError(""); setSuccess(null);
+    if (!form.nom || !form.email) { setError("Nom et email requis."); return; }
+
+    setLoading(true);
+    try {
+      // POST /reseau/creer-membre → { success, message, membre, credentials }
+      const data = await apiFetch("/reseau/creer-membre", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+
+      if (!data) { setError("Erreur réseau."); return; }
+      if (!data.success) { setError(data.message || "Erreur création"); return; }
+
+      setSuccess(data.credentials || data);
+      setForm({ nom: "", email: "", phone: "" });
+      // Recharger la liste
+      apiFetch("/reseau/membres-crees").then(d => {
+        if (d?.success) setMembresCreés(d.membres || []);
+      });
+    } catch (e) {
+      setError("Erreur réseau.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!roleACreer) {
+    return (
+      <div style={styles.card}>
+        <div style={{ padding: 32, textAlign: "center", color: "#aaa", fontSize: 13 }}>
+          Votre rôle ({ROLES[membre?.role]?.label}) ne permet pas de créer des membres.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Formulaire de création */}
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Créer un {ROLES[roleACreer]?.label}</span>
+            <span style={{ background: ROLES[roleACreer]?.color, color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 500 }}>{ROLES[roleACreer]?.abbr}</span>
+          </div>
+          <div style={{ padding: 20 }}>
+            <Alert type="error" msg={error} />
+
+            {success && (
+              <div style={{ background: "#D1FAE5", border: "1px solid #A7F3D0", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#065F46", marginBottom: 10 }}>✓ Membre créé avec succès</div>
+                {[
+                  { label: "Email",       value: success.email },
+                  { label: "Mot de passe",value: success.mot_de_passe, mono: true },
+                  { label: "Lien connexion", value: success.lien_connexion, mono: true },
+                  { label: "Rôle",        value: ROLES[success.role]?.label || success.role },
+                ].map((f, i) => f.value && (
+                  <div key={i} style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: "#065F46", fontWeight: 500 }}>{f.label} : </span>
+                    <span style={{ fontSize: 12, color: "#065F46", fontFamily: f.mono ? "monospace" : "inherit" }}>{f.value}</span>
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    const text = `Email: ${success.email}\nMot de passe: ${success.mot_de_passe}\nLien: ${success.lien_connexion}`;
+                    navigator.clipboard?.writeText(text);
+                  }}
+                  style={{ ...styles.btn, background: "#1D9E75", color: "#fff", padding: "6px 14px", fontSize: 12, marginTop: 8 }}
+                >
+                  Copier les identifiants
+                </button>
+              </div>
+            )}
+
+            {[
+              { label: "Nom complet", key: "nom", type: "text", required: true },
+              { label: "Email", key: "email", type: "email", required: true },
+              { label: "Téléphone (optionnel)", key: "phone", type: "tel", required: false },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 6 }}>
+                  {f.label} {f.required && <span style={{ color: "#D85A30" }}>*</span>}
+                </label>
+                <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)} style={styles.input} placeholder={f.label} />
+              </div>
+            ))}
+
+            <button
+              onClick={handleCreer}
+              disabled={loading}
+              style={{ ...styles.btn, background: ROLES[roleACreer]?.color, color: "#fff", width: "100%", marginTop: 4, opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? "Création…" : `Créer ce ${ROLES[roleACreer]?.label}`}
+            </button>
+
+            <div style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
+              Le mot de passe est généré automatiquement et doit être transmis au nouveau membre.
+            </div>
+          </div>
+        </div>
+
+        {/* Liste des membres créés */}
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Membres créés par moi</span>
+            <span style={{ fontSize: 12, color: "#888" }}>{membresCreés.length}</span>
+          </div>
+          <div style={{ padding: 16, maxHeight: 400, overflowY: "auto" }}>
+            {listLoading ? <Spinner /> : membresCreés.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 24, color: "#aaa", fontSize: 13 }}>Aucun membre créé</div>
+            ) : membresCreés.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < membresCreés.length - 1 ? "1px solid #f5f4f0" : "none" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1917" }}>{m.nom}</div>
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{m.email} · {ROLES[m.role]?.label || m.role}</div>
+                </div>
+                <ActiveBadge statut={m.statut} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE SIMULATEUR
+// ══════════════════════════════════════════════════════════════════════════════
 function SimulatePage({ currentRole, onRoleChange }) {
-  const [adhesion, setAdhesion]   = useState(15000);
+  const [adhesion, setAdhesion]     = useState(15000);
   const [cotisation, setCotisation] = useState(5000);
-  const [members, setMembers]     = useState(10);
-  const [ca, setCa]               = useState(500000);
+  const [members, setMembers]       = useState(10);
+  const [ca, setCa]                 = useState(500000);
 
   const renderResult = () => {
     if (currentRole === "BUREAU_CENTRALE") {
@@ -831,11 +1041,11 @@ function SimulatePage({ currentRole, onRoleChange }) {
     const gb = ca * 0.015;
     return (
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Gains estimés — {ROLES[currentRole].label}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Gains estimés — {ROLES[currentRole]?.label}</div>
         {[
-          { label: `Adhésion (${members} × ${fmt(adhesion)} × 10%)`, val: fmt(ga), color: "#1D9E75" },
-          { label: `Cotisation (${members} × ${fmt(cotisation)} × 5%)`, val: fmt(gc), color: "#378ADD" },
-          { label: `Bonus réseau (CA ${fmt(ca)} × 1,5%)`, val: fmt(gb), color: "#BA7517" },
+          { label: `Adhésion (${members} × ${fmt(adhesion)} × 10%)`,       val: fmt(ga), color: "#1D9E75" },
+          { label: `Cotisation (${members} × ${fmt(cotisation)} × 5%)`,    val: fmt(gc), color: "#378ADD" },
+          { label: `Bonus réseau (CA ${fmt(ca)} × 1,5%)`,                  val: fmt(gb), color: "#BA7517" },
         ].map((item, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f0efe9" }}>
             <span style={{ fontSize: 13, color: "#555" }}>{item.label}</span>
@@ -856,17 +1066,9 @@ function SimulatePage({ currentRole, onRoleChange }) {
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Simuler un autre rôle</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {Object.entries(ROLES).map(([k, r]) => (
-            <button
-              key={k}
-              onClick={() => onRoleChange(k)}
-              style={{
-                padding: "6px 14px", borderRadius: 20, border: "1px solid",
-                borderColor: currentRole === k ? "#7F77DD" : "#e8e7e2",
-                background: currentRole === k ? "#7F77DD" : "#fff",
-                color: currentRole === k ? "#fff" : "#555",
-                fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >{r.label}</button>
+            <button key={k} onClick={() => onRoleChange(k)} style={{ padding: "6px 14px", borderRadius: 20, border: "1px solid", borderColor: currentRole === k ? "#7F77DD" : "#e8e7e2", background: currentRole === k ? "#7F77DD" : "#fff", color: currentRole === k ? "#fff" : "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              {r.label}
+            </button>
           ))}
         </div>
       </div>
@@ -875,19 +1077,14 @@ function SimulatePage({ currentRole, onRoleChange }) {
         <div style={{ padding: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
             {[
-              { label: "Montant d'adhésion (FCFA)", val: adhesion, set: setAdhesion },
-              { label: "Cotisation mensuelle (FCFA)", val: cotisation, set: setCotisation },
-              { label: "Nombre de membres directs", val: members, set: setMembers },
-              { label: "CA mensuel réseau (FCFA)", val: ca, set: setCa },
+              { label: "Montant d'adhésion (FCFA)",    val: adhesion,   set: setAdhesion },
+              { label: "Cotisation mensuelle (FCFA)",  val: cotisation, set: setCotisation },
+              { label: "Nombre de membres directs",    val: members,    set: setMembers },
+              { label: "CA mensuel réseau (FCFA)",     val: ca,         set: setCa },
             ].map((f, i) => (
               <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 500, color: "#888" }}>{f.label}</label>
-                <input
-                  type="number"
-                  value={f.val}
-                  onChange={e => f.set(parseFloat(e.target.value) || 0)}
-                  style={styles.input}
-                />
+                <input type="number" value={f.val} onChange={e => f.set(parseFloat(e.target.value) || 0)} style={styles.input} />
               </div>
             ))}
           </div>
@@ -902,14 +1099,15 @@ function SimulatePage({ currentRole, onRoleChange }) {
 
 // ─── NAV ITEMS ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",   label: "Tableau de bord",  icon: "◉" },
-  { id: "network",     label: "Mon réseau",        icon: "◈" },
-  { id: "commissions", label: "Commissions",       icon: "◎" },
-  { id: "bonus",       label: "Bonus mensuel",     icon: "◆" },
-  { id: "paiement",    label: "Payer",             icon: "◑" },
-  { id: "invite",      label: "Lien d'invitation", icon: "◇" },
-  { id: "history",     label: "Historique",        icon: "○" },
-  { id: "simulate",    label: "Simuler rôle",      icon: "◐" },
+  { id: "dashboard",    label: "Tableau de bord",  icon: "◉" },
+  { id: "network",      label: "Mon réseau",        icon: "◈" },
+  { id: "creer",        label: "Créer un membre",   icon: "+" },
+  { id: "commissions",  label: "Commissions",       icon: "◎" },
+  { id: "bonus",        label: "Bonus mensuel",     icon: "◆" },
+  { id: "paiement",     label: "Payer",             icon: "◑" },
+  { id: "invite",       label: "Lien d'invitation", icon: "◇" },
+  { id: "history",      label: "Historique",        icon: "○" },
+  { id: "simulate",     label: "Simuler rôle",      icon: "◐" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -917,30 +1115,21 @@ const NAV_ITEMS = [
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [membre, setMembre] = useState(null);
-  const [checking, setChecking] = useState(true); // vérification du token au démarrage
+  const [checking, setChecking] = useState(true);
   const [page, setPage]   = useState("dashboard");
-  const [simRole, setSimRole] = useState(null); // uniquement pour simulateur
+  const [simRole, setSimRole] = useState(null);
 
-  // Vérifier le token au démarrage avant d'afficher quoi que ce soit
   useEffect(() => {
-    const token = localStorage.getItem("cnepeci_token");
+    const token        = localStorage.getItem("cnepeci_token");
     const membreStored = localStorage.getItem("cnepeci_membre");
 
-    if (!token || !membreStored) {
-      setChecking(false);
-      return;
-    }
+    if (!token || !membreStored) { setChecking(false); return; }
 
-    // Vérifier que le token est encore valide côté serveur
-    apiFetch("/reseau/stats")
+    // Vérifier le token via /profile (endpoint authentifié)
+    apiFetch("/profile")
       .then(data => {
-        if (data && !data.error) {
-          try {
-            setMembre(JSON.parse(membreStored));
-          } catch {
-            localStorage.removeItem("cnepeci_token");
-            localStorage.removeItem("cnepeci_membre");
-          }
+        if (data?.success) {
+          try { setMembre(JSON.parse(membreStored)); } catch { /* ignore */ }
         } else {
           localStorage.removeItem("cnepeci_token");
           localStorage.removeItem("cnepeci_membre");
@@ -957,27 +1146,30 @@ export default function App() {
   const roleInfo = ROLES[role] || ROLES.SOUSCRIPTEUR;
   const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || "Tableau de bord";
 
-  const handleAuth = (m) => setMembre(m);
-
   const handleLogout = () => {
     localStorage.removeItem("cnepeci_token");
     localStorage.removeItem("cnepeci_membre");
     setMembre(null);
   };
 
-  // Pendant la vérification du token → spinner neutre
   if (checking) return (
     <div style={{ minHeight: "100vh", background: "#f5f4f0", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
       <Spinner />
     </div>
   );
 
-  if (!membre) return <AuthPage onAuth={handleAuth} />;
+  if (!membre) return <AuthPage onAuth={m => setMembre(m)} />;
+
+  // Masquer "Créer un membre" si le rôle ne peut pas créer
+  const navVisible = NAV_ITEMS.filter(item =>
+    item.id !== "creer" || !!CREATION_MAP[membre.role]
+  );
 
   const renderPage = () => {
     switch (page) {
       case "dashboard":   return <DashboardPage membre={membre} />;
       case "network":     return <NetworkPage />;
+      case "creer":       return <CreerMembrePage membre={membre} />;
       case "commissions": return <CommissionsPage />;
       case "bonus":       return <BonusPage />;
       case "paiement":    return <PaiementPage membre={membre} />;
@@ -1002,7 +1194,7 @@ export default function App() {
         </div>
 
         <nav style={{ flex: 1, padding: "6px 0", overflowY: "auto" }}>
-          {NAV_ITEMS.map(item => (
+          {navVisible.map(item => (
             <div
               key={item.id}
               onClick={() => { setPage(item.id); if (item.id !== "simulate") setSimRole(null); }}
@@ -1035,11 +1227,7 @@ export default function App() {
           <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1917" }}>{pageTitle}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 12, color: "#888" }}>{membre.nom}</span>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%", background: roleInfo.color,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 12, fontWeight: 600,
-            }}>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: roleInfo.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 600 }}>
               {roleInfo.abbr}
             </div>
           </div>
