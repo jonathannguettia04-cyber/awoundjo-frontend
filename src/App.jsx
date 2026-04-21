@@ -186,7 +186,7 @@ function ProtectedRoute({ children, allowedRoles = null }) {
   const isIndependentPortal = pathname.startsWith("/business") ||
     pathname.startsWith("/diaspora") || pathname.startsWith("/referral") ||
     pathname.startsWith("/affilie") || pathname.startsWith("/client") ||
-    pathname.startsWith("/etablissement");
+    pathname.startsWith("/etablissement") || pathname.startsWith("/cnepeci");
   if (isIndependentPortal) return children;
 
   // Attend que le localStorage soit lu avant de décider
@@ -250,7 +250,8 @@ export default function App() {
   const isReferralPage = pathname.startsWith("/referral");
   const isAffiliePage  = pathname.startsWith("/affilie");
   const isBusinessPage = pathname.startsWith("/business");
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage && !isBusinessPage;
+  const isCnepeciPage  = pathname.startsWith("/cnepeci");
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
