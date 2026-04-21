@@ -916,12 +916,42 @@ const NAV_ITEMS = [
 // APP
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [membre, setMembre] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("cnepeci_membre") || "null"); }
-    catch { return null; }
-  });
+  const [membre, setMembre] = useState(null);
+  const [checking, setChecking] = useState(true); // vérification du token au démarrage
   const [page, setPage]   = useState("dashboard");
   const [simRole, setSimRole] = useState(null); // uniquement pour simulateur
+
+  // Vérifier le token au démarrage avant d'afficher quoi que ce soit
+  useEffect(() => {
+    const token = localStorage.getItem("cnepeci_token");
+    const membreStored = localStorage.getItem("cnepeci_membre");
+
+    if (!token || !membreStored) {
+      setChecking(false);
+      return;
+    }
+
+    // Vérifier que le token est encore valide côté serveur
+    apiFetch("/reseau/stats")
+      .then(data => {
+        if (data && !data.error) {
+          try {
+            setMembre(JSON.parse(membreStored));
+          } catch {
+            localStorage.removeItem("cnepeci_token");
+            localStorage.removeItem("cnepeci_membre");
+          }
+        } else {
+          localStorage.removeItem("cnepeci_token");
+          localStorage.removeItem("cnepeci_membre");
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("cnepeci_token");
+        localStorage.removeItem("cnepeci_membre");
+      })
+      .finally(() => setChecking(false));
+  }, []);
 
   const role     = simRole || membre?.role || "SOUSCRIPTEUR";
   const roleInfo = ROLES[role] || ROLES.SOUSCRIPTEUR;
@@ -934,6 +964,13 @@ export default function App() {
     localStorage.removeItem("cnepeci_membre");
     setMembre(null);
   };
+
+  // Pendant la vérification du token → spinner neutre
+  if (checking) return (
+    <div style={{ minHeight: "100vh", background: "#f5f4f0", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
+      <Spinner />
+    </div>
+  );
 
   if (!membre) return <AuthPage onAuth={handleAuth} />;
 
