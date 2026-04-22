@@ -432,7 +432,7 @@ export default function App() {
                 RÉSEAU AFFILIÉ
             ══════════════════════════════════════════════════*/}
             <Route path="/business/login"    element={<BusinessAuth />} />
-            s<Route path="/business/register" element={<BusinessAuth />} />
+            <Route path="/business/register" element={<BusinessAuth />} />
             <Route path="/affilie" element={<AffilieGuard><AffilieLayout /></AffilieGuard>}>
               <Route index                   element={<Navigate to="/affilie/dashboard" replace />} />
               <Route path="dashboard"        element={<AffilieDashboard />} />
