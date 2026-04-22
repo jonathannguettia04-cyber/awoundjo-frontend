@@ -86,9 +86,10 @@ function RoleBadge({ role }) {
 }
 
 function StatusBadge({ status }) {
-  const s = status === "ACTIVE" || status === "actif"
+  const v = (status || "").toLowerCase();
+  const s = v === "actif" || v === "active"
     ? { label: "● Actif",      color: C.green,  bg: C.greenL }
-    : status === "SUSPENDED" || status === "suspendu"
+    : v === "suspendu" || v === "suspended"
     ? { label: "● Suspendu",   color: C.red,    bg: C.redL }
     : { label: "● En attente", color: C.gold,   bg: C.goldL };
   return <Badge color={s.color} bg={s.bg}>{s.label}</Badge>;
@@ -165,32 +166,50 @@ function ConfirmModal({ open, onClose, onConfirm, title, message, confirmLabel =
 function MembreActions({ membre, onRefresh, onAlert }) {
   const [loading, setLoading] = useState(null);
   const [modal, setModal] = useState(null); // "suspend" | "reactivate" | "delete" | "reset"
-  const [newPwd, setNewPwd] = useState("");
+  const [resetCredentials, setResetCredentials] = useState(null); // { email, mot_de_passe, lien_connexion }
 
-  const isActive = membre.statut === "ACTIVE" || membre.status === "ACTIVE";
+  // Normalise le statut quelle que soit la casse retournée par le backend
+  const statut = (membre.statut || membre.status || "").toLowerCase();
+  const isActive = statut === "actif" || statut === "active";
   const mid = membre.id;
 
-  const doAction = async (action, body = {}) => {
+  const doAction = async (action) => {
     setLoading(action);
     try {
       if (action === "delete") {
         await api("delete", `/api/cnepeci/admin/membres/${mid}`);
         onAlert({ type: "success", msg: `Membre ${membre.nom} supprimé avec succès.` });
+        onRefresh();
       } else if (action === "reset") {
-        await api("post", `/api/cnepeci/admin/membres/${mid}/reset-password`, { new_password: newPwd || undefined });
-        onAlert({ type: "success", msg: `Mot de passe de ${membre.nom} réinitialisé.` });
-        setNewPwd("");
+        const res = await api("post", `/api/cnepeci/admin/membres/${mid}/reset-password`);
+        const creds = res.data?.credentials || res.data?.data?.credentials;
+        if (creds) {
+          setResetCredentials(creds);
+        } else {
+          onAlert({ type: "success", msg: `Mot de passe de ${membre.nom} réinitialisé.` });
+        }
+        // Pas de onRefresh ici — on garde le modal ouvert pour afficher les credentials
       } else {
+        // suspend / reactivate
         await api("patch", `/api/cnepeci/admin/membres/${mid}/${action}`);
         onAlert({ type: "success", msg: `Membre ${action === "suspend" ? "suspendu" : "réactivé"} avec succès.` });
+        onRefresh();
       }
-      onRefresh();
     } catch (e) {
       onAlert({ type: "error", msg: e.response?.data?.message || `Erreur : ${action}` });
     } finally {
       setLoading(null);
-      setModal(null);
+      if (action !== "reset") setModal(null);
     }
+  };
+
+  const copyText = text => {
+    navigator.clipboard?.writeText(text).catch(() => {
+      const el = document.createElement("textarea");
+      el.value = text; document.body.appendChild(el);
+      el.select(); document.execCommand("copy");
+      document.body.removeChild(el);
+    });
   };
 
   return (
@@ -210,16 +229,18 @@ function MembreActions({ membre, onRefresh, onAlert }) {
         )}
 
         {/* Reset MDP */}
-        <button onClick={() => setModal("reset")}
+        <button onClick={() => { setResetCredentials(null); setModal("reset"); }}
           style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.gold}44`, background: C.goldL, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
           🔑 MDP
         </button>
 
         {/* Supprimer */}
-        <button onClick={() => setModal("delete")}
-          style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.red}`, background: "#fff", color: C.red, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-          🗑
-        </button>
+        {membre.role !== "BUREAU_CENTRALE" && (
+          <button onClick={() => setModal("delete")}
+            style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.red}`, background: "#fff", color: C.red, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+            🗑
+          </button>
+        )}
       </div>
 
       {/* Modal suspend */}
@@ -241,22 +262,55 @@ function MembreActions({ membre, onRefresh, onAlert }) {
         message={`Vous êtes sur le point de SUPPRIMER définitivement ${membre.nom} (${membre.email}). Cette action est irréversible et supprimera toutes ses données associées.`} />
 
       {/* Modal reset MDP */}
-      <Modal open={modal === "reset"} onClose={() => setModal(null)} title="🔑 Réinitialiser le mot de passe" width={440}>
-        <div style={{ fontSize: 13, color: C.slate, marginBottom: 18 }}>
-          Réinitialiser le mot de passe de <strong>{membre.nom}</strong>. Laissez vide pour générer automatiquement.
-        </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.slate, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Nouveau mot de passe (optionnel)</label>
-          <input type="text" value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder="Laisser vide = généré automatiquement"
-            style={{ width: "100%", padding: "11px 14px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-        </div>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={() => setModal(null)} style={{ padding: "10px 20px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", color: C.slate, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
-          <button onClick={() => doAction("reset")} disabled={loading === "reset"}
-            style={{ padding: "10px 20px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${C.gold}, #B45309)`, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading === "reset" ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading === "reset" ? .7 : 1 }}>
-            {loading === "reset" ? "⏳ En cours…" : "🔑 Réinitialiser"}
-          </button>
-        </div>
+      <Modal open={modal === "reset"} onClose={() => { setModal(null); setResetCredentials(null); }} title="🔑 Réinitialiser le mot de passe" width={460}>
+        {!resetCredentials ? (
+          <>
+            <div style={{ fontSize: 14, color: C.slate, marginBottom: 24, lineHeight: 1.6 }}>
+              Un nouveau mot de passe sera généré automatiquement pour <strong>{membre.nom}</strong> ({membre.email}).
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setModal(null)}
+                style={{ padding: "10px 20px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", color: C.slate, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+              <button onClick={() => doAction("reset")} disabled={loading === "reset"}
+                style={{ padding: "10px 20px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${C.gold}, #B45309)`, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading === "reset" ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading === "reset" ? .7 : 1 }}>
+                {loading === "reset" ? "⏳ En cours…" : "🔑 Générer nouveau MDP"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ background: C.greenL, border: `1px solid ${C.green}44`, borderRadius: 12, padding: "16px 18px", marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.green, marginBottom: 12 }}>✅ Mot de passe réinitialisé !</div>
+              <div style={{ background: "#fff", borderRadius: 8, padding: 12, fontFamily: "monospace", fontSize: 13, lineHeight: 1.8 }}>
+                <div>📧 Email : <strong>{resetCredentials.email}</strong></div>
+                <div>🔑 Mot de passe : <strong style={{ color: C.purple, fontSize: 15 }}>{resetCredentials.mot_de_passe}</strong></div>
+                {resetCredentials.lien_connexion && (
+                  <div style={{ fontSize: 12, wordBreak: "break-all" }}>🔗 Lien : <strong style={{ color: C.blue }}>{resetCredentials.lien_connexion}</strong></div>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: C.slate, marginTop: 10 }}>⚠️ Notez ces informations — elles ne seront plus affichées.</div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => copyText(`Email : ${resetCredentials.email}\nMot de passe : ${resetCredentials.mot_de_passe}\nLien : ${resetCredentials.lien_connexion || ""}`)}
+                style={{ flex: 1, padding: "10px 14px", border: "none", borderRadius: 10, background: C.blue, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                📋 Copier
+              </button>
+              <button onClick={() => {
+                const msg = encodeURIComponent(`🔑 Nouveaux identifiants CNEPECI\n\n📧 Email : ${resetCredentials.email}\n🔑 Mot de passe : ${resetCredentials.mot_de_passe}\n🔗 Connexion : ${resetCredentials.lien_connexion || ""}`);
+                window.open(`https://wa.me/?text=${msg}`, "_blank");
+              }}
+                style={{ flex: 1, padding: "10px 14px", border: "none", borderRadius: 10, background: "#25D366", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                📱 WhatsApp
+              </button>
+              <button onClick={() => { setModal(null); setResetCredentials(null); }}
+                style={{ padding: "10px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", color: C.slate, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Fermer
+              </button>
+            </div>
+          </>
+        )}
       </Modal>
     </>
   );
@@ -276,7 +330,7 @@ function MembresTable({ membres, onRefresh }) {
       m.email?.toLowerCase().includes(search.toLowerCase()) ||
       m.phone?.includes(search);
     const matchRole = filterRole === "ALL" || m.role === filterRole;
-    const status = m.statut || m.status;
+    const status = (m.statut || m.status || "").toLowerCase();
     const matchStatus = filterStatus === "ALL" || status === filterStatus;
     return matchSearch && matchRole && matchStatus;
   });
@@ -297,9 +351,9 @@ function MembresTable({ membres, onRefresh }) {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}>
           <option value="ALL">Tous les statuts</option>
-          <option value="ACTIVE">● Actifs</option>
-          <option value="SUSPENDED">● Suspendus</option>
-          <option value="PENDING">● En attente</option>
+          <option value="actif">● Actifs</option>
+          <option value="suspendu">● Suspendus</option>
+          <option value="pending">● En attente</option>
         </select>
       </div>
 
