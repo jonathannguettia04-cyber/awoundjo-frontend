@@ -11,7 +11,6 @@ function apiHeaders() {
   };
 }
 
-// Adapté : gère success/data selon la réponse réelle du contrôleur
 async function apiFetch(path, options = {}) {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -24,16 +23,13 @@ async function apiFetch(path, options = {}) {
       window.location.reload();
       return null;
     }
-    const json = await res.json();
-    // Le contrôleur retourne { success, data, message } ou { success, ...fields }
-    return json;
+    return await res.json();
   } catch (e) {
     console.error("[apiFetch]", path, e.message);
     return null;
   }
 }
 
-// Helper : extrait les données utiles peu importe la structure de réponse
 function extractData(json) {
   if (!json) return null;
   if (json.data !== undefined) return json.data;
@@ -43,15 +39,14 @@ function extractData(json) {
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 const ROLES = {
-  BUREAU_CENTRALE:       { label: "Bureau Centrale",       abbr: "BC", color: "#7F77DD", level: 1 },
-  COORDONNATEUR_GENERAL: { label: "Coordonnateur Général", abbr: "CG", color: "#1D9E75", level: 2 },
-  BUREAU_LOCAL:          { label: "Bureau Local",          abbr: "BL", color: "#378ADD", level: 3 },
-  COORDONNATEUR_LOCAL:   { label: "Coordonnateur Local",   abbr: "CL", color: "#BA7517", level: 4 },
-  PASTEUR:               { label: "Pasteur d'Église",      abbr: "PA", color: "#D85A30", level: 5 },
-  SOUSCRIPTEUR:          { label: "Souscripteur Final",    abbr: "SF", color: "#888780", level: 6 },
+  BUREAU_CENTRALE:       { label: "Bureau Centrale",       abbr: "BC", color: "#7C3AED", grad: "linear-gradient(135deg,#7C3AED,#5B21B6)", level: 1 },
+  COORDONNATEUR_GENERAL: { label: "Coordonnateur Général", abbr: "CG", color: "#059669", grad: "linear-gradient(135deg,#059669,#047857)", level: 2 },
+  BUREAU_LOCAL:          { label: "Bureau Local",          abbr: "BL", color: "#2563EB", grad: "linear-gradient(135deg,#2563EB,#1D4ED8)", level: 3 },
+  COORDONNATEUR_LOCAL:   { label: "Coordonnateur Local",   abbr: "CL", color: "#D97706", grad: "linear-gradient(135deg,#D97706,#B45309)", level: 4 },
+  PASTEUR:               { label: "Pasteur d'Église",      abbr: "PA", color: "#DC2626", grad: "linear-gradient(135deg,#DC2626,#B91C1C)", level: 5 },
+  SOUSCRIPTEUR:          { label: "Souscripteur Final",    abbr: "SF", color: "#6B7280", grad: "linear-gradient(135deg,#6B7280,#4B5563)", level: 6 },
 };
 
-// Qui peut créer qui (issu du contrôleur CREATION_MAP)
 const CREATION_MAP = {
   BUREAU_CENTRALE:       "COORDONNATEUR_GENERAL",
   COORDONNATEUR_GENERAL: "BUREAU_LOCAL",
@@ -60,91 +55,44 @@ const CREATION_MAP = {
   PASTEUR:               "SOUSCRIPTEUR",
 };
 
-const TYPE_COLORS = {
-  adhesion:   { bg: "#E1F5EE", text: "#0F6E56", label: "Adhésion" },
-  cotisation: { bg: "#E6F1FB", text: "#185FA5", label: "Cotisation" },
-  bonus:      { bg: "#FAEEDA", text: "#854F0B", label: "Bonus" },
-};
-
 const MONTHS = ["Nov", "Déc", "Jan", "Fév", "Mar", "Avr"];
 const BAR_VALUES_STATIC = [32000, 45000, 28000, 61000, 55000, 82500];
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
-const styles = {
-  sidebar: {
-    width: 220,
-    background: "#1a1917",
-    display: "flex",
-    flexDirection: "column",
-    height: "100vh",
-    position: "fixed",
-    top: 0, left: 0,
-    zIndex: 100,
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  main: {
-    marginLeft: 220,
-    flex: 1,
-    minHeight: "100vh",
-    background: "#f5f4f0",
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  topbar: {
-    background: "#fff",
-    borderBottom: "1px solid #e8e7e2",
-    padding: "14px 28px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    position: "sticky",
-    top: 0,
-    zIndex: 50,
-  },
-  card: {
-    background: "#fff",
-    border: "1px solid #e8e7e2",
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
-  cardHeader: {
-    padding: "14px 20px",
-    borderBottom: "1px solid #f0efe9",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  input: {
-    padding: "10px 14px",
-    border: "1px solid #e8e7e2",
-    borderRadius: 8,
-    fontFamily: "inherit",
-    fontSize: 13,
-    background: "#fff",
-    color: "#1a1917",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-  btn: {
-    padding: "10px 20px",
-    borderRadius: 8,
-    border: "none",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
+const fmt = n => (parseFloat(n) || 0).toLocaleString("fr-FR") + " F";
+const fmtShort = n => {
+  const v = parseFloat(n) || 0;
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + "M F";
+  if (v >= 1000) return Math.round(v / 1000) + "k F";
+  return v + " F";
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const fmt = n => (parseFloat(n) || 0).toLocaleString("fr-FR") + " F";
+// ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
+const G = {
+  sidebar: "#0F0E17",
+  sidebarBorder: "rgba(255,255,255,0.06)",
+  bg: "#F0F2F8",
+  surface: "#FFFFFF",
+  border: "#E4E8F0",
+  text: "#111827",
+  muted: "#6B7280",
+  purple: "#7C3AED",
+  purpleLight: "#EDE9FE",
+  green: "#059669",
+  greenLight: "#D1FAE5",
+  blue: "#2563EB",
+  blueLight: "#DBEAFE",
+  gold: "#D97706",
+  goldLight: "#FEF3C7",
+  red: "#DC2626",
+  redLight: "#FEE2E2",
+};
 
+// ─── COMPOSANTS DE BASE ───────────────────────────────────────────────────────
 function Spinner() {
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
-      <div style={{ width: 28, height: 28, border: "3px solid #e8e7e2", borderTop: "3px solid #7F77DD", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+      <div style={{ width: 32, height: 32, border: `3px solid ${G.border}`, borderTop: `3px solid ${G.purple}`, borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -152,98 +100,193 @@ function Spinner() {
 function Alert({ type, msg }) {
   if (!msg) return null;
   const colors = {
-    error:   { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" },
-    success: { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0" },
+    error:   { bg: G.redLight,   text: G.red,   border: "#FECACA" },
+    success: { bg: G.greenLight, text: G.green,  border: "#6EE7B7" },
+    info:    { bg: G.purpleLight, text: G.purple, border: "#C4B5FD" },
   };
-  const c = colors[type] || colors.error;
+  const c = colors[type] || colors.info;
   return (
-    <div style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
+    <div style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 16px", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+      <span>{type === "error" ? "⚠️" : type === "success" ? "✅" : "ℹ️"}</span>
       {msg}
     </div>
   );
 }
 
-// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent }) {
+function Badge({ children, color, bg }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e8e7e2", borderRadius: 12, padding: "16px 20px", borderTop: `3px solid ${accent}` }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-.4px", color: "#1a1917" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function TypeBadge({ type }) {
-  const c = TYPE_COLORS[type] || { bg: "#f0efe9", text: "#555", label: type };
-  return (
-    <span style={{ background: c.bg, color: c.text, borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500 }}>
-      {c.label}
+    <span style={{ background: bg, color, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, display: "inline-block" }}>
+      {children}
     </span>
   );
 }
 
 function ActiveBadge({ statut }) {
-  const active = statut === "actif";
+  const active = statut === "actif" || statut === "ACTIVE";
+  const suspended = statut === "suspendu" || statut === "SUSPENDED";
   return (
-    <span style={{ background: active ? "#E1F5EE" : statut === "suspendu" ? "#FEE2E2" : "#f0efe9", color: active ? "#0F6E56" : statut === "suspendu" ? "#991B1B" : "#888", borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500 }}>
-      {active ? "Actif" : statut === "suspendu" ? "Suspendu" : "Inactif"}
-    </span>
+    <Badge color={active ? G.green : suspended ? G.red : G.muted} bg={active ? G.greenLight : suspended ? G.redLight : "#F3F4F6"}>
+      {active ? "● Actif" : suspended ? "● Suspendu" : "● Inactif"}
+    </Badge>
   );
 }
 
-function TreeNode({ node }) {
-  const [open, setOpen] = useState(false);
+function TypeBadge({ type }) {
+  const map = {
+    adhesion:   { color: G.green,  bg: G.greenLight,  label: "Adhésion" },
+    cotisation: { color: G.blue,   bg: G.blueLight,   label: "Cotisation" },
+    bonus:      { color: G.gold,   bg: G.goldLight,   label: "Bonus" },
+  };
+  const c = map[type] || { color: G.muted, bg: "#F3F4F6", label: type };
+  return <Badge color={c.color} bg={c.bg}>{c.label}</Badge>;
+}
+
+// ─── STAT CARD ────────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, accent, icon, trend }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e8e7e2", borderRadius: 10, marginBottom: 8 }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", cursor: "pointer" }}
-      >
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1917" }}>{node.nom}</div>
-          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{ROLES[node.role]?.label || node.role} · {node.email}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <ActiveBadge statut={node.statut} />
-          <span style={{ fontSize: 14, color: "#aaa", transform: open ? "rotate(90deg)" : "none", display: "inline-block", transition: "transform .2s" }}>›</span>
-        </div>
+    <div style={{
+      background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16,
+      padding: "20px 22px", position: "relative", overflow: "hidden",
+      transition: "transform .15s, box-shadow .15s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,.08)"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
+    >
+      {/* Accent bar */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "16px 16px 0 0" }} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".7px" }}>{label}</div>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: accent + "1A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{icon}</div>
       </div>
-      {open && (
-        <div style={{ borderLeft: "2px solid #EEEDFE", marginLeft: 28, marginBottom: 10, paddingLeft: 16, paddingTop: 6, paddingBottom: 6 }}>
-          <div style={{ fontSize: 12, color: "#555" }}>📞 {node.phone || "—"}</div>
-          <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>Inscrit le {new Date(node.created_at).toLocaleDateString("fr-FR")}</div>
-          {node.code_invitation && (
-            <div style={{ fontSize: 12, color: "#7F77DD", marginTop: 4, fontFamily: "monospace" }}>Code : {node.code_invitation}</div>
-          )}
+      <div style={{ fontSize: 26, fontWeight: 800, color: G.text, letterSpacing: "-1px", lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: G.muted, marginTop: 6 }}>{sub}</div>}
+      {trend !== undefined && (
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 11, color: trend >= 0 ? G.green : G.red, fontWeight: 600 }}>
+            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}% ce mois
+          </span>
         </div>
       )}
     </div>
   );
 }
 
+// ─── BAR CHART ────────────────────────────────────────────────────────────────
 function BarChart({ values }) {
-  const data = values || BAR_VALUES_STATIC;
+  const data = values?.length ? values : BAR_VALUES_STATIC;
   const max = Math.max(...data);
+  const [hovered, setHovered] = useState(null);
+
   return (
-    <div style={{ padding: "0 4px" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 110 }}>
-        {data.map((v, i) => (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, height: "100%", justifyContent: "flex-end" }}>
-            <span style={{ fontSize: 10, fontWeight: 500, color: "#555" }}>{Math.round(v / 1000)}k</span>
-            <div style={{ width: "100%", height: Math.round(v / max * 80), background: i === data.length - 1 ? "#7F77DD" : "#CECBF6", borderRadius: "4px 4px 0 0" }} />
-          </div>
-        ))}
+    <div style={{ padding: "4px 0" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
+        {data.map((v, i) => {
+          const isLast = i === data.length - 1;
+          const isHov = hovered === i;
+          return (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, height: "100%", justifyContent: "flex-end", cursor: "pointer" }}
+              onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: isHov ? G.purple : "#aaa", opacity: isHov || isLast ? 1 : 0.7, transition: "all .15s" }}>
+                {Math.round(v / 1000)}k
+              </span>
+              <div style={{
+                width: "100%",
+                height: Math.round(v / max * 90),
+                background: isLast ? `linear-gradient(180deg, ${G.purple}, #5B21B6)` : isHov ? `linear-gradient(180deg, #A78BFA, #7C3AED)` : "#DDD6FE",
+                borderRadius: "6px 6px 0 0",
+                transition: "all .2s",
+                boxShadow: isHov ? `0 4px 12px ${G.purple}44` : "none",
+              }} />
+            </div>
+          );
+        })}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-        {MONTHS.map(m => <span key={m} style={{ fontSize: 10, color: "#aaa", flex: 1, textAlign: "center" }}>{m}</span>)}
+      <div style={{ display: "flex", borderTop: `1px solid ${G.border}`, paddingTop: 6, marginTop: 2 }}>
+        {MONTHS.map((m, i) => (
+          <span key={m} style={{ flex: 1, fontSize: 10, color: hovered === i ? G.purple : "#aaa", textAlign: "center", fontWeight: hovered === i ? 700 : 400, transition: "all .15s" }}>{m}</span>
+        ))}
       </div>
     </div>
   );
 }
 
+// ─── MINI DONUT ───────────────────────────────────────────────────────────────
+function DonutChart({ segments, label }) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  if (!total) return <div style={{ textAlign: "center", padding: 24, color: G.muted, fontSize: 12 }}>Aucune donnée</div>;
+
+  let offset = 0;
+  const r = 40, cx = 50, cy = 50, stroke = 14;
+  const circ = 2 * Math.PI * r;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        {segments.map((seg, i) => {
+          const pct = seg.value / total;
+          const dash = pct * circ;
+          const gap = circ - dash;
+          const el = (
+            <circle key={i} cx={cx} cy={cy} r={r}
+              fill="none" stroke={seg.color} strokeWidth={stroke}
+              strokeDasharray={`${dash} ${gap}`}
+              strokeDashoffset={-offset * circ}
+              style={{ transition: "all .3s" }}
+            />
+          );
+          offset += pct;
+          return el;
+        })}
+        <text x="50" y="46" textAnchor="middle" style={{ fontSize: 9, fontWeight: 700, fill: G.text }}>{label}</text>
+        <text x="50" y="56" textAnchor="middle" style={{ fontSize: 8, fill: G.muted }}>total</text>
+      </svg>
+      <div style={{ flex: 1 }}>
+        {segments.map((seg, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: seg.color }} />
+              <span style={{ fontSize: 12, color: G.muted }}>{seg.label}</span>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: seg.color }}>{fmtShort(seg.value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── TREE NODE ────────────────────────────────────────────────────────────────
+function TreeNode({ node }) {
+  const [open, setOpen] = useState(false);
+  const role = ROLES[node.role] || ROLES.SOUSCRIPTEUR;
+  return (
+    <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 12, marginBottom: 8, overflow: "hidden", transition: "box-shadow .15s" }}>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer", gap: 12 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: role.color + "18", color: role.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+          {node.nom?.charAt(0)?.toUpperCase() || "?"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{node.nom}</div>
+          <div style={{ fontSize: 11, color: G.muted }}>{role.label} · {node.email}</div>
+        </div>
+        <ActiveBadge statut={node.statut} />
+        <span style={{ fontSize: 14, color: "#ccc", transform: open ? "rotate(90deg)" : "none", transition: "transform .2s", marginLeft: 4 }}>›</span>
+      </div>
+      {open && (
+        <div style={{ borderTop: `1px solid ${G.border}`, background: "#FAFBFE", padding: "12px 16px 12px 64px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><span style={{ fontSize: 11, color: G.muted }}>Téléphone</span><div style={{ fontSize: 13, color: G.text, marginTop: 2 }}>{node.phone || "—"}</div></div>
+            <div><span style={{ fontSize: 11, color: G.muted }}>Inscription</span><div style={{ fontSize: 13, color: G.text, marginTop: 2 }}>{new Date(node.created_at).toLocaleDateString("fr-FR")}</div></div>
+            {node.code_invitation && <div><span style={{ fontSize: 11, color: G.muted }}>Code</span><div style={{ fontSize: 13, fontFamily: "monospace", color: G.purple, marginTop: 2 }}>{node.code_invitation}</div></div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE AUTH — Login / Inscription
+// PAGE AUTH
 // ══════════════════════════════════════════════════════════════════════════════
 function AuthPage({ onAuth }) {
   const [mode, setMode] = useState("login");
@@ -251,6 +294,7 @@ function AuthPage({ onAuth }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -258,98 +302,81 @@ function AuthPage({ onAuth }) {
     setError(""); setSuccessMsg("");
     if (!form.email || !form.password) { setError("Email et mot de passe requis."); return; }
     if (mode === "register" && !form.nom) { setError("Nom requis."); return; }
-
     setLoading(true);
     try {
       const endpoint = mode === "login" ? "/login" : "/register";
       const body = mode === "login"
         ? { email: form.email, password: form.password }
         : { nom: form.nom, email: form.email, phone: form.phone, password: form.password, code_invitation: form.code_invitation || undefined };
-
       const data = await apiFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
-
       if (!data) { setError("Erreur réseau. Réessayez."); return; }
-
-      if (!data.success) {
-        setError(data.message || "Erreur inconnue");
-        return;
-      }
-
+      if (!data.success) { setError(data.message || "Erreur inconnue"); return; }
       if (mode === "login") {
-        // Contrôleur retourne { success, token, membre }
-        const token  = data.token  || data.data?.token;
+        const token = data.token || data.data?.token;
         const membre = data.membre || data.data?.membre;
         localStorage.setItem("cnepeci_token", token);
         localStorage.setItem("cnepeci_membre", JSON.stringify(membre));
         onAuth(membre);
       } else {
-        setSuccessMsg("Inscription réussie ! Connectez-vous.");
+        setSuccessMsg("Inscription réussie ! Vous pouvez vous connecter.");
         setMode("login");
         setForm(f => ({ ...f, nom: "", phone: "", password: "", code_invitation: "" }));
       }
-    } catch (e) {
-      setError("Erreur réseau. Vérifiez votre connexion.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Erreur réseau. Vérifiez votre connexion."); }
+    finally { setLoading(false); }
   };
 
-  const fields = mode === "login"
-    ? [
-        { label: "Email", key: "email", type: "email" },
-        { label: "Mot de passe", key: "password", type: "password" },
-      ]
-    : [
-        { label: "Nom complet", key: "nom", type: "text" },
-        { label: "Email", key: "email", type: "email" },
-        { label: "Téléphone", key: "phone", type: "tel" },
-        { label: "Mot de passe", key: "password", type: "password" },
-        { label: "Code d'invitation (optionnel)", key: "code_invitation", type: "text" },
-      ];
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f4f0", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
-      <div style={{ background: "#fff", border: "1px solid #e8e7e2", borderRadius: 16, padding: "36px 40px", width: 380, maxWidth: "90vw" }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ width: 44, height: 44, background: "#7F77DD", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", color: "#fff", fontSize: 18, fontWeight: 700 }}>C</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#1a1917" }}>CNEPECI Business</div>
-          <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{mode === "login" ? "Connexion à votre espace" : "Créer un compte"}</div>
+    <div style={{ minHeight: "100vh", background: `linear-gradient(135deg, #0F0E17 0%, #1E1B4B 50%, #0F0E17 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", position: "relative" }}>
+      {/* Decorative blobs */}
+      <div style={{ position: "absolute", top: "15%", left: "10%", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${G.purple}22, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "15%", right: "10%", width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, #059669 22, transparent 70%)`, pointerEvents: "none" }} />
+
+      <div style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: "44px 44px", width: 400, maxWidth: "90vw", position: "relative" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ width: 56, height: 56, background: `linear-gradient(135deg, ${G.purple}, #5B21B6)`, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 24, boxShadow: `0 8px 32px ${G.purple}44` }}>
+            ⛪
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: "-.3px" }}>CNEPECI Business</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 4 }}>{mode === "login" ? "Connexion à votre espace" : "Créer un compte"}</div>
         </div>
 
-        <Alert type="error" msg={error} />
-        <Alert type="success" msg={successMsg} />
+        {error && <div style={{ background: "rgba(220,38,38,.15)", color: "#FCA5A5", border: "1px solid rgba(220,38,38,.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
+        {successMsg && <div style={{ background: "rgba(5,150,105,.15)", color: "#6EE7B7", border: "1px solid rgba(5,150,105,.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>✅ {successMsg}</div>}
 
-        {fields.map(f => (
-          <div key={f.key} style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 6 }}>{f.label}</label>
-            <input
-              type={f.type}
-              value={form[f.key]}
-              onChange={e => set(f.key, e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSubmit()}
-              style={styles.input}
-              placeholder={f.label}
+        {(mode === "register" ? [
+          { label: "Nom complet", key: "nom", type: "text" },
+          { label: "Email", key: "email", type: "email" },
+          { label: "Téléphone", key: "phone", type: "tel" },
+          { label: "Mot de passe", key: "password", type: showPwd ? "text" : "password" },
+          { label: "Code d'invitation (optionnel)", key: "code_invitation", type: "text" },
+        ] : [
+          { label: "Email", key: "email", type: "email" },
+          { label: "Mot de passe", key: "password", type: showPwd ? "text" : "password" },
+        ]).map(f => (
+          <div key={f.key} style={{ marginBottom: 14, position: "relative" }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>{f.label}</label>
+            <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)} onKeyDown={e => e.key === "Enter" && handleSubmit()}
+              style={{ width: "100%", padding: "11px 14px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 13, color: "#fff", fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border .15s" }}
+              onFocus={e => e.target.style.borderColor = G.purple}
+              onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"}
             />
+            {f.key === "password" && (
+              <span onClick={() => setShowPwd(s => !s)} style={{ position: "absolute", right: 12, bottom: 11, fontSize: 14, cursor: "pointer", color: "rgba(255,255,255,.3)" }}>{showPwd ? "🙈" : "👁"}</span>
+            )}
           </div>
         ))}
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          style={{ ...styles.btn, background: "#7F77DD", color: "#fff", width: "100%", marginTop: 6, opacity: loading ? 0.7 : 1 }}
-        >
-          {loading ? "Chargement…" : mode === "login" ? "Se connecter" : "S'inscrire"}
+        <button onClick={handleSubmit} disabled={loading}
+          style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg, ${G.purple}, #5B21B6)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: 8, boxShadow: `0 4px 20px ${G.purple}44`, opacity: loading ? 0.7 : 1, transition: "all .15s" }}>
+          {loading ? "Chargement…" : mode === "login" ? "Se connecter →" : "Créer mon compte →"}
         </button>
 
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "#888" }}>
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "rgba(255,255,255,.4)" }}>
           {mode === "login" ? (
-            <>Pas encore membre ?{" "}
-              <span onClick={() => { setMode("register"); setError(""); }} style={{ color: "#7F77DD", cursor: "pointer", fontWeight: 500 }}>S'inscrire</span>
-            </>
+            <>Pas encore membre ?{" "}<span onClick={() => { setMode("register"); setError(""); }} style={{ color: "#A78BFA", cursor: "pointer", fontWeight: 600 }}>S'inscrire</span></>
           ) : (
-            <>Déjà inscrit ?{" "}
-              <span onClick={() => { setMode("login"); setError(""); }} style={{ color: "#7F77DD", cursor: "pointer", fontWeight: 500 }}>Se connecter</span>
-            </>
+            <>Déjà inscrit ?{" "}<span onClick={() => { setMode("login"); setError(""); }} style={{ color: "#A78BFA", cursor: "pointer", fontWeight: 600 }}>Se connecter</span></>
           )}
         </div>
       </div>
@@ -364,86 +391,111 @@ function DashboardPage({ membre }) {
   const [stats, setStats] = useState(null);
   const [profil, setProfil] = useState(null);
   const [loading, setLoading] = useState(true);
+  const role = membre?.role;
 
   useEffect(() => {
-    Promise.all([
-      apiFetch("/reseau/stats"),
-      apiFetch("/profile"),
-    ]).then(([statsRes, profilRes]) => {
-      // GET /reseau/stats → retourne les champs directement ou dans data
+    Promise.all([apiFetch("/reseau/stats"), apiFetch("/profile")]).then(([statsRes, profilRes]) => {
       if (statsRes?.success) setStats(extractData(statsRes) || statsRes);
-      // GET /profile → { success, profil }
       if (profilRes?.success) setProfil(profilRes.profil || extractData(profilRes));
       setLoading(false);
     });
   }, []);
 
-  const role = membre?.role;
-  const showGains = role !== "SOUSCRIPTEUR" && role !== "BUREAU_CENTRALE";
-
   if (loading) return <Spinner />;
 
-  const cards = stats ? [
-    { label: "Membres directs",   value: stats.membres_directs ?? "—",    sub: "dans mon réseau",    accent: "#1D9E75" },
-    { label: "CA réseau (mois)",   value: fmt(stats.ca_reseau_mois),        sub: "paiements validés", accent: "#378ADD" },
-    { label: "Commissions perçues",value: fmt(stats.commissions_total),     sub: "total cumulé",      accent: "#7F77DD" },
-    { label: "Bonus ce mois",      value: fmt(stats.bonus_mois),            sub: "1,5% du CA réseau", accent: "#BA7517" },
+  const roleInfo = ROLES[role] || ROLES.SOUSCRIPTEUR;
+  const showGains = role !== "SOUSCRIPTEUR" && role !== "BUREAU_CENTRALE";
+
+  const kpis = stats ? [
+    { label: "Membres directs",    value: stats.membres_directs ?? "0",      sub: "dans mon réseau",     accent: G.green,  icon: "👥", trend: 12 },
+    { label: "CA réseau (mois)",    value: fmtShort(stats.ca_reseau_mois),    sub: "paiements validés",   accent: G.blue,   icon: "💳", trend: 5 },
+    { label: "Commissions perçues", value: fmtShort(stats.commissions_total), sub: "total cumulé",        accent: G.purple, icon: "🏆" },
+    { label: "Bonus ce mois",       value: fmtShort(stats.bonus_mois),        sub: "1,5% du CA réseau",   accent: G.gold,   icon: "🎁" },
   ] : [];
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 22 }}>
-        {cards.map((s, i) => <StatCard key={i} {...s} />)}
+      {/* Welcome banner */}
+      <div style={{ background: `linear-gradient(135deg, ${G.purple} 0%, #5B21B6 100%)`, borderRadius: 20, padding: "24px 28px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", right: -20, top: -20, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,.06)" }} />
+        <div style={{ position: "absolute", right: 60, bottom: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
+        <div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,.6)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".7px", marginBottom: 6 }}>Bienvenue,</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-.3px" }}>{membre?.nom || "Membre"}</div>
+          <div style={{ marginTop: 10 }}>
+            <span style={{ background: "rgba(255,255,255,.18)", color: "#fff", borderRadius: 20, padding: "4px 14px", fontSize: 12, fontWeight: 600 }}>{roleInfo.label}</span>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginBottom: 4 }}>Statut du compte</div>
+          <div style={{ background: "rgba(5,150,105,.3)", color: "#6EE7B7", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 600, display: "inline-block" }}>● Actif</div>
+        </div>
       </div>
 
-      {/* Infos profil */}
-      {profil && (
-        <div style={{ ...styles.card, marginBottom: 20 }}>
-          <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Mon profil</span></div>
-          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-            {[
-              { label: "Nom", value: profil.nom },
-              { label: "Email", value: profil.email },
-              { label: "Téléphone", value: profil.phone || "—" },
-              { label: "Rôle", value: ROLES[profil.role]?.label || profil.role },
-              { label: "Statut", value: <ActiveBadge statut={profil.statut} /> },
-              { label: "Code invitation", value: profil.code_invitation ? <span style={{ fontFamily: "monospace", color: "#7F77DD" }}>{profil.code_invitation}</span> : "—" },
-            ].map((f, i) => (
-              <div key={i}>
-                <div style={{ fontSize: 11, color: "#888", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>{f.label}</div>
-                <div style={{ fontSize: 13, color: "#1a1917" }}>{f.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* KPI Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+        {kpis.map((s, i) => <StatCard key={i} {...s} />)}
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div style={styles.card}>
-          <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Commissions (6 mois)</span></div>
-          <div style={{ padding: "18px 20px" }}><BarChart /></div>
-        </div>
-        <div style={styles.card}>
-          <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Répartition des gains</span></div>
-          <div style={{ padding: "16px 20px" }}>
-            {!showGains ? (
-              <div style={{ textAlign: "center", padding: 24, color: "#aaa", fontSize: 13 }}>Aucune commission pour ce rôle</div>
-            ) : (
-              [
-                { label: "Adhésion (10%)", color: "#1D9E75" },
-                { label: "Cotisation (5%)", color: "#378ADD" },
-                { label: "Bonus réseau (1,5%)", color: "#BA7517" },
-              ].map((item, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: i < 2 ? "1px solid #f5f4f0" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
-                    <span style={{ fontSize: 13, color: "#333" }}>{item.label}</span>
-                  </div>
+      {/* Profil + Charts */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        {/* Profil */}
+        {profil && (
+          <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: roleInfo.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 20, fontWeight: 800 }}>
+                {profil.nom?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: G.text }}>{profil.nom}</div>
+                <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{roleInfo.label}</div>
+              </div>
+              <ActiveBadge statut={profil.statut} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              {[
+                { label: "Email", value: profil.email, icon: "✉️" },
+                { label: "Téléphone", value: profil.phone || "—", icon: "📞" },
+                { label: "Code invitation", value: profil.code_invitation ? <span style={{ fontFamily: "monospace", color: G.purple, fontWeight: 700 }}>{profil.code_invitation}</span> : "—", icon: "🔑" },
+                { label: "Inscrit le", value: profil.created_at ? new Date(profil.created_at).toLocaleDateString("fr-FR") : "—", icon: "📅" },
+              ].map((f, i) => (
+                <div key={i} style={{ background: "#FAFBFE", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: G.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>{f.icon} {f.label}</div>
+                  <div style={{ fontSize: 13, color: G.text, fontWeight: 500 }}>{f.value}</div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* Bar chart */}
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>Commissions (6 mois)</div>
+            <span style={{ background: G.purpleLight, color: G.purple, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>📈 Tendance</span>
+          </div>
+          <BarChart />
         </div>
+      </div>
+
+      {/* Gains breakdown */}
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 16 }}>Répartition des gains</div>
+        {!showGains ? (
+          <div style={{ textAlign: "center", padding: 24, color: G.muted, fontSize: 13, background: "#FAFBFE", borderRadius: 10 }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>💡</div>
+            {role === "BUREAU_CENTRALE" ? "Le Bureau Centrale perçoit uniquement le bonus réseau global." : "Aucune commission directe pour ce rôle."}
+          </div>
+        ) : (
+          <DonutChart
+            label={fmtShort((stats?.commissions_total || 0))}
+            segments={[
+              { label: "Adhésion (10%)",    value: stats?.commissions_adhesion || 0,   color: G.green },
+              { label: "Cotisation (5%)",   value: stats?.commissions_cotisation || 0, color: G.blue },
+              { label: "Bonus réseau (1,5%)", value: stats?.bonus_mois || 0,           color: G.gold },
+            ]}
+          />
+        )}
       </div>
     </div>
   );
@@ -455,27 +507,36 @@ function DashboardPage({ membre }) {
 function NetworkPage() {
   const [membres, setMembres] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    // GET /reseau → { success, membres, total }
     apiFetch("/reseau").then(data => {
       if (data?.success) setMembres(data.membres || extractData(data)?.membres || []);
       setLoading(false);
     });
   }, []);
 
-  if (loading) return <Spinner />;
+  const filtered = membres.filter(m => !search || m.nom?.toLowerCase().includes(search.toLowerCase()) || m.email?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div style={styles.card}>
-      <div style={styles.cardHeader}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Arbre de mon réseau direct</span>
-        <span style={{ fontSize: 12, color: "#888" }}>{membres.length} membre(s) direct(s)</span>
-      </div>
-      <div style={{ padding: 20 }}>
-        {membres.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 32, color: "#aaa", fontSize: 13 }}>Aucun membre direct pour l'instant</div>
-        ) : membres.map((n, i) => <TreeNode key={i} node={n} />)}
+    <div>
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${G.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: G.text }}>Mon réseau direct</div>
+            <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{membres.length} membre(s) direct(s)</div>
+          </div>
+          <input placeholder="🔍 Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ padding: "8px 14px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", width: 220, background: "#FAFBFE" }} />
+        </div>
+        <div style={{ padding: 20 }}>
+          {loading ? <Spinner /> : filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: G.muted, fontSize: 13 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
+              {search ? "Aucun membre correspondant" : "Aucun membre direct pour l'instant"}
+            </div>
+          ) : filtered.map((n, i) => <TreeNode key={i} node={n} />)}
+        </div>
       </div>
     </div>
   );
@@ -493,7 +554,6 @@ function CommissionsPage() {
 
   const load = useCallback((p = 1) => {
     setLoading(true);
-    // GET /commissions?page=&limit= → { success, commissions, total, page }
     apiFetch(`/commissions?page=${p}&limit=20`).then(data => {
       if (data?.success) {
         const rows = data.commissions || [];
@@ -513,42 +573,50 @@ function CommissionsPage() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <StatCard label="Commissions adhésion"   value={fmt(stats.adhesion)}   sub="10% / adhésion directe"    accent="#1D9E75" />
-        <StatCard label="Commissions cotisation" value={fmt(stats.cotisation)} sub="5% / cotisation mensuelle" accent="#378ADD" />
-        <StatCard label="Bonus réseau"           value={fmt(stats.bonus)}      sub="1,5% CA mensuel réseau"    accent="#BA7517" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+        <StatCard label="Adhésion (10%)"   value={fmtShort(stats.adhesion)}   sub="commission directe"  accent={G.green}  icon="🤝" />
+        <StatCard label="Cotisation (5%)"  value={fmtShort(stats.cotisation)} sub="mensuelle"           accent={G.blue}   icon="💳" />
+        <StatCard label="Bonus réseau"     value={fmtShort(stats.bonus)}      sub="1,5% CA mensuel"    accent={G.gold}   icon="⭐" />
       </div>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Détail des commissions</span></div>
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${G.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>Détail des commissions</div>
+        </div>
         {loading ? <Spinner /> : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Date", "Type", "Source", "Rôle source", "Montant"].map(h => (
-                  <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {commissions.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucune commission</td></tr>
-              ) : commissions.map((c, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
-                  <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{new Date(c.created_at).toLocaleDateString("fr-FR")}</td>
-                  <td style={{ padding: "11px 20px" }}><TypeBadge type={c.type} /></td>
-                  <td style={{ padding: "11px 20px", fontSize: 13, color: "#333" }}>{c.source_nom || "—"}</td>
-                  <td style={{ padding: "11px 20px", fontSize: 12, color: "#888" }}>{ROLES[c.source_role]?.label || c.source_role || "—"}</td>
-                  <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#1a1917" }}>{fmt(c.montant)}</td>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#FAFBFE" }}>
+                  {["Date", "Type", "Source", "Rôle", "Montant"].map(h => (
+                    <th key={h} style={{ fontSize: 11, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".5px", padding: "10px 20px", textAlign: "left", borderBottom: `1px solid ${G.border}` }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {commissions.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: "center", padding: 36, color: G.muted, fontSize: 13 }}>Aucune commission pour le moment</td></tr>
+                ) : commissions.map((c, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${G.border}` }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#FAFBFE"}
+                    onMouseLeave={e => e.currentTarget.style.background = ""}>
+                    <td style={{ padding: "12px 20px", fontSize: 13, color: G.muted }}>{new Date(c.created_at).toLocaleDateString("fr-FR")}</td>
+                    <td style={{ padding: "12px 20px" }}><TypeBadge type={c.type} /></td>
+                    <td style={{ padding: "12px 20px", fontSize: 13, color: G.text, fontWeight: 500 }}>{c.source_nom || "—"}</td>
+                    <td style={{ padding: "12px 20px", fontSize: 12, color: G.muted }}>{ROLES[c.source_role]?.label || c.source_role || "—"}</td>
+                    <td style={{ padding: "12px 20px", fontSize: 14, fontWeight: 700, color: G.text }}>{fmt(c.montant)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {total > 20 && (
-          <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: 16 }}>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ ...styles.btn, background: "#f0efe9", color: "#555", padding: "6px 14px" }}>← Préc.</button>
-            <span style={{ fontSize: 13, color: "#888", lineHeight: "32px" }}>Page {page}</span>
-            <button onClick={() => setPage(p => p + 1)} disabled={page * 20 >= total} style={{ ...styles.btn, background: "#f0efe9", color: "#555", padding: "6px 14px" }}>Suiv. →</button>
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: 16, borderTop: `1px solid ${G.border}` }}>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${G.border}`, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, color: G.muted, fontFamily: "inherit" }}>← Préc.</button>
+            <span style={{ padding: "7px 16px", fontSize: 13, color: G.muted }}>Page {page}</span>
+            <button onClick={() => setPage(p => p + 1)} disabled={page * 20 >= total}
+              style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${G.border}`, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, color: G.muted, fontFamily: "inherit" }}>Suiv. →</button>
           </div>
         )}
       </div>
@@ -565,11 +633,7 @@ function BonusPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch("/bonus/historique"),
-      apiFetch("/reseau/stats"),
-    ]).then(([bonusRes, statsRes]) => {
-      // GET /bonus/historique → { success, historique }
+    Promise.all([apiFetch("/bonus/historique"), apiFetch("/reseau/stats")]).then(([bonusRes, statsRes]) => {
       if (bonusRes?.success) setHistorique(bonusRes.historique || []);
       if (statsRes?.success) setStatsReseau(statsRes);
       setLoading(false);
@@ -582,32 +646,36 @@ function BonusPage() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
-        <StatCard label="CA réseau (mois courant)" value={fmt(statsReseau?.ca_reseau_mois)}  sub="" accent="#BA7517" />
-        <StatCard label="Bonus ce mois"            value={fmt(statsReseau?.bonus_mois)}       sub="= CA × 1,5%"     accent="#7F77DD" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        <StatCard label="CA réseau (ce mois)" value={fmtShort(statsReseau?.ca_reseau_mois)} sub="chiffre d'affaires réseau" accent={G.gold}   icon="📊" />
+        <StatCard label="Bonus ce mois"        value={fmtShort(statsReseau?.bonus_mois)}    sub="= CA × 1,5%"              accent={G.purple} icon="🎁" />
       </div>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Historique bonus mensuel</span></div>
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${G.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>Historique bonus mensuel</div>
+        </div>
         {historique.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 32, color: "#aaa", fontSize: 13 }}>Aucun historique disponible</div>
+          <div style={{ textAlign: "center", padding: 48, color: G.muted, fontSize: 13 }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>Aucun historique disponible
+          </div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr>
+              <tr style={{ background: "#FAFBFE" }}>
                 {["Période", "CA réseau", "Taux", "Bonus versé"].map(h => (
-                  <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
+                  <th key={h} style={{ fontSize: 11, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".5px", padding: "10px 20px", textAlign: "left", borderBottom: `1px solid ${G.border}` }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {historique.map((b, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
-                  <td style={{ padding: "11px 20px", fontSize: 13 }}>{moisNoms[(b.mois || 1) - 1]} {b.annee}</td>
-                  <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{fmt(b.chiffre_affaire)}</td>
-                  <td style={{ padding: "11px 20px" }}>
-                    <span style={{ background: "#FAEEDA", color: "#854F0B", borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500 }}>1,5%</span>
-                  </td>
-                  <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#BA7517" }}>{fmt(b.bonus)}</td>
+                <tr key={i} style={{ borderBottom: `1px solid ${G.border}` }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAFBFE"}
+                  onMouseLeave={e => e.currentTarget.style.background = ""}>
+                  <td style={{ padding: "12px 20px", fontSize: 13, fontWeight: 600, color: G.text }}>{moisNoms[(b.mois || 1) - 1]} {b.annee}</td>
+                  <td style={{ padding: "12px 20px", fontSize: 13, color: G.muted }}>{fmt(b.chiffre_affaire)}</td>
+                  <td style={{ padding: "12px 20px" }}><Badge color={G.gold} bg={G.goldLight}>1,5%</Badge></td>
+                  <td style={{ padding: "12px 20px", fontSize: 14, fontWeight: 700, color: G.gold }}>{fmt(b.bonus)}</td>
                 </tr>
               ))}
             </tbody>
@@ -622,114 +690,102 @@ function BonusPage() {
 // PAGE PAIEMENT
 // ══════════════════════════════════════════════════════════════════════════════
 function PaiementPage({ membre }) {
-  const [type, setType]       = useState("adhesion");
+  const [type, setType] = useState("adhesion");
   const [montant, setMontant] = useState(15000);
   const [methode, setMethode] = useState("cinetpay");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const handlePayer = async () => {
     setError(""); setSuccess("");
     if (!montant || montant < 100) { setError("Montant minimum : 100 FCFA"); return; }
-
     setLoading(true);
     try {
-      const endpoint = methode === "cinetpay"
-        ? "/paiement/cinetpay/init"
-        : "/paiement/paydunya/init";
-
-      const body = {
-        montant,
-        type,
-        success_url: `${window.location.origin}/cnepeci/paiement/success`,
-        failed_url:  `${window.location.origin}/cnepeci/paiement/echec`,
-      };
-
-      const data = await apiFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
-
-      if (!data) { setError("Erreur réseau. Réessayez."); return; }
+      const endpoint = methode === "cinetpay" ? "/paiement/cinetpay/init" : "/paiement/paydunya/init";
+      const data = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify({ montant, type, success_url: `${window.location.origin}/cnepeci/paiement/success`, failed_url: `${window.location.origin}/cnepeci/paiement/echec` }),
+      });
+      if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur paiement"); return; }
-
-      // Contrôleur retourne { success, payment_url, transaction_id }
       const payUrl = data.payment_url || data.data?.payment_url;
       if (payUrl) {
         setSuccess("Redirection vers la page de paiement…");
         setTimeout(() => { window.location.href = payUrl; }, 1000);
-      } else {
-        setError("URL de paiement non reçue. Réessayez.");
-      }
-    } catch (e) {
-      setError("Erreur réseau. Vérifiez votre connexion.");
-    } finally {
-      setLoading(false);
-    }
+      } else { setError("URL de paiement non reçue. Réessayez."); }
+    } catch { setError("Erreur réseau."); }
+    finally { setLoading(false); }
   };
 
-  const commEstimee = type === "adhesion"
-    ? Math.round(montant * 0.10)
-    : Math.round(montant * 0.05);
+  const commEstimee = type === "adhesion" ? Math.round(montant * 0.10) : Math.round(montant * 0.05);
 
   return (
-    <div style={{ maxWidth: 520 }}>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Effectuer un paiement</span></div>
-        <div style={{ padding: 24 }}>
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg, ${G.green}0D, transparent)` }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: G.text }}>💳 Effectuer un paiement</div>
+          <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>CinetPay & PayDunya acceptés</div>
+        </div>
+        <div style={{ padding: 28 }}>
           <Alert type="error" msg={error} />
           <Alert type="success" msg={success} />
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 8 }}>Type de paiement</label>
+          {/* Type */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".5px" }}>Type de paiement</label>
             <div style={{ display: "flex", gap: 10 }}>
-              {[{ val: "adhesion", label: "Adhésion" }, { val: "cotisation", label: "Cotisation" }].map(t => (
-                <button key={t.val} onClick={() => setType(t.val)} style={{ ...styles.btn, flex: 1, background: type === t.val ? "#7F77DD" : "#f5f4f0", color: type === t.val ? "#fff" : "#555", border: `1px solid ${type === t.val ? "#7F77DD" : "#e8e7e2"}` }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 6 }}>Montant (FCFA)</label>
-            <input type="number" value={montant} onChange={e => setMontant(parseFloat(e.target.value) || 0)} style={styles.input} min={100} />
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 8 }}>Méthode de paiement</label>
-            <div style={{ display: "flex", gap: 10 }}>
-              {[
-                { val: "cinetpay", label: "CinetPay",  sub: "Orange, Wave, MTN…" },
-                { val: "paydunya", label: "PayDunya",   sub: "Orange, Wave, MTN…" },
-              ].map(m => (
-                <div key={m.val} onClick={() => setMethode(m.val)} style={{ flex: 1, border: `2px solid ${methode === m.val ? "#7F77DD" : "#e8e7e2"}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", background: methode === m.val ? "#EEEDFE" : "#fff" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: methode === m.val ? "#3C3489" : "#1a1917" }}>{m.label}</div>
-                  <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{m.sub}</div>
+              {[{ val: "adhesion", label: "🤝 Adhésion", sub: "Frais d'entrée" }, { val: "cotisation", label: "📆 Cotisation", sub: "Mensuelle" }].map(t => (
+                <div key={t.val} onClick={() => setType(t.val)} style={{ flex: 1, border: `2px solid ${type === t.val ? G.green : G.border}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", background: type === t.val ? G.greenLight : "#FAFBFE", transition: "all .15s" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: type === t.val ? G.green : G.text }}>{t.label}</div>
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>{t.sub}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ background: "#faf9f6", border: "1px solid #f0efe9", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: "#555" }}>Montant</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(montant)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: "#555" }}>Type</span>
-              <TypeBadge type={type} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #e8e7e2" }}>
-              <span style={{ fontSize: 13, color: "#1D9E75", fontWeight: 500 }}>Commission générée pour votre parrain</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#1D9E75" }}>{fmt(commEstimee)}</span>
+          {/* Montant */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>Montant (FCFA)</label>
+            <input type="number" value={montant} onChange={e => setMontant(parseFloat(e.target.value) || 0)}
+              style={{ width: "100%", padding: "12px 16px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 16, fontWeight: 700, color: G.text, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#FAFBFE" }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              {[5000, 10000, 15000, 25000].map(v => (
+                <button key={v} onClick={() => setMontant(v)} style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${montant === v ? G.purple : G.border}`, background: montant === v ? G.purpleLight : "#fff", color: montant === v ? G.purple : G.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{(v / 1000)}k</button>
+              ))}
             </div>
           </div>
 
-          <button
-            onClick={handlePayer}
-            disabled={loading || !!success}
-            style={{ ...styles.btn, background: "#1D9E75", color: "#fff", width: "100%", fontSize: 14, padding: "13px 20px", opacity: loading || success ? 0.7 : 1 }}
-          >
-            {loading ? "Traitement…" : `Payer ${fmt(montant)} via ${methode === "cinetpay" ? "CinetPay" : "PayDunya"}`}
+          {/* Méthode */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".5px" }}>Méthode de paiement</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              {[{ val: "cinetpay", label: "CinetPay", sub: "Orange, Wave, MTN…" }, { val: "paydunya", label: "PayDunya", sub: "Orange, Wave, MTN…" }].map(m => (
+                <div key={m.val} onClick={() => setMethode(m.val)} style={{ flex: 1, border: `2px solid ${methode === m.val ? G.purple : G.border}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", background: methode === m.val ? G.purpleLight : "#FAFBFE", transition: "all .15s" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: methode === m.val ? G.purple : G.text }}>{m.label}</div>
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Récap */}
+          <div style={{ background: "#FAFBFE", border: `1px solid ${G.border}`, borderRadius: 12, padding: "16px 18px", marginBottom: 22 }}>
+            {[
+              { label: "Type", value: <TypeBadge type={type} /> },
+              { label: "Montant", value: <span style={{ fontWeight: 700, fontSize: 14 }}>{fmt(montant)}</span> },
+              { label: "Commission parrain", value: <span style={{ color: G.green, fontWeight: 700 }}>{fmt(commEstimee)} ({type === "adhesion" ? "10%" : "5%"})</span> },
+            ].map((row, i, arr) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${G.border}` : "none" }}>
+                <span style={{ fontSize: 13, color: G.muted }}>{row.label}</span>
+                {row.value}
+              </div>
+            ))}
+          </div>
+
+          <button onClick={handlePayer} disabled={loading || !!success}
+            style={{ width: "100%", padding: "14px 20px", background: `linear-gradient(135deg, ${G.green}, #047857)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading || success ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: `0 4px 20px ${G.green}44`, opacity: loading || success ? 0.7 : 1, transition: "all .15s" }}>
+            {loading ? "⏳ Traitement…" : `Payer ${fmt(montant)} via ${methode === "cinetpay" ? "CinetPay" : "PayDunya"} →`}
           </button>
         </div>
       </div>
@@ -738,59 +794,120 @@ function PaiementPage({ membre }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE INVITATION
+// PAGE INVITATION — CORRIGÉE + AMÉLIORÉE
 // ══════════════════════════════════════════════════════════════════════════════
 function InvitePage({ membre }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(null);
+  const [qrVisible, setQrVisible] = useState(false);
   const code = membre?.code_invitation || null;
-  const frontUrl = process.env.REACT_APP_FRONTEND_URL || "https://cnepeci.mutuelleawoundjo.org";
-  const url  = `${frontUrl}/join?ref=${code}`;
+  const canRecruit = !!CREATION_MAP[membre?.role];
+  const frontUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+  const url = `${frontUrl}/join?ref=${code}`;
 
-  const copy = (text) => {
-    navigator.clipboard?.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copy = (text, key) => {
+    navigator.clipboard?.writeText(text).catch(() => {
+      const el = document.createElement("textarea");
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    });
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2500);
+  };
+
+  const shareWhatsApp = () => {
+    const msg = encodeURIComponent(`Rejoignez mon réseau CNEPECI ! 🌐\n\nLien : ${url}\nCode : ${code}`);
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 
   return (
-    <div>
-      <div style={{ background: "#EEEDFE", border: "1px solid #CECBF6", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: "#3C3489", marginBottom: 10 }}>Votre lien d'invitation personnel</div>
-        {!code ? (
-          <div style={{ fontSize: 13, color: "#888" }}>
-            Les souscripteurs finaux n'ont pas de code d'invitation.
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-              <span style={{ fontFamily: "monospace", fontSize: 12, background: "#fff", border: "1px solid #CECBF6", borderRadius: 8, padding: "8px 14px", flex: 1, color: "#534AB7", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {url}
-              </span>
-              <button onClick={() => copy(url)} style={{ ...styles.btn, background: "#7F77DD", color: "#fff", whiteSpace: "nowrap", padding: "8px 14px" }}>
-                {copied ? "Copié !" : "Copier lien"}
-              </button>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#3C3489" }}>Code seul :</span>
-              <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#534AB7", fontSize: 14 }}>{code}</span>
-              <button onClick={() => copy(code)} style={{ ...styles.btn, background: "transparent", border: "1px solid #CECBF6", color: "#534AB7", padding: "4px 10px", fontSize: 12 }}>
-                Copier code
-              </button>
-            </div>
-          </>
-        )}
-        <div style={{ fontSize: 12, color: "#888", marginTop: 10 }}>
-          {code
-            ? "Partagez ce lien pour recruter directement. Chaque inscription génère automatiquement une commission d'adhésion."
-            : "Votre rôle ne permet pas de recruter directement."}
+    <div style={{ maxWidth: 640 }}>
+      {/* Header card */}
+      <div style={{ background: `linear-gradient(135deg, ${G.purple} 0%, #5B21B6 100%)`, borderRadius: 20, padding: "28px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -30, top: -30, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.07)" }} />
+        <div style={{ fontSize: 28, marginBottom: 8 }}>🔗</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Lien d'invitation personnel</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>
+          Partagez votre lien pour recruter et générer des commissions automatiques
         </div>
       </div>
+
+      {!canRecruit ? (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 32, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: G.text, marginBottom: 8 }}>Recrutement non disponible</div>
+          <div style={{ fontSize: 13, color: G.muted, maxWidth: 360, margin: "0 auto" }}>
+            {membre?.role === "SOUSCRIPTEUR"
+              ? "Les souscripteurs finaux ne peuvent pas recruter directement. Parlez à votre parrain pour évoluer dans le réseau."
+              : "Votre rôle actuel ne permet pas le recrutement direct."}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Code bloc */}
+          <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".7px", marginBottom: 14 }}>Votre code d'invitation</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, background: G.purpleLight, borderRadius: 12, padding: "16px 20px", fontFamily: "monospace", fontSize: 22, fontWeight: 800, color: G.purple, textAlign: "center", letterSpacing: 4 }}>
+                {code}
+              </div>
+              <button onClick={() => copy(code, "code")}
+                style={{ padding: "16px 20px", background: copied === "code" ? G.green : G.purple, color: "#fff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", whiteSpace: "nowrap" }}>
+                {copied === "code" ? "✅ Copié !" : "Copier"}
+              </button>
+            </div>
+          </div>
+
+          {/* URL bloc */}
+          <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".7px", marginBottom: 14 }}>Lien d'inscription direct</div>
+            <div style={{ display: "flex", gap: 10, alignItems: "stretch", marginBottom: 14 }}>
+              <div style={{ flex: 1, background: "#FAFBFE", border: `1px solid ${G.border}`, borderRadius: 10, padding: "11px 14px", fontSize: 12, color: G.purple, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {url}
+              </div>
+              <button onClick={() => copy(url, "url")}
+                style={{ padding: "11px 18px", background: copied === "url" ? G.green : G.purple, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "background .2s" }}>
+                {copied === "url" ? "✅" : "Copier"}
+              </button>
+            </div>
+
+            {/* Share buttons */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={shareWhatsApp}
+                style={{ flex: 1, padding: "11px 16px", background: "#25D366", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                📱 Partager WhatsApp
+              </button>
+              <button onClick={() => copy(`Code: ${code}\nLien: ${url}`, "all")}
+                style={{ flex: 1, padding: "11px 16px", background: "#FAFBFE", color: G.text, border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {copied === "all" ? "✅ Copié !" : "📋 Tout copier"}
+              </button>
+            </div>
+          </div>
+
+          {/* Info card */}
+          <div style={{ background: G.greenLight, border: `1px solid ${G.green}33`, borderRadius: 16, padding: "18px 22px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: G.green, marginBottom: 10 }}>💡 Comment ça marche ?</div>
+            {[
+              "Partagez votre lien ou code à vos contacts",
+              "Chaque inscription via votre lien vous crédite automatiquement",
+              "Vous percevez 10% sur chaque adhésion de votre filleul",
+              "Vous percevez 5% sur ses cotisations mensuelles",
+            ].map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 6, fontSize: 13, color: "#065F46" }}>
+                <span style={{ color: G.green, fontWeight: 700, flexShrink: 0 }}>→</span> {s}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE HISTORIQUE PAIEMENTS
+// PAGE HISTORIQUE
 // ══════════════════════════════════════════════════════════════════════════════
 function HistoryPage() {
   const [paiements, setPaiements] = useState([]);
@@ -798,7 +915,6 @@ function HistoryPage() {
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    // GET /paiements → { success, paiements, total, page }
     apiFetch("/paiements?page=1&limit=50").then(data => {
       if (data?.success) setPaiements(data.paiements || []);
       setLoading(false);
@@ -808,63 +924,65 @@ function HistoryPage() {
   const filtered = filter === "all" ? paiements : paiements.filter(p => p.type === filter || p.statut === filter);
 
   return (
-    <div style={styles.card}>
-      <div style={styles.cardHeader}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Historique de mes paiements</span>
-        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ fontSize: 12, padding: "4px 8px", border: "1px solid #e8e7e2", borderRadius: 6, fontFamily: "inherit", background: "#fff", color: "#333" }}>
-          <option value="all">Tous</option>
-          <option value="adhesion">Adhésion</option>
-          <option value="cotisation">Cotisation</option>
-          <option value="paid">Payés</option>
-          <option value="pending">En attente</option>
-          <option value="failed">Échoués</option>
+    <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", borderBottom: `1px solid ${G.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>📋 Historique de mes paiements</div>
+        <select value={filter} onChange={e => setFilter(e.target.value)}
+          style={{ padding: "7px 12px", border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 12, fontFamily: "inherit", background: "#fff", color: G.text, outline: "none" }}>
+          {[["all","Tous"], ["adhesion","Adhésion"], ["cotisation","Cotisation"], ["paid","Payés"], ["pending","En attente"], ["failed","Échoués"]].map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
         </select>
       </div>
       {loading ? <Spinner /> : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              {["Date", "Type", "Méthode", "Référence", "Montant", "Statut"].map(h => (
-                <th key={h} style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: ".5px", padding: "9px 20px", textAlign: "left", background: "#faf9f6", borderBottom: "1px solid #e8e7e2" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: "center", padding: 28, color: "#aaa", fontSize: 13 }}>Aucun résultat</td></tr>
-            ) : filtered.map((p, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #f5f4f0" }}>
-                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555" }}>{new Date(p.created_at).toLocaleDateString("fr-FR")}</td>
-                <td style={{ padding: "11px 20px" }}><TypeBadge type={p.type} /></td>
-                <td style={{ padding: "11px 20px", fontSize: 13, color: "#555", textTransform: "capitalize" }}>{p.payment_method}</td>
-                <td style={{ padding: "11px 20px", fontSize: 11, color: "#aaa", fontFamily: "monospace" }}>{(p.transaction_reference || "").substring(0, 16)}…</td>
-                <td style={{ padding: "11px 20px", fontSize: 13, fontWeight: 600, color: "#1a1917" }}>{fmt(p.montant)}</td>
-                <td style={{ padding: "11px 20px" }}>
-                  <span style={{
-                    background: p.statut === "paid" ? "#E1F5EE" : p.statut === "pending" ? "#FAEEDA" : "#FEE2E2",
-                    color: p.statut === "paid" ? "#0F6E56" : p.statut === "pending" ? "#854F0B" : "#991B1B",
-                    borderRadius: 20, padding: "3px 8px", fontSize: 11, fontWeight: 500
-                  }}>
-                    {p.statut === "paid" ? "Payé" : p.statut === "pending" ? "En attente" : "Échoué"}
-                  </span>
-                </td>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#FAFBFE" }}>
+                {["Date", "Type", "Méthode", "Référence", "Montant", "Statut"].map(h => (
+                  <th key={h} style={{ fontSize: 11, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".5px", padding: "10px 20px", textAlign: "left", borderBottom: `1px solid ${G.border}` }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: "center", padding: 36, color: G.muted }}>Aucun résultat</td></tr>
+              ) : filtered.map((p, i) => {
+                const isPaid = p.statut === "paid" || p.statut === "success";
+                const isPending = p.statut === "pending";
+                return (
+                  <tr key={i} style={{ borderBottom: `1px solid ${G.border}` }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#FAFBFE"}
+                    onMouseLeave={e => e.currentTarget.style.background = ""}>
+                    <td style={{ padding: "12px 20px", fontSize: 13, color: G.muted }}>{new Date(p.created_at).toLocaleDateString("fr-FR")}</td>
+                    <td style={{ padding: "12px 20px" }}><TypeBadge type={p.type} /></td>
+                    <td style={{ padding: "12px 20px", fontSize: 13, color: G.muted, textTransform: "capitalize" }}>{p.payment_method || "—"}</td>
+                    <td style={{ padding: "12px 20px", fontSize: 11, color: "#aaa", fontFamily: "monospace" }}>{(p.transaction_reference || "—").substring(0, 16)}{p.transaction_reference?.length > 16 ? "…" : ""}</td>
+                    <td style={{ padding: "12px 20px", fontSize: 14, fontWeight: 700, color: G.text }}>{fmt(p.montant)}</td>
+                    <td style={{ padding: "12px 20px" }}>
+                      <Badge color={isPaid ? G.green : isPending ? G.gold : G.red} bg={isPaid ? G.greenLight : isPending ? G.goldLight : G.redLight}>
+                        {isPaid ? "● Payé" : isPending ? "● En attente" : "● Échoué"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE CRÉER MEMBRE — nouvelle page, issu de CREATION_MAP du contrôleur
+// PAGE CRÉER MEMBRE
 // ══════════════════════════════════════════════════════════════════════════════
 function CreerMembrePage({ membre }) {
   const [form, setForm] = useState({ nom: "", email: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(null); // credentials du nouveau membre
+  const [success, setSuccess] = useState(null);
   const [membresCreés, setMembresCreés] = useState([]);
   const [listLoading, setListLoading] = useState(true);
 
@@ -872,7 +990,6 @@ function CreerMembrePage({ membre }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    // GET /reseau/membres-crees → { success, membres, total }
     apiFetch("/reseau/membres-crees").then(data => {
       if (data?.success) setMembresCreés(data.membres || []);
       setListLoading(false);
@@ -882,125 +999,82 @@ function CreerMembrePage({ membre }) {
   const handleCreer = async () => {
     setError(""); setSuccess(null);
     if (!form.nom || !form.email) { setError("Nom et email requis."); return; }
-
     setLoading(true);
     try {
-      // POST /reseau/creer-membre → { success, message, membre, credentials }
-      const data = await apiFetch("/reseau/creer-membre", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-
+      const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(form) });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur création"); return; }
-
       setSuccess(data.credentials || data);
       setForm({ nom: "", email: "", phone: "" });
-      // Recharger la liste
-      apiFetch("/reseau/membres-crees").then(d => {
-        if (d?.success) setMembresCreés(d.membres || []);
-      });
-    } catch (e) {
-      setError("Erreur réseau.");
-    } finally {
-      setLoading(false);
-    }
+      apiFetch("/reseau/membres-crees").then(d => { if (d?.success) setMembresCreés(d.membres || []); });
+    } catch { setError("Erreur réseau."); }
+    finally { setLoading(false); }
   };
 
-  if (!roleACreer) {
-    return (
-      <div style={styles.card}>
-        <div style={{ padding: 32, textAlign: "center", color: "#aaa", fontSize: 13 }}>
-          Votre rôle ({ROLES[membre?.role]?.label}) ne permet pas de créer des membres.
-        </div>
-      </div>
-    );
-  }
+  if (!roleACreer) return (
+    <div style={{ textAlign: "center", padding: 48, color: G.muted, fontSize: 13 }}>
+      <div style={{ fontSize: 36, marginBottom: 12 }}>🔒</div>
+      Votre rôle ne permet pas de créer des membres.
+    </div>
+  );
 
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* Formulaire de création */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Créer un {ROLES[roleACreer]?.label}</span>
-            <span style={{ background: ROLES[roleACreer]?.color, color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 500 }}>{ROLES[roleACreer]?.abbr}</span>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div>
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg, ${G.blue}0D, transparent)` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>➕ Créer un {ROLES[roleACreer]?.label}</div>
+            <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>Votre rôle : {ROLES[membre?.role]?.label}</div>
           </div>
-          <div style={{ padding: 20 }}>
+          <div style={{ padding: 24 }}>
             <Alert type="error" msg={error} />
-
             {success && (
-              <div style={{ background: "#D1FAE5", border: "1px solid #A7F3D0", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#065F46", marginBottom: 10 }}>✓ Membre créé avec succès</div>
-                {[
-                  { label: "Email",       value: success.email },
-                  { label: "Mot de passe",value: success.mot_de_passe, mono: true },
-                  { label: "Lien connexion", value: success.lien_connexion, mono: true },
-                  { label: "Rôle",        value: ROLES[success.role]?.label || success.role },
-                ].map((f, i) => f.value && (
-                  <div key={i} style={{ marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: "#065F46", fontWeight: 500 }}>{f.label} : </span>
-                    <span style={{ fontSize: 12, color: "#065F46", fontFamily: f.mono ? "monospace" : "inherit" }}>{f.value}</span>
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    const text = `Email: ${success.email}\nMot de passe: ${success.mot_de_passe}\nLien: ${success.lien_connexion}`;
-                    navigator.clipboard?.writeText(text);
-                  }}
-                  style={{ ...styles.btn, background: "#1D9E75", color: "#fff", padding: "6px 14px", fontSize: 12, marginTop: 8 }}
-                >
-                  Copier les identifiants
-                </button>
+              <div style={{ background: G.greenLight, border: `1px solid ${G.green}44`, borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: G.green, marginBottom: 10 }}>✅ Membre créé avec succès !</div>
+                <div style={{ background: "#fff", borderRadius: 8, padding: 12, fontFamily: "monospace", fontSize: 12, color: G.text }}>
+                  <div>Email : <strong>{success.email}</strong></div>
+                  <div style={{ marginTop: 4 }}>Mot de passe : <strong>{success.password}</strong></div>
+                  {success.code_invitation && <div style={{ marginTop: 4 }}>Code : <strong style={{ color: G.purple }}>{success.code_invitation}</strong></div>}
+                </div>
+                <div style={{ fontSize: 11, color: G.muted, marginTop: 8 }}>⚠️ Communiquez ces identifiants au membre. Ils ne seront plus affichés.</div>
               </div>
             )}
-
-            {[
-              { label: "Nom complet", key: "nom", type: "text", required: true },
-              { label: "Email", key: "email", type: "email", required: true },
-              { label: "Téléphone (optionnel)", key: "phone", type: "tel", required: false },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 6 }}>
-                  {f.label} {f.required && <span style={{ color: "#D85A30" }}>*</span>}
-                </label>
-                <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)} style={styles.input} placeholder={f.label} />
+            {[{ label: "Nom complet *", key: "nom", type: "text" }, { label: "Email *", key: "email", type: "email" }, { label: "Téléphone", key: "phone", type: "tel" }].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>{f.label}</label>
+                <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)}
+                  style={{ width: "100%", padding: "11px 14px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border .15s" }}
+                  onFocus={e => e.target.style.borderColor = G.blue}
+                  onBlur={e => e.target.style.borderColor = G.border} />
               </div>
             ))}
-
-            <button
-              onClick={handleCreer}
-              disabled={loading}
-              style={{ ...styles.btn, background: ROLES[roleACreer]?.color, color: "#fff", width: "100%", marginTop: 4, opacity: loading ? 0.7 : 1 }}
-            >
-              {loading ? "Création…" : `Créer ce ${ROLES[roleACreer]?.label}`}
+            <button onClick={handleCreer} disabled={loading}
+              style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg, ${G.blue}, #1D4ED8)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1 }}>
+              {loading ? "Création…" : `Créer le ${ROLES[roleACreer]?.label}`}
             </button>
-
-            <div style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
-              Le mot de passe est généré automatiquement et doit être transmis au nouveau membre.
-            </div>
           </div>
         </div>
-
-        {/* Liste des membres créés */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Membres créés par moi</span>
-            <span style={{ fontSize: 12, color: "#888" }}>{membresCreés.length}</span>
-          </div>
-          <div style={{ padding: 16, maxHeight: 400, overflowY: "auto" }}>
-            {listLoading ? <Spinner /> : membresCreés.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 24, color: "#aaa", fontSize: 13 }}>Aucun membre créé</div>
-            ) : membresCreés.map((m, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < membresCreés.length - 1 ? "1px solid #f5f4f0" : "none" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1917" }}>{m.nom}</div>
-                  <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{m.email} · {ROLES[m.role]?.label || m.role}</div>
-                </div>
-                <ActiveBadge statut={m.statut} />
+      </div>
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${G.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>Membres créés</div>
+          <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{membresCreés.length} au total</div>
+        </div>
+        <div style={{ padding: 16, maxHeight: 400, overflowY: "auto" }}>
+          {listLoading ? <Spinner /> : membresCreés.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 32, color: G.muted, fontSize: 13 }}>Aucun membre créé</div>
+          ) : membresCreés.map((m, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, marginBottom: 6, background: "#FAFBFE" }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: G.purpleLight, color: G.purple, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>
+                {m.nom?.charAt(0)?.toUpperCase() || "?"}
               </div>
-            ))}
-          </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{m.nom}</div>
+                <div style={{ fontSize: 11, color: G.muted }}>{m.email}</div>
+              </div>
+              <ActiveBadge statut={m.statut} />
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -1011,85 +1085,66 @@ function CreerMembrePage({ membre }) {
 // PAGE SIMULATEUR
 // ══════════════════════════════════════════════════════════════════════════════
 function SimulatePage({ currentRole, onRoleChange }) {
-  const [adhesion, setAdhesion]     = useState(15000);
+  const [adhesion, setAdhesion] = useState(15000);
   const [cotisation, setCotisation] = useState(5000);
-  const [members, setMembers]       = useState(10);
-  const [ca, setCa]                 = useState(500000);
+  const [members, setMembers] = useState(10);
+  const [ca, setCa] = useState(500000);
 
-  const renderResult = () => {
-    if (currentRole === "BUREAU_CENTRALE") {
-      const total = members * 2000;
-      return (
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Bureau Centrale — gains estimés</div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f0efe9" }}>
-            <span style={{ fontSize: 13 }}>Frais adhésion ({members} × 2 000 F)</span>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(total)}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0" }}>
-            <span style={{ fontWeight: 600 }}>Total estimé</span>
-            <span style={{ fontWeight: 700, color: "#7F77DD" }}>{fmt(total)}</span>
-          </div>
-        </div>
-      );
-    }
-    if (currentRole === "SOUSCRIPTEUR") {
-      return <div style={{ textAlign: "center", padding: 24, color: "#aaa", fontSize: 13 }}>Le souscripteur ne perçoit aucune commission.</div>;
-    }
-    const ga = members * adhesion * 0.10;
-    const gc = members * cotisation * 0.05;
-    const gb = ca * 0.015;
-    return (
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Gains estimés — {ROLES[currentRole]?.label}</div>
-        {[
-          { label: `Adhésion (${members} × ${fmt(adhesion)} × 10%)`,       val: fmt(ga), color: "#1D9E75" },
-          { label: `Cotisation (${members} × ${fmt(cotisation)} × 5%)`,    val: fmt(gc), color: "#378ADD" },
-          { label: `Bonus réseau (CA ${fmt(ca)} × 1,5%)`,                  val: fmt(gb), color: "#BA7517" },
-        ].map((item, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f0efe9" }}>
-            <span style={{ fontSize: 13, color: "#555" }}>{item.label}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: item.color }}>{item.val}</span>
-          </div>
-        ))}
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0" }}>
-          <span style={{ fontWeight: 600 }}>Total mensuel estimé</span>
-          <span style={{ fontWeight: 700, color: "#7F77DD" }}>{fmt(ga + gc + gb)}</span>
-        </div>
-      </div>
-    );
-  };
+  const ga = members * adhesion * 0.10;
+  const gc = members * cotisation * 0.05;
+  const gb = ca * 0.015;
+  const total = ga + gc + gb;
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1a1917" }}>Simuler un autre rôle</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {Object.entries(ROLES).map(([k, r]) => (
-            <button key={k} onClick={() => onRoleChange(k)} style={{ padding: "6px 14px", borderRadius: 20, border: "1px solid", borderColor: currentRole === k ? "#7F77DD" : "#e8e7e2", background: currentRole === k ? "#7F77DD" : "#fff", color: currentRole === k ? "#fff" : "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              {r.label}
-            </button>
-          ))}
-        </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        {Object.entries(ROLES).map(([k, r]) => (
+          <button key={k} onClick={() => onRoleChange(k)} style={{ padding: "8px 16px", borderRadius: 20, border: `2px solid ${currentRole === k ? r.color : G.border}`, background: currentRole === k ? r.color : "#fff", color: currentRole === k ? "#fff" : G.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+            {r.label}
+          </button>
+        ))}
       </div>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}><span style={{ fontSize: 13, fontWeight: 600 }}>Simulateur de commissions</span></div>
-        <div style={{ padding: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 20 }}>⚙️ Paramètres de simulation</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {[
-              { label: "Montant d'adhésion (FCFA)",    val: adhesion,   set: setAdhesion },
-              { label: "Cotisation mensuelle (FCFA)",  val: cotisation, set: setCotisation },
-              { label: "Nombre de membres directs",    val: members,    set: setMembers },
-              { label: "CA mensuel réseau (FCFA)",     val: ca,         set: setCa },
+              { label: "Adhésion (FCFA)", val: adhesion, set: setAdhesion },
+              { label: "Cotisation mensuelle", val: cotisation, set: setCotisation },
+              { label: "Nombre de membres", val: members, set: setMembers },
+              { label: "CA mensuel réseau", val: ca, set: setCa },
             ].map((f, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "#888" }}>{f.label}</label>
-                <input type="number" value={f.val} onChange={e => f.set(parseFloat(e.target.value) || 0)} style={styles.input} />
+              <div key={i}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: G.muted, textTransform: "uppercase", letterSpacing: ".5px", display: "block", marginBottom: 6 }}>{f.label}</label>
+                <input type="number" value={f.val} onChange={e => f.set(parseFloat(e.target.value) || 0)}
+                  style={{ width: "100%", padding: "10px 12px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
             ))}
           </div>
-          <div style={{ background: "#faf9f6", borderRadius: 10, padding: 20 }}>
-            {renderResult()}
+        </div>
+
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 6 }}>📊 Gains estimés — {ROLES[currentRole]?.label}</div>
+          <div style={{ fontSize: 12, color: G.muted, marginBottom: 20 }}>Projection mensuelle</div>
+          {[
+            { label: `Adhésion × ${members} membres × 10%`, val: ga, color: G.green },
+            { label: `Cotisation × ${members} membres × 5%`, val: gc, color: G.blue },
+            { label: `Bonus réseau (CA ${fmtShort(ca)} × 1,5%)`, val: gb, color: G.gold },
+          ].map((item, i) => (
+            <div key={i} style={{ padding: "12px 0", borderBottom: `1px solid ${G.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: G.muted }}>{item.label}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{fmtShort(item.val)}</span>
+              </div>
+              <div style={{ marginTop: 6, height: 4, background: G.border, borderRadius: 4 }}>
+                <div style={{ height: 4, background: item.color, borderRadius: 4, width: total ? `${Math.round(item.val / total * 100)}%` : "0%", transition: "width .3s" }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 20, background: G.purpleLight, borderRadius: 12, padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: G.purple }}>Total mensuel estimé</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: G.purple }}>{fmtShort(total)}</span>
           </div>
         </div>
       </div>
@@ -1099,50 +1154,40 @@ function SimulatePage({ currentRole, onRoleChange }) {
 
 // ─── NAV ITEMS ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",    label: "Tableau de bord",  icon: "◉" },
-  { id: "network",      label: "Mon réseau",        icon: "◈" },
-  { id: "creer",        label: "Créer un membre",   icon: "+" },
-  { id: "commissions",  label: "Commissions",       icon: "◎" },
-  { id: "bonus",        label: "Bonus mensuel",     icon: "◆" },
-  { id: "paiement",     label: "Payer",             icon: "◑" },
-  { id: "invite",       label: "Lien d'invitation", icon: "◇" },
-  { id: "history",      label: "Historique",        icon: "○" },
-  { id: "simulate",     label: "Simuler rôle",      icon: "◐" },
+  { id: "dashboard",    label: "Tableau de bord",   icon: "◉" },
+  { id: "network",      label: "Mon réseau",         icon: "◈" },
+  { id: "creer",        label: "Créer un membre",    icon: "＋" },
+  { id: "commissions",  label: "Commissions",        icon: "◎" },
+  { id: "bonus",        label: "Bonus mensuel",      icon: "◆" },
+  { id: "paiement",     label: "Payer",              icon: "◑" },
+  { id: "invite",       label: "Lien d'invitation",  icon: "◇" },
+  { id: "history",      label: "Historique",         icon: "○" },
+  { id: "simulate",     label: "Simuler rôle",       icon: "◐" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
-// APP
+// APP ROOT
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [membre, setMembre] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [page, setPage]   = useState("dashboard");
+  const [page, setPage] = useState("dashboard");
   const [simRole, setSimRole] = useState(null);
+  const [navOpen, setNavOpen] = useState(true);
 
   useEffect(() => {
-    const token        = localStorage.getItem("cnepeci_token");
+    const token = localStorage.getItem("cnepeci_token");
     const membreStored = localStorage.getItem("cnepeci_membre");
-
     if (!token || !membreStored) { setChecking(false); return; }
-
-    // Vérifier le token via /profile (endpoint authentifié)
-    apiFetch("/profile")
-      .then(data => {
-        if (data?.success) {
-          try { setMembre(JSON.parse(membreStored)); } catch { /* ignore */ }
-        } else {
-          localStorage.removeItem("cnepeci_token");
-          localStorage.removeItem("cnepeci_membre");
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem("cnepeci_token");
-        localStorage.removeItem("cnepeci_membre");
-      })
-      .finally(() => setChecking(false));
+    apiFetch("/profile").then(data => {
+      if (data?.success) { try { setMembre(JSON.parse(membreStored)); } catch {} }
+      else { localStorage.removeItem("cnepeci_token"); localStorage.removeItem("cnepeci_membre"); }
+    }).catch(() => {
+      localStorage.removeItem("cnepeci_token"); localStorage.removeItem("cnepeci_membre");
+    }).finally(() => setChecking(false));
   }, []);
 
-  const role     = simRole || membre?.role || "SOUSCRIPTEUR";
+  const role = simRole || membre?.role || "SOUSCRIPTEUR";
   const roleInfo = ROLES[role] || ROLES.SOUSCRIPTEUR;
   const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || "Tableau de bord";
 
@@ -1153,17 +1198,14 @@ export default function App() {
   };
 
   if (checking) return (
-    <div style={{ minHeight: "100vh", background: "#f5f4f0", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: G.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
       <Spinner />
     </div>
   );
 
   if (!membre) return <AuthPage onAuth={m => setMembre(m)} />;
 
-  // Masquer "Créer un membre" si le rôle ne peut pas créer
-  const navVisible = NAV_ITEMS.filter(item =>
-    item.id !== "creer" || !!CREATION_MAP[membre.role]
-  );
+  const navVisible = NAV_ITEMS.filter(item => item.id !== "creer" || !!CREATION_MAP[membre.role]);
 
   const renderPage = () => {
     switch (page) {
@@ -1181,59 +1223,83 @@ export default function App() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: G.bg }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+      `}</style>
+
       {/* SIDEBAR */}
-      <aside style={styles.sidebar}>
-        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", letterSpacing: "-.2px" }}>CNEPECI Business</div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginTop: 2 }}>Réseau indépendant</div>
-        </div>
-
-        <div style={{ margin: "12px 14px", padding: "6px 10px", background: roleInfo.color, borderRadius: 6, fontSize: 11, fontWeight: 500, textAlign: "center", color: "#fff" }}>
-          {roleInfo.label.toUpperCase()}
-        </div>
-
-        <nav style={{ flex: 1, padding: "6px 0", overflowY: "auto" }}>
-          {navVisible.map(item => (
-            <div
-              key={item.id}
-              onClick={() => { setPage(item.id); if (item.id !== "simulate") setSimRole(null); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 20px", cursor: "pointer", fontSize: 13,
-                color: page === item.id ? "#c8b8ff" : "rgba(255,255,255,.6)",
-                background: page === item.id ? "rgba(127,119,221,.15)" : "transparent",
-                borderLeft: `2px solid ${page === item.id ? "#7F77DD" : "transparent"}`,
-                transition: "all .15s",
-              }}
-            >
-              <span style={{ width: 16, textAlign: "center", fontSize: 13 }}>{item.icon}</span>
-              {item.label}
+      <aside style={{ width: 230, background: G.sidebar, display: "flex", flexDirection: "column", height: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100 }}>
+        {/* Logo */}
+        <div style={{ padding: "20px 20px 14px", borderBottom: `1px solid ${G.sidebarBorder}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: `linear-gradient(135deg, ${G.purple}, #5B21B6)`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>⛪</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: "-.2px" }}>CNEPECI</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,.35)", marginTop: 1, letterSpacing: ".3px" }}>BUSINESS NETWORK</div>
             </div>
-          ))}
+          </div>
+        </div>
+
+        {/* Role badge */}
+        <div style={{ margin: "12px 16px 4px", padding: "8px 12px", background: roleInfo.color + "22", borderRadius: 10, border: `1px solid ${roleInfo.color}44` }}>
+          <div style={{ fontSize: 10, color: roleInfo.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>Rôle actif</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginTop: 2 }}>{roleInfo.label}</div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
+          {navVisible.map(item => {
+            const isActive = page === item.id;
+            return (
+              <div key={item.id} onClick={() => { setPage(item.id); if (item.id !== "simulate") setSimRole(null); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 20px", cursor: "pointer", fontSize: 13, color: isActive ? "#fff" : "rgba(255,255,255,.5)", background: isActive ? `${G.purple}22` : "transparent", borderLeft: `3px solid ${isActive ? G.purple : "transparent"}`, transition: "all .15s", userSelect: "none" }}>
+                <span style={{ width: 16, textAlign: "center", fontSize: 13, color: isActive ? G.purple : "rgba(255,255,255,.3)" }}>{item.icon}</span>
+                <span style={{ fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
+              </div>
+            );
+          })}
         </nav>
 
-        <div
-          onClick={handleLogout}
-          style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,.08)", fontSize: 12, color: "rgba(255,255,255,.4)", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
-        >
+        <div onClick={handleLogout} style={{ padding: "14px 20px", borderTop: `1px solid ${G.sidebarBorder}`, fontSize: 12, color: "rgba(255,255,255,.3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "color .15s" }}
+          onMouseEnter={e => e.currentTarget.style.color = "#FCA5A5"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,.3)"}>
           <span>⎋</span> Déconnexion
         </div>
       </aside>
 
       {/* MAIN */}
-      <div style={styles.main}>
-        <div style={styles.topbar}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1917" }}>{pageTitle}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 12, color: "#888" }}>{membre.nom}</span>
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: roleInfo.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 600 }}>
-              {roleInfo.abbr}
+      <div style={{ marginLeft: 230, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        {/* Topbar */}
+        <div style={{ background: G.surface, borderBottom: `1px solid ${G.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: G.text }}>{pageTitle}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {simRole && (
+              <div style={{ background: G.goldLight, color: G.gold, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700 }}>
+                👁 Simulation : {ROLES[simRole]?.label}
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{membre.nom}</div>
+                <div style={{ fontSize: 10, color: G.muted }}>{ROLES[membre.role]?.label}</div>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${roleInfo.color}, ${roleInfo.color}99)`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 800 }}>
+                {roleInfo.abbr}
+              </div>
             </div>
           </div>
         </div>
 
-        <div style={{ padding: "24px 28px" }}>
+        {/* Page content */}
+        <div style={{ padding: "28px 28px", flex: 1, animation: "fadeIn .2s ease" }} key={page}>
           {renderPage()}
         </div>
       </div>
