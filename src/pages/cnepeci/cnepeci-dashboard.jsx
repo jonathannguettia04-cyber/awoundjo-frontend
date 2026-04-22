@@ -17,13 +17,20 @@ async function apiFetch(path, options = {}) {
       ...options,
       headers: { ...apiHeaders(), ...(options.headers || {}) },
     });
+    // FIX : toujours parser le JSON même en erreur (400, 409, 500…)
+    //       pour récupérer le message d'erreur backend
+    const json = await res.json().catch(() => null);
     if (res.status === 401) {
       localStorage.removeItem("cnepeci_token");
       localStorage.removeItem("cnepeci_membre");
       window.location.reload();
       return null;
     }
-    return await res.json();
+    // FIX : si le backend retourne un code HTTP erreur mais un JSON valide,
+    //       on retourne ce JSON (avec success:false et message) au lieu de null
+    if (!res.ok && json) return { success: false, ...json };
+    if (!res.ok) return { success: false, message: `Erreur serveur (${res.status})` };
+    return json;
   } catch (e) {
     console.error("[apiFetch]", path, e.message);
     return null;
@@ -250,12 +257,27 @@ function TreeNode({ node }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function AuthPage({ onAuth }) {
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ nom: "", email: "", phone: "", password: "" });
+  // FIX 1 : code_invitation ajouté au state — nécessaire pour les inscriptions
+  // non-Bureau Centrale (tous les autres rôles l'exigent côté backend)
+  const [form, setForm] = useState({ nom: "", email: "", phone: "", password: "", code_invitation: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  // FIX 2 : isFirstAccount — détecte si c'est la création du Bureau Centrale
+  // (pas de code d'invitation requis dans ce cas)
+  const [isFirstAccount, setIsFirstAccount] = useState(null); // null = pas encore vérifié
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Vérifie au montage si la table est vide (premier compte = Bureau Centrale)
+  useEffect(() => {
+    if (mode !== "register") return;
+    apiFetch("/check-first").then(data => {
+      // Si l'endpoint n'existe pas encore, on assume que le champ est optionnel
+      if (data?.success) setIsFirstAccount(!!data.is_first);
+      else setIsFirstAccount(false); // par défaut : afficher le champ code
+    }).catch(() => setIsFirstAccount(false));
+  }, [mode]);
 
   const handleSubmit = async () => {
     setError(""); setSuccessMsg("");
@@ -263,12 +285,25 @@ function AuthPage({ onAuth }) {
     if (mode === "register" && !form.nom) { setError("Nom requis."); return; }
     setLoading(true);
     try {
+      // FIX 3 : le body inclut code_invitation — sans ça le backend renvoie
+      // systématiquement 400 "Un code d'invitation est requis pour s'inscrire"
       const body = mode === "login"
         ? { email: form.email, password: form.password }
-        : { nom: form.nom, email: form.email, phone: form.phone, password: form.password };
+        : {
+            nom:             form.nom,
+            email:           form.email,
+            phone:           form.phone,
+            password:        form.password,
+            // On inclut code_invitation seulement si renseigné (vide = ignoré)
+            ...(form.code_invitation ? { code_invitation: form.code_invitation } : {}),
+          };
       const data = await apiFetch(mode === "login" ? "/login" : "/register", { method: "POST", body: JSON.stringify(body) });
       if (!data) { setError("Erreur réseau. Réessayez."); return; }
-      if (!data.success) { setError(data.message || "Erreur inconnue"); return; }
+      // FIX 4 : affiche le vrai message d'erreur du backend (plus "Erreur inconnue")
+      if (!data.success) {
+        setError(data.message || data.error || `Erreur serveur (${data.status || "inconnu"})`);
+        return;
+      }
       if (mode === "login") {
         const token = data.token || data.data?.token;
         const membre = data.membre || data.data?.membre;
@@ -285,34 +320,48 @@ function AuthPage({ onAuth }) {
           localStorage.setItem("cnepeci_membre", JSON.stringify(membre));
           onAuth(membre);
         } else {
-          setSuccessMsg("Compte Bureau Centrale créé ! Connectez-vous.");
+          setSuccessMsg("Compte créé avec succès ! Connectez-vous.");
           setMode("login");
-          setForm(f => ({ ...f, nom: "", phone: "", password: "" }));
+          setForm(f => ({ ...f, nom: "", phone: "", password: "", code_invitation: "" }));
         }
       }
-    } catch { setError("Erreur réseau. Vérifiez votre connexion."); }
+    } catch (e) { setError("Erreur réseau. Vérifiez votre connexion."); console.error(e); }
     finally { setLoading(false); }
   };
+
+  // Champs dynamiques selon le mode et si c'est le premier compte
+  const registerFields = [
+    { label: "Nom complet",       key: "nom",              type: "text" },
+    { label: "Email",             key: "email",            type: "email" },
+    { label: "Téléphone",         key: "phone",            type: "tel" },
+    // FIX 5 : champ code_invitation affiché uniquement si ce n'est pas le premier compte
+    ...(!isFirstAccount ? [{ label: "Code d'invitation", key: "code_invitation", type: "text", placeholder: "Ex: CG1A2B3C4D" }] : []),
+    { label: "Mot de passe",      key: "password",         type: showPwd ? "text" : "password" },
+  ];
+  const loginFields = [
+    { label: "Email",         key: "email",    type: "email" },
+    { label: "Mot de passe",  key: "password", type: showPwd ? "text" : "password" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(135deg,#0F0E17 0%,#1E1B4B 50%,#0F0E17 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif", position: "relative" }}>
       <div style={{ position: "absolute", top: "15%", left: "10%", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle,${G.purple}22,transparent 70%)`, pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: "15%", right: "10%", width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle,#05966922,transparent 70%)`, pointerEvents: "none" }} />
-      <div style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: "44px", width: 400, maxWidth: "90vw" }}>
+      <div style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: "44px", width: 420, maxWidth: "90vw" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ width: 56, height: 56, background: `linear-gradient(135deg,${G.purple},#5B21B6)`, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 24, boxShadow: `0 8px 32px ${G.purple}44` }}>⛪</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>CNEPECI Business</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 4 }}>{mode === "login" ? "Connexion à votre espace" : "Créer le Bureau Centrale"}</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 4 }}>
+            {mode === "login" ? "Connexion à votre espace" : isFirstAccount === null ? "Chargement…" : isFirstAccount ? "Créer le Bureau Centrale" : "Rejoindre le réseau"}
+          </div>
         </div>
         {error && <div style={{ background: "rgba(220,38,38,.15)", color: "#FCA5A5", border: "1px solid rgba(220,38,38,.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
         {successMsg && <div style={{ background: "rgba(5,150,105,.15)", color: "#6EE7B7", border: "1px solid rgba(5,150,105,.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>✅ {successMsg}</div>}
-        {(mode === "register"
-          ? [{ label: "Nom complet", key: "nom", type: "text" }, { label: "Email", key: "email", type: "email" }, { label: "Téléphone", key: "phone", type: "tel" }, { label: "Mot de passe", key: "password", type: showPwd ? "text" : "password" }]
-          : [{ label: "Email", key: "email", type: "email" }, { label: "Mot de passe", key: "password", type: showPwd ? "text" : "password" }]
-        ).map(f => (
+        {(mode === "register" ? registerFields : loginFields).map(f => (
           <div key={f.key} style={{ marginBottom: 14, position: "relative" }}>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>{f.label}</label>
-            <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)} onKeyDown={e => e.key === "Enter" && handleSubmit()}
+          <input type={f.type} value={form[f.key]} onChange={e => set(f.key, e.target.value)} onKeyDown={e => e.key === "Enter" && handleSubmit()}
+              placeholder={f.placeholder || ""}
               style={{ width: "100%", padding: "11px 14px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 13, color: "#fff", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
               onFocus={e => e.target.style.borderColor = G.purple} onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"} />
             {f.key === "password" && <span onClick={() => setShowPwd(s => !s)} style={{ position: "absolute", right: 12, bottom: 11, fontSize: 14, cursor: "pointer", color: "rgba(255,255,255,.3)" }}>{showPwd ? "🙈" : "👁"}</span>}
