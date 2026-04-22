@@ -639,7 +639,7 @@ export default function AdminCnepeci() {
       if (membresRes.status === "fulfilled")     setMembres(membresRes.value.data?.membres || membresRes.value.data?.data || []);
       if (paiementsRes.status === "fulfilled")   setPaiements(paiementsRes.value.data?.paiements || paiementsRes.value.data?.data?.paiements || paiementsRes.value.data?.data || []);
       if (commissionsRes.status === "fulfilled") setCommissions(commissionsRes.value.data?.commissions || commissionsRes.value.data?.data?.commissions || commissionsRes.value.data?.data || []);
-      if (bureauRes.status === "fulfilled")      setBureauCentrale(bureauRes.value.data?.data || null);
+      if (bureauRes.status === "fulfilled")      setBureauCentrale(bureauRes.value.data?.data || bureauRes.value.data || null);
     } catch { setAlert({ type: "error", msg: "Erreur lors du chargement des données." }); }
     finally { setLoading(false); }
   }, []);
