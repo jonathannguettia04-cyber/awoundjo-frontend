@@ -625,6 +625,15 @@ export default function AdminCnepeci() {
   const [alert, setAlert] = useState(null);
   const [searchOverlay, setSearchOverlay] = useState(false);
 
+  // 💸 Demandes de paiement de commissions
+  const [demandesComm,         setDemandesComm]         = useState([]);
+  const [demandesStats,        setDemandesStats]        = useState({});
+  const [demandesFilter,       setDemandesFilter]       = useState("");
+  const [demandesLoading,      setDemandesLoading]      = useState(false);
+  const [actionLoading,        setActionLoading]        = useState(null);
+  const [rejectModal,          setRejectModal]          = useState(null);
+  const [rejectNote,           setRejectNote]           = useState("");
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -667,12 +676,39 @@ export default function AdminCnepeci() {
     return s === "actif" || s === "active";
   }).length;
 
+  const fetchDemandes = useCallback(async () => {
+    setDemandesLoading(true);
+    try {
+      const params = new URLSearchParams({ network: "CNEPECI", limit: 100 });
+      if (demandesFilter) params.set("status", demandesFilter);
+      const res = await api("get", `/api/commissions/requests?${params}`);
+      setDemandesComm(res.data?.requests || res.data?.data?.requests || []);
+      setDemandesStats(res.data?.stats   || res.data?.data?.stats   || {});
+    } catch { setDemandesComm([]); }
+    finally { setDemandesLoading(false); }
+  }, [demandesFilter]);
+
+  async function handleDemandeAction(id, action, note = "") {
+    setActionLoading(id + action);
+    try {
+      await api("patch", `/api/commissions/requests/${id}`, { action, admin_note: note });
+      setAlert({ type: "success", msg: `Demande #${id} : ${action}` });
+      setRejectModal(null); setRejectNote("");
+      fetchDemandes();
+    } catch (e) {
+      setAlert({ type: "error", msg: e.response?.data?.error || "Erreur action" });
+    } finally { setActionLoading(null); }
+  }
+
+  useEffect(() => { if (tab === "demandes") fetchDemandes(); }, [tab, fetchDemandes]);
+
   const TABS = [
-    { id: "overview",    label: "📊 Vue d'ensemble" },
-    { id: "membres",     label: `👥 Membres`, count: membres.length },
-    { id: "paiements",   label: `💰 Paiements`, count: paiements.length, alert: pendingPaiements },
-    { id: "commissions", label: `🏆 Commissions` },
-    { id: "bureau",      label: "🏛️ Bureau Centrale" },
+    { id: "overview",   label: "📊 Vue d'ensemble" },
+    { id: "membres",    label: `👥 Membres`, count: membres.length },
+    { id: "paiements",  label: `💰 Paiements`, count: paiements.length, alert: pendingPaiements },
+    { id: "commissions",label: `🏆 Commissions` },
+    { id: "bureau",     label: "🏛️ Bureau Centrale" },
+    { id: "demandes",   label: "💸 Demandes Retrait", alert: demandesStats["PENDING"] || 0 },
   ];
 
   return (
@@ -927,6 +963,128 @@ export default function AdminCnepeci() {
                 )}
               </div>
             )}
+            {/* ════ TAB : DEMANDES RETRAIT ════ */}
+            {tab === "demandes" && (
+              <div>
+                {/* Stats filtres */}
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+                  {[
+                    { label: "En attente", key: "PENDING",   color: C.gold,   bg: C.goldL   },
+                    { label: "Validées",   key: "VALIDATED", color: C.blue,   bg: C.blueL   },
+                    { label: "Payées",     key: "PAID",      color: C.green,  bg: C.greenL  },
+                    { label: "Rejetées",   key: "REJECTED",  color: C.red,    bg: C.redL    },
+                  ].map(({ label, key, color, bg }) => (
+                    <div key={key}
+                      onClick={() => setDemandesFilter(demandesFilter === key ? "" : key)}
+                      style={{ background: bg, border: `1.5px solid ${color}44`, borderRadius: 12, padding: "12px 18px",
+                        cursor: "pointer", opacity: demandesFilter && demandesFilter !== key ? 0.45 : 1, transition: "opacity .15s" }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color }}>{demandesStats[key] || 0}</div>
+                      <div style={{ fontSize: 11, color, fontWeight: 700 }}>{label}</div>
+                    </div>
+                  ))}
+                  <button onClick={fetchDemandes}
+                    style={{ padding: "9px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", color: C.slate }}>
+                    🔄 Actualiser
+                  </button>
+                </div>
+
+                {demandesLoading ? <Spinner /> : demandesComm.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "48px 20px", color: C.slate, background: C.surface, borderRadius: 16, border: `1px solid ${C.border}` }}>
+                    <p style={{ fontSize: 40, margin: "0 0 12px" }}>💤</p>
+                    <p style={{ fontWeight: 800, fontSize: 15, color: C.dark, margin: "0 0 6px" }}>Aucune demande de retrait</p>
+                    <p style={{ fontSize: 12, margin: 0 }}>Les demandes CNEPECI apparaîtront ici</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {demandesComm.map(r => {
+                      const details = typeof r.payment_details === "string" ? JSON.parse(r.payment_details || "{}") : (r.payment_details || {});
+                      const ST = {
+                        PENDING:   { label: "⏳ En attente", color: C.gold,   bg: C.goldL   },
+                        VALIDATED: { label: "✅ Validée",    color: C.blue,   bg: C.blueL   },
+                        PAID:      { label: "💸 Payée",      color: C.green,  bg: C.greenL  },
+                        REJECTED:  { label: "❌ Rejetée",    color: C.red,    bg: C.redL    },
+                      };
+                      const st = ST[r.status] || ST.PENDING;
+                      return (
+                        <div key={r.id} style={{ background: C.surface, borderRadius: 14, border: `1px solid ${r.status === "PENDING" ? C.gold + "55" : C.border}`, padding: "16px 20px", animation: "fadeIn .2s ease" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                                <span style={{ fontSize: 20, fontWeight: 900, color: C.green }}>
+                                  {Number(r.amount_requested || 0).toLocaleString("fr-FR")} FCFA
+                                </span>
+                                <span style={{ background: st.bg, color: st.color, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
+                                  {st.label}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 12, color: C.slate, marginBottom: 4 }}>
+                                Demande <strong>#{r.id}</strong> · {r.member_name || "—"} ({r.member_role || "CNEPECI"}) · {r.adhesions_since_last} adhésions
+                              </div>
+                              <div style={{ fontSize: 12, color: C.slate }}>
+                                {r.payment_method === "mobile_money" && `📱 ${details.operator || ""} ${details.phone || ""}`}
+                                {r.payment_method === "virement"     && `🏦 ${details.name || ""} — ${details.bank || ""}`}
+                                {r.payment_method === "cash"         && "💵 Espèces en agence"}
+                                {" · "}{fmtDate(r.created_at)}
+                              </div>
+                              {r.status === "REJECTED" && r.admin_note && (
+                                <div style={{ marginTop: 8, background: C.redL, borderRadius: 8, padding: "6px 12px", fontSize: 12, color: C.red, fontWeight: 600 }}>
+                                  ❌ Motif : {r.admin_note}
+                                </div>
+                              )}
+                              {r.validated_at && <div style={{ fontSize: 11, color: C.blue, fontWeight: 700, marginTop: 6 }}>✅ Validée le {fmtDate(r.validated_at)}</div>}
+                              {r.paid_at      && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 4 }}>💸 Payée le {fmtDate(r.paid_at)}</div>}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {r.status === "PENDING" && (
+                                <>
+                                  <button onClick={() => handleDemandeAction(r.id, "validate")} disabled={!!actionLoading}
+                                    style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: C.blue, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                                    {actionLoading === r.id + "validate" ? "…" : "✅ Valider"}
+                                  </button>
+                                  <button onClick={() => { setRejectModal({ id: r.id, name: r.member_name || `#${r.id}` }); setRejectNote(""); }}
+                                    style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.red}`, background: C.redL, color: C.red, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                                    ❌ Rejeter
+                                  </button>
+                                </>
+                              )}
+                              {r.status === "VALIDATED" && (
+                                <button onClick={() => handleDemandeAction(r.id, "pay")} disabled={!!actionLoading}
+                                  style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: C.green, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                                  {actionLoading === r.id + "pay" ? "…" : "💸 Marquer Payée"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Modal rejet */}
+                {rejectModal && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+                    <div style={{ background: "#fff", borderRadius: 16, padding: "28px 24px", maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.2)", animation: "modalIn .2s ease" }}>
+                      <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.dark }}>❌ Rejeter la demande</h3>
+                      <p style={{ margin: "0 0 14px", fontSize: 13, color: C.slate }}>Demande de <strong>{rejectModal.name}</strong> — motif (optionnel) :</p>
+                      <input placeholder="Motif du rejet…" value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${C.red}44`, fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 16, fontFamily: "inherit" }} />
+                      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                        <button onClick={() => setRejectModal(null)}
+                          style={{ padding: "9px 18px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", color: C.slate, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                          Annuler
+                        </button>
+                        <button onClick={() => handleDemandeAction(rejectModal.id, "reject", rejectNote)} disabled={!!actionLoading}
+                          style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: C.red, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                          {actionLoading ? "…" : "Rejeter"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
       </div>

@@ -21,7 +21,7 @@ const STATUS_COLORS = {
   SUSPENDED: { bg: "#FEF2F2", color: "#DC2626" },
 };
 
-const TABS = ["Membres", "Commissions", "Bonus Pool"];
+const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission"];
 
 // ── Hook fetch générique ──────────────────────────────────────
 function useAdminFetch(token) {
@@ -69,6 +69,14 @@ export default function AdminBusiness() {
   // Filtres commissions
   const [commStatus, setCommStatus] = useState("");
 
+  // Demandes de commission (retrait)
+  const [demandesComm,          setDemandesComm]          = useState([]);
+  const [demandesStats,         setDemandesStats]         = useState({});
+  const [demandesStatusFilter,  setDemandesStatusFilter]  = useState("");
+  const [actionLoading,         setActionLoading]         = useState(null);
+  const [rejectModal,           setRejectModal]           = useState(null);
+  const [rejectNote,            setRejectNote]            = useState("");
+
   // Modal confirmation
   const [modal, setModal] = useState(null); // { type, member/commission }
 
@@ -114,11 +122,24 @@ export default function AdminBusiness() {
     setLoading(false);
   }, [get]);
 
+  const loadDemandesCommission = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ network: "BUSINESS", limit: 100 });
+      if (demandesStatusFilter) params.set("status", demandesStatusFilter);
+      const d = await get(`/api/commissions/requests?${params}`);
+      setDemandesComm(d.requests || d.data?.requests || []);
+      setDemandesStats(d.stats   || d.data?.stats   || {});
+    } catch (e) { showToast(e.message, true); }
+    setLoading(false);
+  }, [get, demandesStatusFilter]);
+
   useEffect(() => {
-    if (tab === "Membres")     loadMembers();
-    if (tab === "Commissions") loadCommissions();
-    if (tab === "Bonus Pool")  loadBonusPool();
-  }, [tab, loadMembers, loadCommissions, loadBonusPool]);
+    if (tab === "Membres")              loadMembers();
+    if (tab === "Commissions")          loadCommissions();
+    if (tab === "Bonus Pool")           loadBonusPool();
+    if (tab === "Demandes Commission")  loadDemandesCommission();
+  }, [tab, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission]);
 
   // ── Actions membres ────────────────────────────────────────
   async function handleValidate(id, action, isCash = false) {
@@ -177,6 +198,24 @@ export default function AdminBusiness() {
       showToast(`✅ Commission : ${action}`);
       loadCommissions();
     } catch (e) { showToast(e.message, true); }
+  }
+
+  // ── Actions demandes de retrait ────────────────────────────
+  async function handleDemandeAction(id, action, note = "") {
+    setActionLoading(id + action);
+    try {
+      const r = await fetch(`${API}/api/commissions/requests/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, admin_note: note }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || "Erreur");
+      showToast(`✅ Demande #${id} : ${action}`);
+      setRejectModal(null); setRejectNote("");
+      loadDemandesCommission();
+    } catch (e) { showToast(e.message, true); }
+    setActionLoading(null);
   }
 
   // ── Filtre local membres ───────────────────────────────────
@@ -465,6 +504,135 @@ export default function AdminBusiness() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ONGLET DEMANDES COMMISSION ──────────────────── */}
+      {tab === "Demandes Commission" && (
+        <div>
+          {/* Stats rapides */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+            {[
+              { label: "En attente", key: "PENDING",   color: "#D97706", bg: "#FFFBEB" },
+              { label: "Validées",   key: "VALIDATED", color: "#1B4FD8", bg: "#EFF6FF" },
+              { label: "Payées",     key: "PAID",      color: "#059669", bg: "#ECFDF5" },
+              { label: "Rejetées",   key: "REJECTED",  color: "#DC2626", bg: "#FEF2F2" },
+            ].map(({ label, key, color, bg }) => (
+              <div key={key} onClick={() => setDemandesStatusFilter(demandesStatusFilter === key ? "" : key)}
+                style={{ background: bg, border: `1.5px solid ${color}44`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", opacity: demandesStatusFilter && demandesStatusFilter !== key ? 0.5 : 1, transition: "opacity .15s" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color }}>{demandesStats[key] || 0}</div>
+                <div style={{ fontSize: 11, color, fontWeight: 700 }}>{label}</div>
+              </div>
+            ))}
+            <button onClick={loadDemandesCommission} style={s.btnSecondary}>↻ Rafraîchir</button>
+          </div>
+
+          {loading ? <Spinner /> : demandesComm.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>💤</div>
+              <p style={{ fontWeight: 700 }}>Aucune demande de paiement</p>
+              <p style={{ fontSize: 12 }}>Les demandes de retrait de commissions apparaîtront ici</p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {demandesComm.map(r => {
+                const details = typeof r.payment_details === "string" ? JSON.parse(r.payment_details || "{}") : (r.payment_details || {});
+                const STATUS_MAP = {
+                  PENDING:   { label: "⏳ En attente", color: "#D97706", bg: "#FFFBEB" },
+                  VALIDATED: { label: "✅ Validée",    color: "#1B4FD8", bg: "#EFF6FF" },
+                  PAID:      { label: "💸 Payée",      color: "#059669", bg: "#ECFDF5" },
+                  REJECTED:  { label: "❌ Rejetée",    color: "#DC2626", bg: "#FEF2F2" },
+                };
+                const st = STATUS_MAP[r.status] || STATUS_MAP.PENDING;
+                return (
+                  <div key={r.id} style={{ background: "#fff", borderRadius: 12, border: `1px solid ${r.status === "PENDING" ? "#D9770633" : "#E2E8F0"}`, padding: "16px 20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                          <span style={{ fontSize: 19, fontWeight: 900, color: "#059669" }}>
+                            {Number(r.amount_requested || 0).toLocaleString("fr-FR")} FCFA
+                          </span>
+                          <span style={{ background: st.bg, color: st.color, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
+                            {st.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>
+                          Demande <strong>#{r.id}</strong> · {r.member_name || "—"} ({r.member_role || r.network}) · {r.adhesions_since_last} adhésions
+                        </div>
+                        <div style={{ fontSize: 12, color: "#64748B" }}>
+                          {r.payment_method === "mobile_money" && `📱 ${details.operator || ""} ${details.phone || ""}`}
+                          {r.payment_method === "virement"     && `🏦 ${details.name || ""} — ${details.iban || details.bank || ""}`}
+                          {r.payment_method === "cash"         && "💵 Espèces en agence"}
+                          {" · "}<span style={{ color: "#94A3B8" }}>{new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                        </div>
+                        {r.admin_note && r.status === "REJECTED" && (
+                          <div style={{ marginTop: 8, background: "#FEF2F2", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#DC2626", fontWeight: 600 }}>
+                            ❌ Motif : {r.admin_note}
+                          </div>
+                        )}
+                        {r.validated_at && (
+                          <div style={{ fontSize: 11, color: "#1B4FD8", fontWeight: 700, marginTop: 6 }}>
+                            ✅ Validée le {new Date(r.validated_at).toLocaleDateString("fr-FR")}
+                          </div>
+                        )}
+                        {r.paid_at && (
+                          <div style={{ fontSize: 11, color: "#059669", fontWeight: 700, marginTop: 4 }}>
+                            💸 Payée le {new Date(r.paid_at).toLocaleDateString("fr-FR")}
+                          </div>
+                        )}
+                      </div>
+                      {/* Actions */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {r.status === "PENDING" && (
+                          <>
+                            <button onClick={() => handleDemandeAction(r.id, "validate")}
+                              disabled={!!actionLoading}
+                              style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#1B4FD8", color: "#fff", fontWeight: 700, fontSize: 12, cursor: actionLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                              {actionLoading === r.id + "validate" ? "…" : "✅ Valider"}
+                            </button>
+                            <button onClick={() => { setRejectModal({ id: r.id, name: r.member_name || `#${r.id}` }); setRejectNote(""); }}
+                              style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid #DC2626", background: "#FEF2F2", color: "#DC2626", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                              ❌ Rejeter
+                            </button>
+                          </>
+                        )}
+                        {r.status === "VALIDATED" && (
+                          <button onClick={() => handleDemandeAction(r.id, "pay")}
+                            disabled={!!actionLoading}
+                            style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#059669", color: "#fff", fontWeight: 700, fontSize: 12, cursor: actionLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                            {actionLoading === r.id + "pay" ? "…" : "💸 Marquer Payée"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Modal rejet */}
+          {rejectModal && (
+            <div style={s.overlay}>
+              <div style={s.modalBox}>
+                <h3 style={{ ...s.modalTitle, color: "#DC2626" }}>❌ Rejeter la demande</h3>
+                <p style={s.modalText}>Demande de <strong>{rejectModal.name}</strong> — veuillez indiquer un motif (optionnel) :</p>
+                <input
+                  placeholder="Motif du rejet…"
+                  value={rejectNote}
+                  onChange={e => setRejectNote(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #FECACA", fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 16 }}
+                />
+                <div style={s.modalActions}>
+                  <button style={s.btnSecondary} onClick={() => setRejectModal(null)}>Annuler</button>
+                  <button style={s.btnDanger} onClick={() => handleDemandeAction(rejectModal.id, "reject", rejectNote)}
+                    disabled={!!actionLoading}>
+                    {actionLoading ? "…" : "Rejeter"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

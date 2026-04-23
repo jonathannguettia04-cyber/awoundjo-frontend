@@ -345,6 +345,15 @@ export default function AdminFederation() {
   const [validating, setValidating]   = useState(null);
   const [cashModes, setCashModes]     = useState({});
 
+  // 💸 Demandes de paiement de commissions
+  const [demandesComm,       setDemandesComm]       = useState([]);
+  const [demandesStats,      setDemandesStats]       = useState({});
+  const [demandesFilter,     setDemandesFilter]     = useState("");
+  const [demandesLoading,    setDemandesLoading]    = useState(false);
+  const [actionLoading,      setActionLoading]      = useState(null);
+  const [rejectModal,        setRejectModal]        = useState(null);
+  const [rejectNote,         setRejectNote]         = useState("");
+
   const stats = {
     total:      members.length,
     actifs:     members.filter(m => m.status === "ACTIVE").length,
@@ -416,10 +425,41 @@ export default function AdminFederation() {
     }
   }
 
+  async function fetchDemandes() {
+    setDemandesLoading(true);
+    try {
+      const params = new URLSearchParams({ network: "DIASPORA", limit: 100 }); // Fédération utilise le réseau DIASPORA (ambassadors)
+      if (demandesFilter) params.set("status", demandesFilter);
+      const { data } = await axios.get(`${API}/api/commissions/requests?${params}`, {
+        headers: { Authorization: `Bearer ${agentToken()}` },
+      });
+      setDemandesComm(data.requests || data.data?.requests || []);
+      setDemandesStats(data.stats   || data.data?.stats   || {});
+    } catch (e) {
+      console.error("fetchDemandes Federation", e.message);
+    } finally { setDemandesLoading(false); }
+  }
+
+  async function handleDemandeAction(id, action, note = "") {
+    setActionLoading(id + action);
+    try {
+      await axios.patch(`${API}/api/commissions/requests/${id}`, { action, admin_note: note }, {
+        headers: { Authorization: `Bearer ${agentToken()}` },
+      });
+      setRejectModal(null); setRejectNote("");
+      fetchDemandes();
+    } catch (e) {
+      alert(e.response?.data?.error || "Erreur action");
+    } finally { setActionLoading(null); }
+  }
+
+  useEffect(() => { if (tab === "demandes") fetchDemandes(); }, [tab, demandesFilter]);
+
   const TABS = [
-    { id:"members",    label:"👥 Membres",       count:stats.total   },
-    { id:"hierarchy",  label:"🏛️ Hiérarchie",    count:null          },
-    { id:"commissions",label:"💰 Commissions",   count:null          },
+    { id:"members",    label:"👥 Membres",            count: stats.total },
+    { id:"hierarchy",  label:"🏛️ Hiérarchie",         count: null },
+    { id:"commissions",label:"💰 Commissions",        count: null },
+    { id:"demandes",   label:"💸 Demandes Retrait",   count: null, badge: demandesStats["PENDING"] || 0 },
   ];
 
   return (
@@ -459,13 +499,17 @@ export default function AdminFederation() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:"flex", gap:4, background:C.bg, borderRadius:12, padding:4, marginBottom:20, width:"fit-content" }}>
+      <div style={{ display:"flex", gap:4, background:C.bg, borderRadius:12, padding:4, marginBottom:20, width:"fit-content", flexWrap:"wrap" }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{ padding:"8px 18px", borderRadius:8, border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600, transition:"all .2s",
               background:tab===t.id?"#fff":"transparent", color:tab===t.id?C.purple:C.slate,
-              boxShadow:tab===t.id?"0 1px 4px rgba(0,0,0,.08)":"none" }}>
+              boxShadow:tab===t.id?"0 1px 4px rgba(0,0,0,.08)":"none",
+              display:"flex", alignItems:"center", gap:6 }}>
             {t.label}{t.count !== null ? ` (${t.count})` : ""}
+            {t.badge > 0 && (
+              <span style={{ background:C.gold, color:"#fff", borderRadius:999, padding:"1px 7px", fontSize:10, fontWeight:800 }}>{t.badge}</span>
+            )}
           </button>
         ))}
       </div>
@@ -699,6 +743,133 @@ export default function AdminFederation() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ══ TAB : Demandes Retrait ══ */}
+      {tab === "demandes" && (
+        <div>
+          {/* Stats filtres */}
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
+            {[
+              { label:"En attente", key:"PENDING",   color:C.gold,   bg:C.goldL   },
+              { label:"Validées",   key:"VALIDATED", color:C.blue,   bg:C.blueL   },
+              { label:"Payées",     key:"PAID",       color:C.green,  bg:C.greenL  },
+              { label:"Rejetées",   key:"REJECTED",  color:C.red,    bg:C.redL    },
+            ].map(({ label, key, color, bg }) => (
+              <div key={key}
+                onClick={() => setDemandesFilter(demandesFilter === key ? "" : key)}
+                style={{ background:bg, border:`1.5px solid ${color}44`, borderRadius:10, padding:"10px 16px",
+                  cursor:"pointer", opacity: demandesFilter && demandesFilter !== key ? 0.5 : 1, transition:"opacity .15s" }}>
+                <div style={{ fontSize:18, fontWeight:900, color }}>{demandesStats[key] || 0}</div>
+                <div style={{ fontSize:11, color, fontWeight:700 }}>{label}</div>
+              </div>
+            ))}
+            <button onClick={fetchDemandes}
+              style={{ padding:"9px 14px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+              ↻ Rafraîchir
+            </button>
+          </div>
+
+          {demandesLoading ? (
+            <div style={{ textAlign:"center", padding:48, color:C.slate }}>
+              <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+              <div style={{ fontSize:32, animation:"spin 1s linear infinite", display:"inline-block" }}>⏳</div>
+            </div>
+          ) : demandesComm.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"48px 20px", color:C.slate, background:"#fff", borderRadius:14, border:`1px solid ${C.border}` }}>
+              <p style={{ fontSize:40, margin:"0 0 10px" }}>💤</p>
+              <p style={{ fontWeight:800, fontSize:15, margin:"0 0 6px", color:C.dark }}>Aucune demande de retrait</p>
+              <p style={{ fontSize:12, margin:0 }}>Les demandes Fédération apparaîtront ici</p>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {demandesComm.map(r => {
+                const details = typeof r.payment_details === "string" ? JSON.parse(r.payment_details || "{}") : (r.payment_details || {});
+                const ST = {
+                  PENDING:   { label:"⏳ En attente", color:C.gold,   bg:C.goldL   },
+                  VALIDATED: { label:"✅ Validée",    color:C.blue,   bg:C.blueL   },
+                  PAID:      { label:"💸 Payée",      color:C.green,  bg:C.greenL  },
+                  REJECTED:  { label:"❌ Rejetée",    color:C.red,    bg:C.redL    },
+                };
+                const st = ST[r.status] || ST.PENDING;
+                return (
+                  <div key={r.id} style={{ background:"#fff", borderRadius:12, border:`1px solid ${r.status === "PENDING" ? C.gold + "44" : C.border}`, padding:"16px 20px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                          <span style={{ fontSize:19, fontWeight:900, color:C.green }}>
+                            {Number(r.amount_requested || 0).toLocaleString("fr-FR")} FCFA
+                          </span>
+                          <span style={{ background:st.bg, color:st.color, padding:"3px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                            {st.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:C.slate, marginBottom:4 }}>
+                          Demande <strong>#{r.id}</strong> · {r.member_name || "—"} ({r.member_role || "Fédération"}) · {r.adhesions_since_last} adhésions
+                        </div>
+                        <div style={{ fontSize:12, color:C.slate }}>
+                          {r.payment_method === "mobile_money" && `📱 ${details.operator || ""} ${details.phone || ""}`}
+                          {r.payment_method === "virement"     && `🏦 ${details.name || ""} — ${details.iban || details.bank || ""}`}
+                          {r.payment_method === "cash"         && "💵 Espèces en agence"}
+                          {" · "}{new Date(r.created_at).toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" })}
+                        </div>
+                        {r.status === "REJECTED" && r.admin_note && (
+                          <div style={{ marginTop:8, background:C.redL, borderRadius:8, padding:"6px 12px", fontSize:12, color:C.red, fontWeight:600 }}>
+                            ❌ Motif : {r.admin_note}
+                          </div>
+                        )}
+                        {r.validated_at && <div style={{ fontSize:11, color:C.blue, fontWeight:700, marginTop:6 }}>✅ Validée le {new Date(r.validated_at).toLocaleDateString("fr-FR")}</div>}
+                        {r.paid_at      && <div style={{ fontSize:11, color:C.green, fontWeight:700, marginTop:4 }}>💸 Payée le {new Date(r.paid_at).toLocaleDateString("fr-FR")}</div>}
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                        {r.status === "PENDING" && (
+                          <>
+                            <button onClick={() => handleDemandeAction(r.id, "validate")} disabled={!!actionLoading}
+                              style={{ padding:"7px 14px", borderRadius:8, border:"none", background:C.purple, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                              {actionLoading === r.id + "validate" ? "…" : "✅ Valider"}
+                            </button>
+                            <button onClick={() => { setRejectModal({ id:r.id, name:r.member_name || `#${r.id}` }); setRejectNote(""); }}
+                              style={{ padding:"7px 14px", borderRadius:8, border:`1.5px solid ${C.red}`, background:C.redL, color:C.red, fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                              ❌ Rejeter
+                            </button>
+                          </>
+                        )}
+                        {r.status === "VALIDATED" && (
+                          <button onClick={() => handleDemandeAction(r.id, "pay")} disabled={!!actionLoading}
+                            style={{ padding:"7px 14px", borderRadius:8, border:"none", background:C.green, color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                            {actionLoading === r.id + "pay" ? "…" : "💸 Marquer Payée"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Modal rejet */}
+          {rejectModal && (
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+              <div style={{ background:"#fff", borderRadius:16, padding:"28px 24px", maxWidth:420, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
+                <h3 style={{ margin:"0 0 10px", fontSize:17, fontWeight:800, color:C.dark }}>❌ Rejeter la demande</h3>
+                <p style={{ margin:"0 0 14px", fontSize:13, color:C.slate }}>Demande de <strong>{rejectModal.name}</strong> — motif (optionnel) :</p>
+                <input placeholder="Motif du rejet…" value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                  style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:`1.5px solid ${C.red}44`, fontSize:14, boxSizing:"border-box", outline:"none", marginBottom:16, fontFamily:"inherit" }} />
+                <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+                  <button onClick={() => setRejectModal(null)}
+                    style={{ padding:"9px 18px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                    Annuler
+                  </button>
+                  <button onClick={() => handleDemandeAction(rejectModal.id, "reject", rejectNote)} disabled={!!actionLoading}
+                    style={{ padding:"9px 18px", borderRadius:8, border:"none", background:C.red, color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                    {actionLoading ? "…" : "Rejeter"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

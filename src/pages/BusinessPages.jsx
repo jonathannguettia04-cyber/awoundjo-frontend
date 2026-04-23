@@ -20,7 +20,7 @@
 //       + colonne status_validation
 // 10. BizLayout sans BizAuthProvider (App.jsx le gère déjà)
 // ══════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 
 // ─────────────────────────────────────────────────────────────
@@ -43,52 +43,11 @@ async function apiBiz(path, options = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  AUTH CONTEXT
+//  AUTH CONTEXT — importé depuis le fichier isolé
+//  (évite le warning INEFFECTIVE_DYNAMIC_IMPORT dans App.jsx)
 // ─────────────────────────────────────────────────────────────
-const BizAuthContext = createContext(null);
-
-export function BizAuthProvider({ children }) {
-  const [member,  setMember]  = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    const token = localStorage.getItem("business_token");
-    if (!token) { setLoading(false); return; }
-    try {
-      const { member: m } = await apiBiz("/me");
-      setMember(m);
-    } catch {
-      localStorage.removeItem("business_token");
-      localStorage.removeItem("business_data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const loginCtx = (token, m) => {
-    localStorage.setItem("business_token", token);
-    localStorage.setItem("business_data",  JSON.stringify(m));
-    setMember(m);
-  };
-
-  const logoutCtx = () => {
-    localStorage.removeItem("business_token");
-    localStorage.removeItem("business_data");
-    setMember(null);
-  };
-
-  if (loading) return <FullLoader />;
-
-  return (
-    <BizAuthContext.Provider value={{ member, loading, loginCtx, logoutCtx, reload: load }}>
-      {children}
-    </BizAuthContext.Provider>
-  );
-}
-
-export function useBizAuth() { return useContext(BizAuthContext); }
+export { BizAuthProvider, BizAuthContext, useBizAuth } from "./business/BizAuthContext";
+import { BizAuthContext } from "./business/BizAuthContext";
 
 // ─────────────────────────────────────────────────────────────
 //  UI ATOMS
