@@ -3,7 +3,7 @@
 //  Client API Awoundjô — Réseaux Diaspora & Parrainage
 //  Token unique partagé entre les deux réseaux
 // ─────────────────────────────────────────────────────────────
-import axios from "axios";
+import axios from "axios/dist/axios.min.js";
 
 const BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/diaspora`;
 
