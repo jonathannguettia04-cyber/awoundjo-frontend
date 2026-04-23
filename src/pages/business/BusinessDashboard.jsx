@@ -137,6 +137,7 @@ const TABS = [
   { id: "commissions", label: "Commissions", icon: "💰" },
   { id: "bonus",       label: "Bonus Pool",  icon: "🎯" },
   { id: "inviter",     label: "Inviter",     icon: "🔗" },
+  { id: "retrait",     label: "Retrait",     icon: "💸" },
 ];
 
 // ── Tab Accueil ───────────────────────────────────────────────────
@@ -689,6 +690,325 @@ function TabInviter() {
   );
 }
 
+// ── Tab Retrait commissions ────────────────────────────────────────
+// Appelle POST /api/commissions/requests  (monté via commissionRequestRoutes.js)
+// Le JWT "business_token" est lu par authenticateToken → resolveIdentity
+// → network: BUSINESS, field: business_member_id
+function TabRetrait() {
+  const [eligibility, setEligibility] = useState(null);
+  const [history,     setHistory]     = useState([]);
+  const [loadingElig, setLoadingElig] = useState(true);
+  const [loadingHist, setLoadingHist] = useState(true);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [error,       setError]       = useState("");
+  const [success,     setSuccess]     = useState("");
+
+  // Formulaire
+  const [method,  setMethod]  = useState("WAVE");
+  const [details, setDetails] = useState({ phone: "" });
+
+  const COMM_BASE = (import.meta.env.VITE_API_URL || "http://localhost:3001") + "/api/commissions";
+
+  async function commFetch(path, opts = {}) {
+    const token = localStorage.getItem("business_token");
+    const res   = await fetch(`${COMM_BASE}${path}`, {
+      ...opts,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || data?.message || `Erreur ${res.status}`);
+    return data;
+  }
+
+  const loadData = () => {
+    setLoadingElig(true);
+    commFetch("/requests/eligibility")
+      .then(d => setEligibility(d))
+      .catch(e => setError(e.message))
+      .finally(() => setLoadingElig(false));
+
+    setLoadingHist(true);
+    commFetch("/requests/me")
+      .then(d => setHistory(d.requests || []))
+      .catch(() => {})
+      .finally(() => setLoadingHist(false));
+  };
+
+  useEffect(loadData, []);
+
+  const METHODS = [
+    { id: "WAVE",          label: "Wave",            icon: "🌊" },
+    { id: "ORANGE_MONEY",  label: "Orange Money",    icon: "🟠" },
+    { id: "MTN_MONEY",     label: "MTN Mobile Money",icon: "🟡" },
+    { id: "VIREMENT",      label: "Virement bancaire",icon: "🏦" },
+  ];
+
+  const needsPhone = method !== "VIREMENT";
+
+  async function handleSubmit() {
+    setError(""); setSuccess("");
+    if (needsPhone && !details.phone.trim()) {
+      setError("Numéro de téléphone requis pour ce mode de paiement."); return;
+    }
+    if (method === "VIREMENT" && !details.rib?.trim()) {
+      setError("RIB / IBAN requis pour un virement."); return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await commFetch("/requests", {
+        method: "POST",
+        body: JSON.stringify({ payment_method: method, payment_details: details }),
+      });
+      setSuccess(`✅ Demande soumise (${(res.amount_requested || 0).toLocaleString("fr-FR")} FCFA). Traitement sous 48h.`);
+      loadData();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const STATUS_MAP = {
+    PENDING:   { label: "En attente",  bg: "#1A1A00", color: "#EAB308" },
+    VALIDATED: { label: "Validé",      bg: T.greenL,  color: T.green   },
+    PAID:      { label: "Payé",        bg: T.blueL,   color: T.blue    },
+    REJECTED:  { label: "Rejeté",      bg: T.redL,    color: T.red     },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* Hero */}
+      <div style={{
+        background: "linear-gradient(135deg, #14141F 0%, #1C1028 100%)",
+        border: `1px solid ${T.gold}30`, borderRadius: 16, padding: "22px 26px",
+        position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", right: -20, top: -20, width: 120, height: 120, borderRadius: "50%", background: `${T.gold}06` }} />
+        <div style={{ fontSize: 28, marginBottom: 8 }}>💸</div>
+        <div style={{ fontSize: 17, fontWeight: 900, color: T.text }}>Demande de paiement</div>
+        <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>
+          Seuil requis : <strong style={{ color: T.gold }}>25 adhésions actives</strong> depuis la dernière demande
+        </div>
+      </div>
+
+      {/* Éligibilité */}
+      {loadingElig ? (
+        <div style={{ textAlign: "center", padding: 40 }}><Spin /></div>
+      ) : eligibility && (
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            📊 Votre éligibilité
+          </div>
+          <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* Solde disponible */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderRadius: 12, background: `${T.gold}10`, border: `1px solid ${T.gold}30` }}>
+              <div>
+                <div style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Solde disponible</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: T.gold, fontFamily: "monospace" }}>
+                  {(eligibility.available_balance_xof || 0).toLocaleString("fr-FR")} FCFA
+                </div>
+              </div>
+              <div style={{ fontSize: 36 }}>💰</div>
+            </div>
+
+            {/* Progress adhésions */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: T.textSub }}>Adhésions depuis dernière demande</span>
+                <span style={{ fontWeight: 900, color: eligibility.eligible ? T.green : "#EAB308" }}>
+                  {eligibility.adhesions_since_last} / {eligibility.threshold}
+                </span>
+              </div>
+              <div style={{ background: T.border, borderRadius: 99, height: 8, overflow: "hidden" }}>
+                <div style={{
+                  height: 8, borderRadius: 99, transition: "width .4s",
+                  width: `${Math.min(100, Math.round((eligibility.adhesions_since_last / eligibility.threshold) * 100))}%`,
+                  background: eligibility.eligible
+                    ? `linear-gradient(90deg, ${T.green}, #16A34A)`
+                    : `linear-gradient(90deg, #EAB308, #CA8A04)`,
+                }} />
+              </div>
+              {!eligibility.eligible && !eligibility.pending_request && (
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
+                  Il manque <strong style={{ color: "#EAB308" }}>{eligibility.adhesions_missing} adhésion(s)</strong> pour débloquer le retrait.
+                </div>
+              )}
+            </div>
+
+            {/* Demande PENDING existante */}
+            {eligibility.pending_request && (
+              <div style={{ padding: "12px 16px", borderRadius: 10, background: "#1A1A00", border: "1px solid #EAB30840", display: "flex", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 18 }}>⏳</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#EAB308" }}>Demande en cours de traitement</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
+                    Soumise le {new Date(eligibility.pending_request.created_at).toLocaleDateString("fr-FR")}. Attendez sa résolution.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Formulaire de demande — affiché seulement si éligible */}
+      {eligibility?.eligible && !eligibility?.pending_request && (
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            📝 Nouvelle demande
+          </div>
+          <div style={{ padding: "20px" }}>
+
+            {error && (
+              <div style={{ background: T.redL, border: `1px solid ${T.red}40`, borderRadius: 10, padding: "12px 16px", fontSize: 13, color: T.red, marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
+                ⚠️ {error}
+              </div>
+            )}
+            {success && (
+              <div style={{ background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 10, padding: "12px 16px", fontSize: 13, color: T.green, marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
+                {success}
+              </div>
+            )}
+
+            {/* Méthode de paiement */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                Méthode de paiement
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {METHODS.map(m => (
+                  <div key={m.id} onClick={() => setMethod(m.id)} style={{
+                    padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                    border: `2px solid ${method === m.id ? T.gold : T.border}`,
+                    background: method === m.id ? `${T.gold}12` : "#12121A",
+                    display: "flex", alignItems: "center", gap: 10,
+                    transition: "all .15s",
+                  }}>
+                    <span style={{ fontSize: 20 }}>{m.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: method === m.id ? 800 : 500, color: method === m.id ? T.gold : T.textSub }}>
+                      {m.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Détails de paiement */}
+            {needsPhone && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  Numéro de téléphone
+                </label>
+                <input
+                  type="tel"
+                  placeholder="07 XX XX XX XX"
+                  value={details.phone}
+                  onChange={e => setDetails(d => ({ ...d, phone: e.target.value }))}
+                  style={{
+                    width: "100%", padding: "12px 16px", borderRadius: 10,
+                    background: "#0C0C12", border: `1px solid ${T.border}`,
+                    color: T.text, fontSize: 14, fontFamily: "inherit", outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            )}
+            {method === "VIREMENT" && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  RIB / IBAN
+                </label>
+                <input
+                  type="text"
+                  placeholder="CI XX XXXX XXXX XXXX XXXX XXXX XXX"
+                  value={details.rib || ""}
+                  onChange={e => setDetails(d => ({ ...d, rib: e.target.value }))}
+                  style={{
+                    width: "100%", padding: "12px 16px", borderRadius: 10,
+                    background: "#0C0C12", border: `1px solid ${T.border}`,
+                    color: T.text, fontSize: 13, fontFamily: "monospace", outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Récapitulatif */}
+            <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+              {[
+                { label: "Montant demandé", value: `${(eligibility.available_balance_xof || 0).toLocaleString("fr-FR")} FCFA`, color: T.gold },
+                { label: "Méthode",         value: METHODS.find(m => m.id === method)?.label },
+                { label: "Adhésions",       value: `${eligibility.adhesions_since_last} validées` },
+              ].map((row, i, arr) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                  <span style={{ fontSize: 12, color: T.muted }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: row.color || T.text }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={handleSubmit} disabled={submitting} style={{
+              width: "100%", padding: "14px 20px", borderRadius: 10, border: "none",
+              background: submitting ? T.border : `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+              color: submitting ? T.muted : "#0C0C0F",
+              fontSize: 14, fontWeight: 900, cursor: submitting ? "not-allowed" : "pointer",
+              fontFamily: "inherit", transition: "all .15s",
+            }}>
+              {submitting ? "⏳ Envoi en cours…" : "💸 Soumettre la demande"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Historique des demandes */}
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          📋 Historique des demandes
+        </div>
+        {loadingHist ? (
+          <div style={{ padding: 40, textAlign: "center" }}><Spin /></div>
+        ) : history.length === 0 ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", color: T.muted }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+            <div style={{ fontSize: 14, color: T.textSub }}>Aucune demande pour l'instant</div>
+          </div>
+        ) : (
+          history.map((req, i) => {
+            const s = STATUS_MAP[req.status] || STATUS_MAP.PENDING;
+            return (
+              <div key={req.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 20px",
+                borderBottom: i < history.length - 1 ? `1px solid ${T.border}` : "none",
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: T.gold, fontFamily: "monospace" }}>
+                    {(req.amount_requested || 0).toLocaleString("fr-FR")} FCFA
+                  </div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
+                    {req.payment_method}
+                    {req.created_at && " · " + new Date(req.created_at).toLocaleDateString("fr-FR")}
+                    {req.admin_note && <span style={{ color: T.red }}> · {req.admin_note}</span>}
+                  </div>
+                </div>
+                <span style={{ padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: s.bg, color: s.color, whiteSpace: "nowrap", marginLeft: 12 }}>
+                  {s.label}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Composant principal ────────────────────────────────────────────
 export default function BusinessDashboard() {
   const [tab,     setTab]     = useState("accueil");
@@ -822,6 +1142,7 @@ export default function BusinessDashboard() {
             {tab === "commissions" && <TabCommissions />}
             {tab === "bonus"       && <TabBonus />}
             {tab === "inviter"     && <TabInviter />}
+            {tab === "retrait"     && <TabRetrait />}
           </>
         ) : null}
       </div>

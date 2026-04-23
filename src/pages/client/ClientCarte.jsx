@@ -1,5 +1,5 @@
 // src/pages/client/ClientCarte.jsx
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientCardAPI, PLANS } from "../../clientApi";
 
@@ -10,13 +10,57 @@ const PLAN_GRADIENTS = {
 };
 
 // ── QR dynamique : Carte + Nom + Mutualiste ──────────────────────────────────
+const LOGO_DATA_URI = "data:image/jpeg;base64,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";
+
 function buildQrUrl(card) {
   const content = [
     `Carte: ${card.numero_carte || card.mutual_number}`,
     `Nom: ${card.name}`,
     `Mutualiste: ${card.mutual_number}`,
+    `Urgence: 0171721668`,
   ].join(" | ");
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(content)}&bgcolor=ffffff&color=1a56db&margin=10`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(content)}&bgcolor=ffffff&color=1a56db&margin=10&ecc=H`;
+}
+
+
+// ── QR Code avec logo centré (canvas overlay) ─────────────────────────────
+function QrWithLogo({ qrUrl, size = 280 }) {
+  const canvasRef = React.useRef();
+  React.useEffect(() => {
+    if (!qrUrl || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    canvas.width = size;
+    canvas.height = size;
+    const qrImg = new Image();
+    qrImg.crossOrigin = "anonymous";
+    qrImg.onload = () => {
+      ctx.drawImage(qrImg, 0, 0, size, size);
+      const logo = new Image();
+      logo.onload = () => {
+        const logoSize = size * 0.22;
+        const logoX = (size - logoSize) / 2;
+        const logoY = (size - logoSize) / 2;
+        // White background circle behind logo
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, logoSize/2 + 4, 0, Math.PI*2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.restore();
+        // Draw logo
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, logoSize/2, 0, Math.PI*2);
+        ctx.clip();
+        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        ctx.restore();
+      };
+      logo.src = LOGO_DATA_URI;
+    };
+    qrImg.src = qrUrl;
+  }, [qrUrl, size]);
+  return <canvas ref={canvasRef} width={size} height={size} style={{ width: size, height: size, display:"block" }} />;
 }
 
 export default function ClientCarte() {
@@ -71,7 +115,19 @@ export default function ClientCarte() {
   };
 
   // ── Impression format CNI ────────────────────────────────────────────────
-  const handlePrint = () => window.print();
+  const [printMode, setPrintMode] = useState(null); // null | 'choose' | 'carte' | 'qr'
+  const handlePrint = () => setPrintMode('choose');
+  const doPrint = (mode) => {
+    setPrintMode(mode);
+    document.body.setAttribute('data-print-mode', mode);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        setPrintMode(null);
+        document.body.removeAttribute('data-print-mode');
+      }, 600);
+    }, 150);
+  };
 
   // ── Caméra ───────────────────────────────────────────────────────────────
   const openCamera = async () => {
@@ -120,23 +176,36 @@ export default function ClientCarte() {
 
         @media print {
           body * { visibility: hidden !important; }
-          #carte-physique,
-          #carte-physique * { visibility: visible !important; }
-          #carte-physique {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 85.6mm !important;
-            height: 54mm !important;
-            border-radius: 4mm !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-            padding: 4mm !important;
-            overflow: hidden !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+
+          /* === MODE CARTE === */
+          body[data-print-mode="carte"] #carte-physique,
+          body[data-print-mode="carte"] #carte-physique * { visibility: visible !important; }
+          body[data-print-mode="carte"] #carte-physique {
+            position: fixed !important; left: 0 !important; top: 0 !important;
+            width: 85.6mm !important; height: 54mm !important;
+            border-radius: 4mm !important; box-shadow: none !important;
+            margin: 0 !important; padding: 3mm !important; overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
           }
-          @page { size: 85.6mm 54mm; margin: 0; }
+
+          /* === MODE QR === */
+          body[data-print-mode="qr"] #qr-print-zone,
+          body[data-print-mode="qr"] #qr-print-zone * { visibility: visible !important; }
+          body[data-print-mode="qr"] #qr-print-zone {
+            display: flex !important; position: fixed !important;
+            left: 0 !important; top: 0 !important;
+            width: 85.6mm !important; height: 54mm !important;
+            flex-direction: column !important; align-items: center !important;
+            justify-content: center !important; background: #ffffff !important;
+            margin: 0 !important; padding: 2mm !important; box-sizing: border-box !important;
+            gap: 3px !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+          }
+
+          @page { size: 85.6mm 54mm; margin: 0 !important; padding: 0 !important; }
+        }
+        @media screen {
+          #qr-print-zone { display: none !important; }
         }
       `}</style>
 
@@ -403,6 +472,44 @@ export default function ClientCarte() {
               </div>
             )}
             <button onClick={() => setScanRes(null)} style={{ width:"100%", background:"linear-gradient(135deg,#1a56db,#1e40af)", color:"#fff", border:"none", borderRadius:14, padding:14, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", marginTop:20 }}>Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Zone QR imprimable (cachée à l'écran, visible à l'impression en mode QR) ── */}
+      <div id="qr-print-zone">
+        <div style={{ position:"relative" }}>
+          <QrWithLogo qrUrl={qrUrl} size={200} />
+        </div>
+        <p style={{ margin:"4px 0 0", fontSize:9, fontWeight:700, color:"#1a56db", fontFamily:"monospace", letterSpacing:1, textAlign:"center" }}>{numeroCarte} · {card.name}</p>
+        <p style={{ margin:"3px 0 0", fontSize:7.5, color:"#475569", textAlign:"center", fontFamily:"'Poppins',sans-serif", fontWeight:600, lineHeight:1.3 }}>
+          En cas de perte/urgence, veuillez contacter : 0171721668
+        </p>
+      </div>
+
+      {/* ── Modal choix d'impression ──────────────────────────────────────── */}
+      {printMode === 'choose' && (
+        <div onClick={() => setPrintMode(null)} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.8)", backdropFilter:"blur(8px)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:"#fff", borderRadius:28, padding:28, textAlign:"center", maxWidth:340, width:"100%" }}>
+            <p style={{ margin:"0 0 6px", fontSize:18, fontWeight:800, color:"#0F172A" }}>🖨️ Que voulez-vous imprimer ?</p>
+            <p style={{ margin:"0 0 20px", fontSize:13, color:"#64748B" }}>Choisissez le format d'impression</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <button onClick={() => doPrint('carte')} style={{ background:"linear-gradient(135deg,#1a56db,#1e40af)", color:"#fff", border:"none", borderRadius:16, padding:"16px 20px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", display:"flex", alignItems:"center", gap:12, textAlign:"left" }}>
+                <span style={{ fontSize:28 }}>💳</span>
+                <div>
+                  <div>Carte PVC (85.6×54mm)</div>
+                  <div style={{ fontSize:11, opacity:.8, fontWeight:500 }}>Format carte d'identité, compatible Epson L8050</div>
+                </div>
+              </button>
+              <button onClick={() => doPrint('qr')} style={{ background:"linear-gradient(135deg,#059669,#064e3b)", color:"#fff", border:"none", borderRadius:16, padding:"16px 20px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", display:"flex", alignItems:"center", gap:12, textAlign:"left" }}>
+                <span style={{ fontSize:28 }}>🔲</span>
+                <div>
+                  <div>QR Code seul (85.6×54mm)</div>
+                  <div style={{ fontSize:11, opacity:.8, fontWeight:500 }}>Avec logo Awoundjô et contact d'urgence</div>
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setPrintMode(null)} style={{ marginTop:16, width:"100%", background:"#F1F5F9", color:"#64748B", border:"none", borderRadius:12, padding:12, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'Poppins',sans-serif" }}>Annuler</button>
           </div>
         </div>
       )}

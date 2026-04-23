@@ -163,6 +163,9 @@ const BizInvitationPage = bizPage("BizInvitationPage");
 const BizLeaderboardPage= bizPage("BizLeaderboardPage");
 const BizMembersPage    = bizPage("BizMembersPage");
 
+// ── Page partagée : Retrait de commissions ───────────────────
+const CommissionWithdrawal = lazy(() => import("./pages/shared/CommissionWithdrawal"));
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -400,6 +403,7 @@ export default function App() {
               <Route path="leaderboard"            element={<DiasporaLeaderboard />} />
               <Route path="notifications"          element={<DiasporaNotifications />} />
               <Route path="profile"                element={<DiasporaProfile />} />
+              <Route path="withdrawal"             element={<CommissionWithdrawal accentColor="#1B4FD8" backPath="/diaspora/earnings" />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════
@@ -426,6 +430,7 @@ export default function App() {
               <Route path="leaderboard"                element={<ReferralLeaderboard />} />
               <Route path="notifications"              element={<ReferralNotifications />} />
               <Route path="profile"                    element={<ReferralProfile />} />
+              <Route path="withdrawal"                 element={<CommissionWithdrawal accentColor="#7C3AED" backPath="/referral/earnings" />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════
@@ -441,6 +446,7 @@ export default function App() {
               <Route path="notifications"    element={<AffilieNotifications />} />
               <Route path="profil"           element={<AffilieProfil />} />
               <Route path="membres"          element={<AffilieMembers />} />
+              <Route path="withdrawal"       element={<CommissionWithdrawal accentColor="#0D9488" backPath="/affilie/commissions" />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════
@@ -455,6 +461,7 @@ export default function App() {
             <Route path="/business/invitation"  element={<BizGuard><BizAuthProviderComp><BizInvitationPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/leaderboard" element={<BizGuard><BizAuthProviderComp><BizLeaderboardPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/members"     element={<BizGuard><BizAuthProviderComp><BizMembersPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/withdrawal"  element={<BizGuard><BizAuthProviderComp><CommissionWithdrawal accentColor="#D97706" backPath="/business/commissions" /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business" element={<Navigate to="/business/dashboard" replace />} />
 
             {/* ═══════════════════════════════════════════════

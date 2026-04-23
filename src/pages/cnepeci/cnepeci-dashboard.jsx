@@ -44,6 +44,32 @@ function extractData(json) {
   return Object.keys(rest).length ? rest : null;
 }
 
+// ─── HELPER : appels vers /api/commissions (endpoints retrait) ────────────────
+// Distinct de apiFetch (qui préfixe /api/cnepeci).
+// Le backend résout l'identité via le rôle dans le JWT "cnepeci_token".
+const COMM_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api/commissions";
+async function commFetch(path, options = {}) {
+  try {
+    const token = localStorage.getItem("cnepeci_token");
+    const res = await fetch(`${COMM_BASE}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    const json = await res.json().catch(() => null);
+    if (res.status === 401) { window.location.reload(); return null; }
+    if (!res.ok && json) return { success: false, ...json };
+    if (!res.ok) return { success: false, message: `Erreur serveur (${res.status})` };
+    return json;
+  } catch (e) {
+    console.error("[commFetch]", path, e.message);
+    return null;
+  }
+}
+
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 const ROLES = {
   BUREAU_CENTRALE:       { label: "Bureau Centrale",       abbr: "BC", color: "#7C3AED", grad: "linear-gradient(135deg,#7C3AED,#5B21B6)", level: 1 },
@@ -1075,17 +1101,279 @@ function SimulatePage({ currentRole, onRoleChange }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE RETRAIT COMMISSION
+// ══════════════════════════════════════════════════════════════════════════════
+// Appelle /api/commissions/requests  (commissionRequestRoutes.js)
+// NOTE BACKEND : ajouter les rôles CNEPECI dans resolveIdentity() :
+//   if (["BUREAU_CENTRALE","COORDONNATEUR_GENERAL","BUREAU_LOCAL",
+//        "COORDONNATEUR_LOCAL","PASTEUR"].includes(user.role))
+//     return { network: "CNEPECI", memberId: user.id, field: "cnepeci_member_id" };
+function WithdrawalPage() {
+  const [eligibility, setEligibility] = useState(null);
+  const [history,     setHistory]     = useState([]);
+  const [loadingElig, setLoadingElig] = useState(true);
+  const [loadingHist, setLoadingHist] = useState(true);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [formError,   setFormError]   = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+  const [method,      setMethod]      = useState("WAVE");
+  const [details,     setDetails]     = useState({ phone: "" });
+
+  const METHODS = [
+    { id: "WAVE",         label: "Wave",             icon: "🌊" },
+    { id: "ORANGE_MONEY", label: "Orange Money",     icon: "🟠" },
+    { id: "MTN_MONEY",    label: "MTN Mobile Money", icon: "🟡" },
+    { id: "VIREMENT",     label: "Virement bancaire",icon: "🏦" },
+  ];
+  const needsPhone = method !== "VIREMENT";
+
+  const STATUS_STYLE = {
+    PENDING:   { label: "En attente",  color: G.gold,   bg: G.goldLight  },
+    VALIDATED: { label: "Validé",      color: G.green,  bg: G.greenLight },
+    PAID:      { label: "Payé",        color: G.blue,   bg: G.blueLight  },
+    REJECTED:  { label: "Rejeté",      color: G.red,    bg: G.redLight   },
+  };
+
+  const reload = () => {
+    setLoadingElig(true);
+    commFetch("/requests/eligibility")
+      .then(d => setEligibility(d))
+      .catch(() => {})
+      .finally(() => setLoadingElig(false));
+
+    setLoadingHist(true);
+    commFetch("/requests/me")
+      .then(d => setHistory(d?.requests || []))
+      .catch(() => {})
+      .finally(() => setLoadingHist(false));
+  };
+  useEffect(reload, []);
+
+  async function handleSubmit() {
+    setFormError(""); setFormSuccess("");
+    if (needsPhone && !details.phone.trim()) { setFormError("Numéro de téléphone requis."); return; }
+    if (method === "VIREMENT" && !details.rib?.trim()) { setFormError("RIB / IBAN requis."); return; }
+    setSubmitting(true);
+    try {
+      const res = await commFetch("/requests", {
+        method: "POST",
+        body: JSON.stringify({ payment_method: method, payment_details: details }),
+      });
+      if (res?.success === false) throw new Error(res.message || "Erreur inconnue");
+      const amt = res?.amount_requested || 0;
+      setFormSuccess(`Demande soumise — ${parseFloat(amt).toLocaleString("fr-FR")} F. Traitement sous 48h.`);
+      reload();
+    } catch (e) {
+      setFormError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const pct = eligibility
+    ? Math.min(100, Math.round((eligibility.adhesions_since_last / eligibility.threshold) * 100))
+    : 0;
+
+  return (
+    <div style={{ maxWidth: 680, display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* Hero */}
+      <div style={{ background: `linear-gradient(135deg,${G.purple} 0%,#5B21B6 100%)`, borderRadius: 20, padding: "26px 28px", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -30, top: -30, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.06)" }} />
+        <div style={{ fontSize: 28, marginBottom: 8 }}>💸</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Demande de paiement de commission</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,.6)", marginTop: 4 }}>
+          Seuil requis : <strong style={{ color: "#C4B5FD" }}>25 adhésions actives</strong> depuis la dernière demande approuvée
+        </div>
+      </div>
+
+      {/* Éligibilité */}
+      {loadingElig ? <Spinner /> : eligibility && (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.purple}0D,transparent)` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>📊 Votre éligibilité</div>
+          </div>
+          <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Solde */}
+            <div style={{ background: G.purpleLight, border: `1px solid #C4B5FD`, borderRadius: 14, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: G.purple, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>Solde disponible</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: G.purple }}>{parseFloat(eligibility.available_balance_xof || 0).toLocaleString("fr-FR")} F</div>
+              </div>
+              <div style={{ fontSize: 40 }}>💰</div>
+            </div>
+
+            {/* Progression */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
+                <span style={{ color: G.muted }}>Adhésions validées depuis la dernière demande</span>
+                <span style={{ fontWeight: 800, color: eligibility.eligible ? G.green : G.gold }}>
+                  {eligibility.adhesions_since_last} / {eligibility.threshold}
+                </span>
+              </div>
+              <div style={{ background: G.border, borderRadius: 99, height: 10, overflow: "hidden" }}>
+                <div style={{ height: 10, borderRadius: 99, transition: "width .5s", width: `${pct}%`, background: eligibility.eligible ? `linear-gradient(90deg,${G.green},#047857)` : `linear-gradient(90deg,${G.gold},#B45309)` }} />
+              </div>
+              {!eligibility.eligible && !eligibility.pending_request && (
+                <div style={{ fontSize: 12, color: G.muted, marginTop: 6 }}>
+                  Il manque <strong style={{ color: G.gold }}>{eligibility.adhesions_missing} adhésion(s)</strong> pour débloquer le retrait.
+                </div>
+              )}
+            </div>
+
+            {/* Demande en cours */}
+            {eligibility.pending_request && (
+              <div style={{ background: G.goldLight, border: `1px solid #FDE68A`, borderRadius: 12, padding: "12px 16px", display: "flex", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 20 }}>⏳</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: G.gold }}>Une demande est en cours de traitement</div>
+                  <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>
+                    Soumise le {new Date(eligibility.pending_request.created_at).toLocaleDateString("fr-FR")}. Attendez sa résolution.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Formulaire — seulement si éligible et pas de demande pending */}
+      {eligibility?.eligible && !eligibility?.pending_request && (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.purple}0D,transparent)` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>📝 Nouvelle demande</div>
+            <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>Le montant total de vos commissions disponibles sera demandé</div>
+          </div>
+          <div style={{ padding: "22px" }}>
+            <Alert type="error"   msg={formError}   />
+            <Alert type="success" msg={formSuccess} />
+
+            {/* Méthode */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                Méthode de paiement
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {METHODS.map(m => (
+                  <div key={m.id} onClick={() => setMethod(m.id)} style={{
+                    padding: "12px 14px", borderRadius: 12, cursor: "pointer",
+                    border: `2px solid ${method === m.id ? G.purple : G.border}`,
+                    background: method === m.id ? G.purpleLight : "#FAFBFE",
+                    display: "flex", alignItems: "center", gap: 10, transition: "all .15s",
+                  }}>
+                    <span style={{ fontSize: 20 }}>{m.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: method === m.id ? 700 : 500, color: method === m.id ? G.purple : G.text }}>
+                      {m.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Détails */}
+            {needsPhone && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                  Numéro de téléphone
+                </label>
+                <input type="tel" placeholder="07 XX XX XX XX" value={details.phone}
+                  onChange={e => setDetails(d => ({ ...d, phone: e.target.value }))}
+                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                  onFocus={e => e.target.style.borderColor = G.purple}
+                  onBlur={e  => e.target.style.borderColor = G.border}
+                />
+              </div>
+            )}
+            {method === "VIREMENT" && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                  RIB / IBAN
+                </label>
+                <input type="text" placeholder="CI XX XXXX XXXX XXXX XXXX XXXX XXX" value={details.rib || ""}
+                  onChange={e => setDetails(d => ({ ...d, rib: e.target.value }))}
+                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+                  onFocus={e => e.target.style.borderColor = G.purple}
+                  onBlur={e  => e.target.style.borderColor = G.border}
+                />
+              </div>
+            )}
+
+            {/* Récap */}
+            <div style={{ background: "#FAFBFE", border: `1px solid ${G.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+              {[
+                { label: "Montant demandé", value: `${parseFloat(eligibility.available_balance_xof || 0).toLocaleString("fr-FR")} F`, color: G.purple },
+                { label: "Méthode",         value: METHODS.find(m => m.id === method)?.label },
+                { label: "Adhésions",        value: `${eligibility.adhesions_since_last} validées` },
+              ].map((row, i, arr) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${G.border}` : "none" }}>
+                  <span style={{ fontSize: 13, color: G.muted }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: row.color || G.text }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={handleSubmit} disabled={submitting || !!formSuccess}
+              style={{ width: "100%", padding: "14px 20px", background: `linear-gradient(135deg,${G.purple},#5B21B6)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: submitting || formSuccess ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: submitting || formSuccess ? 0.7 : 1 }}>
+              {submitting ? "⏳ Envoi en cours…" : "💸 Soumettre la demande →"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Historique */}
+      <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${G.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>📋 Historique des demandes</div>
+          <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{history.length} demande(s)</div>
+        </div>
+        {loadingHist ? <Spinner /> : history.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: G.muted }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+            <div style={{ fontSize: 14, color: G.muted }}>Aucune demande pour l'instant</div>
+          </div>
+        ) : (
+          <div>
+            {history.map((req, i) => {
+              const s = STATUS_STYLE[req.status] || STATUS_STYLE.PENDING;
+              return (
+                <div key={req.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: i < history.length - 1 ? `1px solid ${G.border}` : "none", transition: "background .15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAFBFE"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: G.text }}>
+                      {parseFloat(req.amount_requested || 0).toLocaleString("fr-FR")} F
+                    </div>
+                    <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>
+                      {req.payment_method}
+                      {req.created_at && " · " + new Date(req.created_at).toLocaleDateString("fr-FR")}
+                      {req.admin_note && <span style={{ color: G.red }}> · {req.admin_note}</span>}
+                    </div>
+                  </div>
+                  <Badge color={s.color} bg={s.bg}>{s.label}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── NAV ITEMS ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",   label: "Tableau de bord",  icon: "◉" },
-  { id: "network",     label: "Mon réseau",        icon: "◈" },
-  { id: "creer",       label: "Créer un membre",   icon: "＋" },
-  { id: "commissions", label: "Commissions",       icon: "◎" },
-  { id: "bonus",       label: "Bonus mensuel",     icon: "◆" },
-  { id: "paiement",    label: "Payer",             icon: "◑" },
-  { id: "invite",      label: "Lien d'invitation", icon: "◇" },
-  { id: "history",     label: "Historique",        icon: "○" },
-  { id: "simulate",    label: "Simuler rôle",      icon: "◐" },
+  { id: "dashboard",   label: "Tableau de bord",    icon: "◉" },
+  { id: "network",     label: "Mon réseau",          icon: "◈" },
+  { id: "creer",       label: "Créer un membre",     icon: "＋" },
+  { id: "commissions", label: "Commissions",         icon: "◎" },
+  { id: "bonus",       label: "Bonus mensuel",       icon: "◆" },
+  { id: "paiement",    label: "Payer",               icon: "◑" },
+  { id: "retrait",     label: "Retrait commission",  icon: "💸" },
+  { id: "invite",      label: "Lien d'invitation",   icon: "◇" },
+  { id: "history",     label: "Historique",          icon: "○" },
+  { id: "simulate",    label: "Simuler rôle",        icon: "◐" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1149,6 +1437,7 @@ export default function App() {
       case "commissions": return <CommissionsPage />;
       case "bonus":       return <BonusPage />;
       case "paiement":    return <PaiementPage />;
+      case "retrait":     return <WithdrawalPage />;
       case "invite":      return <InvitePage membre={membre} />;
       case "history":     return <HistoryPage />;
       case "simulate":    return <SimulatePage currentRole={role} onRoleChange={r => setSimRole(r)} />;
