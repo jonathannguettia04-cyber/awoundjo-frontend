@@ -149,9 +149,9 @@ const AffilieProfil       = affiliePage("AffilieProfil");
 const AffilieMembers      = affiliePage("AffilieMembers");
 
 // ── Pages BUSINESS ───────────────────────────────────────────
-// BizAuthProvider importé depuis un fichier isolé pour éviter le conflit
-// static/dynamic sur BusinessPages (warning INEFFECTIVE_DYNAMIC_IMPORT)
-import { BizAuthProvider as BizAuthProviderComp } from "./pages/business/BizAuthProvider";
+// BizAuthProvider importé depuis BizAuthContext (fichier isolé)
+// → pas de conflit static/dynamic avec BusinessPages.jsx
+import { BizAuthProvider as BizAuthProviderComp } from "./pages/business/BizAuthContext";
 
 const bizPage = (name) =>
   lazy(() => import("./pages/BusinessPages").then(m => ({ default: m[name] })));
