@@ -8,7 +8,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["axios"],
-    esbuildOptions: {
+    rolldownOptions: {
       mainFields: ["browser", "module", "main"],
     },
   },
