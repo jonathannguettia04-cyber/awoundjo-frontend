@@ -16,9 +16,15 @@
 //  7. BizBonusPage : data.history[]{mois/annee/montant_total} + current_pool
 //       (pas de champ "distribue" dans le schéma)
 //  8. BizInvitationPage : data.code/link/child_role/whatsapp_message
-//  9. BizMembersPage : POST /create-member (route backend correcte)
+//  9. BizMembersPage : POST /members (route backend correcte)
 //       + colonne status_validation
 // 10. BizLayout sans BizAuthProvider (App.jsx le gère déjà)
+//
+//  FIX CRITIQUE :
+//  - Import/export useBizAuth corrigé : import d'abord, re-export ensuite
+//    (l'ancien "export ... from" + "import" sur le même module cassait le scope)
+//  - BizMembersPage : suppression de la référence invalide à `m` hors scope
+//    dans le bloc creds (utilisait la variable de la boucle .map, pas le résultat API)
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
@@ -44,10 +50,14 @@ async function apiBiz(path, options = {}) {
 
 // ─────────────────────────────────────────────────────────────
 //  AUTH CONTEXT — importé depuis le fichier isolé
-//  (évite le warning INEFFECTIVE_DYNAMIC_IMPORT dans App.jsx)
+//  FIX : import d'abord (met useBizAuth dans le scope local),
+//        puis re-export séparé. L'ancienne syntaxe
+//        "export { ... } from ..." + "import { ... } from ..."
+//        sur le même module empêchait useBizAuth d'être résolu
+//        dans les composants du même fichier.
 // ─────────────────────────────────────────────────────────────
-export { BizAuthProvider, BizAuthContext, useBizAuth } from "./business/BizAuthContext";
-import { BizAuthContext } from "./business/BizAuthContext";
+import { BizAuthProvider, BizAuthContext, useBizAuth } from "./business/BizAuthContext";
+export { BizAuthProvider, BizAuthContext, useBizAuth };
 
 // ─────────────────────────────────────────────────────────────
 //  UI ATOMS
@@ -148,14 +158,6 @@ function Loader() {
   return <div style={{ textAlign: "center", padding: 60, color: "#7C3AED", fontSize: 16 }}>Chargement…</div>;
 }
 
-function FullLoader() {
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
-      <div style={{ color: "#7C3AED" }}>Chargement…</div>
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────
 //  LAYOUT SIDEBAR
 // ─────────────────────────────────────────────────────────────
@@ -206,7 +208,6 @@ export function BizLayout({ children }) {
         }
       `}</style>
 
-      {/* Overlay mobile — affiché uniquement quand le sidebar est ouvert */}
       {sidebarOpen && <div className="biz-overlay" onClick={() => setSidebarOpen(false)} />}
 
       <aside className={`biz-sidebar${sidebarOpen ? " open" : ""}`} style={{
@@ -275,10 +276,6 @@ export function BizLayout({ children }) {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — DASHBOARD
-//  Champs backend : commissions.{total_earned,pending,paid,this_month,today,this_week}
-//                   network.{network_size, direct_members{role:{total,active}}}
-//                   bonus_pool.{montant,mois,annee}
-//                   notifications_unread
 // ─────────────────────────────────────────────────────────────
 export function BizDashboardPage() {
   const { member } = useBizAuth();
@@ -374,7 +371,6 @@ export function BizDashboardPage() {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — RÉSEAU
-//  data.network.{level1,level2,level3,level4} + data.totals
 // ─────────────────────────────────────────────────────────────
 export function BizNetworkPage() {
   const [data,  setData]  = useState(null);
@@ -427,36 +423,37 @@ export function BizNetworkPage() {
 
       <Card>
         <div style={{ overflowX: "auto" }}>
-          <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-                {["Nom", "Rôle", "Pays", "Statut", "Date d'adhésion", "Gains"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
-                  Aucun membre à ce niveau.
-                </td></tr>
-              )}
-              {list.map(m => (
-                <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
-                  <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
-                  <td style={{ padding: "10px 12px", color: "#64748B" }}>{m.country || "—"}</td>
-                  <td style={{ padding: "10px 12px" }}><StatusBadge status={m.status} /></td>
-                  <td style={{ padding: "10px 12px", color: "#64748B" }}>
-                    {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
-                  </td>
-                  <td style={{ padding: "10px 12px", fontWeight: 600, color: "#7C3AED" }}>
-                    {fmt(m.total_earned)} FCFA
-                  </td>
+          <div className="biz-table-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                  {["Nom", "Rôle", "Pays", "Statut", "Date d'adhésion", "Gains"].map(h => (
+                    <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                    Aucun membre à ce niveau.
+                  </td></tr>
+                )}
+                {list.map(m => (
+                  <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
+                    <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
+                    <td style={{ padding: "10px 12px", color: "#64748B" }}>{m.country || "—"}</td>
+                    <td style={{ padding: "10px 12px" }}><StatusBadge status={m.status} /></td>
+                    <td style={{ padding: "10px 12px", color: "#64748B" }}>
+                      {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
+                    </td>
+                    <td style={{ padding: "10px 12px", fontWeight: 600, color: "#7C3AED" }}>
+                      {fmt(m.total_earned)} FCFA
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </Card>
@@ -466,10 +463,6 @@ export function BizNetworkPage() {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — COMMISSIONS
-//  data.commissions[]{montant/rate_pct/niveau/status/created_at/
-//    amount_xof/source_name/source_role}
-//  data.totals{total_earned/niveau1_total/niveau2_total/this_month/
-//    niveau1_count/niveau2_count}
 // ─────────────────────────────────────────────────────────────
 export function BizCommissionsPage() {
   const [data, setData] = useState(null);
@@ -506,46 +499,47 @@ export function BizCommissionsPage() {
       <Card style={{ marginTop: 16 }}>
         <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Historique des gains</h3>
         <div style={{ overflowX: "auto" }}>
-          <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-                {["Date", "Source", "Niv.", "Taux", "Base paiement", "Commission", "Statut"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
-                  Aucune commission reçue.
-                </td></tr>
-              )}
-              {list.map(c => (
-                <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "9px 12px", color: "#64748B" }}>
-                    {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
-                  </td>
-                  <td style={{ padding: "9px 12px" }}>
-                    <span style={{ fontWeight: 600 }}>{c.source_name || "—"}</span>
-                    <span style={{ fontSize: 11, color: "#94A3B8", display: "block" }}>{c.source_role || ""}</span>
-                  </td>
-                  <td style={{ padding: "9px 12px" }}>
-                    <span style={{
-                      background: c.niveau === 1 ? "#EDE9FE" : "#DBEAFE",
-                      color:      c.niveau === 1 ? "#7C3AED" : "#2563EB",
-                      borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600,
-                    }}>N{c.niveau}</span>
-                  </td>
-                  <td style={{ padding: "9px 12px", color: "#64748B" }}>{c.rate_pct}%</td>
-                  <td style={{ padding: "9px 12px", color: "#64748B" }}>{fmt(c.amount_xof)} FCFA</td>
-                  <td style={{ padding: "9px 12px", fontWeight: 700, color: "#059669" }}>
-                    +{fmt(c.montant)} FCFA
-                  </td>
-                  <td style={{ padding: "9px 12px" }}><StatusBadge status={c.status} /></td>
+          <div className="biz-table-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                  {["Date", "Source", "Niv.", "Taux", "Base paiement", "Commission", "Statut"].map(h => (
+                    <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                    Aucune commission reçue.
+                  </td></tr>
+                )}
+                {list.map(c => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "9px 12px", color: "#64748B" }}>
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                    </td>
+                    <td style={{ padding: "9px 12px" }}>
+                      <span style={{ fontWeight: 600 }}>{c.source_name || "—"}</span>
+                      <span style={{ fontSize: 11, color: "#94A3B8", display: "block" }}>{c.source_role || ""}</span>
+                    </td>
+                    <td style={{ padding: "9px 12px" }}>
+                      <span style={{
+                        background: c.niveau === 1 ? "#EDE9FE" : "#DBEAFE",
+                        color:      c.niveau === 1 ? "#7C3AED" : "#2563EB",
+                        borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600,
+                      }}>N{c.niveau}</span>
+                    </td>
+                    <td style={{ padding: "9px 12px", color: "#64748B" }}>{c.rate_pct}%</td>
+                    <td style={{ padding: "9px 12px", color: "#64748B" }}>{fmt(c.amount_xof)} FCFA</td>
+                    <td style={{ padding: "9px 12px", fontWeight: 700, color: "#059669" }}>
+                      +{fmt(c.montant)} FCFA
+                    </td>
+                    <td style={{ padding: "9px 12px" }}><StatusBadge status={c.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </Card>
@@ -555,7 +549,6 @@ export function BizCommissionsPage() {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — BONUS POOL
-//  data.history[]{mois/annee/montant_total} + data.current_pool
 // ─────────────────────────────────────────────────────────────
 export function BizBonusPage() {
   const [data, setData] = useState(null);
@@ -593,40 +586,41 @@ export function BizBonusPage() {
 
       <Card>
         <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Historique des pools</h3>
-        <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-              {["Mois", "Année", "Montant pool", "Statut"].map(h => (
-                <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {history.length === 0 && (
-              <tr><td colSpan={4} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
-                Aucun historique disponible.
-              </td></tr>
-            )}
-            {history.map((p, i) => {
-              const isCurrent = p.mois === (now.getMonth() + 1) && p.annee === now.getFullYear();
-              return (
-                <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{MONTHS[(p.mois || 1) - 1]}</td>
-                  <td style={{ padding: "10px 12px" }}>{p.annee}</td>
-                  <td style={{ padding: "10px 12px", fontWeight: 700, color: "#D97706" }}>
-                    {fmt(p.montant_total)} FCFA
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    {isCurrent
-                      ? <span style={{ background: "#FEF3C7", color: "#92400E", borderRadius: 20, padding: "2px 10px", fontSize: 12 }}>⏳ En cours</span>
-                      : <span style={{ background: "#DBEAFE", color: "#1E40AF", borderRadius: 20, padding: "2px 10px", fontSize: 12 }}>✅ Clôturé</span>
-                    }
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="biz-table-wrap">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                {["Mois", "Année", "Montant pool", "Statut"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {history.length === 0 && (
+                <tr><td colSpan={4} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                  Aucun historique disponible.
+                </td></tr>
+              )}
+              {history.map((p, i) => {
+                const isCurrent = p.mois === (now.getMonth() + 1) && p.annee === now.getFullYear();
+                return (
+                  <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{MONTHS[(p.mois || 1) - 1]}</td>
+                    <td style={{ padding: "10px 12px" }}>{p.annee}</td>
+                    <td style={{ padding: "10px 12px", fontWeight: 700, color: "#D97706" }}>
+                      {fmt(p.montant_total)} FCFA
+                    </td>
+                    <td style={{ padding: "10px 12px" }}>
+                      {isCurrent
+                        ? <span style={{ background: "#FEF3C7", color: "#92400E", borderRadius: 20, padding: "2px 10px", fontSize: 12 }}>⏳ En cours</span>
+                        : <span style={{ background: "#DBEAFE", color: "#1E40AF", borderRadius: 20, padding: "2px 10px", fontSize: 12 }}>✅ Clôturé</span>
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </Card>
     </BizLayout>
@@ -635,7 +629,6 @@ export function BizBonusPage() {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — INVITATION
-//  data.{code, role, child_role, link, whatsapp_message}
 // ─────────────────────────────────────────────────────────────
 export function BizInvitationPage() {
   const [data,   setData]   = useState(null);
@@ -786,34 +779,35 @@ export function BizLeaderboardPage() {
       {busy ? <Loader /> : (
         <Card>
           <div style={{ overflowX: "auto" }}>
-            <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-                  {["#", "Nom", "Rôle", "Pays", "Gains (FCFA)", "Recrues"].map(h => (
-                    <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.top_earners || []).length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
-                    Aucun classement disponible.
-                  </td></tr>
-                )}
-                {(data?.top_earners || []).map((m, i) => (
-                  <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9", background: i < 3 ? "#FAFAF7" : undefined }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: 16 }}>
-                      {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
-                    </td>
-                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
-                    <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
-                    <td style={{ padding: "10px 12px", color: "#64748B" }}>{m.country || "—"}</td>
-                    <td style={{ padding: "10px 12px", fontWeight: 700, color: "#059669" }}>{fmt(m.earnings)}</td>
-                    <td style={{ padding: "10px 12px" }}>{m.recruits}</td>
+            <div className="biz-table-wrap">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                    {["#", "Nom", "Rôle", "Pays", "Gains (FCFA)", "Recrues"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(data?.top_earners || []).length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                      Aucun classement disponible.
+                    </td></tr>
+                  )}
+                  {(data?.top_earners || []).map((m, i) => (
+                    <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9", background: i < 3 ? "#FAFAF7" : undefined }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: 16 }}>
+                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                      </td>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
+                      <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
+                      <td style={{ padding: "10px 12px", color: "#64748B" }}>{m.country || "—"}</td>
+                      <td style={{ padding: "10px 12px", fontWeight: 700, color: "#059669" }}>{fmt(m.earnings)}</td>
+                      <td style={{ padding: "10px 12px" }}>{m.recruits}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </Card>
@@ -824,8 +818,10 @@ export function BizLeaderboardPage() {
 
 // ─────────────────────────────────────────────────────────────
 //  PAGE — MES MEMBRES
-//  FIX : POST /create-member (route correcte dans businessRoutes.js)
-//        Colonne status_validation ajoutée
+//  FIX : référence `m` dans le bloc creds corrigée — on utilisait
+//        la variable de boucle `m` hors de son scope (.map).
+//        Remplacé par creds.member_id directement (déjà stocké via
+//        setCreds({ ...credentials, member_id: newMember?.id }))
 // ─────────────────────────────────────────────────────────────
 export function BizMembersPage() {
   const { member } = useBizAuth();
@@ -857,11 +853,13 @@ export function BizMembersPage() {
     if (!form.name || !form.email) return setError("Nom et email requis.");
     setBusy(true);
     try {
-      const { member: m, credentials } = await apiBiz("/members", {
+      // FIX : on renomme la variable locale en "newMember" pour éviter
+      // toute confusion avec le `member` du contexte Auth
+      const { member: newMember, credentials } = await apiBiz("/members", {
         method: "POST",
         body:   JSON.stringify(form),
       });
-      setCreds({ ...credentials, member_id: m?.id });
+      setCreds({ ...credentials, member_id: newMember?.id });
       setForm({ name: "", email: "", phone: "", country: "CI", city: "" });
       setShowForm(false);
       load();
@@ -914,7 +912,8 @@ export function BizMembersPage() {
           <h3 style={{ margin: "0 0 14px", color: "#065F46", fontSize: 16 }}>✅ Membre créé — Identifiants à transmettre</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, fontSize: 14 }}>
             {[
-              { label: "🪪 ID membre",       value: creds.member_id || m?.id || "—" },
+              // FIX : utilise creds.member_id directement (plus de référence à `m` hors scope)
+              { label: "🪪 ID membre",       value: creds.member_id || "—" },
               { label: "👤 Identifiant",     value: creds.username },
               { label: "🔑 Mot de passe",    value: creds.temp_password },
               { label: "🎫 Code invitation", value: creds.invitation_code },
@@ -928,7 +927,7 @@ export function BizMembersPage() {
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <button
               onClick={() => {
-                const txt = `ID membre : ${creds.member_id || "—"}\nIdentifiant : ${creds.username}\nMot de passe : ${creds.temp_password}\nCode invitation : ${creds.invitation_code}\nLien connexion : ${creds.login_url}`;
+                const txt = `ID membre : ${creds.member_id || "—"}\nIdentifiant : ${creds.username}\nMot de passe : ${creds.temp_password}\nCode invitation : ${creds.invitation_code}\nLien connexion : ${creds.login_url || ""}`;
                 navigator.clipboard.writeText(txt);
                 alert("✅ Identifiants copiés !");
               }}
@@ -947,51 +946,52 @@ export function BizMembersPage() {
       {loading ? <Loader /> : (
         <Card>
           <div style={{ overflowX: "auto" }}>
-            <div className="biz-table-wrap"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-                  {["Nom", "Email", "Rôle", "Statut", "Paiement", "Validation", "Inscription"].map(h => (
-                    <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {members.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
-                    Aucun membre direct.
-                  </td></tr>
-                )}
-                {members.map(m => (
-                  <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
-                    <td style={{ padding: "10px 12px", color: "#64748B", fontSize: 12 }}>{m.email}</td>
-                    <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
-                    <td style={{ padding: "10px 12px" }}><StatusBadge status={m.status} /></td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span style={{
-                        padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                        background: m.status_payment === "paid" ? "#D1FAE5" : "#FFF1F2",
-                        color:      m.status_payment === "paid" ? "#065F46" : "#BE123C",
-                      }}>
-                        {m.status_payment === "paid" ? "✅ Payé" : "❌ Impayé"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span style={{
-                        padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                        background: m.status_validation === "approved" ? "#D1FAE5" : m.status_validation === "rejected" ? "#FFF1F2" : "#FEF3C7",
-                        color:      m.status_validation === "approved" ? "#065F46" : m.status_validation === "rejected" ? "#BE123C" : "#92400E",
-                      }}>
-                        {m.status_validation === "approved" ? "Validé" : m.status_validation === "rejected" ? "Refusé" : "En attente"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 12px", color: "#64748B" }}>
-                      {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
-                    </td>
+            <div className="biz-table-wrap">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                    {["Nom", "Email", "Rôle", "Statut", "Paiement", "Validation", "Inscription"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {members.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                      Aucun membre direct.
+                    </td></tr>
+                  )}
+                  {members.map(m => (
+                    <tr key={m.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{m.name}</td>
+                      <td style={{ padding: "10px 12px", color: "#64748B", fontSize: 12 }}>{m.email}</td>
+                      <td style={{ padding: "10px 12px" }}><Badge role={m.role} /></td>
+                      <td style={{ padding: "10px 12px" }}><StatusBadge status={m.status} /></td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span style={{
+                          padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          background: m.status_payment === "paid" ? "#D1FAE5" : "#FFF1F2",
+                          color:      m.status_payment === "paid" ? "#065F46" : "#BE123C",
+                        }}>
+                          {m.status_payment === "paid" ? "✅ Payé" : "❌ Impayé"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span style={{
+                          padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          background: m.status_validation === "approved" ? "#D1FAE5" : m.status_validation === "rejected" ? "#FFF1F2" : "#FEF3C7",
+                          color:      m.status_validation === "approved" ? "#065F46" : m.status_validation === "rejected" ? "#BE123C" : "#92400E",
+                        }}>
+                          {m.status_validation === "approved" ? "Validé" : m.status_validation === "rejected" ? "Refusé" : "En attente"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "#64748B" }}>
+                        {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </Card>
