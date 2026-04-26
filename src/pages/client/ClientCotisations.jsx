@@ -130,6 +130,7 @@ export default function ClientCotisations() {
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
   const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
+  const [jekoMethod,  setJekoMethod]  = useState("orange");
 
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
@@ -233,6 +234,7 @@ export default function ClientCotisations() {
           client_email: client?.email || "client@awoundjo.ci",
           client_phone: client?.phone || "",
           type:         "mensualite",
+          jeko_method:  jekoMethod,
           success_url:  `${window.location.origin}/client/cotisations?payment=success`,
           failed_url:   `${window.location.origin}/client/cotisations?payment=failed`,
         }),
@@ -240,8 +242,10 @@ export default function ClientCotisations() {
 
       const initData = await initRes.json();
       const paymentUrl =
-        initData?.data?.payment_url ||
-        initData?.payment_url       ||
+        initData?.data?.redirect_url ||
+        initData?.data?.payment_url  ||
+        initData?.redirect_url       ||
+        initData?.payment_url        ||
         null;
 
       if (!paymentUrl) {
@@ -381,6 +385,29 @@ export default function ClientCotisations() {
             <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>JEKO</span>
           </div>
           <span style={{ fontSize: 12, color: C.slate }}>Orange · Wave · MTN · Moov · Carte</span>
+        </div>
+
+        {/* ── Sélecteur réseau JEKO ────────────────────────────────── */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: C.slate, display: "block", marginBottom: 6 }}>
+            Réseau de paiement
+          </label>
+          <select
+            value={jekoMethod}
+            onChange={(e) => setJekoMethod(e.target.value)}
+            disabled={payLoading}
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8,
+              border: "1.5px solid #e2e8f0", fontSize: 14, fontFamily: "inherit",
+              background: "#fff", cursor: payLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            <option value="orange">🟠 Orange Money</option>
+            <option value="wave">🔵 Wave</option>
+            <option value="mtn">🟡 MTN Mobile Money</option>
+            <option value="moov">🟢 Moov Money</option>
+            <option value="djamo">💜 Djamo / Carte bancaire</option>
+          </select>
         </div>
 
         {/* ── Bouton payer ─────────────────────────────────────────── */}
