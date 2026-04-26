@@ -214,7 +214,7 @@ export default function ClientDetails() {
         });
 
         const data = await res.json();
-        const paymentUrl = data?.data?.payment_url;
+        const paymentUrl = data?.data?.redirect_url || data?.data?.payment_url;
 
         if (!paymentUrl) {
           throw new Error(data?.error || "URL de paiement JEKO non reçue");
