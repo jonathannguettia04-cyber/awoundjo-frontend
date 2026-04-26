@@ -208,6 +208,7 @@ export default function ClientDetails() {
             client_email: clientData.email || "client@awoundjo.ci",
             client_id:    id,
             type:         payForm.type,
+            jeko_method:  payForm.jeko_method || "orange",
             success_url: `${window.location.origin}/clients/${id}?ps=1&tx=${txId}`,
             failed_url:  `${window.location.origin}/clients/${id}?ps=0`,
           }),
@@ -599,11 +600,22 @@ export default function ClientDetails() {
             </select>
           </div>
 
-          {/* Info méthode JEKO */}
+          {/* Sélecteur méthode JEKO */}
           {payForm.payment_method === "jeko" && (
-            <div className="bg-teal-50 border border-teal-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-teal-700">
-              <span className="text-base">💳</span>
-              Redirection vers JEKO — Orange Money, Wave, MTN, Moov, carte bancaire acceptés.
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Réseau de paiement</label>
+              <select
+                value={payForm.jeko_method || "orange"}
+                onChange={(e) => setPayForm({ ...payForm, jeko_method: e.target.value })}
+                disabled={paySaving}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="orange">🟠 Orange Money</option>
+                <option value="wave">🔵 Wave</option>
+                <option value="mtn">🟡 MTN Mobile Money</option>
+                <option value="moov">🟢 Moov Money</option>
+                <option value="djamo">💜 Djamo / Carte bancaire</option>
+              </select>
             </div>
           )}
 
