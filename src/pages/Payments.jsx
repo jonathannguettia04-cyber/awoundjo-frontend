@@ -100,8 +100,9 @@ export default function Payments() {
           className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
           <option value="">Toutes les méthodes</option>
-          <option value="cinetpay">CinetPay</option>
-          <option value="paydunya">PayDunya</option>
+          <option value="jeko">JEKO</option>
+          
+          
           <option value="cash">Cash</option>
         </select>
       </div>

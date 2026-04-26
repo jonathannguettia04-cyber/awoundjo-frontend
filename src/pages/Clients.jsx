@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { clientAPI } from "../services/api";
 import { StatusBadge, PlanBadge } from "../components/Badge";
 import Modal from "../components/Modal";
-import { payWithCinetPay } from "../services/cinetpay";
 
 const STATUSES = ["actif", "attente", "suspendu"];
 const EMPTY    = { name: "", phone: "", city: "", plan: "", status: "attente", is_returning_client: false, expiration_date: "" };
@@ -56,7 +55,7 @@ export default function Clients() {
   const [accessCode, setAccessCode] = useState("");
   const [showCode,   setShowCode]   = useState(false);
 
-  // États pour le paiement CinetPay après création
+  // États pour le paiement JEKO après création
   const [pendingPayment, setPendingPayment] = useState(null); // { client, accessCode }
   const [showPayModal,   setShowPayModal]   = useState(false);
   const [payError,       setPayError]       = useState("");
@@ -133,7 +132,7 @@ export default function Clients() {
         return;
       }
 
-      // Nouveau client — proposer le paiement CinetPay
+      // Nouveau client — proposer le paiement JEKO
       setPendingPayment({
         client:       { name: form.name, phone: form.phone, email: "" },
         plan:         form.plan,
@@ -151,54 +150,53 @@ export default function Clients() {
     } finally { setSaving(false); }
   }
 
-  // ── Lancement du paiement d'adhésion CinetPay ──────────────────
-  function handlePayAdhesion() {
+  // ── Lancement du paiement d'adhésion JEKO ──────────────────
+  async function handlePayAdhesion() {
     if (!pendingPayment) return;
     const selectedPlan = plans.find((p) => p.slug.toUpperCase() === pendingPayment.plan);
     const amount = selectedPlan ? Number(selectedPlan.adhesion_price) : 0;
-    if (amount === 0) { /* adhesion gratuite — afficher code directement */
+    if (amount === 0) {
       if (pendingPayment.accessCode) { setAccessCode(pendingPayment.accessCode); setShowPayModal(false); setShowCode(true); }
       return;
     }
     setPayError(""); setPaying(true);
 
-    payWithCinetPay({
-      user:          pendingPayment.client,
-      amount,
-      description:   `Adhésion Awoundjô — Formule ${pendingPayment.plan}`,
-      transactionId: `AWJ-ADH-${Date.now()}`,
+    try {
+      const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const token = localStorage.getItem("token");
+      const txId = `AWJ-ADH-${Date.now()}`;
 
-      onSuccess: async (cinetData, txId) => {
-        setPaying(false);
-        try {
-          // Enregistrer le paiement d'adhésion côté serveur
-          await clientAPI.recordPayment?.({
-            clientId:              pendingPayment.clientId,
-            amount,
-            payment_method:        "CinetPay",
-            transaction_reference: txId,
-            payment_type:          "adhesion",
-          });
-        } catch { /* paiement accepté côté CinetPay, sync sera faite via webhook */ }
+      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount,
+          transaction_id: txId,
+          description: `Adhésion Awoundjô — Formule ${pendingPayment.plan}`,
+          client_name:  pendingPayment.client.name  || "Client",
+          client_email: pendingPayment.client.email || "client@awoundjo.ci",
+          client_id:    pendingPayment.clientId,
+          type:         "adhesion",
+          success_url: `${window.location.origin}/clients?payment=success&tx=${txId}`,
+          failed_url:  `${window.location.origin}/clients?payment=failed`,
+        }),
+      });
 
-        setPaySuccess(`✅ Adhésion confirmée — Réf: ${txId}`);
-        // Afficher le code d'accès si disponible
-        if (pendingPayment.accessCode) {
-          setAccessCode(pendingPayment.accessCode);
-          setTimeout(() => {
-            setShowPayModal(false);
-            setPaySuccess("");
-            setShowCode(true);
-          }, 1500);
-        }
-        load(1);
-      },
+      const data = await res.json();
+      const paymentUrl = data?.data?.payment_url;
 
-      onError: ({ message }) => {
-        setPaying(false);
-        setPayError(message || "Le paiement a été refusé ou annulé.");
-      },
-    });
+      if (!paymentUrl) {
+        throw new Error(data?.error || "URL de paiement JEKO non reçue");
+      }
+
+      window.location.href = paymentUrl;
+    } catch (err) {
+      setPaying(false);
+      setPayError(err.message || "Erreur initialisation paiement JEKO");
+    }
   }
 
   function handleFileChange(e) {
@@ -542,7 +540,7 @@ export default function Clients() {
                     })()
                   }
                 </p>
-                <p className="text-xs text-blue-500">Un paiement CinetPay sera proposé après la création · Identifiants générés automatiquement</p>
+                <p className="text-xs text-blue-500">Un paiement JEKO sera proposé après la création · Identifiants générés automatiquement</p>
               </div>
             </div>
           )}
@@ -558,7 +556,7 @@ export default function Clients() {
         </form>
       </Modal>
 
-      {/* ── Modal paiement adhésion CinetPay ─────────────────── */}
+      {/* ── Modal paiement adhésion JEKO ─────────────────── */}
       <Modal open={showPayModal} onClose={() => !paying && setShowPayModal(false)} title="💳 Paiement de l'adhésion">
         <div className="space-y-4">
           {paySuccess ? (
@@ -613,7 +611,7 @@ export default function Clients() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Moyens acceptés</p>
                 <div className="flex gap-2 flex-wrap">
-                  {["🟠 Orange Money","💛 MTN MoMo","🌊 Wave","💳 Carte"].map(m => (
+                  {["🟠 Orange Money","💛 MTN MoMo","🌊 Wave","🔵 Moov","💳 Carte"].map(m => (
                     <span key={m} className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">{m}</span>
                   ))}
                 </div>
@@ -630,7 +628,7 @@ export default function Clients() {
                 </button>
               </div>
 
-              <p className="text-center text-xs text-slate-400">🔒 Paiement sécurisé par CinetPay</p>
+              <p className="text-center text-xs text-slate-400">🔒 Paiement sécurisé par JEKO</p>
             </>
           )}
         </div>

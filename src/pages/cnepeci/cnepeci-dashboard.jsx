@@ -692,14 +692,13 @@ function BonusPage() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE PAIEMENT
+// PAGE PAIEMENT — JEKO uniquement
 // ══════════════════════════════════════════════════════════════════════════════
 function PaiementPage() {
-  const [type, setType] = useState("adhesion");
+  const [type, setType]       = useState("adhesion");
   const [montant, setMontant] = useState(15000);
-  const [methode, setMethode] = useState("cinetpay");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
 
   const handlePayer = async () => {
@@ -707,15 +706,24 @@ function PaiementPage() {
     if (!montant || montant < 100) { setError("Montant minimum : 100 FCFA"); return; }
     setLoading(true);
     try {
-      const data = await apiFetch(methode === "cinetpay" ? "/paiement/cinetpay/init" : "/paiement/paydunya/init", {
+      const data = await apiFetch("/paiement/jeko/init", {
         method: "POST",
-        body: JSON.stringify({ montant, type, success_url: `${window.location.origin}/cnepeci/paiement/success`, failed_url: `${window.location.origin}/cnepeci/paiement/echec` }),
+        body: JSON.stringify({
+          montant,
+          type,
+          success_url: `${window.location.origin}/cnepeci/paiement/success`,
+          failure_url: `${window.location.origin}/cnepeci/paiement/echec`,
+        }),
       });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur paiement"); return; }
-      const payUrl = data.payment_url || data.data?.payment_url;
-      if (payUrl) { setSuccess("Redirection vers la page de paiement…"); setTimeout(() => { window.location.href = payUrl; }, 1000); }
-      else { setError("URL de paiement non reçue. Réessayez."); }
+      const payUrl = data.data?.redirect_url || data.redirect_url;
+      if (payUrl) {
+        setSuccess("Redirection vers JEKO…");
+        setTimeout(() => { window.location.href = payUrl; }, 1000);
+      } else {
+        setError("URL de paiement non reçue. Réessayez.");
+      }
     } catch { setError("Erreur réseau."); }
     finally { setLoading(false); }
   };
@@ -727,52 +735,75 @@ function PaiementPage() {
       <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.green}0D,transparent)` }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: G.text }}>💳 Effectuer un paiement</div>
-          <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>CinetPay & PayDunya acceptés</div>
+          <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>Paiement sécurisé via JEKO</div>
         </div>
         <div style={{ padding: 28 }}>
-          <Alert type="error" msg={error} />
+          <Alert type="error"   msg={error}   />
           <Alert type="success" msg={success} />
+
+          {/* Type */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".5px" }}>Type de paiement</label>
             <div style={{ display: "flex", gap: 10 }}>
               {[{val:"adhesion",label:"🤝 Adhésion",sub:"Frais d'entrée"},{val:"cotisation",label:"📆 Cotisation",sub:"Mensuelle"}].map(t => (
-                <div key={t.val} onClick={() => setType(t.val)} style={{ flex: 1, border: `2px solid ${type===t.val?G.green:G.border}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", background: type===t.val?G.greenLight:"#FAFBFE" }}>
+                <div key={t.val} onClick={() => setType(t.val)}
+                  style={{ flex: 1, border: `2px solid ${type===t.val?G.green:G.border}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", background: type===t.val?G.greenLight:"#FAFBFE" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: type===t.val?G.green:G.text }}>{t.label}</div>
                   <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>{t.sub}</div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Montant */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>Montant (FCFA)</label>
             <input type="number" value={montant} onChange={e => setMontant(parseFloat(e.target.value)||0)}
               style={{ width: "100%", padding: "12px 16px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 16, fontWeight: 700, color: G.text, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#FAFBFE" }} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {[5000,10000,15000,25000].map(v => <button key={v} onClick={() => setMontant(v)} style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${montant===v?G.purple:G.border}`, background: montant===v?G.purpleLight:"#fff", color: montant===v?G.purple:G.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{v/1000}k</button>)}
-            </div>
-          </div>
-          <div style={{ marginBottom: 22 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".5px" }}>Méthode de paiement</label>
-            <div style={{ display: "flex", gap: 10 }}>
-              {[{val:"cinetpay",label:"CinetPay",sub:"Orange, Wave, MTN…"},{val:"paydunya",label:"PayDunya",sub:"Orange, Wave, MTN…"}].map(m => (
-                <div key={m.val} onClick={() => setMethode(m.val)} style={{ flex: 1, border: `2px solid ${methode===m.val?G.purple:G.border}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", background: methode===m.val?G.purpleLight:"#FAFBFE" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: methode===m.val?G.purple:G.text }}>{m.label}</div>
-                  <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>{m.sub}</div>
-                </div>
+              {[5000,10000,15000,25000].map(v => (
+                <button key={v} onClick={() => setMontant(v)}
+                  style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${montant===v?G.purple:G.border}`, background: montant===v?G.purpleLight:"#fff", color: montant===v?G.purple:G.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {v/1000}k
+                </button>
               ))}
             </div>
           </div>
+
+          {/* Badge JEKO */}
+          <div style={{ background: G.greenLight, border: `1px solid ${G.green}33`, borderRadius: 12, padding: "12px 16px", marginBottom: 22, display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 22 }}>💳</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: G.green }}>Paiement via JEKO</div>
+              <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>MTN · Orange · Moov · Wave · Carte bancaire</div>
+            </div>
+          </div>
+
+          {/* Récap */}
           <div style={{ background: "#FAFBFE", border: `1px solid ${G.border}`, borderRadius: 12, padding: "16px 18px", marginBottom: 22 }}>
-            {[{label:"Type",value:<TypeBadge type={type}/>},{label:"Montant",value:<span style={{fontWeight:700,fontSize:14}}>{fmt(montant)}</span>},{label:"Commission parrain",value:<span style={{color:G.green,fontWeight:700}}>{fmt(commEstimee)} ({type==="adhesion"?"10%":"5%"})</span>}].map((row,i,arr) => (
+            {[
+              { label: "Type",               value: <TypeBadge type={type} /> },
+              { label: "Montant",            value: <span style={{ fontWeight:700, fontSize:14 }}>{fmt(montant)}</span> },
+              { label: "Commission parrain", value: <span style={{ color:G.green, fontWeight:700 }}>{fmt(commEstimee)} ({type==="adhesion"?"10%":"5%"})</span> },
+            ].map((row, i, arr) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i<arr.length-1?`1px solid ${G.border}`:"none" }}>
                 <span style={{ fontSize: 13, color: G.muted }}>{row.label}</span>{row.value}
               </div>
             ))}
           </div>
+
           <button onClick={handlePayer} disabled={loading||!!success}
-            style={{ width: "100%", padding: "14px 20px", background: `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading||success?"not-allowed":"pointer", fontFamily: "inherit", opacity: loading||success?0.7:1 }}>
-            {loading ? "⏳ Traitement…" : `Payer ${fmt(montant)} via ${methode==="cinetpay"?"CinetPay":"PayDunya"} →`}
+            style={{ width: "100%", padding: "14px 20px", background: `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading||success?"not-allowed":"pointer", fontFamily: "inherit", opacity: loading||success?0.7:1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {loading ? (
+              <>
+                <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,.4)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+                Redirection vers JEKO…
+              </>
+            ) : `💳 Payer ${fmt(montant)} avec JEKO →`}
           </button>
+          <p style={{ margin: "10px 0 0", fontSize: 11, color: G.muted, textAlign: "center" }}>
+            Paiement 100% sécurisé via JEKO
+          </p>
         </div>
       </div>
     </div>

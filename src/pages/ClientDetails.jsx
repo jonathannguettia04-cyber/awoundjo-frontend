@@ -153,7 +153,7 @@ export default function ClientDetails() {
       .finally(() => setPlansLoading(false));
   }, []);
 
-  // Gestion retour CinetPay après redirect
+  // Gestion retour JEKO après redirect
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
     const ps = params.get("ps");
@@ -186,61 +186,15 @@ export default function ClientDetails() {
 
     const amount = Number(payForm.amount);
 
-    if (payForm.payment_method === "cinetpay") {
-      // Nouvelle intégration API v1 CinetPay — redirection
+    if (payForm.payment_method === "jeko") {
+      // JEKO — redirection
       try {
         const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
         const token = localStorage.getItem("token");
         const clientData = client?.client || {};
         const txId = `AWJ-CLI-${Date.now()}`;
 
-        const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            amount,
-            transaction_id: txId,
-            description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${clientData.name || ""}`,
-            client_name:  clientData.name  || "Client",
-            client_email: clientData.email || "client@awoundjo.ci",
-            // client_phone omis — format non garanti, backend gère la normalisation
-            client_id:    id,
-            type:         payForm.type,
-            success_url: `${window.location.origin}/clients/${id}?ps=1&tx=${txId}`,
-            failed_url:  `${window.location.origin}/clients/${id}?ps=0`,
-          }),
-        });
-
-        const data = await res.json();
-        let paymentUrl = data?.data?.payment_url || data?.payment_url || null;
-
-        if (!paymentUrl) {
-          const token = data?.data?.payment_token || data?.payment_token;
-          if (token) paymentUrl = `https://secure.cinetpay.net/payment/${token}`;
-        }
-
-        if (!paymentUrl) {
-          throw new Error(data?.error || "URL de paiement non reçue");
-        }
-
-        window.location.href = paymentUrl;
-      } catch (err) {
-        setPayError(err.message || "Erreur initialisation paiement CinetPay");
-        setPaySaving(false);
-      }
-
-    } else if (payForm.payment_method === "paydunya") {
-      // PayDunya PAR — redirection
-      try {
-        const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-        const token = localStorage.getItem("token");
-        const clientData = client?.client || {};
-        const txId = `AWJ-CLI-${Date.now()}`;
-
-        const res = await fetch(`${BASE}/api/payments/paydunya/init-web`, {
+        const res = await fetch(`${BASE}/api/payments/jeko/init`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -263,12 +217,12 @@ export default function ClientDetails() {
         const paymentUrl = data?.data?.payment_url;
 
         if (!paymentUrl) {
-          throw new Error(data?.error || "URL de paiement PayDunya non reçue");
+          throw new Error(data?.error || "URL de paiement JEKO non reçue");
         }
 
         window.location.href = paymentUrl;
       } catch (err) {
-        setPayError(err.message || "Erreur initialisation paiement PayDunya");
+        setPayError(err.message || "Erreur initialisation paiement JEKO");
         setPaySaving(false);
       }
 
@@ -641,22 +595,15 @@ export default function ClientDetails() {
               disabled={paySaving}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="cash">💵 Cash</option>
-              <option value="cinetpay">💳 CinetPay (Orange Money, Wave, MTN…)</option>
-              <option value="paydunya">🏦 PayDunya (Orange Money, Wave, MTN, Moov)</option>
+              <option value="jeko">💳 JEKO (Orange · Wave · MTN · Moov · Carte)</option>
             </select>
           </div>
 
-          {/* Info méthode de paiement */}
-          {payForm.payment_method === "cinetpay" && (
-            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-blue-700">
+          {/* Info méthode JEKO */}
+          {payForm.payment_method === "jeko" && (
+            <div className="bg-teal-50 border border-teal-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-teal-700">
               <span className="text-base">💳</span>
-              Redirection vers CinetPay — Orange Money, Wave, MTN MoMo, carte bancaire acceptés.
-            </div>
-          )}
-          {payForm.payment_method === "paydunya" && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5 flex items-center gap-2 text-xs text-emerald-700">
-              <span className="text-base">🏦</span>
-              Redirection vers PayDunya — Orange Money CI, Wave CI, MTN CI, Moov CI acceptés.
+              Redirection vers JEKO — Orange Money, Wave, MTN, Moov, carte bancaire acceptés.
             </div>
           )}
 
@@ -670,10 +617,8 @@ export default function ClientDetails() {
                 className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-60 font-medium transition-colors">
                 {paySaving
                   ? "⏳ Ouverture…"
-                  : payForm.payment_method === "cinetpay"
-                    ? "💳 Payer via CinetPay"
-                    : payForm.payment_method === "paydunya"
-                    ? "🏦 Payer via PayDunya"
+                  : payForm.payment_method === "jeko"
+                    ? "💳 Payer via JEKO"
                     : "✅ Valider le paiement"}
               </button>
             )}

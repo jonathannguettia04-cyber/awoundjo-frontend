@@ -9,8 +9,7 @@ const C = {
   red:     "#DC2626", redL:     "#FEF2F2",
   slate:   "#64748B", dark:     "#0F172A",
   border:  "#E2E8F0", bg:       "#F8FAFC",
-  cinet:   "#0072C6", cinetL:   "#EFF6FF",
-  pdunya:  "#00B09B", pdunyaL:  "#E6F7F5",
+  jeko:    "#0D9488", jekoL:    "#F0FDFA",
 };
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
@@ -131,7 +130,6 @@ export default function ClientCotisations() {
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
   const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
-  const [payMethod,   setPayMethod]   = useState("cinetpay"); // "cinetpay" | "paydunya"
 
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
@@ -169,9 +167,9 @@ export default function ClientCotisations() {
     monthly_amount: 15000,
   });
   setCotisations([
-    { id:1, created_at:"2024-12-05", amount:15000, status:"paid",    paid_at:"2024-12-05", payment_method:"cinetpay" },
-    { id:2, created_at:"2025-01-07", amount:15000, status:"paid",    paid_at:"2025-01-07", payment_method:"cinetpay" },
-    { id:3, created_at:"2025-02-04", amount:15000, status:"paid",    paid_at:"2025-02-04", payment_method:"cinetpay" },
+    { id:1, created_at:"2024-12-05", amount:15000, status:"paid",    paid_at:"2024-12-05", payment_method:"jeko" },
+    { id:2, created_at:"2025-01-07", amount:15000, status:"paid",    paid_at:"2025-01-07", payment_method:"jeko" },
+    { id:3, created_at:"2025-02-04", amount:15000, status:"paid",    paid_at:"2025-02-04", payment_method:"jeko" },
     { id:4, created_at:"2025-03-01", amount:15000, status:"pending", paid_at:null,         payment_method:null       },
   ]);
 }).finally(() => setLoading(false));
@@ -213,8 +211,8 @@ export default function ClientCotisations() {
 
   const isUpToDate = !pending && paidCount > 0;
 
-  // ── Déclencheur paiement CinetPay — appel direct à /api/payments/cinetpay/init-web
-  const handleCinetPay = async () => {
+  // ── Déclencheur paiement JEKO ────────────────────────────────────────────
+  const handlePayJeko = async () => {
     setPayError("");
     setPayStatus(null);
     setPayLoading(true);
@@ -224,79 +222,19 @@ export default function ClientCotisations() {
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
       const amount  = pending?.amount || monthly;
 
-      // ── Étape 1 : pré-enregistrer via /api/payments/init ─────────────
-      // (optionnel si tu veux tracer côté backend avant redirection)
-      // Pour le portail client on appelle init-web directement
-
-      const txId = `AWJ-CLI-${Date.now()}`;
-
-      const initRes = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
+      const initRes = await fetch(`${BASE}/api/payments/jeko/init`, {
         method:  "POST",
         headers,
         body: JSON.stringify({
           amount,
-          transaction_id: txId,
-          description:    `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
-          client_name:    client?.name  || "Client",
-          client_email:   client?.email || "client@awoundjo.ci",
-          client_phone:   client?.phone || "",
-          success_url: `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
-          failed_url:  `${window.location.origin}/client/cotisations?payment=failed`,
-          notify_url:  `${BASE}/api/payments/cinetpay/notify`,
-        }),
-      });
-
-      const initData = await initRes.json();
-
-      // ── Lire payment_url — double .data géré ─────────────────────────
-      const paymentUrl =
-        initData?.data?.payment_url   ||
-        initData?.payment_url          ||
-        null;
-
-      if (!paymentUrl) {
-        console.error("[ClientCotisations] réponse init-web :", initData);
-        throw new Error(initData?.error || "URL de paiement non reçue du serveur");
-      }
-
-      // Redirection vers la page de paiement CinetPay
-      window.location.href = paymentUrl;
-
-    } catch (e) {
-      setPayError(e.message || "Le paiement a échoué. Veuillez réessayer.");
-      setPayLoading(false);
-    }
-  };
-
-
-  // ── Déclencheur paiement PayDunya ─────────────────────────────────────────
-  const handlePayDunya = async () => {
-    setPayError("");
-    setPayStatus(null);
-    setPayLoading(true);
-
-    try {
-      const token   = localStorage.getItem("client_token");
-      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-      const amount  = pending?.amount || monthly;
-      const txId    = `AWJ-CLI-PD-${Date.now()}`;
-
-      const initRes = await fetch(`${BASE}/api/payments/paydunya/init-web`, {
-        method:  "POST",
-        headers,
-        body: JSON.stringify({
-          amount,
-          transaction_id: txId,
-          description:    `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
-          client_id:      client?.id    || undefined,
-          client_name:    client?.name  || "Client",
-          client_email:   client?.email || "client@awoundjo.ci",
-          client_phone:   client?.phone || "",
-          type:           "mensualite",
-          success_url: `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
-          cancel_url:  `${window.location.origin}/client/cotisations?payment=failed`,
-          return_url:  `${window.location.origin}/client/cotisations?payment=success&tx=${txId}`,
-          notify_url:  `${BASE}/api/payments/paydunya/notify`,
+          description:  `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
+          client_id:    client?.id    || undefined,
+          client_name:  client?.name  || "Client",
+          client_email: client?.email || "client@awoundjo.ci",
+          client_phone: client?.phone || "",
+          type:         "mensualite",
+          success_url:  `${window.location.origin}/client/cotisations?payment=success`,
+          failed_url:   `${window.location.origin}/client/cotisations?payment=failed`,
         }),
       });
 
@@ -307,25 +245,23 @@ export default function ClientCotisations() {
         null;
 
       if (!paymentUrl) {
-        console.error("[ClientCotisations] PayDunya réponse:", initData);
-        throw new Error(initData?.error || "URL de paiement PayDunya non reçue");
+        console.error("[ClientCotisations] JEKO réponse:", initData);
+        throw new Error(initData?.error || "URL de paiement JEKO non reçue");
       }
 
       window.location.href = paymentUrl;
 
     } catch (e) {
-      setPayError(e.message || "Le paiement PayDunya a échoué. Veuillez réessayer.");
+      setPayError(e.message || "Le paiement a échoué. Veuillez réessayer.");
       setPayLoading(false);
     }
   };
-
-  const handlePay = () => payMethod === "paydunya" ? handlePayDunya() : handleCinetPay();
 
   return (
     <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Bannière retour CinetPay ─────────────────────────────────── */}
+      {/* ── Bannière retour paiement ─────────────────────────────────── */}
       {payStatus === "success" && (
         <div style={{
           marginBottom: 20, padding: "14px 18px", borderRadius: 12,
@@ -398,11 +334,11 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* ── Bloc paiement — CinetPay + PayDunya ──────────────────── */}
+      {/* ── Bloc paiement — JEKO ──────────────────── */}
       <Card style={{
         marginBottom: 20,
-        border: `2px solid ${isUpToDate ? C.primary : (payMethod === "paydunya" ? C.pdunya : C.cinet)}`,
-        background: isUpToDate ? C.primaryL : (payMethod === "paydunya" ? C.pdunyaL : C.cinetL),
+        border: `2px solid ${isUpToDate ? C.primary : C.jeko}`,
+        background: isUpToDate ? C.primaryL : C.jekoL,
       }}>
 
         {/* Montant + badge à jour */}
@@ -424,7 +360,7 @@ export default function ClientCotisations() {
             </p>
           )}
 
-          <p style={{ margin: 0, fontSize: 22, fontWeight: 900, color: isUpToDate ? C.primary : (payMethod === "paydunya" ? C.pdunya : C.cinet) }}>
+          <p style={{ margin: 0, fontSize: 22, fontWeight: 900, color: isUpToDate ? C.primary : C.jeko }}>
             {fmt(pending?.amount || monthly)}
           </p>
 
@@ -435,43 +371,21 @@ export default function ClientCotisations() {
           )}
         </div>
 
-        {/* ── Sélecteur de méthode de paiement ─────────────────────── */}
-        <div style={{ marginBottom: 14 }}>
-          <p style={{ margin: "0 0 8px", fontSize: 12, color: C.slate, fontWeight: 700 }}>
-            CHOISIR LA MÉTHODE DE PAIEMENT
-          </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {[
-              { id: "cinetpay", label: "💳 CinetPay",  desc: "MTN, Orange, Moov, Wave, carte…", color: C.cinet,  bg: C.cinetL  },
-              { id: "paydunya", label: "🌿 PayDunya",   desc: "Mobile Money, Wave, carte…",       color: C.pdunya, bg: C.pdunyaL },
-            ].map(m => (
-              <button
-                key={m.id}
-                onClick={() => setPayMethod(m.id)}
-                style={{
-                  padding: "10px 16px",
-                  border: `2px solid ${payMethod === m.id ? m.color : C.border}`,
-                  borderRadius: 10,
-                  background: payMethod === m.id ? m.bg : "#fff",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  flex: 1, minWidth: 140,
-                  textAlign: "left",
-                  transition: "all .15s",
-                }}
-              >
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: payMethod === m.id ? m.color : C.dark }}>
-                  {m.label}
-                </p>
-                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>{m.desc}</p>
-              </button>
-            ))}
+        {/* ── Info JEKO ─────────────────────────────────────────── */}
+        <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            background: C.jeko, borderRadius: 8,
+            padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ fontSize: 14 }}>💳</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>JEKO</span>
           </div>
+          <span style={{ fontSize: 12, color: C.slate }}>Orange · Wave · MTN · Moov · Carte</span>
         </div>
 
         {/* ── Bouton payer ─────────────────────────────────────────── */}
         <button
-          onClick={handlePay}
+          onClick={handlePayJeko}
           disabled={payLoading}
           style={{
             width: "100%",
@@ -480,9 +394,7 @@ export default function ClientCotisations() {
               ? "#94a3b8"
               : isUpToDate
                 ? "linear-gradient(135deg,#059669,#047857)"
-                : payMethod === "paydunya"
-                  ? "linear-gradient(135deg,#00B09B,#008a78)"
-                  : "linear-gradient(135deg,#0072C6,#005A9E)",
+                : "linear-gradient(135deg,#0D9488,#0f766e)",
             color: "#fff", fontWeight: 900, fontSize: 15,
             border: "none", borderRadius: 12,
             cursor: payLoading ? "not-allowed" : "pointer",
@@ -499,7 +411,7 @@ export default function ClientCotisations() {
             </>
           ) : (
             <>
-              💳 {isUpToDate ? "Payer en avance" : `Payer avec ${payMethod === "paydunya" ? "PayDunya" : "CinetPay"}`}
+              💳 {isUpToDate ? "Payer en avance" : "Payer avec JEKO"}
             </>
           )}
         </button>
@@ -567,8 +479,8 @@ export default function ClientCotisations() {
                       </p>
                       <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>
                         {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
-                        {cot.method === "cinetpay" && (
-                          <span style={{ marginLeft: 6, color: C.cinet, fontWeight: 700 }}>· 💳 CinetPay</span>
+                        {cot.payment_method === "jeko" && (
+                          <span style={{ marginLeft: 6, color: C.jeko, fontWeight: 700 }}>· 💳 JEKO</span>
                         )}
                       </p>
                     </div>
@@ -581,13 +493,11 @@ export default function ClientCotisations() {
                     <Badge label={s.label} color={s.color} bg={s.bg} />
                     {isPending && (
                       <button
-                        onClick={handlePay}
+                        onClick={handlePayJeko}
                         disabled={payLoading}
                         style={{
                           padding: "6px 14px",
-                          background: payMethod === "paydunya"
-                            ? "linear-gradient(135deg,#00B09B,#008a78)"
-                            : "linear-gradient(135deg,#0072C6,#005A9E)",
+                          background: "linear-gradient(135deg,#0D9488,#0f766e)",
                           color: "#fff", fontWeight: 700, fontSize: 12,
                           border: "none", borderRadius: 8,
                           cursor: payLoading ? "not-allowed" : "pointer",
@@ -607,7 +517,7 @@ export default function ClientCotisations() {
       </Card>
 
       <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
-        🔒 Paiements sécurisés via CinetPay & PayDunya · Awoundjô Mutuelle Santé CI<br />
+        🔒 Paiements sécurisés via JEKO · Awoundjô Mutuelle Santé CI<br />
         En cas de problème : <strong>+225 01 71 72 16 68</strong>
       </p>
     </div>

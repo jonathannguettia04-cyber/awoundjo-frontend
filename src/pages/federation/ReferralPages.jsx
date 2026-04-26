@@ -2,12 +2,22 @@
 // ─────────────────────────────────────────────────────────────
 //  Toutes les pages du réseau Parrainage (REFERRAL)
 //  RUM → LEADER → PASTEUR → RESPONSABLE → CLIENT
-//  Exports nommés utilisés dans App.jsx via referralPage()
+//  Paiement : JEKO uniquement
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDiasporaData } from "../../diasporaApi";
-import { federationMemberAPI, federationCommAPI, federationPayAPI, federationNotifAPI, federationLeaderAPI, federationNetAPI, federationRecruitAPI, federationProfileAPI } from "../../federationApi";
+import {
+  federationMemberAPI,
+  federationCommAPI,
+  federationPayAPI,
+  federationNotifAPI,
+  federationLeaderAPI,
+  federationNetAPI,
+  federationRecruitAPI,
+  federationProfileAPI,
+  federationDashAPI,
+} from "../../federationApi";
 import { diasporaBeneAPI } from "../../diasporaApi";
 import AdhesionForm from "../../components/AdhesionForm";
 import { usePlans, planIcon } from "../../hooks/usePlans";
@@ -33,9 +43,6 @@ const ROLE_CONFIG = {
   RESPONSABLE: { label:"Responsable", icon:"🤝", color:C.gold,   bg:C.goldL   },
 };
 
-
-
-
 const REWARD_LEVELS = [
   { level:1, min:5,   label:"Bronze 🥉",  reward:"Bon d'achat 5 000 FCFA",   color:"#CD7F32" },
   { level:2, min:15,  label:"Argent 🥈",  reward:"Bon d'achat 20 000 FCFA",  color:"#A8A9AD" },
@@ -43,6 +50,11 @@ const REWARD_LEVELS = [
   { level:4, min:60,  label:"Platine 💎", reward:"Voyage tous frais payés",  color:"#7C3AED" },
   { level:5, min:100, label:"Diamant 🚀", reward:"Voiture + prime 500 000",  color:"#0D9488" },
 ];
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+// Retourne true si le membre doit encore payer
+const needsPayment = (m) => m.status !== "ACTIVE" || m.status_payment !== "paid";
 
 // ── Shared UI ─────────────────────────────────────────────────
 function Card({ children, style={} }) {
@@ -94,6 +106,7 @@ function Btn({ children, onClick, color=C.purple, outline=false, disabled=false,
         background: outline ? "#fff" : color,
         color:      outline ? color  : "#fff",
         border:     outline ? `1.5px solid ${color}` : "none",
+        fontFamily: "inherit",
         ...style,
       }}>
       {children}
@@ -101,51 +114,36 @@ function Btn({ children, onClick, color=C.purple, outline=false, disabled=false,
   );
 }
 
-// Affiche les credentials générés après création + bouton paiement CinetPay
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-// Retourne true si le membre doit encore payer
-const needsPayment = (m) =>
-  m.status !== "ACTIVE" || m.status_payment !== "paid";
-
+// ─────────────────────────────────────────────────────────────
+// MODAL CREDENTIALS — affiché après création d'un rôle
+// Paiement via JEKO uniquement
+// ─────────────────────────────────────────────────────────────
 function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
-  const [payMethod,  setPayMethod]  = useState("cinetpay"); // "cinetpay" | "paydunya"
+
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
-  const fee = Number(adhesionFee) || 0;
+  const fee  = Number(adhesionFee) || 0;
 
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const endpoint = payMethod === "paydunya"
-        ? `${BASE}/api/payments/paydunya/init-web`
-        : `${BASE}/api/payments/cinetpay/init-web`;
-      const body = payMethod === "paydunya"
-        ? {
-            ambassador_id: ambassadorId,
-            amount:        fee,
-            type:          "adhesion",
-            description:   `Adhésion Awoundjô — ${targetLabel}`,
-            success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
-            failed_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
-          }
-        : {
-            ambassador_id: ambassadorId,
-            amount:        fee,
-            type:          "adhesion",
-            description:   `Adhésion Awoundjô — ${targetLabel}`,
-            return_url:    `${window.location.origin}${window.location.pathname}?payment=success`,
-            cancel_url:    `${window.location.origin}${window.location.pathname}?payment=failed`,
-          };
-      const res = await fetch(endpoint, {
-        method: "POST",
+      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+        method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ambassador_id: ambassadorId,
+          amount:        fee,
+          type:          "adhesion",
+          description:   `Adhésion Awoundjô — ${targetLabel}`,
+          success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
+          failure_url:   `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
       });
       const data = await res.json();
-      const url  = data?.data?.payment_url || data?.payment_url;
+      const url  = data?.data?.redirect_url || data?.redirect_url;
       if (!url) throw new Error(data?.error || "URL de paiement non reçue du serveur");
       window.location.href = url;
     } catch (e) {
@@ -157,6 +155,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
       <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:480, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", maxHeight:"90vh", overflowY:"auto" }}>
+
         {/* En-tête */}
         <div style={{ textAlign:"center", marginBottom:20 }}>
           <div style={{ fontSize:48, marginBottom:8 }}>🎉</div>
@@ -211,39 +210,14 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           </a>
         </div>
 
-        {/* Paiement — choix méthode */}
-        <div style={{ background:"#F8FAFC", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"16px 18px", marginBottom:14 }}>
-          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:C.dark }}>
+        {/* Paiement JEKO */}
+        <div style={{ background:"#ECFDF5", border:`1.5px solid ${C.green}44`, borderRadius:12, padding:"16px 18px", marginBottom:14 }}>
+          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:C.green }}>
             💳 Étape suivante — Paiement des frais d'adhésion
           </p>
           <p style={{ margin:"0 0 12px", fontSize:12, color:C.slate }}>
-            Payez maintenant les frais d'adhésion de <strong>{fee.toLocaleString("fr-FR")} FCFA</strong> pour activer le processus de validation.
+            Payez maintenant les frais d'adhésion de <strong>{fee.toLocaleString("fr-FR")} FCFA</strong> via JEKO pour activer le processus de validation.
           </p>
-
-          {/* Sélecteur méthode */}
-          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-            {[
-              { id:"cinetpay", label:"💳 CinetPay",  sub:"Orange · Wave · MTN · Carte" },
-              { id:"paydunya", label:"🏦 PayDunya",   sub:"Orange · Wave · MTN · Moov"  },
-            ].map(m => (
-              <button key={m.id} onClick={() => setPayMethod(m.id)}
-                style={{
-                  flex:1, padding:"10px 8px", borderRadius:10, border:"none", cursor:"pointer",
-                  background: payMethod === m.id ? (m.id === "cinetpay" ? "#EFF6FF" : "#ECFDF5") : "#fff",
-                  outline: payMethod === m.id
-                    ? `2px solid ${m.id === "cinetpay" ? "#0072C6" : "#059669"}`
-                    : "1.5px solid #E2E8F0",
-                  textAlign:"center", fontFamily:"inherit",
-                }}>
-                <p style={{ margin:0, fontSize:13, fontWeight:800,
-                  color: payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.slate }}>
-                  {m.label}
-                </p>
-                <p style={{ margin:"2px 0 0", fontSize:10, color:C.slate }}>{m.sub}</p>
-              </button>
-            ))}
-          </div>
-
           {payError && (
             <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
               <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
@@ -252,17 +226,11 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           <button onClick={handlePay} disabled={payLoading}
             style={{
               width:"100%", padding:"13px 0", borderRadius:10, border:"none",
-              background: payLoading ? "#94a3b8"
-                : payMethod === "paydunya"
-                ? "linear-gradient(135deg,#059669,#047857)"
-                : "linear-gradient(135deg,#0072C6,#005A9E)",
+              background: payLoading ? "#94a3b8" : `linear-gradient(135deg, ${C.green}, #047857)`,
               color:"#fff", fontWeight:900, fontSize:14,
               cursor: payLoading ? "not-allowed" : "pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              boxShadow: payLoading ? "none"
-                : payMethod === "paydunya"
-                ? "0 4px 16px rgba(5,150,105,.35)"
-                : "0 4px 16px rgba(0,114,198,.35)",
+              boxShadow: payLoading ? "none" : "0 4px 16px rgba(5,150,105,.35)",
               fontFamily:"inherit",
             }}>
             {payLoading ? (
@@ -270,14 +238,10 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
                 <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
                 Redirection…
               </>
-            ) : payMethod === "paydunya" ? (
-              <>🏦 Payer {fee.toLocaleString("fr-FR")} FCFA avec PayDunya</>
-            ) : (
-              <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>
-            )}
+            ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec JEKO</>}
           </button>
           <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
-            Paiement 100% sécurisé
+            MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
           </p>
         </div>
 
@@ -290,36 +254,33 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   );
 }
 
-// Modal de paiement pour un membre existant (cartes cliquables)
+// ─────────────────────────────────────────────────────────────
+// MODAL PAIEMENT — pour un membre existant
+// Paiement via JEKO uniquement
+// ─────────────────────────────────────────────────────────────
 function PaymentModal({ member, roleLabel, onClose }) {
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
-  const [payMethod,  setPayMethod]  = useState("cinetpay"); // "cinetpay" | "paydunya"
   const fee = Number(member.membership_fee) || 0;
 
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
-      const token    = localStorage.getItem("diaspora_token") || localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const endpoint = payMethod === "paydunya"
-        ? `${BASE}/api/payments/paydunya/init-web`
-        : `${BASE}/api/payments/cinetpay/init-web`;
-      const body = payMethod === "paydunya"
-        ? { ambassador_id: member.id, amount: fee, currency: "XOF", type: "adhesion",
-            description: `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
-            return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-            cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed` }
-        : { ambassador_id: member.id, amount: fee, type: "adhesion",
-            description: `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
-            return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-            cancel_url: `${window.location.origin}${window.location.pathname}?payment=failed` };
-      const res  = await fetch(endpoint, {
-        method: "POST",
+      const token = localStorage.getItem("diaspora_token") || localStorage.getItem("token") || localStorage.getItem("agent_token");
+      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+        method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ambassador_id: member.id,
+          amount:        fee,
+          type:          "adhesion",
+          description:   `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
+          success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
+          failure_url:   `${window.location.origin}${window.location.pathname}?payment=failed`,
+        }),
       });
       const data = await res.json();
-      const url  = data?.data?.payment_url || data?.payment_url;
+      const url  = data?.data?.redirect_url || data?.redirect_url;
       if (!url) throw new Error("URL de paiement non reçue du serveur");
       window.location.href = url;
     } catch (e) {
@@ -328,21 +289,18 @@ function PaymentModal({ member, roleLabel, onClose }) {
     }
   }
 
-  const methods = [
-    { id:"cinetpay", label:"💳 CinetPay",  sub:"Carte · Mobile Money CI" },
-    { id:"paydunya", label:"🏦 PayDunya",   sub:"Orange · Wave · MTN · Moov" },
-  ];
-
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
       <div style={{ background:"#fff", borderRadius:20, padding:28, maxWidth:440, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+
         <div style={{ textAlign:"center", marginBottom:20 }}>
           <div style={{ fontSize:44, marginBottom:8 }}>💳</div>
           <h2 style={{ margin:0, fontSize:18, fontWeight:900, color:C.dark }}>Payer l'adhésion</h2>
           <p style={{ margin:"6px 0 0", color:C.slate, fontSize:13 }}>{member.name} · {roleLabel}</p>
         </div>
 
-        <div style={{ background:C.bg, borderRadius:12, padding:"14px 16px", marginBottom:16, border:`1px solid ${C.border}` }}>
+        {/* Récapitulatif */}
+        <div style={{ background:C.bg, borderRadius:12, padding:"14px 16px", marginBottom:20, border:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
             <span style={{ fontSize:13, color:C.slate }}>Membre</span>
             <span style={{ fontSize:13, fontWeight:700, color:C.dark }}>{member.name}</span>
@@ -355,26 +313,8 @@ function PaymentModal({ member, roleLabel, onClose }) {
           )}
           <div style={{ display:"flex", justifyContent:"space-between", paddingTop:8, borderTop:`1px solid ${C.border}` }}>
             <span style={{ fontSize:13, fontWeight:800, color:C.dark }}>Frais d'adhésion</span>
-            <span style={{ fontSize:15, fontWeight:900, color:"#0072C6" }}>{fee.toLocaleString("fr-FR")} FCFA</span>
+            <span style={{ fontSize:15, fontWeight:900, color:C.green }}>{fee.toLocaleString("fr-FR")} FCFA</span>
           </div>
-        </div>
-
-        {/* Sélecteur méthode de paiement */}
-        <p style={{ margin:"0 0 8px", fontSize:12, fontWeight:700, color:C.slate }}>Choisir le mode de paiement</p>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
-          {methods.map(m => (
-            <button key={m.id} onClick={() => setPayMethod(m.id)}
-              style={{
-                padding:"10px 8px", borderRadius:10, cursor:"pointer", textAlign:"left",
-                background: payMethod === m.id ? (m.id === "cinetpay" ? "#EFF6FF" : "#ECFDF5") : "#fff",
-                border: `2px solid ${payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.border}`,
-                fontFamily:"inherit", transition:"all .15s",
-              }}>
-              <p style={{ margin:0, fontWeight:800, fontSize:13,
-                color: payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.dark }}>{m.label}</p>
-              <p style={{ margin:"2px 0 0", fontSize:10, color:C.slate }}>{m.sub}</p>
-            </button>
-          ))}
         </div>
 
         {payError && (
@@ -386,27 +326,22 @@ function PaymentModal({ member, roleLabel, onClose }) {
         <button onClick={handlePay} disabled={payLoading}
           style={{
             width:"100%", padding:"14px 0", borderRadius:10, border:"none",
-            background: payLoading ? "#94a3b8"
-              : payMethod === "paydunya" ? "linear-gradient(135deg,#059669,#047857)"
-              : "linear-gradient(135deg,#0072C6,#005A9E)",
+            background: payLoading ? "#94a3b8" : `linear-gradient(135deg, ${C.green}, #047857)`,
             color:"#fff", fontWeight:900, fontSize:15,
             cursor: payLoading ? "not-allowed" : "pointer",
             display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-            boxShadow: payLoading ? "none" : payMethod === "paydunya" ? "0 4px 16px rgba(5,150,105,.35)" : "0 4px 16px rgba(0,114,198,.35)",
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(5,150,105,.35)",
             fontFamily:"inherit", marginBottom:10,
           }}>
           {payLoading ? (
             <>
               <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
-              {payMethod === "paydunya" ? "Redirection vers PayDunya…" : "Redirection vers CinetPay…"}
+              Redirection vers JEKO…
             </>
-          ) : payMethod === "paydunya"
-            ? <>🏦 Payer {fee.toLocaleString("fr-FR")} FCFA avec PayDunya</>
-            : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec CinetPay</>
-          }
+          ) : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA avec JEKO</>}
         </button>
         <p style={{ margin:"0 0 12px", fontSize:11, color:C.slate, textAlign:"center" }}>
-          MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé
+          MTN · Orange · Moov · Wave · Carte bancaire · Paiement 100% sécurisé via JEKO
         </p>
 
         <button onClick={onClose}
@@ -418,21 +353,35 @@ function PaymentModal({ member, roleLabel, onClose }) {
   );
 }
 
-// NB : RegisterRoleForm remplacé par AdhesionForm (CinetPay + plan + récap)
+// ─────────────────────────────────────────────────────────────
+// Bloc d'erreur paiement échoué (réutilisable)
+// ─────────────────────────────────────────────────────────────
+function PayFailedBanner({ onClose }) {
+  return (
+    <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22 }}>❌</span>
+      <div>
+        <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
+        <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement JEKO n'a pas abouti. Veuillez réessayer ou contacter le support.</p>
+      </div>
+      <button onClick={onClose} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN LEADER (RUM uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterLeader() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]       = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
-  const [credsId, setCredsId]   = useState(null);
+  const [list, setList]                     = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [showForm, setShowForm]             = useState(false);
+  const [creds, setCreds]                   = useState(null);
+  const [credsLabel, setCredsLabel]         = useState("");
+  const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
-  const [payMember, setPayMember] = useState(null);
-  const [payFailed, setPayFailed] = useState(false);
+  const [payMember, setPayMember]           = useState(null);
+  const [payFailed, setPayFailed]           = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -446,30 +395,16 @@ export function ReferralRegisterLeader() {
   }, []);
 
   function handleSuccess(credentials, label, id, fee) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setCredsId(id || null);
-    setCredsAdhesionFee(fee || 0);
+    setCreds(credentials); setCredsLabel(label); setCredsId(id || null); setCredsAdhesionFee(fee || 0);
     setShowForm(false);
-    federationMemberAPI.getAll({ role:"LEADER" })
-      .then(r => setList(r.data.ambassadors || []));
+    federationMemberAPI.getAll({ role:"LEADER" }).then(r => setList(r.data.ambassadors || []));
   }
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Leader" onClose={() => setPayMember(null)} />}
-
-      {payFailed && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-          </div>
-          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
-        </div>
-      )}
+      {payFailed && <PayFailedBanner onClose={() => setPayFailed(false)} />}
 
       <PageHeader
         title="⭐ Mes Leaders"
@@ -477,18 +412,15 @@ export function ReferralRegisterLeader() {
         action={<Btn onClick={() => setShowForm(!showForm)}>{showForm ? "✕ Annuler" : "➕ Nouveau Leader"}</Btn>}
       />
 
-      {showForm && (
-        <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="LEADER" onSuccess={handleSuccess} />
-        </div>
-      )}
+      {showForm && <div style={{ marginBottom:24 }}><AdhesionForm targetRole="LEADER" onSuccess={handleSuccess} /></div>}
 
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="⭐" title="Aucun Leader enregistré" desc="Cliquez sur + Nouveau Leader pour commencer" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+            <Card key={m.id}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
               onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
@@ -503,7 +435,7 @@ export function ReferralRegisterLeader() {
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
-                    style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                    style={{ padding:"5px 12px", borderRadius:8, background:`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
@@ -523,15 +455,15 @@ export function ReferralRegisterLeader() {
 // PAGE : ENREGISTRER UN PASTEUR (LEADER uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterPasteur() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]       = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
-  const [credsId, setCredsId]   = useState(null);
+  const [list, setList]                     = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [showForm, setShowForm]             = useState(false);
+  const [creds, setCreds]                   = useState(null);
+  const [credsLabel, setCredsLabel]         = useState("");
+  const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
-  const [payMember, setPayMember] = useState(null);
-  const [payFailed, setPayFailed] = useState(false);
+  const [payMember, setPayMember]           = useState(null);
+  const [payFailed, setPayFailed]           = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -545,30 +477,16 @@ export function ReferralRegisterPasteur() {
   }, []);
 
   function handleSuccess(credentials, label, id, fee) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setCredsId(id || null);
-    setCredsAdhesionFee(fee || 0);
+    setCreds(credentials); setCredsLabel(label); setCredsId(id || null); setCredsAdhesionFee(fee || 0);
     setShowForm(false);
-    federationMemberAPI.getAll({ role:"PASTEUR" })
-      .then(r => setList(r.data.ambassadors || []));
+    federationMemberAPI.getAll({ role:"PASTEUR" }).then(r => setList(r.data.ambassadors || []));
   }
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Pasteur" onClose={() => setPayMember(null)} />}
-
-      {payFailed && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-          </div>
-          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
-        </div>
-      )}
+      {payFailed && <PayFailedBanner onClose={() => setPayFailed(false)} />}
 
       <PageHeader
         title="⛪ Mes Pasteurs"
@@ -576,18 +494,15 @@ export function ReferralRegisterPasteur() {
         action={<Btn onClick={() => setShowForm(!showForm)}>{showForm ? "✕ Annuler" : "➕ Nouveau Pasteur"}</Btn>}
       />
 
-      {showForm && (
-        <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="PASTEUR" onSuccess={handleSuccess} />
-        </div>
-      )}
+      {showForm && <div style={{ marginBottom:24 }}><AdhesionForm targetRole="PASTEUR" onSuccess={handleSuccess} /></div>}
 
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="⛪" title="Aucun Pasteur enregistré" desc="Créez votre premier Pasteur" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+            <Card key={m.id}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
               onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
@@ -602,7 +517,7 @@ export function ReferralRegisterPasteur() {
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
-                    style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                    style={{ padding:"5px 12px", borderRadius:8, background:`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
@@ -622,15 +537,15 @@ export function ReferralRegisterPasteur() {
 // PAGE : ENREGISTRER UN RESPONSABLE (PASTEUR uniquement)
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterResponsable() {
-  const [list, setList]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [creds, setCreds]       = useState(null);
-  const [credsLabel, setCredsLabel] = useState("");
-  const [credsId, setCredsId]   = useState(null);
+  const [list, setList]                     = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [showForm, setShowForm]             = useState(false);
+  const [creds, setCreds]                   = useState(null);
+  const [credsLabel, setCredsLabel]         = useState("");
+  const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
-  const [payMember, setPayMember] = useState(null);
-  const [payFailed, setPayFailed] = useState(false);
+  const [payMember, setPayMember]           = useState(null);
+  const [payFailed, setPayFailed]           = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -644,30 +559,16 @@ export function ReferralRegisterResponsable() {
   }, []);
 
   function handleSuccess(credentials, label, id, fee) {
-    setCreds(credentials);
-    setCredsLabel(label);
-    setCredsId(id || null);
-    setCredsAdhesionFee(fee || 0);
+    setCreds(credentials); setCredsLabel(label); setCredsId(id || null); setCredsAdhesionFee(fee || 0);
     setShowForm(false);
-    federationMemberAPI.getAll({ role:"RESPONSABLE" })
-      .then(r => setList(r.data.ambassadors || []));
+    federationMemberAPI.getAll({ role:"RESPONSABLE" }).then(r => setList(r.data.ambassadors || []));
   }
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Responsable" onClose={() => setPayMember(null)} />}
-
-      {payFailed && (
-        <div style={{ marginBottom:20, padding:"14px 18px", borderRadius:12, background:C.redL, border:`1.5px solid ${C.red}`, display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:22 }}>❌</span>
-          <div>
-            <p style={{ margin:0, fontWeight:800, color:C.red, fontSize:14 }}>Paiement annulé ou refusé</p>
-            <p style={{ margin:"2px 0 0", fontSize:12, color:C.red }}>Le paiement CinetPay n'a pas abouti. Veuillez réessayer.</p>
-          </div>
-          <button onClick={() => setPayFailed(false)} style={{ marginLeft:"auto", background:"none", border:"none", fontSize:18, cursor:"pointer", color:C.red }}>✕</button>
-        </div>
-      )}
+      {payFailed && <PayFailedBanner onClose={() => setPayFailed(false)} />}
 
       <PageHeader
         title="🤝 Mes Responsables"
@@ -675,18 +576,15 @@ export function ReferralRegisterResponsable() {
         action={<Btn onClick={() => setShowForm(!showForm)}>{showForm ? "✕ Annuler" : "➕ Nouveau Responsable"}</Btn>}
       />
 
-      {showForm && (
-        <div style={{ marginBottom:24 }}>
-          <AdhesionForm targetRole="RESPONSABLE" onSuccess={handleSuccess} />
-        </div>
-      )}
+      {showForm && <div style={{ marginBottom:24 }}><AdhesionForm targetRole="RESPONSABLE" onSuccess={handleSuccess} /></div>}
 
       {loading ? <Loader /> : list.length === 0 ? (
         <EmptyState icon="🤝" title="Aucun Responsable enregistré" desc="Créez votre premier Responsable" />
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {list.map(m => (
-            <Card key={m.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
+            <Card key={m.id}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, cursor:"pointer", transition:"box-shadow .15s" }}
               onClick={() => needsPayment(m) && setPayMember(m)}
               onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
@@ -698,7 +596,7 @@ export function ReferralRegisterResponsable() {
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 {needsPayment(m) && (
                   <button onClick={e => { e.stopPropagation(); setPayMember(m); }}
-                    style={{ padding:"5px 12px", borderRadius:8, background:"linear-gradient(135deg,#0072C6,#005A9E)", color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                    style={{ padding:"5px 12px", borderRadius:8, background:`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:12, cursor:"pointer" }}>
                     💳 Payer
                   </button>
                 )}
@@ -716,14 +614,13 @@ export function ReferralRegisterResponsable() {
 
 // ─────────────────────────────────────────────────────────────
 // PAGE : ENREGISTRER UN CLIENT (RESPONSABLE / PASTEUR)
-// Génère numéro mutualiste AWJ-YYYY-XXXX
 // ─────────────────────────────────────────────────────────────
 export function ReferralRegisterClient() {
   const navigate  = useNavigate();
   const { plans, plansLoading } = usePlans();
-  const [form, setForm] = useState({ name:"", phone:"", city:"", plan:"" });
+  const [form, setForm]     = useState({ name:"", phone:"", city:"", plan:"" });
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError]   = useState("");
   const [success, setSuccess] = useState(null);
 
   useEffect(() => {
@@ -736,7 +633,6 @@ export function ReferralRegisterClient() {
     e.preventDefault(); setError(""); setLoading(true);
     try {
       const { data } = await diasporaBeneAPI.create({ ...form });
-      // data = { beneficiary, credentials: { mutual_number, temp_password } }
       setSuccess({ ...data.beneficiary, temp_password: data.credentials?.temp_password });
     } catch(err) {
       setError(err.response?.data?.error || "Erreur création client");
@@ -767,11 +663,14 @@ export function ReferralRegisterClient() {
             Un administrateur doit valider ce compte avant que le client puisse effectuer son paiement d'adhésion.
           </p>
           <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
-            <button onClick={() => { const t = `Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`; navigator.clipboard.writeText(t); }}              style={{ padding:"8px 14px", borderRadius:8, border:`1.5px solid ${C.gold}`, background:C.goldL, color:C.dark, fontWeight:700, fontSize:12, cursor:"pointer" }}>
+            <button onClick={() => { const t = `Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`; navigator.clipboard.writeText(t); }}
+              style={{ padding:"8px 14px", borderRadius:8, border:`1.5px solid ${C.gold}`, background:C.goldL, color:C.dark, fontWeight:700, fontSize:12, cursor:"pointer" }}>
               📋 Copier
             </button>
             {success.temp_password && (
-              <a href={`https://wa.me/?text=${encodeURIComponent(`Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`)}`}                target="_blank" rel="noreferrer"                style={{ padding:"8px 14px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:12, textDecoration:"none" }}>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nMot de passe temporaire : ${success.temp_password}`)}`}
+                target="_blank" rel="noreferrer"
+                style={{ padding:"8px 14px", borderRadius:8, background:"#25D366", color:"#fff", fontWeight:700, fontSize:12, textDecoration:"none" }}>
                 📱 WhatsApp
               </a>
             )}
@@ -790,20 +689,18 @@ export function ReferralRegisterClient() {
         {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
         <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {[
-            { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",           type:"text" },
-            { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00",   type:"tel"  },
-            { key:"city",  label:"Ville",              placeholder:"Abidjan",               type:"text" },
+            { key:"name",  label:"Nom complet *",      placeholder:"Jean Dupont",         type:"text" },
+            { key:"phone", label:"Téléphone WhatsApp", placeholder:"+225 07 00 00 00 00", type:"tel"  },
+            { key:"city",  label:"Ville",              placeholder:"Abidjan",             type:"text" },
           ].map(f => (
             <div key={f.key}>
               <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
               <input required={f.key==="name"} type={f.type} placeholder={f.placeholder}
-                value={form[f.key]}
-                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                 style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
             </div>
           ))}
 
-          {/* Choix offre */}
           <div>
             <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
             {plansLoading ? (
@@ -881,16 +778,14 @@ export function ReferralClients() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : RÉCOMPENSES 🏆 (tous les rôles avec cardsSold)
+// PAGE : RÉCOMPENSES 🏆
 // ─────────────────────────────────────────────────────────────
 export function ReferralRewards() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats]     = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    federationDashAPI.getStats()
-      .then(r => setStats(r.data))
-      .finally(() => setLoading(false));
+    federationDashAPI.getStats().then(r => setStats(r.data)).finally(() => setLoading(false));
   }, []);
 
   const cardsSold    = stats?.cards_sold || 0;
@@ -907,7 +802,6 @@ export function ReferralRewards() {
     <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
       <PageHeader title="🏆 Mes récompenses" subtitle="Vendez des cartes pour débloquer des paliers" />
 
-      {/* Résumé */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
         <Card style={{ textAlign:"center" }}>
           <p style={{ margin:"0 0 4px", fontSize:36, fontWeight:900, color:C.purple }}>{cardsSold}</p>
@@ -920,7 +814,6 @@ export function ReferralRewards() {
         </Card>
       </div>
 
-      {/* Niveau actuel */}
       <Card style={{ marginBottom:24 }}>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>🎖️ Niveau actuel</p>
         {currentLevel ? (
@@ -933,8 +826,6 @@ export function ReferralRewards() {
             <p style={{ margin:0, color:C.slate, fontSize:13 }}>Vendez {REWARD_LEVELS[0].min} cartes pour débloquer votre premier niveau !</p>
           </div>
         )}
-
-        {/* Progression vers le prochain niveau */}
         {nextLevel && (
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
@@ -949,7 +840,6 @@ export function ReferralRewards() {
         )}
       </Card>
 
-      {/* Tous les paliers */}
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📊 Tous les paliers</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -975,18 +865,80 @@ export function ReferralRewards() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// PAGE : CARTES VENDUES
+// ─────────────────────────────────────────────────────────────
+export function ReferralCards() {
+  const [stats, setStats]     = useState(null);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      federationDashAPI.getStats(),
+      federationMemberAPI.getAll({ role:"CLIENT" }),
+    ]).then(([s, c]) => {
+      setStats(s.data);
+      setClients(c.data.ambassadors || []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const cardsSold    = stats?.cards_sold || clients.length;
+  const currentLevel = REWARD_LEVELS.slice().reverse().find(l => cardsSold >= l.min) || null;
+
+  if (loading) return <Loader />;
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
+      <PageHeader title="💳 Cartes vendues" subtitle={`${cardsSold} carte(s) au total`} />
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
+        <Card style={{ textAlign:"center" }}>
+          <p style={{ margin:"0 0 4px", fontSize:40, fontWeight:900, color:C.purple }}>{cardsSold}</p>
+          <p style={{ margin:0, color:C.slate, fontSize:13, fontWeight:600 }}>Cartes vendues</p>
+        </Card>
+        <Card style={{ textAlign:"center" }}>
+          <p style={{ margin:"0 0 4px", fontSize:24, fontWeight:900, color:currentLevel ? C.gold : C.slate }}>{currentLevel?.label || "Aucun niveau"}</p>
+          <p style={{ margin:0, color:C.slate, fontSize:13, fontWeight:600 }}>Niveau atteint</p>
+          {currentLevel && <p style={{ margin:"6px 0 0", fontSize:12, color:C.gold }}>{currentLevel.reward}</p>}
+        </Card>
+      </div>
+
+      <Card>
+        <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📋 Liste des clients (cartes)</p>
+        {clients.length === 0 ? (
+          <EmptyState icon="💳" title="Aucune carte vendue" desc="Enregistrez des clients pour vendre des cartes" />
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {clients.map(c => (
+              <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:C.bg, borderRadius:8 }}>
+                <div>
+                  <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{c.name}</p>
+                  <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{c.city} • {fmtDate(c.created_at)}</p>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <p style={{ margin:0, fontSize:12, fontWeight:700, fontFamily:"monospace", color:C.purple }}>{c.mutual_number}</p>
+                  <span style={{ fontSize:11, fontWeight:700, color:C.teal }}>{c.plan}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // PAGE : GAINS / COMMISSIONS
 // ─────────────────────────────────────────────────────────────
 export function ReferralEarnings() {
-  const [data, setData]   = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const amb  = getDiasporaData();
   const role = amb?.role || "RESPONSABLE";
 
   useEffect(() => {
-    federationCommAPI.getAll()
-      .then(r => setData(r.data))
-      .finally(() => setLoading(false));
+    federationCommAPI.getAll().then(r => setData(r.data)).finally(() => setLoading(false));
   }, []);
 
   const totals = data?.totals || {};
@@ -997,14 +949,13 @@ export function ReferralEarnings() {
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="💰 Mes gains" subtitle="Commissions générées par votre réseau" />
 
-      {/* Totaux */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total gagné",    value:totals.total_earned, color:C.green  },
-          { label:"En attente",     value:totals.pending,      color:C.gold   },
-          { label:"Validé",         value:totals.validated,    color:C.blue   },
-          { label:"Payé",           value:totals.paid,         color:C.purple },
-          { label:"Ce mois",        value:totals.this_month,   color:C.teal   },
+          { label:"Total gagné", value:totals.total_earned, color:C.green  },
+          { label:"En attente",  value:totals.pending,      color:C.gold   },
+          { label:"Validé",      value:totals.validated,    color:C.blue   },
+          { label:"Payé",        value:totals.paid,         color:C.purple },
+          { label:"Ce mois",     value:totals.this_month,   color:C.teal   },
         ].map(s => (
           <Card key={s.label} style={{ textAlign:"center" }}>
             <p style={{ margin:"0 0 4px", fontSize:22, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -1014,7 +965,6 @@ export function ReferralEarnings() {
         ))}
       </div>
 
-      {/* Tableau commissions */}
       <Card>
         <p style={{ margin:"0 0 16px", fontWeight:800, color:C.dark, fontSize:15 }}>📋 Détail des commissions</p>
         {!data?.commissions?.length ? (
@@ -1063,9 +1013,7 @@ export function ReferralNetwork() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    federationNetAPI.getHierarchy()
-      .then(r => setNetwork(r.data))
-      .finally(() => setLoading(false));
+    federationNetAPI.getHierarchy().then(r => setNetwork(r.data)).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loader />;
@@ -1076,12 +1024,11 @@ export function ReferralNetwork() {
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
       <PageHeader title="🌐 Mon réseau" subtitle={`${network?.totals?.total || 0} membres au total`} />
 
-      {/* Totaux par niveau */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:24 }}>
         {[
-          { label:"Niveau 1",  value:levels.level1?.length||0, color:C.purple },
-          { label:"Niveau 2",  value:levels.level2?.length||0, color:C.blue   },
-          { label:"Niveau 3",  value:levels.level3?.length||0, color:C.teal   },
+          { label:"Niveau 1", value:levels.level1?.length||0, color:C.purple },
+          { label:"Niveau 2", value:levels.level2?.length||0, color:C.blue   },
+          { label:"Niveau 3", value:levels.level3?.length||0, color:C.teal   },
         ].map(s => (
           <Card key={s.label} style={{ textAlign:"center" }}>
             <p style={{ margin:0, fontSize:28, fontWeight:900, color:s.color }}>{fmt(s.value)}</p>
@@ -1090,7 +1037,6 @@ export function ReferralNetwork() {
         ))}
       </div>
 
-      {/* Liste par niveau */}
       {["level1","level2","level3"].map((lvl, i) => (
         levels[lvl]?.length > 0 && (
           <Card key={lvl} style={{ marginBottom:16 }}>
@@ -1120,225 +1066,13 @@ export function ReferralNetwork() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────
-export function ReferralNotifications() {
-  const [notifs, setNotifs] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    federationNotifAPI.getAll()
-      .then(r => { setNotifs(r.data.notifications || []); federationNotifAPI.markRead().catch(()=>{}); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
-      <PageHeader title="🔔 Notifications" subtitle={`${notifs.length} notification(s)`} />
-      {loading ? <Loader /> : notifs.length === 0 ? (
-        <EmptyState icon="🔔" title="Aucune notification" desc="Vous êtes à jour !" />
-      ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {notifs.map(n => (
-            <Card key={n.id} style={{ display:"flex", gap:14, opacity:n.read?0.7:1 }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
-                {n.type==="commission"?"💰":n.type==="welcome"?"🎉":"🔔"}
-              </div>
-              <div>
-                <p style={{ margin:"0 0 3px", fontWeight:700, color:C.dark, fontSize:13 }}>{n.title || "Notification"}</p>
-                <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate }}>{n.message}</p>
-                <p style={{ margin:0, fontSize:11, color:C.slate }}>{fmtDate(n.created_at)}</p>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// PAGE : CLASSEMENT
-// ─────────────────────────────────────────────────────────────
-export function ReferralLeaderboard() {
-  const [data, setData]   = useState(null);
-  const [period, setPeriod] = useState("month");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    federationLeaderAPI.getLeaderboard(period)
-      .then(r => setData(r.data))
-      .finally(() => setLoading(false));
-  }, [period]);
-
-  return (
-    <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
-      <PageHeader title="🏅 Classement" subtitle="Les meilleurs performers de votre réseau" />
-
-      {/* Sélecteur période */}
-      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
-        {[{ id:"week",label:"Cette semaine" },{ id:"month",label:"Ce mois" },{ id:"all",label:"Tout temps" }].map(p => (
-          <button key={p.id} onClick={() => setPeriod(p.id)}
-            style={{ padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? <Loader /> : (
-        <Card>
-          <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>🏆 Top gains</p>
-          {data?.top_earners?.map((a, i) => (
-            <div key={a.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 12px", background:i===0?C.goldL:C.bg, borderRadius:10, marginBottom:8 }}>
-              <span style={{ fontSize:20, width:30, textAlign:"center" }}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`}</span>
-              <div style={{ flex:1 }}>
-                <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{a.name}</p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{ROLE_CONFIG[a.role]?.label || a.role} • {a.country}</p>
-              </div>
-              <span style={{ fontWeight:800, color:C.gold, fontSize:14 }}>{fmt(a.earnings)} FCFA</span>
-            </div>
-          ))}
-          {!data?.top_earners?.length && <EmptyState icon="🏅" title="Aucune donnée" desc="Le classement s'affichera bientôt" />}
-
-          {data?.my_rank && (
-            <div style={{ marginTop:16, padding:"12px 16px", background:C.purpleL, borderRadius:10, textAlign:"center" }}>
-              <p style={{ margin:0, fontWeight:700, color:C.purple }}>Votre rang : #{data.my_rank}</p>
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// PAGE : PROFIL
-// ─────────────────────────────────────────────────────────────
-export function ReferralProfile() {
-  const [form, setForm]   = useState({ name:"", country:"", city:"", phone:"" });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [saved, setSaved]     = useState(false);
-  const amb  = getDiasporaData();
-  const role = amb?.role || "RESPONSABLE";
-  const rc   = ROLE_CONFIG[role] || {};
-
-  useEffect(() => {
-    federationProfileAPI.getMe()
-      .then(r => { const a = r.data.ambassador; setForm({ name:a.name||"", country:a.country||"", city:a.city||"", phone:a.phone||"" }); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function save(e) {
-    e.preventDefault(); setSaving(true); setSaved(false);
-    try { await federationProfileAPI.update(form); setSaved(true); setTimeout(() => setSaved(false), 3000); }
-    catch {}
-    finally { setSaving(false); }
-  }
-
-  if (loading) return <Loader />;
-
-  return (
-    <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
-      <PageHeader title="👤 Mon profil" subtitle="Gérez vos informations personnelles" />
-      <Card>
-        {/* Badge rôle */}
-        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:rc.bg||C.purpleL, borderRadius:12, marginBottom:24 }}>
-          <span style={{ fontSize:32 }}>{rc.icon}</span>
-          <div>
-            <p style={{ margin:0, fontWeight:900, fontSize:16, color:C.dark }}>{form.name}</p>
-            <span style={{ fontSize:12, fontWeight:700, color:rc.color||C.purple }}>{rc.label}</span>
-          </div>
-        </div>
-
-        {saved && <div style={{ background:C.greenL, color:C.green, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13, fontWeight:700 }}>✅ Profil mis à jour !</div>}
-
-        <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
-          {[
-            { key:"name",    label:"Nom complet",  placeholder:"Jean Kofi" },
-            { key:"phone",   label:"Téléphone",     placeholder:"+225 07 00 00 00 00" },
-            { key:"city",    label:"Ville",          placeholder:"Abidjan" },
-            { key:"country", label:"Pays",           placeholder:"Côte d'Ivoire" },
-          ].map(f => (
-            <div key={f.key}>
-              <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
-              <input value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
-                style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
-            </div>
-          ))}
-          <Btn disabled={saving}>
-            {saving ? "Enregistrement…" : "💾 Sauvegarder"}
-          </Btn>
-        </form>
-      </Card>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// PAGE : PAIEMENTS
-// ─────────────────────────────────────────────────────────────
-export function ReferralPayments() {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading]   = useState(true);
-
-  useEffect(() => {
-    federationPayAPI.getAll()
-      .then(r => setPayments(r.data.payments || []))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      <PageHeader title="💳 Paiements" subtitle={`${payments.length} paiement(s)`} />
-      {loading ? <Loader /> : payments.length === 0 ? (
-        <EmptyState icon="💳" title="Aucun paiement" desc="Les paiements apparaîtront ici" />
-      ) : (
-        <Card>
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:500 }}>
-              <thead>
-                <tr style={{ background:C.bg }}>
-                  {["Date","Bénéficiaire","Offre","Montant","Statut"].map(h => (
-                    <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:700, color:C.slate, fontSize:11, textTransform:"uppercase", letterSpacing:.8 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map(p => (
-                  <tr key={p.id} style={{ borderTop:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"10px 12px", color:C.slate }}>{fmtDate(p.created_at)}</td>
-                    <td style={{ padding:"10px 12px", fontWeight:600, color:C.dark }}>{p.beneficiary_name || "—"}</td>
-                    <td style={{ padding:"10px 12px" }}>
-                      <span style={{ background:C.purpleL, color:C.purple, padding:"2px 8px", borderRadius:999, fontSize:11, fontWeight:700 }}>{p.plan || "—"}</span>
-                    </td>
-                    <td style={{ padding:"10px 12px", fontWeight:700, color:C.green }}>{fmt(p.amount_xof || p.amount)} FCFA</td>
-                    <td style={{ padding:"10px 12px" }}>
-                      <span style={{ background:p.status==="COMPLETED"?C.greenL:C.goldL, color:p.status==="COMPLETED"?C.green:C.gold, padding:"2px 8px", borderRadius:999, fontSize:11, fontWeight:700 }}>
-                        {p.status === "COMPLETED" ? "Complété" : "En attente"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // PAGE : RECRUTEMENT / LIEN PARRAINAGE
 // ─────────────────────────────────────────────────────────────
 export function ReferralReferral() {
-  const [link, setLink]   = useState(null);
+  const [link, setLink]           = useState(null);
   const [referrals, setReferrals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [copied, setCopied]       = useState(false);
 
   useEffect(() => {
     Promise.all([federationRecruitAPI.getLink(), federationRecruitAPI.getReferrals()])
@@ -1405,68 +1139,206 @@ export function ReferralReferral() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PAGE : CARTES VENDUES (RESPONSABLE / PASTEUR)
+// PAGE : PAIEMENTS
 // ─────────────────────────────────────────────────────────────
-export function ReferralCards() {
-  const [stats, setStats] = useState(null);
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+export function ReferralPayments() {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      federationDashAPI.getStats(),
-      federationMemberAPI.getAll({ role:"CLIENT" }),
-    ]).then(([s, c]) => {
-      setStats(s.data);
-      setClients(c.data.ambassadors || []);
-    }).finally(() => setLoading(false));
+    federationPayAPI.getAll().then(r => setPayments(r.data.payments || [])).finally(() => setLoading(false));
   }, []);
-
-  const cardsSold = stats?.cards_sold || clients.length;
-  const currentLevel = REWARD_LEVELS.slice().reverse().find(l => cardsSold >= l.min) || null;
-
-  if (loading) return <Loader />;
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
-      <PageHeader title="💳 Cartes vendues" subtitle={`${cardsSold} carte(s) au total`} />
-
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
-        <Card style={{ textAlign:"center" }}>
-          <p style={{ margin:"0 0 4px", fontSize:40, fontWeight:900, color:C.purple }}>{cardsSold}</p>
-          <p style={{ margin:0, color:C.slate, fontSize:13, fontWeight:600 }}>Cartes vendues</p>
-        </Card>
-        <Card style={{ textAlign:"center" }}>
-          <p style={{ margin:"0 0 4px", fontSize:24, fontWeight:900, color:currentLevel ? C.gold : C.slate }}>{currentLevel?.label || "Aucun niveau"}</p>
-          <p style={{ margin:0, color:C.slate, fontSize:13, fontWeight:600 }}>Niveau atteint</p>
-          {currentLevel && <p style={{ margin:"6px 0 0", fontSize:12, color:C.gold }}>{currentLevel.reward}</p>}
-        </Card>
-      </div>
-
-      <Card>
-        <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>📋 Liste des clients (cartes)</p>
-        {clients.length === 0 ? (
-          <EmptyState icon="💳" title="Aucune carte vendue" desc="Enregistrez des clients pour vendre des cartes" />
-        ) : (
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {clients.map(c => (
-              <div key={c.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:C.bg, borderRadius:8 }}>
-                <div>
-                  <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{c.name}</p>
-                  <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{c.city} • {fmtDate(c.created_at)}</p>
-                </div>
-                <div style={{ textAlign:"right" }}>
-                  <p style={{ margin:0, fontSize:12, fontWeight:700, fontFamily:"monospace", color:C.purple }}>{c.mutual_number}</p>
-                  <span style={{ fontSize:11, fontWeight:700, color:C.teal }}>{c.plan}</span>
-                </div>
-              </div>
-            ))}
+      <PageHeader title="💳 Paiements" subtitle={`${payments.length} paiement(s)`} />
+      {loading ? <Loader /> : payments.length === 0 ? (
+        <EmptyState icon="💳" title="Aucun paiement" desc="Les paiements apparaîtront ici" />
+      ) : (
+        <Card>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:500 }}>
+              <thead>
+                <tr style={{ background:C.bg }}>
+                  {["Date","Bénéficiaire","Offre","Montant","Statut"].map(h => (
+                    <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:700, color:C.slate, fontSize:11, textTransform:"uppercase", letterSpacing:.8 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map(p => (
+                  <tr key={p.id} style={{ borderTop:`1px solid ${C.border}` }}>
+                    <td style={{ padding:"10px 12px", color:C.slate }}>{fmtDate(p.created_at)}</td>
+                    <td style={{ padding:"10px 12px", fontWeight:600, color:C.dark }}>{p.beneficiary_name || "—"}</td>
+                    <td style={{ padding:"10px 12px" }}>
+                      <span style={{ background:C.purpleL, color:C.purple, padding:"2px 8px", borderRadius:999, fontSize:11, fontWeight:700 }}>{p.plan || "—"}</span>
+                    </td>
+                    <td style={{ padding:"10px 12px", fontWeight:700, color:C.green }}>{fmt(p.amount_xof || p.amount)} FCFA</td>
+                    <td style={{ padding:"10px 12px" }}>
+                      <span style={{ background:p.status==="COMPLETED"?C.greenL:C.goldL, color:p.status==="COMPLETED"?C.green:C.gold, padding:"2px 8px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                        {p.status === "COMPLETED" ? "Complété" : "En attente"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
 
-// Export manquant pour federationDashAPI (utilisé dans ReferralRewards et ReferralCards)
-import { federationDashAPI } from "../../federationApi";
+// ─────────────────────────────────────────────────────────────
+// PAGE : NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+export function ReferralNotifications() {
+  const [notifs, setNotifs]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    federationNotifAPI.getAll()
+      .then(r => { setNotifs(r.data.notifications || []); federationNotifAPI.markRead().catch(()=>{}); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
+      <PageHeader title="🔔 Notifications" subtitle={`${notifs.length} notification(s)`} />
+      {loading ? <Loader /> : notifs.length === 0 ? (
+        <EmptyState icon="🔔" title="Aucune notification" desc="Vous êtes à jour !" />
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {notifs.map(n => (
+            <Card key={n.id} style={{ display:"flex", gap:14, opacity:n.read?0.7:1 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
+                {n.type==="commission"?"💰":n.type==="welcome"?"🎉":"🔔"}
+              </div>
+              <div>
+                <p style={{ margin:"0 0 3px", fontWeight:700, color:C.dark, fontSize:13 }}>{n.title || "Notification"}</p>
+                <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate }}>{n.message}</p>
+                <p style={{ margin:0, fontSize:11, color:C.slate }}>{fmtDate(n.created_at)}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGE : CLASSEMENT
+// ─────────────────────────────────────────────────────────────
+export function ReferralLeaderboard() {
+  const [data, setData]     = useState(null);
+  const [period, setPeriod] = useState("month");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    federationLeaderAPI.getLeaderboard(period).then(r => setData(r.data)).finally(() => setLoading(false));
+  }, [period]);
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:700, margin:"0 auto" }}>
+      <PageHeader title="🏅 Classement" subtitle="Les meilleurs performers de votre réseau" />
+
+      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+        {[{ id:"week",label:"Cette semaine" },{ id:"month",label:"Ce mois" },{ id:"all",label:"Tout temps" }].map(p => (
+          <button key={p.id} onClick={() => setPeriod(p.id)}
+            style={{ padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600, background:period===p.id?C.purple:"#fff", color:period===p.id?"#fff":C.slate, border:`1.5px solid ${period===p.id?C.purple:C.border}` }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <Loader /> : (
+        <Card>
+          <p style={{ margin:"0 0 14px", fontWeight:800, color:C.dark }}>🏆 Top gains</p>
+          {data?.top_earners?.map((a, i) => (
+            <div key={a.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 12px", background:i===0?C.goldL:C.bg, borderRadius:10, marginBottom:8 }}>
+              <span style={{ fontSize:20, width:30, textAlign:"center" }}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`}</span>
+              <div style={{ flex:1 }}>
+                <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{a.name}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{ROLE_CONFIG[a.role]?.label || a.role} • {a.country}</p>
+              </div>
+              <span style={{ fontWeight:800, color:C.gold, fontSize:14 }}>{fmt(a.earnings)} FCFA</span>
+            </div>
+          ))}
+          {!data?.top_earners?.length && <EmptyState icon="🏅" title="Aucune donnée" desc="Le classement s'affichera bientôt" />}
+          {data?.my_rank && (
+            <div style={{ marginTop:16, padding:"12px 16px", background:C.purpleL, borderRadius:10, textAlign:"center" }}>
+              <p style={{ margin:0, fontWeight:700, color:C.purple }}>Votre rang : #{data.my_rank}</p>
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGE : PROFIL
+// ─────────────────────────────────────────────────────────────
+export function ReferralProfile() {
+  const [form, setForm]   = useState({ name:"", country:"", city:"", phone:"" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const amb  = getDiasporaData();
+  const role = amb?.role || "RESPONSABLE";
+  const rc   = ROLE_CONFIG[role] || {};
+
+  useEffect(() => {
+    federationProfileAPI.getMe()
+      .then(r => { const a = r.data.ambassador; setForm({ name:a.name||"", country:a.country||"", city:a.city||"", phone:a.phone||"" }); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save(e) {
+    e.preventDefault(); setSaving(true); setSaved(false);
+    try { await federationProfileAPI.update(form); setSaved(true); setTimeout(() => setSaved(false), 3000); }
+    catch {}
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <Loader />;
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
+      <PageHeader title="👤 Mon profil" subtitle="Gérez vos informations personnelles" />
+      <Card>
+        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:rc.bg||C.purpleL, borderRadius:12, marginBottom:24 }}>
+          <span style={{ fontSize:32 }}>{rc.icon}</span>
+          <div>
+            <p style={{ margin:0, fontWeight:900, fontSize:16, color:C.dark }}>{form.name}</p>
+            <span style={{ fontSize:12, fontWeight:700, color:rc.color||C.purple }}>{rc.label}</span>
+          </div>
+        </div>
+
+        {saved && <div style={{ background:C.greenL, color:C.green, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13, fontWeight:700 }}>✅ Profil mis à jour !</div>}
+
+        <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {[
+            { key:"name",    label:"Nom complet",  placeholder:"Jean Kofi"           },
+            { key:"phone",   label:"Téléphone",    placeholder:"+225 07 00 00 00 00" },
+            { key:"city",    label:"Ville",        placeholder:"Abidjan"             },
+            { key:"country", label:"Pays",         placeholder:"Côte d'Ivoire"       },
+          ].map(f => (
+            <div key={f.key}>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
+              <input value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
+            </div>
+          ))}
+          <Btn disabled={saving}>
+            {saving ? "Enregistrement…" : "💾 Sauvegarder"}
+          </Btn>
+        </form>
+      </Card>
+    </div>
+  );
+}

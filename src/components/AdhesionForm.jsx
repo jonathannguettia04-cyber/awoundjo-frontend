@@ -91,46 +91,18 @@ function InputField({ label, type="text", placeholder, value, onChange, required
 
 // ── Écran credentials + paiement CinetPay ────────────────────
 function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, onClose }) {
-  const [copied,      setCopied]      = useState(false);
-  const [payLoading,  setPayLoading]  = useState(false);
-  const [payError,    setPayError]    = useState("");
-  const [payMethod,   setPayMethod]   = useState("cinetpay"); // "cinetpay" | "paydunya"
+  const [copied,     setCopied]     = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
 
   const text = `Identifiants ${roleLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
 
-  async function handlePay() {
+  async function handlePayJeko() {
     setPayLoading(true);
     setPayError("");
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/cinetpay/init-web`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ambassador_id:   ambassadorId,
-          amount:          adhesionFee,
-          type:            "adhesion",
-          description:     `Adhésion Awoundjô — ${roleLabel}`,
-          return_url:      `${window.location.origin}${window.location.pathname}?payment=success`,
-          cancel_url:      `${window.location.origin}${window.location.pathname}?payment=failed`,
-        }),
-      });
-      const data = await res.json();
-      const url  = data?.data?.payment_url || data?.payment_url;
-      if (!url) throw new Error("URL de paiement non reçue du serveur");
-      window.location.href = url;
-    } catch (e) {
-      setPayError(e.message || "Erreur lors de l'initialisation du paiement");
-      setPayLoading(false);
-    }
-  }
-
-  async function handlePayDunya() {
-    setPayLoading(true);
-    setPayError("");
-    try {
-      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/paydunya/init-web`, {
+      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -144,10 +116,10 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, 
       });
       const data = await res.json();
       const url  = data?.data?.payment_url;
-      if (!url) throw new Error(data?.error || "URL de paiement PayDunya non reçue");
+      if (!url) throw new Error(data?.error || "URL de paiement JEKO non reçue");
       window.location.href = url;
     } catch (e) {
-      setPayError(e.message || "Erreur lors de l'initialisation du paiement PayDunya");
+      setPayError(e.message || "Erreur lors de l'initialisation du paiement JEKO");
       setPayLoading(false);
     }
   }
@@ -214,7 +186,7 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, 
         </a>
       </div>
 
-      {/* Paiement — choix méthode */}
+      {/* Paiement JEKO */}
       <div style={{ background:"#F8FAFC", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"16px 18px" }}>
         <p style={{ margin:"0 0 10px", fontSize:13, fontWeight:800, color:C.dark }}>
           💳 Étape suivante — Paiement des frais d'adhésion
@@ -223,56 +195,22 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, 
           Payez maintenant les frais d'adhésion de <strong>{Number(adhesionFee).toLocaleString("fr-FR")} FCFA</strong> pour activer le processus de validation.
         </p>
 
-        {/* Sélecteur méthode */}
-        <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-          {[
-            { id:"cinetpay",  label:"💳 CinetPay",  sub:"Orange · Wave · MTN · Carte" },
-            { id:"paydunya",  label:"🏦 PayDunya",   sub:"Orange · Wave · MTN · Moov"  },
-          ].map(m => (
-            <button
-              key={m.id}
-              onClick={() => setPayMethod(m.id)}
-              style={{
-                flex:1, padding:"10px 8px", borderRadius:10, border:"none",
-                background: payMethod === m.id
-                  ? (m.id === "cinetpay" ? "#EFF6FF" : "#ECFDF5")
-                  : "#fff",
-                outline: payMethod === m.id
-                  ? `2px solid ${m.id === "cinetpay" ? "#0072C6" : "#059669"}`
-                  : "1.5px solid #E2E8F0",
-                cursor:"pointer", textAlign:"center", fontFamily:"inherit",
-              }}
-            >
-              <p style={{ margin:0, fontSize:13, fontWeight:800,
-                color: payMethod === m.id ? (m.id === "cinetpay" ? "#0072C6" : "#059669") : C.slate }}>
-                {m.label}
-              </p>
-              <p style={{ margin:"2px 0 0", fontSize:10, color:C.slate }}>{m.sub}</p>
-            </button>
-          ))}
-        </div>
-
         {payError && (
           <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:12 }}>
             <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
           </div>
         )}
+
         <button
-          onClick={payMethod === "paydunya" ? handlePayDunya : handlePay}
+          onClick={handlePayJeko}
           disabled={payLoading}
           style={{
             width:"100%", padding:"13px 0", borderRadius:10, border:"none",
-            background: payLoading ? "#94a3b8"
-              : payMethod === "paydunya"
-              ? "linear-gradient(135deg,#059669,#047857)"
-              : "linear-gradient(135deg,#0072C6,#005A9E)",
+            background: payLoading ? "#94a3b8" : "linear-gradient(135deg,#0D9488,#0F766E)",
             color:"#fff", fontWeight:900, fontSize:14,
             cursor: payLoading ? "not-allowed" : "pointer",
             display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-            boxShadow: payLoading ? "none"
-              : payMethod === "paydunya"
-              ? "0 4px 16px rgba(5,150,105,.35)"
-              : "0 4px 16px rgba(0,114,198,.35)",
+            boxShadow: payLoading ? "none" : "0 4px 16px rgba(13,148,136,.35)",
             fontFamily:"inherit",
           }}
         >
@@ -281,14 +219,12 @@ function SuccessScreen({ credentials, ambassadorId, roleLabel, rc, adhesionFee, 
               <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
               Redirection…
             </>
-          ) : payMethod === "paydunya" ? (
-            <>🏦 Payer {Number(adhesionFee).toLocaleString("fr-FR")} FCFA avec PayDunya</>
           ) : (
-            <>💳 Payer {Number(adhesionFee).toLocaleString("fr-FR")} FCFA avec CinetPay</>
+            <>💳 Payer {Number(adhesionFee).toLocaleString("fr-FR")} FCFA avec JEKO</>
           )}
         </button>
         <p style={{ margin:"8px 0 0", fontSize:11, color:C.slate, textAlign:"center" }}>
-          Paiement 100% sécurisé
+          Orange · Wave · MTN · Moov · Carte — Paiement 100% sécurisé
         </p>
       </div>
 
