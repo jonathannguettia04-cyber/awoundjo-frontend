@@ -122,6 +122,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
+  const [jekoMethod, setJekoMethod] = useState("orange");
 
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : https://awoundjo-app.vercel.app/diaspora/login`;
   const fee  = Number(adhesionFee) || 0;
@@ -137,6 +138,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           ambassador_id: ambassadorId,
           amount:        fee,
           type:          "adhesion",
+          jeko_method:   jekoMethod,
           description:   `Adhésion Awoundjô — ${targetLabel}`,
           success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
           failure_url:   `${window.location.origin}${window.location.pathname}?payment=failed`,
@@ -223,6 +225,18 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
               <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
             </div>
           )}
+          {/* Sélecteur réseau JEKO */}
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:6 }}>Réseau de paiement</label>
+            <select value={jekoMethod} onChange={(e) => setJekoMethod(e.target.value)} disabled={payLoading}
+              style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:"inherit", background:"#fff" }}>
+              <option value="orange">🟠 Orange Money</option>
+              <option value="wave">🔵 Wave</option>
+              <option value="mtn">🟡 MTN Mobile Money</option>
+              <option value="moov">🟢 Moov Money</option>
+              <option value="djamo">💜 Djamo / Carte bancaire</option>
+            </select>
+          </div>
           <button onClick={handlePay} disabled={payLoading}
             style={{
               width:"100%", padding:"13px 0", borderRadius:10, border:"none",
@@ -261,6 +275,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
 function PaymentModal({ member, roleLabel, onClose }) {
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
+  const [jekoMethod, setJekoMethod] = useState("orange");
   const fee = Number(member.membership_fee) || 0;
 
   async function handlePay() {
@@ -274,6 +289,7 @@ function PaymentModal({ member, roleLabel, onClose }) {
           ambassador_id: member.id,
           amount:        fee,
           type:          "adhesion",
+          jeko_method:   jekoMethod,
           description:   `Adhésion Awoundjô — ${roleLabel} — ${member.name}`,
           success_url:   `${window.location.origin}${window.location.pathname}?payment=success`,
           failure_url:   `${window.location.origin}${window.location.pathname}?payment=failed`,
@@ -322,6 +338,19 @@ function PaymentModal({ member, roleLabel, onClose }) {
             <p style={{ margin:0, fontSize:13, color:C.red, fontWeight:600 }}>⚠️ {payError}</p>
           </div>
         )}
+
+        {/* Sélecteur réseau JEKO */}
+        <div style={{ marginBottom:14 }}>
+          <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:6 }}>Réseau de paiement</label>
+          <select value={jekoMethod} onChange={(e) => setJekoMethod(e.target.value)} disabled={payLoading}
+            style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:"inherit", background:"#fff" }}>
+            <option value="orange">🟠 Orange Money</option>
+            <option value="wave">🔵 Wave</option>
+            <option value="mtn">🟡 MTN Mobile Money</option>
+            <option value="moov">🟢 Moov Money</option>
+            <option value="djamo">💜 Djamo / Carte bancaire</option>
+          </select>
+        </div>
 
         <button onClick={handlePay} disabled={payLoading}
           style={{

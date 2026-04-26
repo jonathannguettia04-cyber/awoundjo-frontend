@@ -695,11 +695,12 @@ function BonusPage() {
 // PAGE PAIEMENT — JEKO uniquement
 // ══════════════════════════════════════════════════════════════════════════════
 function PaiementPage() {
-  const [type, setType]       = useState("adhesion");
-  const [montant, setMontant] = useState(15000);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [success, setSuccess] = useState("");
+  const [type, setType]           = useState("adhesion");
+  const [montant, setMontant]     = useState(15000);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
+  const [success, setSuccess]     = useState("");
+  const [jekoMethod, setJekoMethod] = useState("orange");
 
   const handlePayer = async () => {
     setError(""); setSuccess("");
@@ -711,6 +712,7 @@ function PaiementPage() {
         body: JSON.stringify({
           montant,
           type,
+          jeko_method:  jekoMethod,
           success_url: `${window.location.origin}/cnepeci/paiement/success`,
           failure_url: `${window.location.origin}/cnepeci/paiement/echec`,
         }),
@@ -790,6 +792,19 @@ function PaiementPage() {
                 <span style={{ fontSize: 13, color: G.muted }}>{row.label}</span>{row.value}
               </div>
             ))}
+          </div>
+
+          {/* Sélecteur réseau JEKO */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: G.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>Réseau de paiement</label>
+            <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)} disabled={loading}
+              style={{ width: "100%", padding: "12px 16px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#FAFBFE", color: G.text, outline: "none", boxSizing: "border-box" }}>
+              <option value="orange">🟠 Orange Money</option>
+              <option value="wave">🔵 Wave</option>
+              <option value="mtn">🟡 MTN Mobile Money</option>
+              <option value="moov">🟢 Moov Money</option>
+              <option value="djamo">💜 Djamo / Carte bancaire</option>
+            </select>
           </div>
 
           <button onClick={handlePayer} disabled={loading||!!success}
