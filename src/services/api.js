@@ -27,6 +27,31 @@ api.interceptors.response.use(
   }
 );
 
+// ── Instance CLIENT (token client — portail adhérent) ────────────
+// Séparée de l'instance agent pour éviter toute redirection vers /login agent
+const clientApi = axios.create({
+  baseURL: `${API_URL}/api`,
+  headers: { "Content-Type": "application/json" },
+  timeout: 30000,
+});
+
+clientApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("client_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+clientApi.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("client_token");
+      window.location.href = "/client/login"; // portail client uniquement
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ── AUTH AGENT ───────────────────────────────────────────────────
 export const authAPI = {
   login:  (data) => api.post("/auth/login", data),
@@ -108,7 +133,8 @@ export const statAPI = statsAPI;
 // ── HEALTHCARE (réseau de soins + dossiers médicaux) ─────────────
 export const healthcareAPI = {
   // Établissements
-  getProviders:    (params)         => api.get("/healthcare/providers", { params }),
+  // getProviders utilise clientApi → token client, redirige vers /client/login si 401
+  getProviders:    (params)         => clientApi.get("/healthcare/providers", { params }),
   createProvider:  (data)           => api.post("/healthcare/providers", data),
   updateProvider:  (id, data)       => api.put(`/healthcare/providers/${id}`, data),
   deleteProvider:  (id)             => api.delete(`/healthcare/providers/${id}`),
