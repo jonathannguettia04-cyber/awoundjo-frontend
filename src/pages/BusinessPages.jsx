@@ -169,6 +169,7 @@ const NAV = [
   { to: "/business/invitation",   icon: "🔗", label: "Invitation"      },
   { to: "/business/leaderboard",  icon: "🏆", label: "Classement"      },
   { to: "/business/members",      icon: "👥", label: "Mes membres"     },
+  { to: "/business/clients",      icon: "🏥", label: "Mes clients"     },
 ];
 
 export function BizLayout({ children }) {
@@ -1001,8 +1002,663 @@ export function BizMembersPage() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  STYLES PARTAGÉS
+//  MODAL — CRÉER UN CLIENT MUTUALISTE
+//  Flux 4 étapes : Infos → Formule → Paiement → Confirmation
+//  Accessible à tous les niveaux (DIRECTRICE, LEADER, SUPERVISEUR, RECRUTEUR)
 // ─────────────────────────────────────────────────────────────
+const JEKO_METHODS = [
+  { value: "orange", label: "Orange Money", icon: "🟠" },
+  { value: "wave",   label: "Wave",         icon: "🔵" },
+  { value: "mtn",    label: "MTN MoMo",     icon: "🟡" },
+  { value: "moov",   label: "Moov Money",   icon: "🟢" },
+  { value: "djamo",  label: "Djamo",        icon: "💜" },
+];
+const MODAL_STEPS = ["Informations", "Formule", "Paiement", "Confirmation"];
+
+function CreateClientModal({ onClose, onCreated }) {
+  const [step,         setStep]         = useState(0);
+  const [plans,        setPlans]        = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  // Étape 1
+  const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [city,         setCity]         = useState("");
+  const [isReturning,  setIsReturning]  = useState(false);
+  const [expDate,      setExpDate]      = useState("");
+  // Étape 2
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  // Étape 3
+  const [payMethod,    setPayMethod]    = useState("cash");
+  const [jekoMethod,   setJekoMethod]   = useState("orange");
+  // Étape 4
+  const [result,       setResult]       = useState(null);
+  const [copied,       setCopied]       = useState(null);
+
+  // Charger les formules
+  useEffect(() => {
+    apiBiz("/plans")
+      .then(d => setPlans(d.plans || []))
+      .catch(() => setError("Impossible de charger les formules."));
+  }, []);
+
+  // Fermer sur Escape
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const copy = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  function validateStep1() {
+    setError("");
+    if (!name.trim())  return setError("Le nom est requis.");
+    if (!phone.trim()) return setError("Le téléphone est requis.");
+    if (isReturning && !expDate) return setError("La date d'expiration est requise pour un ancien client.");
+    setStep(1);
+  }
+
+  function validateStep2() {
+    setError("");
+    if (!selectedPlan) return setError("Veuillez choisir une formule.");
+    setStep(2);
+  }
+
+  async function handleSubmit() {
+    setError("");
+    setLoading(true);
+    try {
+      // 1. Créer le client
+      const createData = await apiBiz("/clients", {
+        method: "POST",
+        body: JSON.stringify({
+          name:                name.trim(),
+          phone:               phone.trim(),
+          city:                city.trim() || undefined,
+          plan_slug:           selectedPlan.slug,
+          is_returning_client: isReturning,
+          expiration_date:     isReturning ? expDate : undefined,
+        }),
+      });
+
+      const { client, access_code, mutual_number, adhesion_fee } = createData;
+      const clientId = client.id;
+
+      // Ancien client migré → pas de paiement
+      if (isReturning) {
+        setResult({ client, access_code, mutual_number, adhesion_fee: 0, isReturning: true });
+        setStep(3);
+        onCreated?.();
+        return;
+      }
+
+      // Paiement CASH
+      if (payMethod === "cash") {
+        await apiBiz(`/clients/${clientId}/pay-adhesion`, {
+          method: "POST",
+          body: JSON.stringify({ amount: adhesion_fee }),
+        });
+        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "cash" });
+        setStep(3);
+        onCreated?.();
+        return;
+      }
+
+      // Paiement JEKO
+      if (payMethod === "jeko") {
+        const jekoData = await apiBiz(`/clients/${clientId}/pay-adhesion-jeko`, {
+          method: "POST",
+          body: JSON.stringify({ jeko_method: jekoMethod }),
+        });
+        const redirectUrl = jekoData?.data?.redirect_url;
+        if (redirectUrl) window.open(redirectUrl, "_blank");
+        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", pending: !redirectUrl });
+        setStep(3);
+        onCreated?.();
+      }
+    } catch (e) {
+      setError(e?.error || e?.message || "Une erreur est survenue.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const overlayStyle = {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(0,0,0,.55)", display: "flex",
+    alignItems: "center", justifyContent: "center", padding: 16,
+  };
+  const modalStyle = {
+    background: "#fff", borderRadius: 16,
+    boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+    width: "100%", maxWidth: 520,
+    maxHeight: "92vh", display: "flex", flexDirection: "column",
+    overflow: "hidden",
+  };
+
+  return (
+    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={modalStyle}>
+
+        {/* En-tête */}
+        <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
+                Nouveau client mutualiste
+              </h3>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                Étape {step + 1} / {MODAL_STEPS.length} — {MODAL_STEPS[step]}
+              </p>
+            </div>
+            <button onClick={onClose} style={{
+              background: "none", border: "none", fontSize: 22,
+              cursor: "pointer", color: "#94A3B8", lineHeight: 1, padding: 0,
+            }}>×</button>
+          </div>
+          {/* Barre de progression */}
+          <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+            {MODAL_STEPS.map((_, i) => (
+              <div key={i} style={{
+                flex: 1, height: 4, borderRadius: 4,
+                background: i <= step ? "#7C3AED" : "#E2E8F0",
+                transition: "background .3s",
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Corps scrollable */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}>
+
+          {error && (
+            <Alert type="error" style={{ marginBottom: 14 }}>{error}</Alert>
+          )}
+
+          {/* ── Étape 1 : Infos client ── */}
+          {step === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                  Nom complet <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input value={name} onChange={e => setName(e.target.value)}
+                  placeholder="ex : Kouamé Adjoua Marie" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                  Téléphone <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input value={phone} onChange={e => setPhone(e.target.value)}
+                  placeholder="ex : 0707080808" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                  Ville
+                </label>
+                <input value={city} onChange={e => setCity(e.target.value)}
+                  placeholder="ex : Abidjan" style={inputStyle} />
+              </div>
+              {/* Ancien client */}
+              <div style={{
+                background: "#FFFBEB", border: "1px solid #FDE68A",
+                borderRadius: 10, padding: "14px 16px",
+              }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={isReturning}
+                    onChange={e => setIsReturning(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#D97706" }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#92400E" }}>
+                    Ancien client (migration de dossier)
+                  </span>
+                </label>
+                {isReturning && (
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                      Date d'expiration de cotisation <span style={{ color: "#EF4444" }}>*</span>
+                    </label>
+                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)}
+                      style={{ ...inputStyle, borderColor: "#FCD34D" }} />
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#92400E" }}>
+                      Date passée → compte suspendu · Date future → compte actif
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Étape 2 : Choix formule ── */}
+          {step === 1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {plans.length === 0 && (
+                <p style={{ textAlign: "center", color: "#94A3B8", padding: 32 }}>Chargement des formules…</p>
+              )}
+              {plans.map(plan => (
+                <button key={plan.id} type="button" onClick={() => setSelectedPlan(plan)} style={{
+                  width: "100%", textAlign: "left", borderRadius: 12, padding: 16, cursor: "pointer",
+                  border: `2px solid ${selectedPlan?.id === plan.id ? "#7C3AED" : "#E2E8F0"}`,
+                  background: selectedPlan?.id === plan.id ? "#F5F3FF" : "#fff",
+                  transition: "all .15s",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{plan.name}</p>
+                      <p style={{ margin: "3px 0 0", fontSize: 12, color: "#64748B" }}>
+                        Couverture {plan.coverage_percent}%
+                        {plan.benefits?.length > 0 && ` · ${plan.benefits.length} catégorie(s)`}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#7C3AED" }}>
+                        {Number(plan.adhesion_price).toLocaleString("fr-FR")} FCFA
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94A3B8" }}>adhésion</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>
+                        {Number(plan.monthly_price).toLocaleString("fr-FR")} FCFA/mois
+                      </p>
+                    </div>
+                  </div>
+                  {selectedPlan?.id === plan.id && plan.benefits?.length > 0 && (
+                    <div style={{
+                      marginTop: 12, paddingTop: 12,
+                      borderTop: "1px solid #DDD6FE",
+                      display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6,
+                    }}>
+                      {plan.benefits.map(b => (
+                        <div key={b.category} style={{ fontSize: 12, color: "#374151", display: "flex", gap: 4 }}>
+                          <span style={{ color: "#7C3AED" }}>✓</span>
+                          <span>{b.category} ({b.coverage_percent}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Étape 3 : Paiement ── */}
+          {step === 2 && selectedPlan && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Récap */}
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", fontSize: 14 }}>
+                <p style={{ margin: "0 0 8px", fontWeight: 700, color: "#0F172A" }}>Récapitulatif</p>
+                <p style={{ margin: "0 0 4px", color: "#64748B" }}>Client : <strong style={{ color: "#0F172A" }}>{name}</strong> — {phone}</p>
+                <p style={{ margin: "0 0 4px", color: "#64748B" }}>Formule : <strong style={{ color: "#0F172A" }}>{selectedPlan.name}</strong></p>
+                <p style={{ margin: 0, color: "#64748B" }}>Adhésion : <strong style={{ color: "#7C3AED", fontSize: 16 }}>
+                  {Number(selectedPlan.adhesion_price).toLocaleString("fr-FR")} FCFA
+                </strong></p>
+              </div>
+
+              {isReturning ? (
+                <Alert type="warning">
+                  ✓ Migration de dossier — aucun paiement requis à cette étape.
+                </Alert>
+              ) : (
+                <>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#374151" }}>Mode de paiement</p>
+                  {/* Cash */}
+                  <button type="button" onClick={() => setPayMethod("cash")} style={{
+                    display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
+                    borderRadius: 12, cursor: "pointer", textAlign: "left",
+                    border: `2px solid ${payMethod === "cash" ? "#7C3AED" : "#E2E8F0"}`,
+                    background: payMethod === "cash" ? "#F5F3FF" : "#fff",
+                  }}>
+                    <span style={{ fontSize: 28 }}>💵</span>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Paiement Cash</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>Espèces reçues — activation immédiate</p>
+                    </div>
+                  </button>
+                  {/* JEKO */}
+                  <button type="button" onClick={() => setPayMethod("jeko")} style={{
+                    display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
+                    borderRadius: 12, cursor: "pointer", textAlign: "left",
+                    border: `2px solid ${payMethod === "jeko" ? "#7C3AED" : "#E2E8F0"}`,
+                    background: payMethod === "jeko" ? "#F5F3FF" : "#fff",
+                  }}>
+                    <span style={{ fontSize: 28 }}>📱</span>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Paiement Mobile (JEKO)</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>Orange, Wave, MTN, Moov, Djamo</p>
+                    </div>
+                  </button>
+                  {/* Sous-choix JEKO */}
+                  {payMethod === "jeko" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                      {JEKO_METHODS.map(m => (
+                        <button key={m.value} type="button" onClick={() => setJekoMethod(m.value)} style={{
+                          display: "flex", flexDirection: "column", alignItems: "center",
+                          gap: 4, padding: "10px 6px", borderRadius: 10, cursor: "pointer",
+                          border: `2px solid ${jekoMethod === m.value ? "#7C3AED" : "#E2E8F0"}`,
+                          background: jekoMethod === m.value ? "#F5F3FF" : "#fff",
+                          fontSize: 11, fontWeight: 600,
+                          color: jekoMethod === m.value ? "#7C3AED" : "#64748B",
+                        }}>
+                          <span style={{ fontSize: 22 }}>{m.icon}</span>
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── Étape 4 : Confirmation ── */}
+          {step === 3 && result && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: result.pending ? "#FEF3C7" : "#D1FAE5",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 32, margin: "0 auto 12px",
+                }}>
+                  {result.pending ? "⏳" : "✅"}
+                </div>
+                <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
+                  {result.pending ? "Paiement en attente" : "Client enregistré !"}
+                </h3>
+                {result.pending && (
+                  <p style={{ margin: 0, fontSize: 13, color: "#64748B" }}>
+                    La page de paiement s'est ouverte. Le compte sera activé automatiquement.
+                  </p>
+                )}
+              </div>
+
+              {/* Numéro mutualiste */}
+              <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 12, padding: "14px 16px" }}>
+                <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Numéro mutualiste
+                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 800, color: "#5B21B6" }}>
+                    {result.mutual_number}
+                  </span>
+                  <button onClick={() => copy(result.mutual_number, "num")} style={{
+                    fontSize: 12, padding: "4px 12px", borderRadius: 8,
+                    border: "1px solid #DDD6FE", background: "#fff",
+                    color: "#7C3AED", cursor: "pointer", fontWeight: 600,
+                  }}>
+                    {copied === "num" ? "✅ Copié" : "Copier"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Code d'accès */}
+              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "14px 16px" }}>
+                <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Code d'accès temporaire (portail client)
+                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 800, letterSpacing: 4, color: "#78350F" }}>
+                    {result.access_code}
+                  </span>
+                  <button onClick={() => copy(result.access_code, "code")} style={{
+                    fontSize: 12, padding: "4px 12px", borderRadius: 8,
+                    border: "1px solid #FDE68A", background: "#fff",
+                    color: "#92400E", cursor: "pointer", fontWeight: 600,
+                  }}>
+                    {copied === "code" ? "✅ Copié" : "Copier"}
+                  </button>
+                </div>
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "#92400E" }}>
+                  ⚠️ À remettre au client — il devra le changer à la première connexion.
+                </p>
+              </div>
+
+              {/* Résumé client */}
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px", fontSize: 13 }}>
+                <p style={{ margin: "0 0 4px" }}><span style={{ color: "#64748B" }}>Nom :</span> <strong>{result.client?.name}</strong></p>
+                <p style={{ margin: "0 0 4px" }}><span style={{ color: "#64748B" }}>Téléphone :</span> {result.client?.phone}</p>
+                <p style={{ margin: "0 0 4px" }}><span style={{ color: "#64748B" }}>Formule :</span> {result.client?.plan}</p>
+                <p style={{ margin: 0 }}>
+                  <span style={{ color: "#64748B" }}>Statut :</span>{" "}
+                  <span style={{ fontWeight: 700, color: result.client?.status === "actif" ? "#059669" : "#D97706" }}>
+                    {result.client?.status === "actif" ? "✅ Actif" : "⏳ En attente de paiement"}
+                  </span>
+                </p>
+              </div>
+
+              {/* Copier tout */}
+              <button onClick={() => copy(
+                `Numéro mutualiste : ${result.mutual_number}\nCode d'accès : ${result.access_code}\nPortail : ${API_BASE.replace("/api/business","")}/client/login`,
+                "all"
+              )} style={{ ...btnSecondary, width: "100%", textAlign: "center" }}>
+                {copied === "all" ? "✅ Copié !" : "📋 Copier numéro + code"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Pied de modal */}
+        <div style={{
+          padding: "14px 24px", borderTop: "1px solid #F1F5F9",
+          display: "flex", justifyContent: "space-between", gap: 10,
+          background: "#FAFAFA", flexShrink: 0,
+        }}>
+          <button
+            type="button"
+            onClick={() => { if (step === 0) onClose(); else setStep(s => s - 1); }}
+            disabled={loading || step === 3}
+            style={{ ...btnSecondary, opacity: (loading || step === 3) ? .5 : 1 }}
+          >
+            {step === 0 ? "Annuler" : "← Retour"}
+          </button>
+
+          {step === 0 && (
+            <button type="button" onClick={validateStep1} style={btnPrimary}>Suivant →</button>
+          )}
+          {step === 1 && (
+            <button type="button" onClick={validateStep2} style={btnPrimary}>Suivant →</button>
+          )}
+          {step === 2 && (
+            <button type="button" onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? .7 : 1 }}>
+              {loading ? "Traitement…" :
+                isReturning ? "✅ Enregistrer" :
+                payMethod === "cash" ? "💵 Confirmer le paiement" : "📱 Payer par mobile"}
+            </button>
+          )}
+          {step === 3 && (
+            <button type="button" onClick={onClose} style={{ ...btnPrimary, background: "#059669" }}>
+              Fermer
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PAGE — MES CLIENTS (MUTUALISTES)
+// ─────────────────────────────────────────────────────────────
+export function BizClientsPage() {
+  const [clients,    setClients]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showModal,  setShowModal]  = useState(false);
+  const [search,     setSearch]     = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page,       setPage]       = useState(1);
+  const [pagination, setPagination] = useState({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ page, limit: 20 });
+    if (search)      params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    apiBiz(`/my-clients?${params}`)
+      .then(d => {
+        setClients(d.clients || []);
+        setPagination(d.pagination || {});
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [page, search, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const STATUS_LABELS = {
+    actif:            { label: "Actif",      bg: "#D1FAE5", color: "#065F46" },
+    attente:          { label: "En attente", bg: "#FEF3C7", color: "#92400E" },
+    suspendu:         { label: "Suspendu",   bg: "#FFF1F2", color: "#BE123C" },
+    renewal_required: { label: "Renouvellement", bg: "#DBEAFE", color: "#1E40AF" },
+  };
+
+  return (
+    <BizLayout>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1E1B4B" }}>
+            🏥 Mes clients mutualistes
+          </h2>
+          {pagination.total !== undefined && (
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748B" }}>
+              {pagination.total} client(s) au total
+            </p>
+          )}
+        </div>
+        <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+          ➕ Nouveau client
+        </button>
+      </div>
+
+      {/* Filtres */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <input
+          placeholder="🔍 Nom, téléphone ou numéro…"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          style={{ ...inputStyle, maxWidth: 280 }}
+        />
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          style={{ ...inputStyle, maxWidth: 180 }}
+        >
+          <option value="">Tous les statuts</option>
+          <option value="actif">Actif</option>
+          <option value="attente">En attente</option>
+          <option value="suspendu">Suspendu</option>
+          <option value="renewal_required">Renouvellement</option>
+        </select>
+      </div>
+
+      <Card>
+        {loading ? <Loader /> : (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <div className="biz-table-wrap">
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                      {["N° Mutualiste", "Nom", "Téléphone", "Formule", "Statut", "Paiement", "Inscription", "Cotisation"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clients.length === 0 && (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>
+                          <div style={{ fontSize: 32, marginBottom: 8 }}>🏥</div>
+                          Aucun client enregistré.<br />
+                          <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, marginTop: 12, fontSize: 13 }}>
+                            ➕ Créer votre premier client
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    {clients.map(c => {
+                      const st = STATUS_LABELS[c.status] || { label: c.status, bg: "#F1F5F9", color: "#64748B" };
+                      const payOk = c.status_payment === "paid";
+                      return (
+                        <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                          <td style={{ padding: "10px 12px" }}>
+                            <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#7C3AED", fontSize: 13 }}>
+                              {c.mutual_number}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 12px", fontWeight: 600, color: "#0F172A" }}>{c.name}</td>
+                          <td style={{ padding: "10px 12px", color: "#64748B" }}>{c.phone}</td>
+                          <td style={{ padding: "10px 12px" }}>
+                            <span style={{
+                              background: "#EDE9FE", color: "#7C3AED",
+                              borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600,
+                            }}>{c.plan}</span>
+                          </td>
+                          <td style={{ padding: "10px 12px" }}>
+                            <span style={{
+                              background: st.bg, color: st.color,
+                              borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600,
+                            }}>{st.label}</span>
+                          </td>
+                          <td style={{ padding: "10px 12px" }}>
+                            <span style={{
+                              background: payOk ? "#D1FAE5" : "#FFF1F2",
+                              color: payOk ? "#065F46" : "#BE123C",
+                              borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600,
+                            }}>
+                              {payOk ? "✅ Payé" : "❌ Impayé"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "#64748B", whiteSpace: "nowrap" }}>
+                            {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "#64748B", whiteSpace: "nowrap" }}>
+                            {c.expiration_date
+                              ? new Date(c.expiration_date).toLocaleDateString("fr-FR")
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 16 }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  style={{ ...btnSecondary, padding: "6px 14px", opacity: page === 1 ? .5 : 1 }}>
+                  ← Préc.
+                </button>
+                <span style={{ padding: "8px 14px", fontSize: 13, color: "#64748B" }}>
+                  Page {page} / {pagination.pages}
+                </span>
+                <button onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
+                  disabled={page === pagination.pages}
+                  style={{ ...btnSecondary, padding: "6px 14px", opacity: page === pagination.pages ? .5 : 1 }}>
+                  Suiv. →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {showModal && (
+        <CreateClientModal
+          onClose={() => setShowModal(false)}
+          onCreated={() => { setShowModal(false); load(); }}
+        />
+      )}
+    </BizLayout>
+  );
+}
+
+
 const inputStyle = {
   width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14,
   border: "1px solid #E2E8F0", outline: "none", boxSizing: "border-box",
