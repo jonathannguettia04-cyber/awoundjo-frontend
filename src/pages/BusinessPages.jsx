@@ -1087,7 +1087,7 @@ function CreateClientModal({ onClose, onCreated }) {
         }),
       });
 
-      const { client, access_code, mutual_number, adhesion_fee } = createData;
+      const { client, access_code, mutual_number, adhesion_fee } = createData.data || createData;
       const clientId = client.id;
 
       // Ancien client migré → pas de paiement
