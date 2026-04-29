@@ -164,6 +164,7 @@ const BizBonusPage      = bizPage("BizBonusPage");
 const BizInvitationPage = bizPage("BizInvitationPage");
 const BizLeaderboardPage= bizPage("BizLeaderboardPage");
 const BizMembersPage    = bizPage("BizMembersPage");
+const BizClientsPage    = bizPage("BizClientsPage");
 
 // ── Page partagée : Retrait de commissions ───────────────────
 const CommissionWithdrawal = lazy(() => import("./pages/shared/CommissionWithdrawal"));
@@ -463,6 +464,7 @@ export default function App() {
             <Route path="/business/invitation"  element={<BizGuard><BizAuthProviderComp><BizInvitationPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/leaderboard" element={<BizGuard><BizAuthProviderComp><BizLeaderboardPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/members"     element={<BizGuard><BizAuthProviderComp><BizMembersPage /></BizAuthProviderComp></BizGuard>} />
+            <Route path="/business/clients"     element={<BizGuard><BizAuthProviderComp><BizClientsPage /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business/withdrawal"  element={<BizGuard><BizAuthProviderComp><CommissionWithdrawal accentColor="#D97706" backPath="/business/commissions" /></BizAuthProviderComp></BizGuard>} />
             <Route path="/business" element={<Navigate to="/business/dashboard" replace />} />
 

@@ -138,6 +138,7 @@ const TABS = [
   { id: "bonus",       label: "Bonus Pool",  icon: "🎯" },
   { id: "inviter",     label: "Inviter",     icon: "🔗" },
   { id: "retrait",     label: "Retrait",     icon: "💸" },
+  { id: "clients",     label: "Mes Clients", icon: "🏥" },
 ];
 
 // ── Tab Accueil ───────────────────────────────────────────────────
@@ -1009,6 +1010,483 @@ function TabRetrait() {
   );
 }
 
+// ── Modal Créer Client ─────────────────────────────────────────────
+const JEKO_METHODS_LIST = [
+  { value: "orange", label: "Orange",  icon: "🟠" },
+  { value: "wave",   label: "Wave",    icon: "🔵" },
+  { value: "mtn",    label: "MTN",     icon: "🟡" },
+  { value: "moov",   label: "Moov",    icon: "🟢" },
+  { value: "djamo",  label: "Djamo",   icon: "💜" },
+];
+
+function CreateClientModal({ onClose, onCreated }) {
+  const [step,         setStep]         = useState(0);
+  const [plans,        setPlans]        = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [city,         setCity]         = useState("");
+  const [isReturning,  setIsReturning]  = useState(false);
+  const [expDate,      setExpDate]      = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [payMethod,    setPayMethod]    = useState("cash");
+  const [jekoMethod,   setJekoMethod]   = useState("orange");
+  const [result,       setResult]       = useState(null);
+  const [copied,       setCopied]       = useState(null);
+
+  useEffect(() => {
+    apiFetch("/plans")
+      .then(d => setPlans(d.plans || []))
+      .catch(() => setError("Impossible de charger les formules."));
+  }, []);
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  function copy(text, key) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key); setTimeout(() => setCopied(null), 2000);
+    });
+  }
+
+  function goStep1() {
+    setError("");
+    if (!name.trim())  return setError("Le nom est requis.");
+    if (!phone.trim()) return setError("Le téléphone est requis.");
+    if (isReturning && !expDate) return setError("La date d'expiration est requise pour un ancien client.");
+    setStep(1);
+  }
+
+  function goStep2() {
+    setError("");
+    if (!selectedPlan) return setError("Veuillez choisir une formule.");
+    setStep(2);
+  }
+
+  async function handleSubmit() {
+    setError(""); setLoading(true);
+    try {
+      const createData = await apiFetch("/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:                name.trim(),
+          phone:               phone.trim(),
+          city:                city.trim() || undefined,
+          plan_slug:           selectedPlan.slug,
+          is_returning_client: isReturning,
+          expiration_date:     isReturning ? expDate : undefined,
+        }),
+      });
+      const { client, access_code, mutual_number, adhesion_fee } = createData;
+      if (isReturning) {
+        setResult({ client, access_code, mutual_number, adhesion_fee: 0, isReturning: true });
+        setStep(3); onCreated?.(); return;
+      }
+      if (payMethod === "cash") {
+        await apiFetch(`/clients/${client.id}/pay-adhesion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: adhesion_fee }),
+        });
+        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "cash" });
+        setStep(3); onCreated?.(); return;
+      }
+      if (payMethod === "jeko") {
+        const jekoData = await apiFetch(`/clients/${client.id}/pay-adhesion-jeko`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jeko_method: jekoMethod }),
+        });
+        const redirectUrl = jekoData?.data?.redirect_url;
+        if (redirectUrl) window.open(redirectUrl, "_blank");
+        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", pending: !redirectUrl });
+        setStep(3); onCreated?.();
+      }
+    } catch (e) {
+      setError(e?.error || e?.message || "Une erreur est survenue.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const STEPS = ["Infos", "Formule", "Paiement", "Confirmation"];
+  const inp = {
+    width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 14,
+    background: "#0C0C12", border: `1px solid ${T.border}`,
+    color: T.text, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+  };
+  const btnGold = {
+    padding: "12px 24px", borderRadius: 10, border: "none", cursor: "pointer",
+    background: `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+    color: "#0C0C0F", fontWeight: 900, fontSize: 14, fontFamily: "inherit",
+  };
+  const btnGhost = {
+    padding: "12px 24px", borderRadius: 10, cursor: "pointer",
+    background: "transparent", border: `1px solid ${T.border}`,
+    color: T.textSub, fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+  };
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(0,0,0,.75)", display: "flex",
+      alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20,
+        width: "100%", maxWidth: 500, maxHeight: "92vh",
+        display: "flex", flexDirection: "column",
+        boxShadow: "0 24px 80px rgba(0,0,0,.8)",
+      }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: T.text }}>🏥 Nouveau client mutualiste</div>
+              <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>Étape {step + 1} / {STEPS.length} — {STEPS[step]}</div>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", color: T.muted, fontSize: 22, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+            {STEPS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= step ? T.gold : T.border, transition: "background .3s" }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Corps */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}>
+          {error && (
+            <div style={{ background: T.redL, border: `1px solid ${T.red}40`, borderRadius: 10, padding: "11px 16px", fontSize: 13, color: T.red, marginBottom: 16 }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {step === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, color: T.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>Nom complet *</div>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="ex : Kouamé Adjoua" style={inp} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: T.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>Téléphone *</div>
+                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0707080808" style={inp} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: T.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>Ville</div>
+                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Abidjan" style={inp} />
+              </div>
+              <div style={{ background: "#14110A", border: `1px solid ${T.gold}30`, borderRadius: 12, padding: "14px 16px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={isReturning} onChange={e => setIsReturning(e.target.checked)} style={{ width: 16, height: 16, accentColor: T.gold }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.gold }}>Ancien client (migration de dossier)</span>
+                </label>
+                {isReturning && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, color: T.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>Date d'expiration *</div>
+                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} style={{ ...inp, borderColor: T.gold + "60" }} />
+                    <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Date passée → suspendu · Date future → actif</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {plans.length === 0 && <div style={{ textAlign: "center", padding: 40 }}><Spin /></div>}
+              {plans.map(plan => (
+                <div key={plan.id} onClick={() => setSelectedPlan(plan)} style={{
+                  borderRadius: 12, padding: 16, cursor: "pointer",
+                  border: `2px solid ${selectedPlan?.id === plan.id ? T.gold : T.border}`,
+                  background: selectedPlan?.id === plan.id ? `${T.gold}10` : T.card, transition: "all .15s",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: T.text }}>{plan.name}</div>
+                      <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>
+                        Couverture {plan.coverage_percent}%{plan.benefits?.length > 0 && ` · ${plan.benefits.length} catégorie(s)`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontWeight: 900, fontSize: 16, color: T.gold, fontFamily: "monospace" }}>{Number(plan.adhesion_price).toLocaleString("fr-FR")} FCFA</div>
+                      <div style={{ fontSize: 11, color: T.muted }}>adhésion</div>
+                      <div style={{ fontSize: 12, color: T.textSub, marginTop: 2 }}>{Number(plan.monthly_price).toLocaleString("fr-FR")} FCFA/mois</div>
+                    </div>
+                  </div>
+                  {selectedPlan?.id === plan.id && plan.benefits?.length > 0 && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.gold}25`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      {plan.benefits.map(b => (
+                        <div key={b.category} style={{ fontSize: 11, color: T.textSub, display: "flex", gap: 4 }}>
+                          <span style={{ color: T.gold }}>✓</span> {b.category} ({b.coverage_percent}%)
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {step === 2 && selectedPlan && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px", fontSize: 13 }}>
+                <div style={{ fontWeight: 800, color: T.text, marginBottom: 10 }}>Récapitulatif</div>
+                <div style={{ color: T.muted, marginBottom: 4 }}>Client : <span style={{ color: T.text, fontWeight: 700 }}>{name}</span> · {phone}</div>
+                <div style={{ color: T.muted, marginBottom: 4 }}>Formule : <span style={{ color: T.text, fontWeight: 700 }}>{selectedPlan.name}</span></div>
+                <div style={{ color: T.muted }}>Adhésion : <span style={{ color: T.gold, fontWeight: 900, fontSize: 16, fontFamily: "monospace" }}>{Number(selectedPlan.adhesion_price).toLocaleString("fr-FR")} FCFA</span></div>
+              </div>
+              {isReturning ? (
+                <div style={{ background: `${T.gold}10`, border: `1px solid ${T.gold}30`, borderRadius: 12, padding: "14px 16px", fontSize: 13, color: T.gold }}>
+                  ✓ Migration de dossier — aucun paiement requis.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Mode de paiement</div>
+                  {[
+                    { id: "cash", icon: "💵", label: "Paiement Cash", sub: "Espèces reçues — activation immédiate" },
+                    { id: "jeko", icon: "📱", label: "Paiement Mobile (JEKO)", sub: "Orange, Wave, MTN, Moov, Djamo" },
+                  ].map(m => (
+                    <div key={m.id} onClick={() => setPayMethod(m.id)} style={{
+                      display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, cursor: "pointer",
+                      border: `2px solid ${payMethod === m.id ? T.gold : T.border}`,
+                      background: payMethod === m.id ? `${T.gold}10` : T.card, transition: "all .15s",
+                    }}>
+                      <span style={{ fontSize: 28 }}>{m.icon}</span>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: T.text }}>{m.label}</div>
+                        <div style={{ fontSize: 12, color: T.muted }}>{m.sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {payMethod === "jeko" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                      {JEKO_METHODS_LIST.map(m => (
+                        <div key={m.value} onClick={() => setJekoMethod(m.value)} style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                          padding: "10px 6px", borderRadius: 10, cursor: "pointer",
+                          border: `2px solid ${jekoMethod === m.value ? T.gold : T.border}`,
+                          background: jekoMethod === m.value ? `${T.gold}10` : "#0C0C12",
+                          fontSize: 11, fontWeight: 700,
+                          color: jekoMethod === m.value ? T.gold : T.muted, transition: "all .15s",
+                        }}>
+                          <span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {step === 3 && result && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: result.pending ? `${T.gold}20` : T.greenL,
+                  border: `2px solid ${result.pending ? T.gold : T.green}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 30, margin: "0 auto 12px",
+                }}>{result.pending ? "⏳" : "✅"}</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: T.text }}>
+                  {result.pending ? "Paiement en attente" : "Client enregistré !"}
+                </div>
+                {result.pending && <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>Activation automatique après confirmation du paiement.</div>}
+              </div>
+              <div style={{ background: `${T.gold}10`, border: `1px solid ${T.gold}40`, borderRadius: 14, padding: "16px 18px" }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: T.gold, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Numéro mutualiste</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 24, fontWeight: 900, color: T.gold, letterSpacing: 2 }}>{result.mutual_number}</span>
+                  <button onClick={() => copy(result.mutual_number, "num")} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, border: `1px solid ${T.gold}50`, background: `${T.gold}15`, color: T.gold, cursor: "pointer", fontWeight: 700 }}>
+                    {copied === "num" ? "✅" : "📋 Copier"}
+                  </button>
+                </div>
+              </div>
+              <div style={{ background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 14, padding: "16px 18px" }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: T.blue, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Code d'accès temporaire (portail client)</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 24, fontWeight: 900, color: T.blue, letterSpacing: 4 }}>{result.access_code}</span>
+                  <button onClick={() => copy(result.access_code, "code")} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, border: `1px solid ${T.blue}50`, background: `${T.blue}15`, color: T.blue, cursor: "pointer", fontWeight: 700 }}>
+                    {copied === "code" ? "✅" : "📋 Copier"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 8 }}>⚠️ À remettre au client — il devra le changer à la première connexion.</div>
+              </div>
+              <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 16px", fontSize: 13 }}>
+                <div style={{ color: T.muted, marginBottom: 4 }}>Nom : <span style={{ color: T.text, fontWeight: 700 }}>{result.client?.name}</span></div>
+                <div style={{ color: T.muted, marginBottom: 4 }}>Téléphone : <span style={{ color: T.textSub }}>{result.client?.phone}</span></div>
+                <div style={{ color: T.muted, marginBottom: 4 }}>Formule : <span style={{ color: T.textSub }}>{result.client?.plan}</span></div>
+                <div style={{ color: T.muted }}>Statut : <span style={{ fontWeight: 800, color: result.client?.status === "actif" ? T.green : T.gold }}>
+                  {result.client?.status === "actif" ? "✅ Actif" : "⏳ En attente"}
+                </span></div>
+              </div>
+              <button onClick={() => copy(`Numéro mutualiste : ${result.mutual_number}\nCode d'accès : ${result.access_code}`, "all")}
+                style={{ ...btnGhost, width: "100%", textAlign: "center" }}>
+                {copied === "all" ? "✅ Copié !" : "📋 Copier numéro + code"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", gap: 10, background: "#0E0E16", flexShrink: 0 }}>
+          <button onClick={() => { if (step === 0) onClose(); else setStep(s => s - 1); }}
+            disabled={loading || step === 3} style={{ ...btnGhost, opacity: (loading || step === 3) ? .4 : 1 }}>
+            {step === 0 ? "Annuler" : "← Retour"}
+          </button>
+          {step === 0 && <button onClick={goStep1} style={btnGold}>Suivant →</button>}
+          {step === 1 && <button onClick={goStep2} style={btnGold}>Suivant →</button>}
+          {step === 2 && (
+            <button onClick={handleSubmit} disabled={loading} style={{ ...btnGold, opacity: loading ? .6 : 1 }}>
+              {loading ? "⏳ Traitement…" : isReturning ? "✅ Enregistrer" : payMethod === "cash" ? "💵 Confirmer" : "📱 Payer par mobile"}
+            </button>
+          )}
+          {step === 3 && (
+            <button onClick={onClose} style={{ ...btnGold, background: `linear-gradient(135deg, ${T.green}, #15803D)` }}>Fermer ✓</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Clients ────────────────────────────────────────────────────
+function TabClients() {
+  const [clients,      setClients]      = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showModal,    setShowModal]    = useState(false);
+  const [search,       setSearch]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page,         setPage]         = useState(1);
+  const [pagination,   setPagination]   = useState({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ page, limit: 15 });
+    if (search)       params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    apiFetch(`/my-clients?${params}`)
+      .then(d => { setClients(d.clients || []); setPagination(d.pagination || {}); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [page, search, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const STATUS_MAP = {
+    actif:            { label: "Actif",          bg: T.greenL,  color: T.green   },
+    attente:          { label: "En attente",     bg: "#1A1A00", color: "#EAB308" },
+    suspendu:         { label: "Suspendu",       bg: T.redL,    color: T.red     },
+    renewal_required: { label: "Renouvellement", bg: T.blueL,   color: T.blue    },
+  };
+
+  const inp = { padding: "10px 14px", borderRadius: 10, fontSize: 13, background: "#0C0C12", border: `1px solid ${T.border}`, color: T.text, outline: "none", fontFamily: "inherit" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{
+        background: "linear-gradient(135deg, #14141F, #0C1420)", border: `1px solid ${T.border}`,
+        borderRadius: 16, padding: "22px 26px", display: "flex",
+        justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14,
+      }}>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: T.text }}>🏥 Mes clients mutualistes</div>
+          <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>
+            {pagination.total !== undefined ? `${pagination.total} client(s) enregistré(s)` : "Gérez vos clients depuis votre espace"}
+          </div>
+        </div>
+        <button onClick={() => setShowModal(true)} style={{
+          padding: "12px 22px", borderRadius: 10, border: "none", cursor: "pointer",
+          background: `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+          color: "#0C0C0F", fontWeight: 900, fontSize: 13, fontFamily: "inherit",
+        }}>➕ Nouveau client</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input placeholder="🔍 Nom, téléphone, numéro…" value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          style={{ ...inp, flex: 1, minWidth: 200 }} />
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={{ ...inp, minWidth: 160 }}>
+          <option value="">Tous les statuts</option>
+          <option value="actif">Actif</option>
+          <option value="attente">En attente</option>
+          <option value="suspendu">Suspendu</option>
+          <option value="renewal_required">Renouvellement</option>
+        </select>
+      </div>
+
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 50 }}><Spin size={36} /></div>
+        ) : clients.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "50px 20px", color: T.muted }}>
+            <div style={{ fontSize: 48, marginBottom: 14 }}>🏥</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.textSub, marginBottom: 6 }}>Aucun client enregistré</div>
+            <button onClick={() => setShowModal(true)} style={{
+              padding: "12px 24px", borderRadius: 10, border: "none", cursor: "pointer",
+              background: `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+              color: "#0C0C0F", fontWeight: 900, fontSize: 13, fontFamily: "inherit",
+            }}>➕ Nouveau client</button>
+          </div>
+        ) : clients.map((c, i) => {
+          const st = STATUS_MAP[c.status] || { label: c.status, bg: T.border, color: T.muted };
+          const payOk = c.status_payment === "paid";
+          return (
+            <div key={c.id} style={{
+              display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 20px",
+              borderBottom: i < clients.length - 1 ? `1px solid ${T.border}` : "none",
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: payOk ? T.greenL : "#1A1A00",
+                border: `1.5px solid ${payOk ? T.green : "#EAB308"}40`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+              }}>{payOk ? "✅" : "⏳"}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: T.text }}>{c.name}</span>
+                  <span style={{ padding: "2px 10px", borderRadius: 99, fontSize: 10, fontWeight: 800, background: st.bg, color: st.color }}>{st.label}</span>
+                </div>
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>📞 {c.phone}{c.city && ` · 📍 ${c.city}`}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 800, color: T.gold, background: `${T.gold}10`, border: `1px solid ${T.gold}30`, borderRadius: 6, padding: "2px 8px" }}>{c.mutual_number}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueL, border: `1px solid ${T.blue}30`, borderRadius: 6, padding: "2px 8px" }}>{c.plan}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 11, color: T.muted }}>{c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}</div>
+                {c.expiration_date && <div style={{ fontSize: 11, color: T.textSub, marginTop: 3 }}>Exp : {new Date(c.expiration_date).toLocaleDateString("fr-FR")}</div>}
+                <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: payOk ? T.green : "#EAB308" }}>
+                  {payOk ? "Adhésion payée" : "Paiement requis"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {pagination.pages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`, background: page === 1 ? T.surface : T.card, color: page === 1 ? T.muted : T.text, cursor: page === 1 ? "default" : "pointer", fontSize: 13, fontFamily: "inherit" }}>← Préc.</button>
+          <span style={{ fontSize: 13, color: T.muted }}>Page {page} / {pagination.pages}</span>
+          <button onClick={() => setPage(p => Math.min(pagination.pages, p + 1))} disabled={page === pagination.pages}
+            style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: T.text, cursor: page === pagination.pages ? "default" : "pointer", fontSize: 13, fontFamily: "inherit" }}>Suiv. →</button>
+        </div>
+      )}
+
+      {showModal && <CreateClientModal onClose={() => setShowModal(false)} onCreated={() => { setShowModal(false); load(); }} />}
+    </div>
+  );
+}
+
 // ── Composant principal ────────────────────────────────────────────
 export default function BusinessDashboard() {
   const [tab,     setTab]     = useState("accueil");
@@ -1143,6 +1621,7 @@ export default function BusinessDashboard() {
             {tab === "bonus"       && <TabBonus />}
             {tab === "inviter"     && <TabInviter />}
             {tab === "retrait"     && <TabRetrait />}
+            {tab === "clients"     && <TabClients />}
           </>
         ) : null}
       </div>
