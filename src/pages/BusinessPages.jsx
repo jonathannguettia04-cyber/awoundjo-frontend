@@ -1310,31 +1310,21 @@ function CreateClientModal({ onClose, onCreated }) {
                 <input value={city} onChange={e => setCity(e.target.value)}
                   placeholder="ex : Abidjan" style={inputStyle} />
               </div>
-              {/* Ancien client */}
+              {/* Ancien client — désactivé temporairement */}
               <div style={{
-                background: "#FFFBEB", border: "1px solid #FDE68A",
-                borderRadius: 10, padding: "14px 16px",
+                background: "#F8FAFC", border: "1px solid #E2E8F0",
+                borderRadius: 10, padding: "14px 16px", opacity: 0.5,
               }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <input type="checkbox" checked={isReturning}
-                    onChange={e => setIsReturning(e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: "#D97706" }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#92400E" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "not-allowed" }}>
+                  <input type="checkbox" checked={false} disabled
+                    style={{ width: 16, height: 16 }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#94A3B8" }}>
                     Ancien client (migration de dossier)
                   </span>
+                  <span style={{ fontSize: 11, color: "#CBD5E1", fontStyle: "italic", marginLeft: 4 }}>
+                    — Non disponible actuellement
+                  </span>
                 </label>
-                {isReturning && (
-                  <div style={{ marginTop: 12 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-                      Date d'expiration de cotisation <span style={{ color: "#EF4444" }}>*</span>
-                    </label>
-                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)}
-                      style={{ ...inputStyle, borderColor: "#FCD34D" }} />
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#92400E" }}>
-                      Date passée → compte suspendu · Date future → compte actif
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1409,17 +1399,18 @@ function CreateClientModal({ onClose, onCreated }) {
               ) : (
                 <>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#374151" }}>Mode de paiement</p>
-                  {/* Cash */}
-                  <button type="button" onClick={() => setPayMethod("cash")} style={{
+                  {/* Cash — désactivé temporairement */}
+                  <button type="button" disabled style={{
                     display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
-                    borderRadius: 12, cursor: "pointer", textAlign: "left",
-                    border: `2px solid ${payMethod === "cash" ? "#7C3AED" : "#E2E8F0"}`,
-                    background: payMethod === "cash" ? "#F5F3FF" : "#fff",
+                    borderRadius: 12, cursor: "not-allowed", textAlign: "left",
+                    border: "2px solid #E2E8F0",
+                    background: "#F1F5F9", opacity: 0.5,
                   }}>
                     <span style={{ fontSize: 28 }}>💵</span>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Paiement Cash</p>
-                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>Espèces reçues — activation immédiate</p>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "#94A3B8" }}>Paiement Cash</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>Espèces reçues — activation immédiate</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#CBD5E1", fontStyle: "italic" }}>Non disponible actuellement</p>
                     </div>
                   </button>
                   {/* JEKO */}
