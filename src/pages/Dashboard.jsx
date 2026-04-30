@@ -188,6 +188,37 @@ export default function Dashboard() {
     .scroll-x::-webkit-scrollbar { height: 4px; }
     .scroll-x::-webkit-scrollbar-track { background: transparent; }
     .scroll-x::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+    .awj-hero-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .awj-clients-row { display: grid; grid-template-columns: auto 1fr; gap: 16px; margin-bottom: 16px; }
+    .awj-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .awj-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .awj-header-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
+    .awj-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .awj-plan-row { display: flex; gap: 12px; align-items: flex-start; }
+    .awj-plan-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    @media (max-width: 768px) {
+      .awj-dash > div { padding: 16px 14px 48px !important; }
+      .awj-hero-grid { grid-template-columns: 1fr !important; }
+      .awj-clients-row { grid-template-columns: 1fr !important; }
+      .awj-stat-grid { grid-template-columns: 1fr 1fr !important; }
+      .awj-bottom-grid { grid-template-columns: 1fr !important; }
+      .awj-number { font-size: 22px !important; }
+      .awj-row-item { padding: 12px 14px !important; gap: 10px !important; }
+      .awj-plan-row { flex-wrap: wrap; }
+      .awj-plan-row-actions { flex-wrap: wrap; }
+      h1 { font-size: 20px !important; }
+    }
+    @media (max-width: 480px) {
+      .awj-dash > div { padding: 12px 10px 48px !important; }
+      .awj-stat-grid { grid-template-columns: 1fr 1fr !important; }
+      .awj-card { border-radius: 12px !important; }
+      .awj-header-actions { width: 100%; }
+      .awj-header-actions .awj-btn-primary,
+      .awj-header-actions .awj-btn-ghost { width: 100%; justify-content: center; }
+      .awj-row-item { padding: 10px 12px !important; }
+      .awj-avatar { width: 32px !important; height: 32px !important; font-size: 12px !important; }
+      .awj-plan-row-actions { width: 100%; }
+    }
   `;
 
   /* ── Loading ──────────────────────────────────────────────────── */
@@ -248,10 +279,10 @@ export default function Dashboard() {
     <>
       <style>{css}</style>
       <div className="awj-dash awj-fade-in">
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 60px" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 60px", width: "100%" }}>
 
           {/* ══ HEADER ══════════════════════════════════════════════ */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, gap: 16, flexWrap: "wrap" }}>
+          <div style={{}}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} className="awj-pulse" />
@@ -269,7 +300,7 @@ export default function Dashboard() {
                 Votre plateforme Awoundjô — vue d'ensemble
               </p>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="awj-header-actions">
               {isAdmin && (
                 <>
                   <button className="awj-btn-ghost" onClick={() => setShowPlans((v) => !v)}>
@@ -361,7 +392,7 @@ export default function Dashboard() {
           )}
 
           {/* ══ HERO ROW — Revenu total + sparkline ══════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div className="awj-hero-grid">
 
             {/* Revenu Total — carte hero */}
             <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden", gridColumn: "span 1" }}>
@@ -420,7 +451,7 @@ export default function Dashboard() {
           </div>
 
           {/* ══ CLIENTS ROW ══════════════════════════════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, marginBottom: 16 }}>
+          <div className="awj-clients-row">
 
             {/* Donut + légende */}
             <div className="awj-card" style={{ padding: "24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 200 }}>
@@ -444,7 +475,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stats clients — grille */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <div className="awj-stat-grid">
               {[
                 { label: "Total clients", value: cs.total_clients ?? 0, sub: "inscrits", color: "#f0f0f0", icon: "👥", to: "/clients" },
                 { label: "Actifs", value: cs.actifs ?? 0, sub: "membres actifs", color: "#10b981", icon: "✅", to: "/clients?status=actif" },
@@ -517,7 +548,7 @@ export default function Dashboard() {
           )}
 
           {/* ══ TABLES BASSES ═══════════════════════════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="awj-bottom-grid">
 
             {/* Derniers clients */}
             <div className="awj-card" style={{ overflow: "hidden" }}>
