@@ -138,6 +138,7 @@ const TABS = [
   { id: "bonus",       label: "Bonus Pool",  icon: "🎯" },
   { id: "inviter",     label: "Inviter",     icon: "🔗" },
   { id: "retrait",     label: "Retrait",     icon: "💸" },
+  { id: "collectes",   label: "Collectes",   icon: "💳" },
   { id: "clients",     label: "Mes Clients", icon: "🏥" },
 ];
 
@@ -1685,6 +1686,244 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
   );
 }
 
+// ── Tab Collectes ──────────────────────────────────────────────────
+function TabCollectes() {
+  const [clients,        setClients]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [showNew,        setShowNew]        = useState(false);
+  const [collecteClient, setCollecteClient] = useState(null);
+  const [search,         setSearch]         = useState("");
+
+  // États création client
+  const [step,         setStep]         = useState(0); // 0=infos 1=formule 2=done
+  const [plans,        setPlans]        = useState([]);
+  const [creating,     setCreating]     = useState(false);
+  const [createError,  setCreateError]  = useState("");
+  const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [city,         setCity]         = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiFetch("/my-clients?limit=200")
+      .then(d => setClients(d.clients || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (showNew && plans.length === 0)
+      apiFetch("/plans").then(d => setPlans(d.plans || [])).catch(() => {});
+  }, [showNew, plans.length]);
+
+  async function handleCreate() {
+    setCreateError(""); setCreating(true);
+    try {
+      const d = await apiFetch("/clients", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), city: city.trim() || undefined, plan_slug: selectedPlan.slug }),
+      });
+      setStep(2); load();
+    } catch (e) {
+      setCreateError(e?.error || e?.message || "Erreur lors de la création.");
+    } finally { setCreating(false); }
+  }
+
+  function resetNew() { setShowNew(false); setStep(0); setName(""); setPhone(""); setCity(""); setSelectedPlan(null); setCreateError(""); }
+
+  const enCours   = clients.filter(c => c.status_payment !== "paid");
+  const completes = clients.filter(c => c.status_payment === "paid");
+
+  const filt = arr => arr.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search) || (c.mutual_number || "").includes(search)
+  );
+
+  const inp = { padding: "10px 14px", borderRadius: 10, fontSize: 13, background: "#0C0C12", border: `1px solid ${T.border}`, color: T.text, outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box" };
+
+  const rowStyle = (complete) => ({
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 14px", borderRadius: 12, marginBottom: 8,
+    background: "#1A1A24", border: complete ? "1px solid #16532440" : "1px solid #2A2A38",
+    cursor: complete ? "default" : "pointer", transition: "border-color .15s",
+  });
+
+  return (
+    <div style={{ animation: "biz-fade-in .3s ease" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: T.gold }}>💳 Collectes Wave</div>
+          <div style={{ fontSize: 12, color: "#6B6B85", marginTop: 3 }}>Collectez 15 000 FCFA en plusieurs versements</div>
+        </div>
+        <button onClick={() => setShowNew(true)} style={{
+          padding: "9px 18px", borderRadius: 10, border: "none", cursor: "pointer",
+          background: T.gold, color: "#0A0A0F", fontWeight: 800, fontSize: 13,
+        }}>➕ Nouvelle collecte</button>
+      </div>
+
+      {/* Recherche */}
+      <input
+        placeholder="🔍 Nom, téléphone ou numéro…"
+        value={search} onChange={e => setSearch(e.target.value)}
+        style={{ ...inp, marginBottom: 20, maxWidth: 320 }}
+      />
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><Spin size={32} /></div>
+      ) : (
+        <>
+          {/* En cours */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B6B85", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+            En cours ({filt(enCours).length})
+          </div>
+          {filt(enCours).length === 0 ? (
+            <div style={{ textAlign: "center", padding: "28px 0", color: "#6B6B85", fontSize: 13, marginBottom: 24 }}>
+              Aucune collecte en cours.
+              <br />
+              <button onClick={() => setShowNew(true)} style={{
+                marginTop: 10, padding: "8px 18px", borderRadius: 8, border: "none",
+                background: T.gold, color: "#0A0A0F", fontWeight: 700, fontSize: 12, cursor: "pointer",
+              }}>➕ Démarrer une collecte</button>
+            </div>
+          ) : filt(enCours).map(c => (
+            <div key={c.id} style={rowStyle(false)}
+              onClick={() => setCollecteClient(c)}
+              onMouseEnter={e => e.currentTarget.style.borderColor = T.gold + "60"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "#2A2A38"}
+            >
+              <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#C9933A20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💳</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, color: T.text, fontSize: 14 }}>{c.name}</div>
+                <div style={{ fontSize: 11, color: "#6B6B85", marginTop: 2 }}>{c.phone} · <span style={{ fontFamily: "monospace", color: T.gold }}>{c.mutual_number}</span> · {c.plan}</div>
+              </div>
+              <span style={{ background: "#1E3A5F", color: "#60A5FA", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>En cours →</span>
+            </div>
+          ))}
+
+          {/* Complètes */}
+          {filt(completes).length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6B6B85", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10, marginTop: 24 }}>
+                Complètes ({filt(completes).length})
+              </div>
+              {filt(completes).map(c => (
+                <div key={c.id} style={rowStyle(true)}>
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#16532420", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✅</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: T.text, fontSize: 14 }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: "#6B6B85", marginTop: 2 }}>{c.phone} · <span style={{ fontFamily: "monospace", color: T.gold }}>{c.mutual_number}</span> · {c.plan}</div>
+                  </div>
+                  <span style={{ background: "#16532420", color: "#4ADE80", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>Complète ✅</span>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Modal nouvelle collecte */}
+      {showNew && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) resetNew(); }}>
+          <div style={{ background: "#14141A", borderRadius: 16, border: "1px solid #2A2A38", width: "100%", maxWidth: 460, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #2A2A38", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 800, color: T.gold, fontSize: 15 }}>💳 Nouvelle collecte Wave</div>
+              <button onClick={resetNew} style={{ background: "none", border: "none", color: "#6B6B85", fontSize: 18, cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "18px 20px", overflowY: "auto", flex: 1 }}>
+              {createError && <div style={{ background: "#2D1010", color: "#EF4444", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>{createError}</div>}
+
+              {step === 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#9090A8", display: "block", marginBottom: 5 }}>Nom complet *</label>
+                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Koné Mariam" style={inp} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#9090A8", display: "block", marginBottom: 5 }}>Téléphone *</label>
+                    <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: 0709876543" style={inp} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#9090A8", display: "block", marginBottom: 5 }}>Ville (optionnel)</label>
+                    <input value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Abidjan" style={inp} />
+                  </div>
+                </div>
+              )}
+
+              {step === 1 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ fontSize: 12, color: "#6B6B85", marginBottom: 4 }}>Choisissez la formule :</div>
+                  {plans.map(p => (
+                    <div key={p.id} onClick={() => setSelectedPlan(p)} style={{
+                      border: selectedPlan?.id === p.id ? `2px solid ${T.gold}` : "2px solid #2A2A38",
+                      borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+                      background: selectedPlan?.id === p.id ? "#C9933A10" : "#1A1A24",
+                    }}>
+                      <div style={{ fontWeight: 700, color: T.text, fontSize: 14 }}>{p.name}</div>
+                      <div style={{ fontSize: 12, color: "#6B6B85", marginTop: 3 }}>
+                        Adhésion : <strong style={{ color: T.gold }}>{(p.adhesion_price || 15000).toLocaleString("fr-FR")} FCFA</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {step === 2 && (
+                <div style={{ textAlign: "center", padding: "20px 0" }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                  <div style={{ fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 8 }}>Client créé avec succès !</div>
+                  <div style={{ fontSize: 13, color: "#6B6B85" }}>Retrouvez-le dans la liste pour enregistrer les versements Wave.</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: "14px 20px", borderTop: "1px solid #2A2A38", display: "flex", gap: 10, justifyContent: "space-between" }}>
+              {step === 0 && (
+                <>
+                  <button onClick={resetNew} style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid #2A2A38", background: "transparent", color: "#9090A8", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Annuler</button>
+                  <button onClick={() => {
+                    if (!name.trim()) return setCreateError("Le nom est requis.");
+                    if (!phone.trim()) return setCreateError("Le téléphone est requis.");
+                    setCreateError(""); setStep(1);
+                  }} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: T.gold, color: "#0A0A0F", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                    Suivant →
+                  </button>
+                </>
+              )}
+              {step === 1 && (
+                <>
+                  <button onClick={() => setStep(0)} style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid #2A2A38", background: "transparent", color: "#9090A8", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>← Retour</button>
+                  <button onClick={() => { if (!selectedPlan) return setCreateError("Choisissez une formule."); handleCreate(); }}
+                    disabled={creating}
+                    style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: T.gold, color: "#0A0A0F", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: creating ? .6 : 1 }}>
+                    {creating ? "Création…" : "Créer et démarrer"}
+                  </button>
+                </>
+              )}
+              {step === 2 && (
+                <button onClick={resetNew} style={{ width: "100%", padding: "9px 20px", borderRadius: 8, border: "none", background: T.gold, color: "#0A0A0F", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Fermer</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal versement Wave */}
+      {collecteClient && (
+        <CollecteWaveModal
+          client={collecteClient}
+          onClose={() => setCollecteClient(null)}
+          onCompleted={() => { setCollecteClient(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Tab Clients ────────────────────────────────────────────────────
 function TabClients() {
   const [clients,       setClients]       = useState([]);
@@ -1974,6 +2213,7 @@ export default function BusinessDashboard() {
             {tab === "bonus"       && <TabBonus />}
             {tab === "inviter"     && <TabInviter />}
             {tab === "retrait"     && <TabRetrait />}
+            {tab === "collectes"   && <TabCollectes />}
             {tab === "clients"     && <TabClients />}
           </>
         ) : null}
