@@ -1517,8 +1517,7 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
         body: JSON.stringify({ montant: montant ? Number(montant) : undefined }),
       });
       setWaveData(d);
-      if (d.wave_qr_data) window.open(d.wave_qr_data, "_blank");
-      setStep("confirm");
+      setStep("qr");
     } catch (e) {
       setError(e?.error || e?.message || "Erreur lors de l'initialisation Wave.");
     } finally { setLoading(false); }
@@ -1625,21 +1624,42 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
             </>
           )}
 
+          {/* Étape QR : afficher le QR code dans le modal */}
+          {step === "qr" && waveData && !success && (
+            <>
+              <div style={{ textAlign: "center", background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 12, padding: "16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: T.blue, marginBottom: 12 }}>📱 Scannez avec l'app Wave</div>
+                <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block", boxShadow: "0 4px 20px rgba(0,0,0,.3)" }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waveData.wave_qr_data || "")}`}
+                    alt="QR Code Wave"
+                    width={180} height={180}
+                    style={{ display: "block", borderRadius: 6 }}
+                  />
+                </div>
+                <div style={{ marginTop: 10, fontSize: 14, fontWeight: 900, color: T.gold }}>
+                  {Number(waveData.versement?.montant_suggere || 0).toLocaleString("fr-FR")} FCFA
+                </div>
+                {waveData.wave_number && (
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
+                    N° Wave : <strong style={{ color: T.textSub }}>{waveData.wave_number}</strong>
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: T.muted, textAlign: "center" }}>
+                Après le paiement Wave, cliquez sur <strong style={{ color: T.text }}>Confirmer</strong> et saisissez la référence.
+              </div>
+            </>
+          )}
+
           {/* Étape confirm : saisie référence */}
           {step === "confirm" && waveData && !success && (
             <>
-              <div style={{ background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 12, padding: "14px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.blue, marginBottom: 4 }}>🔵 Lien Wave ouvert</div>
-                <div style={{ fontSize: 13, color: T.blue }}>
+              <div style={{ background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 12, padding: "14px 16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: T.green, marginBottom: 4 }}>✅ Paiement Wave effectué ?</div>
+                <div style={{ fontSize: 13, color: T.green }}>
                   Montant : <strong>{Number(waveData.versement?.montant_suggere || 0).toLocaleString("fr-FR")} FCFA</strong>
                 </div>
-                {waveData.instructions && <div style={{ fontSize: 12, color: "#93C5FD", marginTop: 4 }}>{waveData.instructions}</div>}
-                <button
-                  onClick={() => { if (waveData.wave_qr_data) window.open(waveData.wave_qr_data, "_blank"); }}
-                  style={{ marginTop: 10, padding: "6px 14px", borderRadius: 8, border: `1px solid ${T.blue}50`, background: `${T.blue}15`, color: T.blue, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  🔄 Rouvrir le lien Wave
-                </button>
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 7 }}>
@@ -1669,6 +1689,14 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
               style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: loading ? T.border : `linear-gradient(135deg, #2563EB, #1D4ED8)`, color: loading ? T.muted : "#fff", fontWeight: 900, fontSize: 13, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}
             >
               {loading ? "Chargement…" : "🔵 Générer QR Wave"}
+            </button>
+          )}
+          {step === "qr" && waveData && !success && (
+            <button
+              onClick={() => setStep("confirm")}
+              style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${T.green}, #15803D)`, color: "#fff", fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              ✅ Paiement effectué → Confirmer
             </button>
           )}
           {step === "confirm" && !success && (
