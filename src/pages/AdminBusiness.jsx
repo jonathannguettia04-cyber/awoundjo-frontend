@@ -21,7 +21,8 @@ const STATUS_COLORS = {
   SUSPENDED: { bg: "#FEF2F2", color: "#DC2626" },
 };
 
-const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission", "Clients"];
+const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission", "Clients", "Sce Technique"];
+const SCE_TECH_PASSWORD = "AwSce2025#";
 
 // ── Hook fetch générique ──────────────────────────────────────
 function useAdminFetch(token) {
@@ -88,6 +89,14 @@ export default function AdminBusiness() {
   const [actionLoading,         setActionLoading]         = useState(null);
   const [rejectModal,           setRejectModal]           = useState(null);
   const [rejectNote,            setRejectNote]            = useState("");
+
+  // Sce Technique
+  const [sceUnlocked,      setSceUnlocked]      = useState(false);
+  const [scePwdInput,      setScePwdInput]      = useState("");
+  const [scePwdError,      setScePwdError]      = useState(false);
+  const [scePayments,      setScePayments]      = useState([]);
+  const [sceLoading,       setSceLoading]       = useState(false);
+  const [sceVerseLoading,  setSceVerseLoading]  = useState(null);
 
   // Modal confirmation
   const [modal, setModal] = useState(null); // { type, member/commission }
@@ -172,13 +181,45 @@ export default function AdminBusiness() {
     setLoading(false);
   }, [get, demandesStatusFilter]);
 
+  const loadScePayments = async () => {
+    setSceLoading(true);
+    try {
+      // Charger tous les membres (tous niveaux)
+      const d = await get("/api/business/admin/members?page=1&limit=200");
+      const allMembers = d.data?.members || d.members || [];
+      // Construire une ligne par membre avec ses infos de paiement d'adhésion
+      const rows = allMembers.map(m => ({
+        id:               m.id,
+        member:           m,
+        amount:           m.membership_fee || 15000,
+        payment_type:     "adhesion",
+        status:           m.status_payment === "paid" ? "COMPLETED" : "PENDING",
+        created_at:       m.created_at,
+        commissions_count: m.commissions_count ?? (m.status_payment === "paid" ? null : 0),
+      }));
+      setScePayments(rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+    } catch (e) { showToast(e.message, true); }
+    setSceLoading(false);
+  };
+
+  async function handleVerseCommissions(paymentId, memberId) {
+    setSceVerseLoading(paymentId);
+    try {
+      await post(`/api/business/admin/members/${memberId}/recalc-commissions`);
+      showToast("✅ Commissions versées avec succès");
+      loadScePayments();
+    } catch (e) { showToast(e.message, true); }
+    setSceVerseLoading(null);
+  }
+
   useEffect(() => {
     if (tab === "Membres")              loadMembers();
     if (tab === "Commissions")          loadCommissions();
     if (tab === "Bonus Pool")           loadBonusPool();
     if (tab === "Demandes Commission")  loadDemandesCommission();
     if (tab === "Clients")              loadClients();
-  }, [tab, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission, loadClients]);
+    if (tab === "Sce Technique" && sceUnlocked) loadScePayments();
+  }, [tab, sceUnlocked, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission, loadClients]);
 
   // ── Actions membres ────────────────────────────────────────
   async function handleValidate(id, action, isCash = false) {
@@ -889,6 +930,137 @@ export default function AdminBusiness() {
           </div>
         </div>
       )}
+
+      {/* ── ONGLET SCE TECHNIQUE ──────────────────────────── */}
+      {tab === "Sce Technique" && (
+        <div>
+          {!sceUnlocked ? (
+            /* ── Écran de verrouillage ── */
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 60 }}>
+              <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: "40px 48px", maxWidth: 380, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,.07)", textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>Service Technique</h2>
+                <p style={{ fontSize: 13, color: "#94A3B8", margin: "0 0 24px" }}>Accès restreint — mot de passe requis</p>
+                <input
+                  type="password"
+                  placeholder="Mot de passe admin"
+                  value={scePwdInput}
+                  onChange={e => { setScePwdInput(e.target.value); setScePwdError(false); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      if (scePwdInput === SCE_TECH_PASSWORD) { setSceUnlocked(true); setScePwdInput(""); }
+                      else setScePwdError(true);
+                    }
+                  }}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${scePwdError ? "#DC2626" : "#E2E8F0"}`, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 8, outline: "none" }}
+                />
+                {scePwdError && <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 12px" }}>Mot de passe incorrect</p>}
+                <button
+                  onClick={() => {
+                    if (scePwdInput === SCE_TECH_PASSWORD) { setSceUnlocked(true); setScePwdInput(""); }
+                    else setScePwdError(true);
+                  }}
+                  style={{ ...s.btnPrimary, width: "100%", marginTop: 8 }}
+                >
+                  🔓 Déverrouiller
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Contenu Sce Technique ── */
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: 0 }}>🔧 Service Technique — Versement des commissions</h2>
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "4px 0 0" }}>Tous les paiements d'entrée (adhésions membres) · Tous niveaux</p>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={loadScePayments} style={s.btnSecondary}>↻ Rafraîchir</button>
+                  <button onClick={() => { setSceUnlocked(false); setScePayments([]); }} style={{ ...s.btnSecondary, color: "#DC2626", borderColor: "#FECACA" }}>🔒 Verrouiller</button>
+                </div>
+              </div>
+
+              {sceLoading ? <Spinner /> : (
+                <div style={s.table}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "#F8FAFC" }}>
+                        <th style={s.th}>Membre</th>
+                        <th style={s.th}>Rôle</th>
+                        <th style={s.th}>Montant</th>
+                        <th style={s.th}>Type</th>
+                        <th style={s.th}>Statut paiement</th>
+                        <th style={s.th}>Date</th>
+                        <th style={s.th}>Commissions</th>
+                        <th style={s.th}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scePayments.length === 0 && (
+                        <tr><td colSpan={8} style={{ ...s.td, textAlign: "center", color: "#94A3B8", padding: 40 }}>Aucun paiement trouvé</td></tr>
+                      )}
+                      {scePayments.map(p => {
+                        const rc = ROLE_COLORS[p.member?.role] || ROLE_COLORS["RECRUTEUR"];
+                        const hasComm = p.commissions_count > 0;
+                        return (
+                          <tr key={p.id} style={s.tr}>
+                            <td style={s.td}>
+                              <div style={s.memberName}>{p.member?.name || "—"}</div>
+                              <div style={s.memberSub}>{p.member?.email || p.member?.phone || ""}</div>
+                            </td>
+                            <td style={s.td}>
+                              <span style={{ ...s.badge, background: rc.bg, color: rc.color, border: `1px solid ${rc.border}` }}>
+                                {p.member?.role || "—"}
+                              </span>
+                            </td>
+                            <td style={{ ...s.td, fontWeight: 700, color: "#059669" }}>
+                              {Number(p.amount || 0).toLocaleString("fr-FR")} FCFA
+                            </td>
+                            <td style={s.td}>
+                              <span style={{ fontSize: 11, color: "#64748B" }}>{p.payment_type || p.type || "adhesion"}</span>
+                            </td>
+                            <td style={s.td}>
+                              <span style={{ ...s.badge,
+                                background: p.status === "COMPLETED" ? "#ECFDF5" : "#FFF7ED",
+                                color:      p.status === "COMPLETED" ? "#059669" : "#D97706" }}>
+                                {p.status || "—"}
+                              </span>
+                            </td>
+                            <td style={{ ...s.td, fontSize: 12, color: "#94A3B8", whiteSpace: "nowrap" }}>
+                              {p.created_at ? new Date(p.created_at).toLocaleDateString("fr-FR") : "—"}
+                            </td>
+                            <td style={s.td}>
+                              <span style={{ ...s.badge,
+                                background: hasComm ? "#ECFDF5" : "#FEF2F2",
+                                color:      hasComm ? "#059669" : "#DC2626" }}>
+                                {hasComm ? `✅ ${p.commissions_count}` : "❌ Aucune"}
+                              </span>
+                            </td>
+                            <td style={s.td}>
+                              {p.status === "COMPLETED" && (
+                                <button
+                                  onClick={() => handleVerseCommissions(p.id, p.member?.id)}
+                                  disabled={sceVerseLoading === p.id}
+                                  style={{ ...s.btnPrimary, fontSize: 12, padding: "5px 12px",
+                                    background: hasComm ? "#64748B" : "#7C3AED",
+                                    opacity: sceVerseLoading === p.id ? 0.6 : 1 }}
+                                >
+                                  {sceVerseLoading === p.id ? "…" : hasComm ? "♻️ Recalculer" : "💸 Verser"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
