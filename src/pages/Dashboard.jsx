@@ -2,55 +2,118 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import StatsCard from "../components/StatsCard";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import PlanModal from "./PlanModal";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
+const fmt = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const fmtShort = (n) => {
+  const v = Number(n || 0);
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace(".", ",") + "M";
+  if (v >= 1_000) return (v / 1_000).toFixed(0) + "k";
+  return v.toLocaleString("fr-FR");
+};
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
 
-function ProgressBar({ value, max, color = "bg-brand-500" }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+/* ─── Sparkline SVG ───────────────────────────────────────────────── */
+function Sparkline({ data = [], color = "#10b981", height = 48 }) {
+  if (data.length < 2) return null;
+  const vals = data.map((d) => Number(d.revenue || 0));
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals);
+  const w = 180;
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = height - ((v - min) / (max - min || 1)) * (height - 6) - 3;
+    return `${x},${y}`;
+  });
+  const path = `M${pts.join(" L")}`;
+  const fill = `M${pts[0]} L${pts.join(" L")} L${w},${height} L0,${height} Z`;
   return (
-    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
-      <div className={`h-1.5 rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
-    </div>
+    <svg viewBox={`0 0 ${w} ${height}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`sg-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={fill} fill={`url(#sg-${color.replace("#", "")})`} />
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function MiniChart({ data = [] }) {
-  if (!data.length) return null;
-  const max = Math.max(...data.map((d) => Number(d.revenue || 0)), 1);
+/* ─── Donut Chart ─────────────────────────────────────────────────── */
+function DonutChart({ segments, size = 88 }) {
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const r = 34;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
   return (
-    <div className="flex items-end gap-0.5 h-10">
-      {data.slice(-12).map((d, i) => {
-        const h = Math.max(4, Math.round((Number(d.revenue || 0) / max) * 40));
-        return (
-          <div key={i} title={`${d.month} : ${fmt(d.revenue)}`}
-            className="flex-1 bg-brand-400 hover:bg-brand-600 rounded-sm transition-colors cursor-default"
-            style={{ height: `${h}px` }}
+    <svg width={size} height={size} viewBox="0 0 88 88">
+      <circle cx="44" cy="44" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+      {segments.map((seg, i) => {
+        const dash = (seg.value / total) * circ;
+        const gap = circ - dash;
+        const el = (
+          <circle
+            key={i}
+            cx="44" cy="44" r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth="10"
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-offset}
+            strokeLinecap="round"
+            style={{ transform: "rotate(-90deg)", transformOrigin: "center", transition: "all 0.8s ease" }}
           />
         );
+        offset += dash + 1.5;
+        return el;
       })}
+      <text x="44" y="40" textAnchor="middle" fill="white" fontSize="13" fontWeight="700" fontFamily="inherit">
+        {total.toLocaleString("fr-FR")}
+      </text>
+      <text x="44" y="54" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="9" fontFamily="inherit">
+        clients
+      </text>
+    </svg>
+  );
+}
+
+/* ─── Barre de progression slim ───────────────────────────────────── */
+function SlimBar({ value, max, color }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 99, height: 4, marginTop: 6 }}>
+      <div style={{ width: `${pct}%`, height: 4, borderRadius: 99, background: color, transition: "width 0.8s ease" }} />
     </div>
   );
 }
 
+/* ─── Médaille podium ─────────────────────────────────────────────── */
+const MEDALS = [
+  { bg: "linear-gradient(135deg,#f59e0b,#d97706)", text: "#fff", label: "1er" },
+  { bg: "linear-gradient(135deg,#94a3b8,#64748b)", text: "#fff", label: "2e" },
+  { bg: "linear-gradient(135deg,#c77c42,#a25d2c)", text: "#fff", label: "3e" },
+  { bg: "rgba(255,255,255,0.08)", text: "rgba(255,255,255,0.5)", label: "4e" },
+  { bg: "rgba(255,255,255,0.08)", text: "rgba(255,255,255,0.5)", label: "5e" },
+];
+
+/* ═══════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [data,    setData]    = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
 
-  // ── Plans (admin) ─────────────────────────────────────────
-  const [plans,       setPlans]       = useState([]);
-  const [showPlans,   setShowPlans]   = useState(false);
-  const [planModal,   setPlanModal]   = useState(false);
-  const [editingPlan, setEditingPlan] = useState(null); // null = création
-
+  const [plans, setPlans] = useState([]);
+  const [showPlans, setShowPlans] = useState(false);
+  const [planModal, setPlanModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
 
   const token = localStorage.getItem("token");
   const authHeader = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
@@ -64,22 +127,11 @@ export default function Dashboard() {
 
   useEffect(() => { if (isAdmin) fetchPlans(); }, [isAdmin]);
 
-  function openCreate() {
-    setEditingPlan(null);
-    setPlanModal(true);
-  }
-
-  function openEdit(plan) {
-    setEditingPlan(plan);
-    setPlanModal(true);
-  }
-
   async function togglePlanActive(plan) {
     try {
       await fetch(`${API}/api/plans/${plan.id}`, {
-        method:  "PUT",
-        headers: authHeader,
-        body:    JSON.stringify({ is_active: !plan.is_active }),
+        method: "PUT", headers: authHeader,
+        body: JSON.stringify({ is_active: !plan.is_active }),
       });
       fetchPlans();
     } catch (err) { console.error(err); }
@@ -88,173 +140,210 @@ export default function Dashboard() {
   async function deletePlan(plan) {
     if (!window.confirm(`Supprimer la formule "${plan.name}" ?`)) return;
     try {
-      const res  = await fetch(`${API}/api/plans/${plan.id}`, { method: "DELETE", headers: authHeader });
+      const res = await fetch(`${API}/api/plans/${plan.id}`, { method: "DELETE", headers: authHeader });
       const json = await res.json();
       alert(json.message || "Supprimée");
       fetchPlans();
     } catch (err) { console.error(err); }
   }
 
-  useEffect(() => {
-    setError("");
-    setLoading(true);
+  const reload = () => {
+    setError(""); setLoading(true);
     statsAPI.getStats()
       .then(({ data }) => setData(data))
       .catch(() => setError("Impossible de charger le tableau de bord"))
       .finally(() => setLoading(false));
-  }, []); // ← une seule fois au montage
+  };
 
+  useEffect(() => { reload(); }, []);
+
+  /* ── CSS-in-JS global styles ──────────────────────────────────── */
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+    .awj-dash * { box-sizing: border-box; }
+    .awj-dash { font-family: 'Outfit', system-ui, sans-serif; background: #0d1117; min-height: 100vh; color: #f0f0f0; }
+    .awj-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; transition: border-color 0.2s, transform 0.2s; }
+    .awj-card:hover { border-color: rgba(255,255,255,0.13); }
+    .awj-card-hover:hover { transform: translateY(-2px); border-color: rgba(16,185,129,0.25) !important; }
+    .awj-btn-primary { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s, transform 0.15s; }
+    .awj-btn-primary:hover { opacity: 0.88; }
+    .awj-btn-primary:active { transform: scale(0.97); }
+    .awj-btn-ghost { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.2s; }
+    .awj-btn-ghost:hover { background: rgba(255,255,255,0.10); }
+    .awj-link { color: #10b981; text-decoration: none; font-size: 12px; font-weight: 500; }
+    .awj-link:hover { text-decoration: underline; }
+    .awj-row-item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-decoration: none; transition: background 0.15s; }
+    .awj-row-item:last-child { border-bottom: none; }
+    .awj-row-item:hover { background: rgba(255,255,255,0.04); }
+    .awj-avatar { width: 38px; height: 38px; border-radius: 10px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.25); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #10b981; flex-shrink: 0; }
+    .awj-section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
+    .awj-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px; }
+    .awj-pulse { animation: awjPulse 2.5s ease-in-out infinite; }
+    @keyframes awjPulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+    .awj-fade-in { animation: awjFadeIn 0.5s ease both; }
+    @keyframes awjFadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .awj-number { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .awj-divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0; }
+    .scroll-x { overflow-x: auto; }
+    .scroll-x::-webkit-scrollbar { height: 4px; }
+    .scroll-x::-webkit-scrollbar-track { background: transparent; }
+    .scroll-x::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+  `;
+
+  /* ── Loading ──────────────────────────────────────────────────── */
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-slate-500 text-sm">Chargement…</p>
+    <>
+      <style>{css}</style>
+      <div className="awj-dash" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 44, height: 44, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Chargement du tableau de bord…</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 
   if (error) return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center">
-        <p className="font-medium mb-3">{error}</p>
-        <button onClick={() => {
-          setError("");
-          setLoading(true);
-          statsAPI.getStats()
-            .then(({ data }) => setData(data))
-            .catch(() => setError("Impossible de charger le tableau de bord"))
-            .finally(() => setLoading(false));
-        }}
-          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all">
-          🔄 Réessayer
-        </button>
+    <>
+      <style>{css}</style>
+      <div className="awj-dash" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div className="awj-card" style={{ padding: 32, textAlign: "center", maxWidth: 380 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+          <p style={{ color: "rgba(255,255,255,0.7)", marginBottom: 20, fontSize: 14 }}>{error}</p>
+          <button className="awj-btn-primary" onClick={reload} style={{ margin: "0 auto" }}>↻ Réessayer</button>
+        </div>
       </div>
-    </div>
+    </>
   );
 
-  // FIX : destructuring défensif — valeurs par défaut sur chaque champ
-  // évite les TypeError si l'API renvoie une réponse partielle
   const {
-    clients:       cs            = {},
-    payments:      ps            = {},
-    top_agents                   = [],
-    last_clients                 = [],
-    last_payments                = [],
-    evolution                    = [],
+    clients: cs = {},
+    payments: ps = {},
+    top_agents = [],
+    last_clients = [],
+    last_payments = [],
+    evolution = [],
   } = data ?? {};
 
-  const now   = new Date();
-  const heure = now.getHours();
-  const greeting = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
+  const now = new Date();
+  const h = now.getHours();
+  const greeting = h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
+
+  const planColors = {
+    ESSENTIELLE: { color: "#10b981", bg: "rgba(16,185,129,0.12)", label: "🌱" },
+    IVOIRIENNE: { color: "#8b5cf6", bg: "rgba(139,92,246,0.12)", label: "🌿" },
+    TURQUOISE: { color: "#06b6d4", bg: "rgba(6,182,212,0.12)", label: "💎" },
+  };
+
+  const donutSegments = [
+    { value: Number(cs.plan_essentielle ?? 0), color: "#10b981" },
+    { value: Number(cs.plan_ivoirienne ?? 0), color: "#8b5cf6" },
+    { value: Number(cs.plan_turquoise ?? 0), color: "#06b6d4" },
+  ];
+
+  const totalClients = Number(cs.total_clients ?? 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+    <>
+      <style>{css}</style>
+      <div className="awj-dash awj-fade-in">
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 60px" }}>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-slate-400 text-sm">{greeting} 👋</p>
-          <h1 className="text-2xl font-bold text-slate-800">
-            <span className="text-brand-600">{user?.name}</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/clients/new"
-            className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-brand-200 flex items-center gap-2">
-            <span>+</span> Nouveau client
-          </Link>
-          {isAdmin && (
-            <>
-              <button onClick={() => setShowPlans((v) => !v)}
-                className="border border-slate-200 hover:bg-slate-50 active:scale-95 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-all flex items-center gap-2">
-                📋 Formules
-              </button>
-              <Link to="/agents"
-                className="border border-slate-200 hover:bg-slate-50 active:scale-95 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-all flex items-center gap-2">
-                👥 Agents
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Panneau Formules (admin) ─────────────────────────── */}
-      {isAdmin && showPlans && (
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          {/* ══ HEADER ══════════════════════════════════════════════ */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, gap: 16, flexWrap: "wrap" }}>
             <div>
-              <h2 className="font-semibold text-slate-800">📋 Gestion des formules</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{plans.length} formule(s) configurée(s)</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} className="awj-pulse" />
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
+                  {now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </span>
+              </div>
+              <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>
+                {greeting},{" "}
+                <span style={{ background: "linear-gradient(135deg, #10b981, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  {user?.name?.split(" ")[0]}
+                </span>{" "}👋
+              </h1>
+              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 }}>
+                Votre plateforme Awoundjô — vue d'ensemble
+              </p>
             </div>
-            <button onClick={openCreate}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all shadow-sm">
-              + Nouvelle formule
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {isAdmin && (
+                <>
+                  <button className="awj-btn-ghost" onClick={() => setShowPlans((v) => !v)}>
+                    <span>📋</span> Formules
+                  </button>
+                  <Link to="/agents" style={{ textDecoration: "none" }}>
+                    <button className="awj-btn-ghost">
+                      <span>👥</span> Agents
+                    </button>
+                  </Link>
+                </>
+              )}
+              <Link to="/clients/new" style={{ textDecoration: "none" }}>
+                <button className="awj-btn-primary">
+                  <span style={{ fontSize: 16 }}>+</span> Nouveau client
+                </button>
+              </Link>
+            </div>
           </div>
 
-          {plans.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
-              <p className="text-3xl mb-2">📋</p>
-              <p className="text-sm">Aucune formule. Créez la première !</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-50">
-              {plans.map((plan) => (
-                <div key={plan.id} className={`flex items-center gap-4 px-5 py-4 ${!plan.is_active ? "opacity-50" : ""}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800">{plan.name}</span>
-                      {!plan.is_active && (
-                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Inactif</span>
-                      )}
+          {/* ══ FORMULES (admin) ════════════════════════════════════ */}
+          {isAdmin && showPlans && (
+            <div className="awj-card awj-fade-in" style={{ marginBottom: 24, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>Gestion des formules</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "2px 0 0" }}>{plans.length} formule(s) configurée(s)</p>
+                </div>
+                <button className="awj-btn-primary" onClick={() => { setEditingPlan(null); setPlanModal(true); }}>+ Nouvelle</button>
+              </div>
+              {plans.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
+                  <p style={{ fontSize: 32, marginBottom: 8 }}>📋</p>
+                  Aucune formule. Créez la première !
+                </div>
+              ) : plans.map((plan) => (
+                <div key={plan.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", opacity: plan.is_active ? 1 : 0.45 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{plan.name}</span>
+                      {!plan.is_active && <span style={{ fontSize: 11, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)", padding: "2px 8px", borderRadius: 6 }}>Inactif</span>}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-xs text-slate-500">
-                        💳 Adhésion : <strong className={plan.adhesion_price === 0 ? "text-green-600" : "text-slate-700"}>
+                    <div style={{ display: "flex", gap: 16, marginTop: 4, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                        Adhésion : <strong style={{ color: plan.adhesion_price === 0 ? "#10b981" : "rgba(255,255,255,0.75)" }}>
                           {plan.adhesion_price === 0 ? "Gratuit" : `${Number(plan.adhesion_price).toLocaleString("fr-FR")} FCFA`}
                         </strong>
                       </span>
-                      <span className="text-xs text-slate-400">·</span>
-                      <span className="text-xs text-slate-500">
-                        🔄 Cotisation : <strong className="text-slate-700">{Number(plan.monthly_price).toLocaleString("fr-FR")} FCFA/mois</strong>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                        Cotisation : <strong style={{ color: "rgba(255,255,255,0.75)" }}>{Number(plan.monthly_price).toLocaleString("fr-FR")} FCFA/mois</strong>
                       </span>
-                      <span className="text-xs text-slate-400">·</span>
-                      <span className="text-xs text-slate-500">
-                        🏥 Couverture : <strong className="text-brand-600">{plan.coverage_percent}%</strong>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                        Couverture : <strong style={{ color: "#10b981" }}>{plan.coverage_percent}%</strong>
                       </span>
                     </div>
                     {plan.benefits?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                         {plan.benefits.map((b) => (
-                          <span key={b.category}
-                            className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-full font-medium">
+                          <span key={b.category} style={{ fontSize: 11, background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)", padding: "2px 8px", borderRadius: 6 }}>
                             {b.category.replace(/_/g, " ")}
-                            {b.coverage_percent != null && <span className="text-brand-500">{b.coverage_percent}%</span>}
-                            {b.ceiling_fcfa != null && (
-                              <span className="text-slate-400">· {Number(b.ceiling_fcfa).toLocaleString("fr-FR")} FCFA</span>
-                            )}
+                            {b.coverage_percent != null && ` ${b.coverage_percent}%`}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => togglePlanActive(plan)} title={plan.is_active ? "Désactiver" : "Activer"}
-                      className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                        plan.is_active
-                          ? "bg-green-50 text-green-700 hover:bg-green-100"
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                      }`}>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => togglePlanActive(plan)} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: plan.is_active ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: plan.is_active ? "#10b981" : "rgba(255,255,255,0.4)" }}>
                       {plan.is_active ? "✓ Actif" : "○ Inactif"}
                     </button>
-                    <button onClick={() => openEdit(plan)}
-                      className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium transition-all">
+                    <button onClick={() => { setEditingPlan(plan); setPlanModal(true); }} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: "rgba(96,165,250,0.12)", color: "#60a5fa" }}>
                       ✏️ Modifier
                     </button>
-                    <button onClick={() => deletePlan(plan)}
-                      className="text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 font-medium transition-all">
+                    <button onClick={() => deletePlan(plan)} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: "rgba(239,68,68,0.12)", color: "#f87171" }}>
                       🗑️
                     </button>
                   </div>
@@ -262,205 +351,239 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </section>
-      )}
 
-      {/* ── Modal création / édition formule ────────────────── */}
-      {isAdmin && planModal && (
-        <PlanModal
-          plan={editingPlan}
-          onClose={() => setPlanModal(false)}
-          onSaved={() => { fetchPlans(); setPlanModal(false); }}
-        />
-      )}
+          {isAdmin && planModal && (
+            <PlanModal
+              plan={editingPlan}
+              onClose={() => setPlanModal(false)}
+              onSaved={() => { fetchPlans(); setPlanModal(false); }}
+            />
+          )}
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Revenus</h2>
-          <Link to="/payments" className="text-xs text-brand-500 hover:underline font-medium">Voir les paiements →</Link>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard label="Revenu total"  value={fmt(ps.total_revenue)}      icon="💰" color="success" sub={`${ps.total_payments ?? 0} paiements`} to="/payments" />
-          <StatsCard label="Aujourd'hui"   value={fmt(ps.today_revenue)}      icon="📅" color="brand"   sub={`${ps.today_payments ?? 0} paiements`} to="/payments" />
-          <StatsCard label="Adhésions"     value={fmt(ps.adhesions_revenue)}  icon="📋" color="purple"  to="/payments" />
-          <StatsCard label="Mensualités"   value={fmt(ps.mensualites_revenue)} icon="🔄" color="teal"   to="/payments" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/payments")}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">📱 Wave</p>
-              <span className="text-sm font-bold text-orange-600">{fmt(ps.wave_revenue)}</span>
-            </div>
-            <ProgressBar value={Number(ps.wave_revenue)} max={Number(ps.total_revenue)} color="bg-orange-400" />
-            <p className="text-xs text-slate-400 mt-1">{ps.total_revenue > 0 ? Math.round((ps.wave_revenue / ps.total_revenue) * 100) : 0}% du total</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/payments")}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">💵 Cash</p>
-              <span className="text-sm font-bold text-green-600">{fmt(ps.cash_revenue)}</span>
-            </div>
-            <ProgressBar value={Number(ps.cash_revenue)} max={Number(ps.total_revenue)} color="bg-green-400" />
-            <p className="text-xs text-slate-400 mt-1">{ps.total_revenue > 0 ? Math.round((ps.cash_revenue / ps.total_revenue) * 100) : 0}% du total</p>
-          </div>
-        </div>
-      </section>
+          {/* ══ HERO ROW — Revenu total + sparkline ══════════════════ */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Clients</h2>
-          <Link to="/clients" className="text-xs text-brand-500 hover:underline font-medium">Voir tous →</Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatsCard label="Total"        value={cs.total_clients  ?? 0} icon="👥" color="slate"   to="/clients" />
-          <StatsCard label="Actifs"       value={cs.actifs         ?? 0} icon="✅" color="success" to="/clients?status=actif" />
-          <StatsCard label="En attente"   value={cs.attente        ?? 0} icon="⏳" color="warning" to="/clients?status=attente" />
-          <StatsCard label="Essentielle"  value={cs.plan_essentielle ?? 0} icon="🌱" color="brand"   to="/clients?plan=ESSENTIELLE" />
-          <StatsCard label="Ivoirienne"   value={cs.plan_ivoirienne  ?? 0} icon="🌿" color="purple"  to="/clients?plan=IVOIRIENNE" />
-          <StatsCard label="Turquoise"    value={cs.plan_turquoise   ?? 0} icon="💎" color="teal"    to="/clients?plan=TURQUOISE" />
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 mt-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Répartition par formule</p>
-          <div className="space-y-3">
-            {[
-              { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "bg-brand-500",  text: "text-brand-600" },
-              { label: "Ivoirienne",  value: Number(cs.plan_ivoirienne  ?? 0), color: "bg-purple-500", text: "text-purple-600" },
-              { label: "Turquoise",   value: Number(cs.plan_turquoise   ?? 0), color: "bg-teal-500",   text: "text-teal-600" },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="font-medium text-slate-700">{item.label}</span>
-                  <span className={`font-bold ${item.text}`}>{item.value} clients</span>
-                </div>
-                <ProgressBar value={item.value} max={Number(cs.total_clients ?? 0)} color={item.color} />
+            {/* Revenu Total — carte hero */}
+            <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden", gridColumn: "span 1" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #10b981, #34d399, transparent)" }} />
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>Revenu total</p>
+              <div className="awj-number" style={{ color: "#10b981", marginBottom: 4 }}>
+                {fmtShort(ps.total_revenue)}
+                <span style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>FCFA</span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {evolution.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Évolution des revenus</p>
-              <p className="text-xs text-slate-400 mt-0.5">12 derniers mois</p>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "4px 0 16px" }}>{ps.total_payments ?? 0} paiements au total</p>
+              <Sparkline data={evolution} color="#10b981" height={44} />
             </div>
-            <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">{evolution.length} mois</span>
-          </div>
-          <MiniChart data={evolution} />
-          <div className="flex justify-between mt-2">
-            <span className="text-xs text-slate-400">{evolution[0]?.month}</span>
-            <span className="text-xs text-slate-400">{evolution[evolution.length - 1]?.month}</span>
-          </div>
-        </section>
-      )}
 
-      {isAdmin && top_agents?.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">🏆 Top Agents</h2>
-            <Link to="/agents" className="text-xs text-brand-500 hover:underline font-medium">Gérer →</Link>
+            {/* Aujourd'hui */}
+            <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #8b5cf6, #a78bfa, transparent)" }} />
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>Aujourd'hui</p>
+              <div className="awj-number" style={{ color: "#a78bfa", marginBottom: 4 }}>
+                {fmtShort(ps.today_revenue)}
+                <span style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>FCFA</span>
+              </div>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "4px 0 0" }}>{ps.today_payments ?? 0} paiements aujourd'hui</p>
+              <div style={{ marginTop: 20, display: "flex", gap: 12 }}>
+                <div>
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>Adhésions</p>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{fmtShort(ps.adhesions_revenue)}</p>
+                </div>
+                <div style={{ width: 1, background: "rgba(255,255,255,0.07)" }} />
+                <div>
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>Mensualités</p>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{fmtShort(ps.mensualites_revenue)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Méthodes de paiement */}
+            <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f59e0b, #fbbf24, transparent)" }} />
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>Méthodes de paiement</p>
+              {[
+                { label: "📱 Wave", value: Number(ps.wave_revenue), color: "#f59e0b" },
+                { label: "💵 Cash", value: Number(ps.cash_revenue), color: "#10b981" },
+              ].map((m) => (
+                <div key={m.label} style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>{m.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: m.color }}>{fmtShort(m.value)} FCFA</span>
+                  </div>
+                  <SlimBar value={m.value} max={Number(ps.total_revenue)} color={m.color} />
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 3 }}>
+                    {ps.total_revenue > 0 ? Math.round((m.value / Number(ps.total_revenue)) * 100) : 0}% du total
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="divide-y divide-slate-50">
-              {top_agents.slice(0, 5).map((a, i) => {
-                const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
-                const maxRevenue = Number(top_agents[0]?.total_revenue || 1);
-                return (
-                  <Link key={a.id} to={`/agents`}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group">
-                    <span className="text-xl w-8 flex-shrink-0 text-center">{medals[i]}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-brand-600 transition-colors">{a.name}</p>
-                        <p className="text-sm font-bold text-brand-600 flex-shrink-0 ml-2">{fmt(a.total_revenue)}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <ProgressBar value={Number(a.total_revenue)} max={maxRevenue} color="bg-brand-400" />
-                        <span className="text-xs text-slate-400 flex-shrink-0">{a.nb_clients} clients</span>
-                      </div>
+
+          {/* ══ CLIENTS ROW ══════════════════════════════════════════ */}
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, marginBottom: 16 }}>
+
+            {/* Donut + légende */}
+            <div className="awj-card" style={{ padding: "24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 200 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 16, alignSelf: "flex-start" }}>Répartition</p>
+              <DonutChart segments={donutSegments} />
+              <div style={{ marginTop: 16, width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "#10b981" },
+                  { label: "Ivoirienne", value: Number(cs.plan_ivoirienne ?? 0), color: "#8b5cf6" },
+                  { label: "Turquoise", value: Number(cs.plan_turquoise ?? 0), color: "#06b6d4" },
+                ].map((s) => (
+                  <div key={s.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{s.label}</span>
                     </div>
-                  </Link>
-                );
-              })}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Stats clients — grille */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {[
+                { label: "Total clients", value: cs.total_clients ?? 0, sub: "inscrits", color: "#f0f0f0", icon: "👥", to: "/clients" },
+                { label: "Actifs", value: cs.actifs ?? 0, sub: "membres actifs", color: "#10b981", icon: "✅", to: "/clients?status=actif" },
+                { label: "En attente", value: cs.attente ?? 0, sub: "à valider", color: "#f59e0b", icon: "⏳", to: "/clients?status=attente" },
+              ].map((s) => (
+                <Link key={s.label} to={s.to} style={{ textDecoration: "none" }}>
+                  <div className="awj-card awj-card-hover" style={{ padding: "18px 20px", cursor: "pointer" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: 0 }}>{s.label}</p>
+                      <span style={{ fontSize: 18 }}>{s.icon}</span>
+                    </div>
+                    <p style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.04em", color: s.color, margin: "0 0 4px", lineHeight: 1 }}>{s.value}</p>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>{s.sub}</p>
+                  </div>
+                </Link>
+              ))}
+              {[
+                { label: "Essentielle", value: cs.plan_essentielle ?? 0, color: "#10b981", to: "/clients?plan=ESSENTIELLE" },
+                { label: "Ivoirienne", value: cs.plan_ivoirienne ?? 0, color: "#8b5cf6", to: "/clients?plan=IVOIRIENNE" },
+                { label: "Turquoise", value: cs.plan_turquoise ?? 0, color: "#06b6d4", to: "/clients?plan=TURQUOISE" },
+              ].map((s) => (
+                <Link key={s.label} to={s.to} style={{ textDecoration: "none" }}>
+                  <div className="awj-card awj-card-hover" style={{ padding: "18px 20px", cursor: "pointer" }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>{s.label}</p>
+                    <p style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.04em", color: s.color, margin: "0 0 4px", lineHeight: 1 }}>{s.value}</p>
+                    <SlimBar value={Number(s.value)} max={totalClients} color={s.color} />
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 4 }}>
+                      {totalClients > 0 ? Math.round((Number(s.value) / totalClients) * 100) : 0}% des membres
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
-        </section>
-      )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-            <h2 className="font-semibold text-slate-800 text-sm">Derniers clients inscrits</h2>
-            <Link to="/clients" className="text-brand-500 text-xs hover:underline font-medium">Voir tout →</Link>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {!last_clients?.length && (
-              <p className="text-center text-slate-400 text-sm py-10">Aucun client pour l'instant</p>
-            )}
-            {last_clients?.map((c) => (
-              <Link key={c.id} to={`/clients/${c.id}`}
-                className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors group">
-                <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-brand-600 font-bold text-sm">{c.name?.charAt(0)?.toUpperCase()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-brand-600 transition-colors">{c.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{c.mutual_number}</p>
-                </div>
-                <div className="text-right flex-shrink-0 space-y-1">
-                  <PlanBadge plan={c.plan} />
-                  <div><StatusBadge status={c.status} /></div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/50">
-            <Link to="/clients/new" className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
-              + Enregistrer un nouveau client
-            </Link>
-          </div>
-        </section>
+          {/* ══ TOP AGENTS (admin) ══════════════════════════════════ */}
+          {isAdmin && top_agents?.length > 0 && (
+            <div className="awj-card" style={{ marginBottom: 16, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>🏆 Top Agents</p>
+                <Link to="/agents" className="awj-link">Gérer →</Link>
+              </div>
+              <div>
+                {top_agents.slice(0, 5).map((a, i) => {
+                  const m = MEDALS[i];
+                  const maxRev = Number(top_agents[0]?.total_revenue || 1);
+                  const pct = Math.round((Number(a.total_revenue) / maxRev) * 100);
+                  return (
+                    <Link key={a.id} to="/agents" className="awj-row-item" style={{ textDecoration: "none", color: "inherit" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: m.text, flexShrink: 0 }}>
+                        {m.label}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <p style={{ fontWeight: 600, fontSize: 13, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</p>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: "#10b981", margin: 0, flexShrink: 0, marginLeft: 12 }}>{fmtShort(a.total_revenue)} FCFA</p>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ flex: 1, background: "rgba(255,255,255,0.07)", borderRadius: 99, height: 3 }}>
+                            <div style={{ width: `${pct}%`, height: 3, borderRadius: 99, background: i === 0 ? "#f59e0b" : "#10b981", transition: "width 0.8s ease" }} />
+                          </div>
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", flexShrink: 0 }}>{a.nb_clients} clients</span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-            <h2 className="font-semibold text-slate-800 text-sm">Derniers paiements reçus</h2>
-            <Link to="/payments" className="text-brand-500 text-xs hover:underline font-medium">Voir tout →</Link>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {!last_payments?.length && (
-              <p className="text-center text-slate-400 text-sm py-10">Aucun paiement pour l'instant</p>
-            )}
-            {last_payments?.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${p.type === "adhesion" ? "bg-purple-50 border border-purple-100" : "bg-teal-50 border border-teal-100"}`}>
-                  <span className="text-base">{p.type === "adhesion" ? "📋" : "🔄"}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{p.client_name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <TypeBadge type={p.type} />
-                    <MethodBadge method={p.payment_method} />
-                    {isAdmin && p.agent_name && (
-                      <span className="text-xs text-slate-400">· {p.agent_name}</span>
-                    )}
+          {/* ══ TABLES BASSES ═══════════════════════════════════════ */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+            {/* Derniers clients */}
+            <div className="awj-card" style={{ overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>Derniers clients</p>
+                <Link to="/clients" className="awj-link">Voir tout →</Link>
+              </div>
+              {!last_clients?.length ? (
+                <p style={{ textAlign: "center", color: "rgba(255,255,255,0.25)", fontSize: 13, padding: "32px 0" }}>Aucun client pour l'instant</p>
+              ) : last_clients.map((c) => (
+                <Link key={c.id} to={`/clients/${c.id}`} className="awj-row-item" style={{ textDecoration: "none", color: "inherit" }}>
+                  <div className="awj-avatar">
+                    {c.name?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, fontSize: 13, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</p>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: "2px 0 0", fontFamily: "monospace" }}>{c.mutual_number}</p>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <PlanBadge plan={c.plan} />
+                    <StatusBadge status={c.status} />
+                  </div>
+                </Link>
+              ))}
+              <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <Link to="/clients/new" className="awj-link">+ Enregistrer un client</Link>
+              </div>
+            </div>
+
+            {/* Derniers paiements */}
+            <div className="awj-card" style={{ overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>Derniers paiements</p>
+                <Link to="/payments" className="awj-link">Voir tout →</Link>
+              </div>
+              {!last_payments?.length ? (
+                <p style={{ textAlign: "center", color: "rgba(255,255,255,0.25)", fontSize: 13, padding: "32px 0" }}>Aucun paiement pour l'instant</p>
+              ) : last_payments.map((p) => (
+                <div key={p.id} className="awj-row-item" style={{ cursor: "default" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18, background: p.type === "adhesion" ? "rgba(139,92,246,0.15)" : "rgba(6,182,212,0.15)", border: `1px solid ${p.type === "adhesion" ? "rgba(139,92,246,0.25)" : "rgba(6,182,212,0.25)"}` }}>
+                    {p.type === "adhesion" ? "📋" : "🔄"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, fontSize: 13, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.client_name}</p>
+                    <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+                      <TypeBadge type={p.type} />
+                      <MethodBadge method={p.payment_method} />
+                      {isAdmin && p.agent_name && (
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>· {p.agent_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <p style={{ fontWeight: 800, fontSize: 13, color: "#10b981", margin: 0 }}>{fmtShort(p.amount)} FCFA</p>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>{fmtDate(p.created_at)}</p>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-brand-600 text-sm">{fmt(p.amount)}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{fmtDate(p.created_at)}</p>
-                </div>
+              ))}
+              <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <Link to="/clients" className="awj-link">+ Enregistrer un paiement</Link>
               </div>
-            ))}
+            </div>
           </div>
-          <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/50">
-            <Link to="/clients" className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
-              + Enregistrer un paiement
-            </Link>
-          </div>
-        </section>
-      </div>
 
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
