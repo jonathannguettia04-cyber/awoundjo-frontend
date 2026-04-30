@@ -57,6 +57,7 @@ export default function AdminBusiness() {
   const [commissions, setCommissions] = useState([]);
   const [bonusPool,   setBonusPool]   = useState([]);
   const [bonusPoolCurrent, setBonusPoolCurrent] = useState(0);
+  const [bonusPoolRouteMissing, setBonusPoolRouteMissing] = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [toast,       setToast]       = useState(null);
 
@@ -126,9 +127,21 @@ export default function AdminBusiness() {
   const loadBonusPool = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await get("/api/business/bonus-pool");
+      // Route admin dédiée (à créer côté backend si absente)
+      // GET /api/business/admin/bonus-pool → { bonus_pool[], current_pool }
+      // Fallback : tente la route membre si la route admin n'existe pas encore
+      let d;
+      try {
+        d = await get("/api/business/admin/bonus-pool");
+      } catch {
+        // Route admin absente → la route /api/business/bonus-pool est réservée
+        // aux membres Business et retourne "Accès refusé" avec un token admin.
+        // Dans ce cas on affiche un message clair plutôt qu'un tableau vide.
+        d = { bonus_pool: [], current_pool: 0, _routeMissing: true };
+      }
       setBonusPool(d.data?.bonus_pool || d.bonus_pool || d.history || []);
       setBonusPoolCurrent(d.data?.current_pool ?? d.current_pool ?? 0);
+      setBonusPoolRouteMissing(!!d._routeMissing);
     } catch { setBonusPool([]); }
     setLoading(false);
   }, [get]);
@@ -531,7 +544,18 @@ export default function AdminBusiness() {
               <button style={{ ...s.btnSecondary, alignSelf: "center" }} onClick={loadBonusPool}>↻ Rafraîchir</button>
             </div>
           )}
-          {loading ? <Spinner /> : bonusPool.length === 0 ? (
+          {loading ? <Spinner /> : bonusPoolRouteMissing ? (
+            <div style={{ background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 12, padding: "20px 24px", color: "#92400E" }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ Route backend manquante</div>
+              <p style={{ margin: "0 0 8px", fontSize: 13 }}>
+                La route <code style={{ background: "#FEF3C7", padding: "2px 6px", borderRadius: 4 }}>GET /api/business/admin/bonus-pool</code> n'existe pas encore.
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: "#B45309" }}>
+                Ajouter cet endpoint dans le contrôleur admin Business avec <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>authenticateAdmin</code> (pas le middleware membre Business).
+                Il doit retourner <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>{"{ bonus_pool[], current_pool }"}</code>.
+              </p>
+            </div>
+          ) : bonusPool.length === 0 ? (
             <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
               <p>Aucun bonus pool enregistré pour le moment.</p>
