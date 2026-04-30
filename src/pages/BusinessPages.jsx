@@ -169,6 +169,7 @@ const NAV = [
   { to: "/business/invitation",   icon: "🔗", label: "Invitation"      },
   { to: "/business/leaderboard",  icon: "🏆", label: "Classement"      },
   { to: "/business/members",      icon: "👥", label: "Mes membres"     },
+  { to: "/business/collectes",    icon: "💳", label: "Collectes"       },
   { to: "/business/clients",      icon: "🏥", label: "Mes clients"     },
 ];
 
@@ -1745,31 +1746,33 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
             </>
           )}
 
-          {/* Étape QR : afficher le QR code dans le modal */}
+          {/* Étape QR : instructions paiement Wave */}
           {step === "qr" && waveData && !success && (
             <>
-              <div style={{ textAlign: "center", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "16px" }}>
-                <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: "#1D4ED8" }}>
-                  📱 Scannez avec l'app Wave
+              <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 14, padding: "20px 18px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🔵</div>
+                <p style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 900, color: "#1D4ED8", letterSpacing: "-0.02em" }}>
+                  {fmt(waveData.versement?.montant_suggere)}
                 </p>
-                <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block", boxShadow: "0 2px 12px rgba(0,0,0,.1)" }}>
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waveData.wave_qr_data || "")}`}
-                    alt="QR Code Wave"
-                    width={180} height={180}
-                    style={{ display: "block", borderRadius: 6 }}
-                  />
+                <p style={{ margin: "0 0 16px", fontSize: 12, color: "#3B82F6" }}>à envoyer via Wave</p>
+                <div style={{ background: "#fff", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 11, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>Numéro Wave destinataire</p>
+                  <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                    {waveData.wave_number || "0700000000"}
+                  </p>
                 </div>
-                <p style={{ margin: "10px 0 0", fontSize: 13, fontWeight: 700, color: "#1D4ED8" }}>
-                  {fmt(waveData.versement?.montant_suggere)} FCFA
-                </p>
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#3B82F6" }}>
-                  {waveData.wave_number && <>N° Wave : <strong>{waveData.wave_number}</strong></>}
+                <button
+                  onClick={() => navigator.clipboard.writeText(waveData.wave_number || "0700000000").then(() => alert("Numéro copié !"))}
+                  style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#2563EB", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  📋 Copier le numéro
+                </button>
+              </div>
+              <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 10, padding: "12px 14px" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#92400E" }}>
+                  <strong>Comment payer :</strong> Ouvrez Wave → Envoyer → saisissez le numéro et le montant → confirmez. Notez bien la <strong>référence de transaction</strong> affichée sur le reçu.
                 </p>
               </div>
-              <p style={{ margin: 0, fontSize: 12, color: "#64748B", textAlign: "center" }}>
-                Après le paiement Wave, cliquez sur <strong>Confirmer</strong> et saisissez la référence.
-              </p>
             </>
           )}
 

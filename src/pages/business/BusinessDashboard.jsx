@@ -1624,30 +1624,32 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
             </>
           )}
 
-          {/* Étape QR : afficher le QR code dans le modal */}
+          {/* Étape QR : instructions paiement Wave */}
           {step === "qr" && waveData && !success && (
             <>
-              <div style={{ textAlign: "center", background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 12, padding: "16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.blue, marginBottom: 12 }}>📱 Scannez avec l'app Wave</div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block", boxShadow: "0 4px 20px rgba(0,0,0,.3)" }}>
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waveData.wave_qr_data || "")}`}
-                    alt="QR Code Wave"
-                    width={180} height={180}
-                    style={{ display: "block", borderRadius: 6 }}
-                  />
-                </div>
-                <div style={{ marginTop: 10, fontSize: 14, fontWeight: 900, color: T.gold }}>
+              <div style={{ background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 14, padding: "20px 18px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🔵</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: T.gold, letterSpacing: "-0.02em", marginBottom: 4 }}>
                   {Number(waveData.versement?.montant_suggere || 0).toLocaleString("fr-FR")} FCFA
                 </div>
-                {waveData.wave_number && (
-                  <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
-                    N° Wave : <strong style={{ color: T.textSub }}>{waveData.wave_number}</strong>
+                <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>à envoyer via Wave</div>
+                <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Numéro Wave destinataire</div>
+                  <div style={{ fontSize: 24, fontWeight: 900, color: T.text, fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                    {waveData.wave_number || "0700000000"}
                   </div>
-                )}
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(waveData.wave_number || "0700000000").then(() => alert("Numéro copié !"))}
+                  style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.blue}50`, background: `${T.blue}15`, color: T.blue, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  📋 Copier le numéro
+                </button>
               </div>
-              <div style={{ fontSize: 12, color: T.muted, textAlign: "center" }}>
-                Après le paiement Wave, cliquez sur <strong style={{ color: T.text }}>Confirmer</strong> et saisissez la référence.
+              <div style={{ background: "#1C1208", border: "1px solid #92400E40", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, color: "#D97706" }}>
+                  <strong>Comment payer :</strong> Ouvrez Wave → Envoyer → saisissez le numéro et le montant → confirmez. Notez la <strong>référence de transaction</strong> sur le reçu.
+                </div>
               </div>
             </>
           )}
