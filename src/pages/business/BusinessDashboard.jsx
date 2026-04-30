@@ -279,6 +279,9 @@ function TabAccueil({ data }) {
 function TabReseau({ network }) {
   const niveau1 = network?.level1 || [];
   const niveau2 = network?.level2 || [];
+  // FIX 4 : level3 et level4 si présents
+  const niveau3 = network?.level3 || [];
+  const niveau4 = network?.level4 || [];
 
   function MemberRow({ m, level }) {
     const rm = ROLE_META[m.role] || {};
@@ -325,10 +328,12 @@ function TabReseau({ network }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="biz-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-        <StatCard icon="🤝" label="Total réseau" value={fmtNum(niveau1.length + niveau2.length)} accent={T.gold} />
+      <div className="biz-grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+        <StatCard icon="🤝" label="Total réseau" value={fmtNum(niveau1.length + niveau2.length + niveau3.length + niveau4.length)} accent={T.gold} />
         <StatCard icon="1️⃣" label="Niveau 1"    value={fmtNum(niveau1.length)} accent="#8B5CF6" sub="Directs" />
         <StatCard icon="2️⃣" label="Niveau 2"    value={fmtNum(niveau2.length)} accent={T.blue}  sub="Indirects" />
+        {niveau3.length > 0 && <StatCard icon="3️⃣" label="Niveau 3" value={fmtNum(niveau3.length)} accent={T.green} sub="" />}
+        {niveau4.length > 0 && <StatCard icon="4️⃣" label="Niveau 4" value={fmtNum(niveau4.length)} accent={T.muted} sub="" />}
       </div>
 
       {niveau1.length > 0 && (
@@ -352,6 +357,30 @@ function TabReseau({ network }) {
             </span>
           </div>
           {niveau2.map((m, i) => <MemberRow key={i} m={m} level={2} />)}
+        </div>
+      )}
+
+      {/* FIX 4 : Niveaux 3 et 4 */}
+      {niveau3.length > 0 && (
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.green }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Niveau 3 ({niveau3.length})
+            </span>
+          </div>
+          {niveau3.map((m, i) => <MemberRow key={i} m={m} level={2} />)}
+        </div>
+      )}
+      {niveau4.length > 0 && (
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.muted }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Niveau 4 ({niveau4.length})
+            </span>
+          </div>
+          {niveau4.map((m, i) => <MemberRow key={i} m={m} level={2} />)}
         </div>
       )}
     </div>
@@ -1082,13 +1111,18 @@ function CreateClientModal({ onClose, onCreated }) {
           expiration_date:     isReturning ? expDate : undefined,
         }),
       });
-      const { client, access_code, mutual_number, adhesion_fee } = createData;
+      // FIX : le backend peut retourner { data: {...} } ou directement les champs
+      const raw = createData?.data || createData;
+      const { client, access_code, mutual_number, adhesion_fee } = raw;
+
       if (isReturning) {
         setResult({ client, access_code, mutual_number, adhesion_fee: 0, isReturning: true });
         setStep(3); onCreated?.(); return;
       }
+
+      // FIX URL : /pay-adhesion-cash (aligné sur la route backend)
       if (payMethod === "cash") {
-        await apiFetch(`/clients/${client.id}/pay-adhesion`, {
+        await apiFetch(`/clients/${client.id}/pay-adhesion-cash`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ amount: adhesion_fee }),
@@ -1096,6 +1130,7 @@ function CreateClientModal({ onClose, onCreated }) {
         setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "cash" });
         setStep(3); onCreated?.(); return;
       }
+
       if (payMethod === "jeko") {
         const jekoData = await apiFetch(`/clients/${client.id}/pay-adhesion-jeko`, {
           method: "POST",
@@ -1104,7 +1139,7 @@ function CreateClientModal({ onClose, onCreated }) {
         });
         const redirectUrl = jekoData?.data?.redirect_url;
         if (redirectUrl) window.open(redirectUrl, "_blank");
-        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", pending: !redirectUrl });
+        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", pending: !redirectUrl, redirectUrl });
         setStep(3); onCreated?.();
       }
     } catch (e) {
@@ -1327,6 +1362,17 @@ function CreateClientModal({ onClose, onCreated }) {
                   {result.client?.status === "actif" ? "✅ Actif" : "⏳ En attente"}
                 </span></div>
               </div>
+              {/* FIX 5 : bouton re-ouvrir lien Jeko si paiement mobile initié */}
+              {result.paymentMethod === "jeko" && result.redirectUrl && (
+                <a href={result.redirectUrl} target="_blank" rel="noreferrer" style={{
+                  display: "block", width: "100%", textAlign: "center",
+                  padding: "11px 24px", borderRadius: 10, textDecoration: "none",
+                  background: `${T.gold}20`, border: `1px solid ${T.gold}40`,
+                  color: T.gold, fontWeight: 800, fontSize: 13, boxSizing: "border-box",
+                }}>
+                  🔗 Rouvrir le lien de paiement Mobile Money
+                </a>
+              )}
               <button onClick={() => copy(`Numéro mutualiste : ${result.mutual_number}\nCode d'accès : ${result.access_code}`, "all")}
                 style={{ ...btnGhost, width: "100%", textAlign: "center" }}>
                 {copied === "all" ? "✅ Copié !" : "📋 Copier numéro + code"}
@@ -1352,6 +1398,80 @@ function CreateClientModal({ onClose, onCreated }) {
             <button onClick={onClose} style={{ ...btnGold, background: `linear-gradient(135deg, ${T.green}, #15803D)` }}>Fermer ✓</button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bouton Jeko inline (FIX 3) ────────────────────────────────────
+function PayJekoButton({ clientId, onPaid }) {
+  const [loading, setLoading] = useState(false);
+  const [jekoMethod, setJekoMethod] = useState("orange");
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState(null);
+
+  async function initJeko() {
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/clients/${clientId}/pay-adhesion-jeko`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jeko_method: jekoMethod }),
+      });
+      const redirect = data?.data?.redirect_url;
+      if (redirect) {
+        setUrl(redirect);
+        window.open(redirect, "_blank");
+      }
+      onPaid?.();
+    } catch (e) {
+      alert("Erreur Jeko : " + (e.message || "Veuillez réessayer."));
+    } finally {
+      setLoading(false);
+      setOpen(false);
+    }
+  }
+
+  if (url) return (
+    <a href={url} target="_blank" rel="noreferrer" style={{
+      fontSize: 11, fontWeight: 700, color: T.gold,
+      background: `${T.gold}15`, border: `1px solid ${T.gold}30`,
+      borderRadius: 6, padding: "3px 8px", textDecoration: "none",
+    }}>🔗 Lien Jeko</a>
+  );
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{
+      fontSize: 11, fontWeight: 700, cursor: "pointer",
+      color: T.gold, background: `${T.gold}15`,
+      border: `1px solid ${T.gold}30`, borderRadius: 6,
+      padding: "3px 10px", fontFamily: "inherit",
+    }}>📲 Payer Jeko</button>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {JEKO_METHODS_LIST.map(m => (
+          <button key={m.value} onClick={() => setJekoMethod(m.value)} style={{
+            fontSize: 10, padding: "2px 7px", borderRadius: 5, cursor: "pointer",
+            fontFamily: "inherit", fontWeight: 700,
+            background: jekoMethod === m.value ? `${T.gold}30` : "transparent",
+            color: jekoMethod === m.value ? T.gold : T.muted,
+            border: `1px solid ${jekoMethod === m.value ? T.gold : T.border}`,
+          }}>{m.icon} {m.label}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={initJeko} disabled={loading} style={{
+          fontSize: 11, fontWeight: 900, cursor: loading ? "not-allowed" : "pointer",
+          color: "#0C0C0F", background: loading ? T.muted : `linear-gradient(135deg, ${T.gold}, ${T.goldD})`,
+          border: "none", borderRadius: 6, padding: "4px 12px", fontFamily: "inherit",
+        }}>{loading ? "⏳" : "✅ Confirmer"}</button>
+        <button onClick={() => setOpen(false)} style={{
+          fontSize: 11, cursor: "pointer", color: T.muted, background: "transparent",
+          border: `1px solid ${T.border}`, borderRadius: 6, padding: "4px 8px", fontFamily: "inherit",
+        }}>×</button>
       </div>
     </div>
   );
@@ -1460,12 +1580,16 @@ function TabClients() {
                   <span style={{ fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueL, border: `1px solid ${T.blue}30`, borderRadius: 6, padding: "2px 8px" }}>{c.plan}</span>
                 </div>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 <div style={{ fontSize: 11, color: T.muted }}>{c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}</div>
-                {c.expiration_date && <div style={{ fontSize: 11, color: T.textSub, marginTop: 3 }}>Exp : {new Date(c.expiration_date).toLocaleDateString("fr-FR")}</div>}
-                <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: payOk ? T.green : "#EAB308" }}>
-                  {payOk ? "Adhésion payée" : "Paiement requis"}
+                {c.expiration_date && <div style={{ fontSize: 11, color: T.textSub }}>Exp : {new Date(c.expiration_date).toLocaleDateString("fr-FR")}</div>}
+                <div style={{ fontSize: 11, fontWeight: 700, color: payOk ? T.green : "#EAB308" }}>
+                  {payOk ? "✅ Adhésion payée" : "⏳ Paiement requis"}
                 </div>
+                {/* ── FIX 3 : bouton Jeko si adhésion impayée ── */}
+                {!payOk && (
+                  <PayJekoButton clientId={c.id} onPaid={load} />
+                )}
               </div>
             </div>
           );

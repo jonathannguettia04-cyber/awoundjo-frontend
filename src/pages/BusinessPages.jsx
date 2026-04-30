@@ -828,8 +828,9 @@ export function BizMembersPage() {
   const { member } = useBizAuth();
   const [members,  setMembers]  = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form,     setForm]     = useState({ name: "", email: "", phone: "", country: "CI", city: "" });
+  const [form,     setForm]     = useState({ name: "", email: "", phone: "", country: "CI", city: "", payment_method: "cash", jeko_method: "orange" });
   const [creds,    setCreds]    = useState(null);
+  const [jekoUrl,  setJekoUrl]  = useState(null);   // lien de paiement Jeko si payment_method=jeko
   const [error,    setError]    = useState("");
   const [busy,     setBusy]     = useState(false);
   const [loading,  setLoading]  = useState(true);
@@ -850,18 +851,26 @@ export function BizMembersPage() {
   const setF = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const handleCreate = async () => {
-    setError("");
+    setError(""); setJekoUrl(null);
     if (!form.name || !form.email) return setError("Nom et email requis.");
     setBusy(true);
     try {
-      // FIX : on renomme la variable locale en "newMember" pour éviter
-      // toute confusion avec le `member` du contexte Auth
-      const { member: newMember, credentials } = await apiBiz("/members", {
-        method: "POST",
-        body:   JSON.stringify(form),
-      });
-      setCreds({ ...credentials, member_id: newMember?.id });
-      setForm({ name: "", email: "", phone: "", country: "CI", city: "" });
+      const payload = { ...form };
+      const res = await apiBiz("/members", { method: "POST", body: JSON.stringify(payload) });
+
+      // Réponse cash ou sans paiement : { member, credentials, payment_status }
+      if (res.credentials) {
+        setCreds({ ...res.credentials, member_id: res.member?.id, payment_status: res.payment_status });
+      }
+      // Réponse Jeko : { data: { redirect_url } } + _business_credentials dans headers (non exposé)
+      // Le backend retourne le redirect_url directement
+      if (res.data?.redirect_url) {
+        setJekoUrl(res.data.redirect_url);
+        // Ouvrir dans un nouvel onglet
+        window.open(res.data.redirect_url, "_blank");
+      }
+
+      setForm({ name: "", email: "", phone: "", country: "CI", city: "", payment_method: "cash", jeko_method: "orange" });
       setShowForm(false);
       load();
     } catch (e) {
@@ -899,6 +908,61 @@ export function BizMembersPage() {
               ))}
             </select>
           </div>
+
+          {/* ── Paiement à la création (MODIF 2) ── */}
+          <div style={{ marginTop: 14 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Mode de paiement de l'adhésion
+            </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                { value: "",     label: "⏳ Sans paiement (admin validera)" },
+                { value: "cash", label: "💵 Cash (immédiat)"                },
+                { value: "jeko", label: "📲 Mobile Money (Jeko)"            },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm(f => ({ ...f, payment_method: opt.value }))}
+                  type="button"
+                  style={{
+                    padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                    fontWeight: 600, fontFamily: "inherit",
+                    background: form.payment_method === opt.value ? "#7C3AED" : "#F8FAFC",
+                    color:      form.payment_method === opt.value ? "#fff"    : "#374151",
+                    border: form.payment_method === opt.value ? "none" : "1px solid #E2E8F0",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sous-méthode Jeko */}
+            {form.payment_method === "jeko" && (
+              <div style={{ marginTop: 10 }}>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 6 }}>
+                  Opérateur Mobile Money
+                </label>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {JEKO_METHODS.map(jm => (
+                    <button key={jm.value} type="button"
+                      onClick={() => setForm(f => ({ ...f, jeko_method: jm.value }))}
+                      style={{
+                        padding: "5px 12px", borderRadius: 8, cursor: "pointer",
+                        fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                        background: form.jeko_method === jm.value ? "#EDE9FE" : "#F8FAFC",
+                        color:      form.jeko_method === jm.value ? "#7C3AED" : "#374151",
+                        border: form.jeko_method === jm.value ? "1px solid #7C3AED" : "1px solid #E2E8F0",
+                      }}
+                    >
+                      {jm.icon} {jm.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <button onClick={handleCreate} disabled={busy} style={btnPrimary}>
               {busy ? "Création…" : "Créer le membre"}
@@ -908,16 +972,29 @@ export function BizMembersPage() {
         </Card>
       )}
 
+      {/* ── Identifiants créés (cash / sans paiement) ── */}
       {creds && (
         <Card style={{ marginBottom: 20, background: "#F0FDF4", border: "2px solid #6EE7B7" }}>
-          <h3 style={{ margin: "0 0 14px", color: "#065F46", fontSize: 16 }}>✅ Membre créé — Identifiants à transmettre</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ margin: 0, color: "#065F46", fontSize: 16 }}>
+              ✅ Membre créé — Identifiants à transmettre
+            </h3>
+            {creds.payment_status && (
+              <span style={{
+                padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                background: creds.payment_status === "paid" ? "#D1FAE5" : "#FEF3C7",
+                color:      creds.payment_status === "paid" ? "#065F46" : "#92400E",
+              }}>
+                {creds.payment_status === "paid" ? "💵 Adhésion payée (cash)" : "⏳ Paiement en attente"}
+              </span>
+            )}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, fontSize: 14 }}>
             {[
-              // FIX : utilise creds.member_id directement (plus de référence à `m` hors scope)
-              { label: "🪪 ID membre",       value: creds.member_id || "—" },
-              { label: "👤 Identifiant",     value: creds.username },
-              { label: "🔑 Mot de passe",    value: creds.temp_password },
-              { label: "🎫 Code invitation", value: creds.invitation_code },
+              { label: "🪪 ID membre",       value: creds.member_id || "—"    },
+              { label: "👤 Identifiant",     value: creds.username            },
+              { label: "🔑 Mot de passe",    value: creds.temp_password       },
+              { label: "🎫 Code invitation", value: creds.invitation_code     },
             ].map(({ label, value }) => (
               <div key={label} style={{ background: "#fff", border: "1px solid #A7F3D0", borderRadius: 8, padding: "10px 14px" }}>
                 <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>{label}</div>
@@ -925,7 +1002,7 @@ export function BizMembersPage() {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <button
               onClick={() => {
                 const txt = `ID membre : ${creds.member_id || "—"}\nIdentifiant : ${creds.username}\nMot de passe : ${creds.temp_password}\nCode invitation : ${creds.invitation_code}\nLien connexion : ${creds.login_url || ""}`;
@@ -944,6 +1021,24 @@ export function BizMembersPage() {
         </Card>
       )}
 
+      {/* ── Lien Jeko en attente de paiement ── */}
+      {jekoUrl && !creds && (
+        <Card style={{ marginBottom: 20, background: "#FFF7ED", border: "2px solid #FDE68A" }}>
+          <h3 style={{ margin: "0 0 10px", color: "#92400E", fontSize: 15 }}>
+            📲 Paiement Mobile Money initié
+          </h3>
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "#78350F" }}>
+            Le lien de paiement a été ouvert dans un nouvel onglet. Le compte sera activé automatiquement après confirmation Jeko.
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <a href={jekoUrl} target="_blank" rel="noreferrer" style={{ ...btnPrimary, background: "#F59E0B", textDecoration: "none" }}>
+              🔗 Rouvrir le lien de paiement
+            </a>
+            <button onClick={() => setJekoUrl(null)} style={btnSecondary}>Fermer</button>
+          </div>
+        </Card>
+      )}
+
       {loading ? <Loader /> : (
         <Card>
           <div style={{ overflowX: "auto" }}>
@@ -951,14 +1046,14 @@ export function BizMembersPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
-                    {["Nom", "Email", "Rôle", "Statut", "Paiement", "Validation", "Inscription"].map(h => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600 }}>{h}</th>
+                    {["Nom", "Email", "Rôle", "Statut", "Paiement", "Validation", "Clients", "Commissions", "Inscription"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {members.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                    <tr><td colSpan={9} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
                       Aucun membre direct.
                     </td></tr>
                   )}
@@ -986,7 +1081,18 @@ export function BizMembersPage() {
                           {m.status_validation === "approved" ? "Validé" : m.status_validation === "rejected" ? "Refusé" : "En attente"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 12px", color: "#64748B" }}>
+                        <td style={{ padding: "10px 12px" }}>
+                        <span style={{
+                          background: "#EDE9FE", color: "#7C3AED",
+                          borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 700,
+                        }}>
+                          {m.total_clients_created || 0}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 12px", fontWeight: 700, color: "#059669", whiteSpace: "nowrap" }}>
+                        {m.total_commissions > 0 ? `${fmt(m.total_commissions)} FCFA` : "—"}
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "#64748B", whiteSpace: "nowrap" }}>
                         {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
                       </td>
                     </tr>
@@ -1100,7 +1206,7 @@ function CreateClientModal({ onClose, onCreated }) {
 
       // Paiement CASH
       if (payMethod === "cash") {
-        await apiBiz(`/clients/${clientId}/pay-adhesion`, {
+        await apiBiz(`/clients/${clientId}/pay-adhesion-cash`, {
           method: "POST",
           body: JSON.stringify({ amount: adhesion_fee }),
         });

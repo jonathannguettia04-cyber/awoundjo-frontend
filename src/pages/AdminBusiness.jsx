@@ -1,7 +1,7 @@
 // src/pages/AdminBusiness.jsx
 // ══════════════════════════════════════════════════════════════
 //  Awoundjô — Administration Réseau Business
-//  Onglets : Membres · Commissions · Bonus Pool · Actions
+//  Onglets : Membres · Commissions · Bonus Pool · Demandes Commission · Clients
 // ══════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -21,7 +21,7 @@ const STATUS_COLORS = {
   SUSPENDED: { bg: "#FEF2F2", color: "#DC2626" },
 };
 
-const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission"];
+const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission", "Clients"];
 
 // ── Hook fetch générique ──────────────────────────────────────
 function useAdminFetch(token) {
@@ -56,6 +56,7 @@ export default function AdminBusiness() {
   const [members,     setMembers]     = useState([]);
   const [commissions, setCommissions] = useState([]);
   const [bonusPool,   setBonusPool]   = useState([]);
+  const [bonusPoolCurrent, setBonusPoolCurrent] = useState(0);
   const [loading,     setLoading]     = useState(false);
   const [toast,       setToast]       = useState(null);
 
@@ -64,10 +65,20 @@ export default function AdminBusiness() {
   const [filterStatus, setFilterStatus] = useState("");
   const [search,       setSearch]       = useState("");
   const [page,         setPage]         = useState(1);
+  const [totalMembers, setTotalMembers] = useState(0);
   const LIMIT = 30;
 
   // Filtres commissions
   const [commStatus, setCommStatus] = useState("");
+
+  // Clients admin
+  const [clients,         setClients]         = useState([]);
+  const [clientsTotal,    setClientsTotal]    = useState(0);
+  const [clientOrigin,    setClientOrigin]    = useState("");
+  const [clientStatus,    setClientStatus]    = useState("");
+  const [clientSearch,    setClientSearch]    = useState("");
+  const [clientPage,      setClientPage]      = useState(1);
+  const CLIENT_LIMIT = 30;
 
   // Demandes de commission (retrait)
   const [demandesComm,          setDemandesComm]          = useState([]);
@@ -93,11 +104,13 @@ export default function AdminBusiness() {
       const params = new URLSearchParams({ page, limit: LIMIT });
       if (filterRole)   params.set("role",   filterRole);
       if (filterStatus) params.set("status", filterStatus);
+      if (search)       params.set("search", search);
       const d = await get(`/api/business/admin/members?${params}`);
       setMembers(d.data?.members || d.members || []);
+      setTotalMembers(d.data?.pagination?.total ?? d.pagination?.total ?? (d.data?.members || d.members || []).length);
     } catch (e) { showToast(e.message, true); }
     setLoading(false);
-  }, [get, page, filterRole, filterStatus]);
+  }, [get, page, filterRole, filterStatus, search]);
 
   const loadCommissions = useCallback(async () => {
     setLoading(true);
@@ -113,14 +126,26 @@ export default function AdminBusiness() {
   const loadBonusPool = useCallback(async () => {
     setLoading(true);
     try {
-      // On récupère les bonus pool via la route membre (admin voit tout)
-      const d = await get("/api/business/admin/members?limit=1");
-      // bonus_pool n'est pas encore une route admin dédiée → on fetch la route globale
-      // Si tu ajoutes GET /api/business/admin/bonus-pool dans le contrôleur, connecte-le ici
-      setBonusPool(d.data?.bonus_pool || []);
+      const d = await get("/api/business/bonus-pool");
+      setBonusPool(d.data?.bonus_pool || d.bonus_pool || d.history || []);
+      setBonusPoolCurrent(d.data?.current_pool ?? d.current_pool ?? 0);
     } catch { setBonusPool([]); }
     setLoading(false);
   }, [get]);
+
+  const loadClients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: clientPage, limit: CLIENT_LIMIT });
+      if (clientOrigin) params.set("origin", clientOrigin);
+      if (clientStatus) params.set("status", clientStatus);
+      if (clientSearch) params.set("search", clientSearch);
+      const d = await get(`/api/business/admin/clients?${params}`);
+      setClients(d.data?.clients || d.clients || []);
+      setClientsTotal(d.data?.pagination?.total ?? d.pagination?.total ?? (d.data?.clients || d.clients || []).length);
+    } catch (e) { showToast(e.message, true); }
+    setLoading(false);
+  }, [get, clientPage, clientOrigin, clientStatus, clientSearch]);
 
   const loadDemandesCommission = useCallback(async () => {
     setLoading(true);
@@ -139,7 +164,8 @@ export default function AdminBusiness() {
     if (tab === "Commissions")          loadCommissions();
     if (tab === "Bonus Pool")           loadBonusPool();
     if (tab === "Demandes Commission")  loadDemandesCommission();
-  }, [tab, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission]);
+    if (tab === "Clients")              loadClients();
+  }, [tab, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission, loadClients]);
 
   // ── Actions membres ────────────────────────────────────────
   async function handleValidate(id, action, isCash = false) {
@@ -218,16 +244,8 @@ export default function AdminBusiness() {
     setActionLoading(null);
   }
 
-  // ── Filtre local membres ───────────────────────────────────
-  const filteredMembers = members.filter(m => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      m.name?.toLowerCase().includes(q) ||
-      m.email?.toLowerCase().includes(q) ||
-      m.phone?.includes(q)
-    );
-  });
+  // La recherche est désormais transmise au serveur via loadMembers
+  const filteredMembers = members;
 
   // ── Render ─────────────────────────────────────────────────
   return (
@@ -248,7 +266,7 @@ export default function AdminBusiness() {
           <p style={s.subtitle}>Administration — Directrices · Leaders · Superviseurs · Recruteurs</p>
         </div>
         <div style={s.headerStats}>
-          <StatBadge label="Membres" value={members.length} color="#7C3AED" />
+          <StatBadge label="Membres" value={totalMembers} color="#7C3AED" />
           <StatBadge label="Commissions" value={commissions.length} color="#0891B2" />
         </div>
       </div>
@@ -275,7 +293,7 @@ export default function AdminBusiness() {
           <div style={s.filters}>
             <input
               style={s.input} placeholder="🔍 Nom, email, téléphone…"
-              value={search} onChange={e => setSearch(e.target.value)}
+              value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
             <select style={s.select} value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(1); }}>
               <option value="">Tous les rôles</option>
@@ -297,7 +315,7 @@ export default function AdminBusiness() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#F8FAFC" }}>
-                    {["Membre","Rôle","Statut","Parent","Total gagné","Validé","Actions"].map(h => (
+                    {["Membre","Rôle","Statut","Paiement","Parent","Clients","Commissions","Total gagné","Actions"].map(h => (
                       <th key={h} style={s.th}>{h}</th>
                     ))}
                   </tr>
@@ -328,20 +346,39 @@ export default function AdminBusiness() {
                             </div>
                           )}
                         </td>
+                        {/* Colonne Paiement — status_payment + date d'adhésion */}
+                        <td style={s.td}>
+                          {m.status_payment
+                            ? <span style={{ ...s.badge, background: m.status_payment === "paid" ? "#ECFDF5" : "#FFF7ED", color: m.status_payment === "paid" ? "#059669" : "#D97706" }}>
+                                {m.status_payment}
+                              </span>
+                            : <span style={{ color: "#CBD5E1" }}>—</span>
+                          }
+                          {m.created_at && (
+                            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>
+                              {new Date(m.created_at).toLocaleDateString("fr-FR")}
+                            </div>
+                          )}
+                        </td>
                         <td style={s.td}>
                           {m.parent_name
                             ? <><div style={s.memberName}>{m.parent_name}</div><div style={s.memberSub}>{m.parent_role}</div></>
                             : <span style={{ color: "#CBD5E1" }}>—</span>
                           }
                         </td>
-                        <td style={{ ...s.td, fontWeight: 700, color: "#059669" }}>
-                          {Number(m.total_earned || 0).toLocaleString("fr-FR")} F
+                        {/* Clients créés */}
+                        <td style={{ ...s.td, textAlign: "center", fontWeight: 700, color: "#0891B2" }}>
+                          {m.total_clients_created ?? "—"}
                         </td>
-                        <td style={s.td}>
-                          {m.validated_at
-                            ? new Date(m.validated_at).toLocaleDateString("fr-FR")
+                        {/* Commissions totales */}
+                        <td style={{ ...s.td, fontWeight: 700, color: "#7C3AED" }}>
+                          {m.total_commissions != null
+                            ? `${Number(m.total_commissions).toLocaleString("fr-FR")} F`
                             : <span style={{ color: "#CBD5E1" }}>—</span>
                           }
+                        </td>
+                        <td style={{ ...s.td, fontWeight: 700, color: "#059669" }}>
+                          {Number(m.total_earned || 0).toLocaleString("fr-FR")} F
                         </td>
                         <td style={s.td}>
                           <div style={s.actionsCol}>
@@ -365,7 +402,7 @@ export default function AdminBusiness() {
                     );
                   })}
                   {filteredMembers.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                    <tr><td colSpan={9} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
                       Aucun membre trouvé
                     </td></tr>
                   )}
@@ -474,6 +511,26 @@ export default function AdminBusiness() {
       {/* ── ONGLET BONUS POOL ─────────────────────────────── */}
       {tab === "Bonus Pool" && (
         <div>
+          {/* Pool du mois en cours — aligné sur BusinessDashboard.jsx */}
+          {!loading && (
+            <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ background: "#fff", border: "1.5px solid #FDE68A", borderRadius: 12, padding: "14px 20px", minWidth: 200 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Pool {new Date().toLocaleString("fr-FR", { month: "long", year: "numeric" })} (en cours)
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#D97706" }}>
+                  {Number(bonusPoolCurrent).toLocaleString("fr-FR")} FCFA
+                </div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "14px 20px", minWidth: 160 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Mois d'historique
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#7C3AED" }}>{bonusPool.length}</div>
+              </div>
+              <button style={{ ...s.btnSecondary, alignSelf: "center" }} onClick={loadBonusPool}>↻ Rafraîchir</button>
+            </div>
+          )}
           {loading ? <Spinner /> : bonusPool.length === 0 ? (
             <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
@@ -635,6 +692,98 @@ export default function AdminBusiness() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ONGLET CLIENTS ────────────────────────────────── */}
+      {tab === "Clients" && (
+        <div>
+          <div style={s.filters}>
+            <input
+              style={s.input} placeholder="🔍 Nom, email, téléphone…"
+              value={clientSearch} onChange={e => { setClientSearch(e.target.value); setClientPage(1); }}
+            />
+            <select style={s.select} value={clientOrigin} onChange={e => { setClientOrigin(e.target.value); setClientPage(1); }}>
+              <option value="">Toutes les origines</option>
+              {["BUSINESS","DIRECT","REFERRAL"].map(o => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+            <select style={s.select} value={clientStatus} onChange={e => { setClientStatus(e.target.value); setClientPage(1); }}>
+              <option value="">Tous les statuts</option>
+              <option value="actif">Actif</option>
+              <option value="attente">En attente</option>
+              <option value="suspendu">Suspendu</option>
+              <option value="renewal_required">Renouvellement</option>
+            </select>
+            <button style={s.btnSecondary} onClick={loadClients}>↻ Rafraîchir</button>
+          </div>
+
+          {loading ? <Spinner /> : (
+            <div style={s.table}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {["Client","Statut","Origine","Recruteur","Formule","Date"].map(h => (
+                      <th key={h} style={s.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map(c => {
+                    return (
+                      <tr key={c.id} style={s.tr}>
+                        <td style={s.td}>
+                          <div style={s.memberName}>{c.name || c.full_name}</div>
+                          <div style={s.memberSub}>{c.email}</div>
+                          {c.phone && <div style={s.memberSub}>{c.phone}</div>}
+                        </td>
+                        <td style={s.td}>
+                          {(() => {
+                            const CLIENT_STATUS = {
+                              actif:            { bg: "#ECFDF5", color: "#059669", label: "Actif"          },
+                              attente:          { bg: "#FFFBEB", color: "#D97706", label: "En attente"     },
+                              suspendu:         { bg: "#FEF2F2", color: "#DC2626", label: "Suspendu"       },
+                              renewal_required: { bg: "#DBEAFE", color: "#1D4ED8", label: "Renouvellement" },
+                            };
+                            const st = CLIENT_STATUS[c.status] || { bg: "#F1F5F9", color: "#64748B", label: c.status || "—" };
+                            return <span style={{ ...s.badge, background: st.bg, color: st.color }}>{st.label}</span>;
+                          })()}
+                        </td>
+                        <td style={s.td}>
+                          <span style={{ ...s.badge, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD" }}>
+                            {c.origin || "—"}
+                          </span>
+                        </td>
+                        <td style={s.td}>
+                          {c.recruiter_name
+                            ? <><div style={s.memberName}>{c.recruiter_name}</div><div style={s.memberSub}>{c.recruiter_role}</div></>
+                            : <span style={{ color: "#CBD5E1" }}>—</span>
+                          }
+                        </td>
+                        <td style={s.td}>{c.plan_name || c.formule || "—"}</td>
+                        <td style={{ ...s.td, fontSize: 12 }}>
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {clients.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                      Aucun client trouvé
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          <div style={s.pagination}>
+            <button style={s.btnSecondary} disabled={clientPage === 1} onClick={() => setClientPage(p => p - 1)}>← Préc.</button>
+            <span style={{ fontSize: 13, color: "#64748B" }}>Page {clientPage} · {clientsTotal} client{clientsTotal !== 1 ? "s" : ""}</span>
+            <button style={s.btnSecondary} disabled={clients.length < CLIENT_LIMIT} onClick={() => setClientPage(p => p + 1)}>Suiv. →</button>
+          </div>
         </div>
       )}
 
