@@ -169,6 +169,7 @@ const NAV = [
   { to: "/business/invitation",   icon: "🔗", label: "Invitation"      },
   { to: "/business/leaderboard",  icon: "🏆", label: "Classement"      },
   { to: "/business/members",      icon: "👥", label: "Mes membres"     },
+  { to: "/business/collectes",    icon: "💳", label: "Collectes"       },
   { to: "/business/clients",      icon: "🏥", label: "Mes clients"     },
 ];
 
@@ -1829,7 +1830,7 @@ export function BizClientsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [page,       setPage]       = useState(1);
   const [pagination, setPagination] = useState({});
-  const [collecteClient, setCollecteClient] = useState(null);
+
 
   const load = useCallback(() => {
     setLoading(true);
@@ -1959,20 +1960,7 @@ export function BizClientsPage() {
                               ? new Date(c.expiration_date).toLocaleDateString("fr-FR")
                               : "—"}
                           </td>
-                          <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                            {!payOk && (
-                              <button
-                                onClick={() => setCollecteClient(c)}
-                                style={{
-                                  padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-                                  background: "#EFF6FF", color: "#2563EB", fontWeight: 700, fontSize: 12,
-                                  display: "inline-flex", alignItems: "center", gap: 5,
-                                }}
-                              >
-                                🔵 Collecte Wave
-                              </button>
-                            )}
-                          </td>
+                          <td style={{ padding: "10px 12px" }} />
                         </tr>
                       );
                     })}
@@ -2009,6 +1997,332 @@ export function BizClientsPage() {
         />
       )}
 
+    </BizLayout>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  MODAL — NOUVELLE COLLECTE (créer client + démarrer collecte)
+//  Étapes : Infos client → Formule → Confirmation
+// ─────────────────────────────────────────────────────────────
+function NouvelleCollecteModal({ onClose, onCreated }) {
+  const [step,         setStep]         = useState(0); // 0=infos 1=formule 2=done
+  const [plans,        setPlans]        = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [city,         setCity]         = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [createdClient,setCreatedClient]= useState(null);
+
+  useEffect(() => {
+    apiBiz("/plans").then(d => setPlans(d.plans || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  async function handleCreate() {
+    setError(""); setLoading(true);
+    try {
+      const d = await apiBiz("/clients", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(), phone: phone.trim(),
+          city: city.trim() || undefined,
+          plan_slug: selectedPlan.slug,
+        }),
+      });
+      const { client } = d.data || d;
+      setCreatedClient(client);
+      setStep(2);
+      onCreated?.();
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la création.");
+    } finally { setLoading(false); }
+  }
+
+  const overlayStyle = {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(0,0,0,.55)", display: "flex",
+    alignItems: "center", justifyContent: "center", padding: 16,
+  };
+  const modalStyle = {
+    background: "#fff", borderRadius: 16,
+    boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+    width: "100%", maxWidth: 480,
+    maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden",
+  };
+
+  return (
+    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={modalStyle}>
+        <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
+              💳 Nouvelle collecte Wave
+            </h3>
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>
+              {step === 0 ? "Informations du client" : step === 1 ? "Choisir la formule" : "Client créé ✅"}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748B" }}>✕</button>
+        </div>
+
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+          {error && <div style={{ background: "#FFF1F2", color: "#BE123C", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>{error}</div>}
+
+          {/* Étape 0 : infos */}
+          {step === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Nom complet <span style={{ color: "#EF4444" }}>*</span></label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Koné Mariam" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Téléphone <span style={{ color: "#EF4444" }}>*</span></label>
+                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: 0709876543" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Ville (optionnel)</label>
+                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Abidjan" style={inputStyle} />
+              </div>
+            </div>
+          )}
+
+          {/* Étape 1 : formule */}
+          {step === 1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {plans.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedPlan(p)}
+                  style={{
+                    border: selectedPlan?.id === p.id ? "2px solid #7C3AED" : "2px solid #E2E8F0",
+                    borderRadius: 12, padding: "14px 16px", cursor: "pointer",
+                    background: selectedPlan?.id === p.id ? "#F5F3FF" : "#fff",
+                    transition: "all .15s",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 15 }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>
+                    Adhésion : <strong>{(p.adhesion_price || 15000).toLocaleString("fr-FR")} FCFA</strong>
+                    {p.cotisation_mensuelle && <> · Cotisation : <strong>{Number(p.cotisation_mensuelle).toLocaleString("fr-FR")} FCFA/mois</strong></>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Étape 2 : succès */}
+          {step === 2 && createdClient && (
+            <div style={{ textAlign: "center", padding: "12px 0" }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+              <h4 style={{ margin: "0 0 8px", color: "#0F172A", fontSize: 17 }}>{createdClient.name}</h4>
+              <p style={{ margin: 0, color: "#64748B", fontSize: 13 }}>
+                Le client a été créé. Retrouvez-le dans <strong>Mes collectes</strong> pour enregistrer les versements Wave.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", gap: 10 }}>
+          {step === 0 && (
+            <>
+              <button onClick={onClose} style={btnSecondary}>Annuler</button>
+              <button
+                onClick={() => {
+                  if (!name.trim()) return setError("Le nom est requis.");
+                  if (!phone.trim()) return setError("Le téléphone est requis.");
+                  setError(""); setStep(1);
+                }}
+                style={btnPrimary}
+              >Suivant →</button>
+            </>
+          )}
+          {step === 1 && (
+            <>
+              <button onClick={() => setStep(0)} style={btnSecondary}>← Retour</button>
+              <button
+                onClick={() => { if (!selectedPlan) return setError("Choisissez une formule."); handleCreate(); }}
+                disabled={loading}
+                style={{ ...btnPrimary, opacity: loading ? .6 : 1 }}
+              >{loading ? "Création…" : "Créer et démarrer la collecte"}</button>
+            </>
+          )}
+          {step === 2 && (
+            <button onClick={onClose} style={{ ...btnPrimary, width: "100%" }}>Fermer</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PAGE — COLLECTES WAVE (page dédiée)
+// ─────────────────────────────────────────────────────────────
+export function BizCollectesPage() {
+  const [clients,      setClients]      = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showModal,    setShowModal]    = useState(false);
+  const [collecteClient, setCollecteClient] = useState(null);
+  const [search,       setSearch]       = useState("");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiBiz("/my-clients?limit=200")
+      .then(d => setClients(d.clients || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Tous les clients non-payés + ceux avec versements (collecte démarrée ou en attente)
+  const filtered = clients
+    .filter(c => c.status_payment !== "paid" || c._collecte_complete)
+    .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || (c.mutual_number || "").includes(search));
+
+  // Séparer en cours vs complètes
+  const enCours   = clients.filter(c => c.status_payment !== "paid");
+  const completes = clients.filter(c => c.status_payment === "paid");
+
+  const filteredEnCours   = enCours.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search) || (c.mutual_number || "").includes(search)
+  );
+  const filteredCompletes = completes.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search) || (c.mutual_number || "").includes(search)
+  );
+
+  function CollecteRow({ c, onClick, complete }) {
+    // Pas de données de versements ici (chargées dans le modal)
+    // On affiche juste le statut global
+    return (
+      <div
+        onClick={complete ? undefined : onClick}
+        style={{
+          display: "flex", alignItems: "center", gap: 14,
+          padding: "14px 16px", borderRadius: 12, marginBottom: 8,
+          background: "#fff", border: complete ? "1.5px solid #D1FAE5" : "1.5px solid #EFF6FF",
+          cursor: complete ? "default" : "pointer",
+          transition: "box-shadow .15s",
+          boxShadow: "0 1px 4px rgba(0,0,0,.05)",
+        }}
+        onMouseEnter={e => { if (!complete) e.currentTarget.style.boxShadow = "0 4px 16px rgba(124,58,237,.12)"; }}
+        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,.05)"; }}
+      >
+        {/* Avatar */}
+        <div style={{
+          width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+          background: complete ? "#D1FAE5" : "#EDE9FE",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18,
+        }}>
+          {complete ? "✅" : "💳"}
+        </div>
+
+        {/* Infos */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {c.name}
+          </div>
+          <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+            {c.phone} · <span style={{ fontFamily: "monospace", color: "#7C3AED" }}>{c.mutual_number}</span> · {c.plan}
+          </div>
+        </div>
+
+        {/* Badge */}
+        <div style={{ flexShrink: 0 }}>
+          {complete ? (
+            <span style={{ background: "#D1FAE5", color: "#065F46", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
+              Complète ✅
+            </span>
+          ) : (
+            <span style={{ background: "#EFF6FF", color: "#2563EB", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
+              En cours →
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <BizLayout>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1E1B4B" }}>
+            💳 Collectes Wave
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748B" }}>
+            Collectez les 15 000 FCFA en plusieurs versements Wave
+          </p>
+        </div>
+        <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+          ➕ Nouvelle collecte
+        </button>
+      </div>
+
+      {/* Recherche */}
+      <div style={{ marginBottom: 16 }}>
+        <input
+          placeholder="🔍 Nom, téléphone ou numéro mutualiste…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inputStyle, maxWidth: 340 }}
+        />
+      </div>
+
+      {loading ? <Loader /> : (
+        <>
+          {/* En cours */}
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#374151", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: ".05em" }}>
+              En cours ({filteredEnCours.length})
+            </h3>
+            {filteredEnCours.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
+                Aucune collecte en cours.
+                <br />
+                <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, marginTop: 12, fontSize: 13 }}>
+                  ➕ Démarrer une collecte
+                </button>
+              </div>
+            ) : filteredEnCours.map(c => (
+              <CollecteRow key={c.id} c={c} complete={false} onClick={() => setCollecteClient(c)} />
+            ))}
+          </div>
+
+          {/* Complètes */}
+          {filteredCompletes.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#374151", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Complètes ({filteredCompletes.length})
+              </h3>
+              {filteredCompletes.map(c => (
+                <CollecteRow key={c.id} c={c} complete={true} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {showModal && (
+        <NouvelleCollecteModal
+          onClose={() => setShowModal(false)}
+          onCreated={() => { setShowModal(false); load(); }}
+        />
+      )}
+
       {collecteClient && (
         <CollecteWaveModal
           client={collecteClient}
@@ -2019,7 +2333,6 @@ export function BizClientsPage() {
     </BizLayout>
   );
 }
-
 
 const inputStyle = {
   width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14,
