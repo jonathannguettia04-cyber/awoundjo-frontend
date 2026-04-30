@@ -917,7 +917,6 @@ export function BizMembersPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {[
                 { value: "",     label: "⏳ Sans paiement (admin validera)" },
-                { value: "cash", label: "💵 Cash (immédiat)"                },
                 { value: "jeko", label: "📲 Mobile Money (Jeko)"            },
               ].map(opt => (
                 <button
