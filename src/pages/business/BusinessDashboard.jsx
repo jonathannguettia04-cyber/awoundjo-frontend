@@ -1478,25 +1478,33 @@ function PayJekoButton({ clientId, onPaid }) {
   );
 }
 
-// ── Modal Collecte Wave progressive ───────────────────────────────
-// Routes : GET  /clients/:id/collecte
-//          POST /clients/:id/collecte/wave-init
-//          POST /clients/:id/collecte/wave-confirm
+
+// ── Modal Collecte Progressive (Wave / Orange / MTN / Moov / Djamo) ─
+const COLLECTE_METHODS = [
+  { value: "wave",   label: "Wave",         icon: "🔵" },
+  { value: "orange", label: "Orange Money", icon: "🟠" },
+  { value: "mtn",    label: "MTN MoMo",     icon: "🟡" },
+  { value: "moov",   label: "Moov Money",   icon: "🟢" },
+  { value: "djamo",  label: "Djamo",        icon: "💜" },
+];
+
 function CollecteWaveModal({ client, onClose, onCompleted }) {
-  const [step,     setStep]     = useState("overview"); // overview | confirm
-  const [collecte, setCollecte] = useState(null);
-  const [waveData, setWaveData] = useState(null);
-  const [montant,  setMontant]  = useState("");
-  const [waveRef,  setWaveRef]  = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
-  const [success,  setSuccess]  = useState("");
+  const [step,     setStep]    = useState("overview"); // overview | confirm_wave
+  const [collecte, setCollecte]= useState(null);
+  const [montant,  setMontant] = useState("");
+  const [method,   setMethod]  = useState("wave");
+  const [waveRef,  setWaveRef] = useState("");
+  const [loading,  setLoading] = useState(false);
+  const [error,    setError]   = useState("");
+  const [success,  setSuccess] = useState("");
+
+  const fmt = n => Number(n || 0).toLocaleString("fr-FR");
 
   useEffect(() => {
     apiFetch(`/clients/${client.id}/collecte`)
       .then(d => {
         setCollecte(d.collecte || d);
-        const reste = d.collecte?.reste ?? d.reste;
+        const reste = d.collecte?.reste ?? d.reste ?? 0;
         if (reste > 0) setMontant(String(reste));
       })
       .catch(() => setError("Impossible de charger la collecte."));
@@ -1508,37 +1516,42 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  async function handleWaveInit() {
+  async function handleJekoInit() {
     setError(""); setLoading(true);
     try {
-      const d = await apiFetch(`/clients/${client.id}/collecte/wave-init`, {
+      const mont = Number(montant);
+      if (!mont || mont < 500) { setError("Montant minimum : 500 FCFA"); return; }
+      const d = await apiFetch(`/clients/${client.id}/collecte/jeko-init`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ montant: montant ? Number(montant) : undefined }),
+        body: JSON.stringify({ montant: mont, jeko_method: method }),
       });
-      setWaveData(d);
-      setStep("qr");
+      const redirectUrl = d?.data?.redirect_url || d?.redirect_url || d?.payment_url;
+      if (redirectUrl) {
+        window.open(redirectUrl, "_blank");
+        setSuccess("Lien de paiement ouvert. Le versement sera enregistré automatiquement après confirmation.");
+      } else {
+        setError("Impossible d\'obtenir le lien de paiement JEKO.");
+      }
     } catch (e) {
-      setError(e?.error || e?.message || "Erreur lors de l'initialisation Wave.");
+      setError(e?.error || e?.message || "Erreur initiation paiement.");
     } finally { setLoading(false); }
   }
 
   async function handleWaveConfirm() {
     setError(""); setLoading(true);
     try {
+      const mont = Number(montant);
+      if (!mont || mont < 500) { setError("Montant minimum : 500 FCFA"); return; }
+      if (!waveRef.trim()) { setError("La référence Wave est requise."); return; }
       const d = await apiFetch(`/clients/${client.id}/collecte/wave-confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          montant: waveData?.versement?.montant_suggere,
-          wave_ref: waveRef.trim(),
-        }),
+        body: JSON.stringify({ montant: mont, wave_ref: waveRef.trim() }),
       });
       setSuccess(d.message || "Versement enregistré !");
       setCollecte(d.collecte);
       if (d.collecte?.complete) setTimeout(() => onCompleted(), 1800);
     } catch (e) {
-      setError(e?.error || e?.message || "Erreur lors de la confirmation.");
+      setError(e?.error || e?.message || "Erreur confirmation versement.");
     } finally { setLoading(false); }
   }
 
@@ -1546,168 +1559,122 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
     ? Math.min(100, Math.round(((collecte.total_verse || 0) / (collecte.adhesion_price || 15000)) * 100))
     : 0;
 
-  const inp = {
-    width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 14,
-    background: "#0C0C12", border: `1px solid ${T.border}`,
-    color: T.text, outline: "none", fontFamily: "inherit", boxSizing: "border-box",
-  };
+  const selectedMethod = COLLECTE_METHODS.find(m => m.value === method);
+  const inp = { padding: "10px 14px", borderRadius: 10, fontSize: 14, background: "#0C0C12", border: `1px solid ${T.border}`, color: T.text, outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box" };
 
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-    >
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 18, width: "100%", maxWidth: 460, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,.6)" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: "#14141A", borderRadius: 16, border: `1px solid ${T.border}`, width: "100%", maxWidth: 460, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* Header */}
-        <div style={{ padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}`, flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        {/* En-tête */}
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 900, color: T.text }}>🔵 Collecte Wave</div>
-            <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>{client.name} — {client.mutual_number}</div>
+            <div style={{ fontWeight: 800, color: T.gold, fontSize: 15 }}>💳 Collecte</div>
+            <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{client.name} — {client.mutual_number}</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: T.muted, lineHeight: 1, padding: 0 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: T.muted, fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* Body */}
-        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Corps */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
 
-          {error   && <div style={{ background: T.redL,   border: `1px solid ${T.red}40`,   borderRadius: 10, padding: "10px 14px", fontSize: 13, color: T.red   }}>{error}</div>}
-          {success && <div style={{ background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: T.green }}>{success}</div>}
+          {error   && <div style={{ background: "#2D1010", color: "#EF4444", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{error}</div>}
+          {success && <div style={{ background: "#0D2010", color: "#4ADE80", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{success}</div>}
 
-          {/* Barre de progression */}
+          {/* Progression */}
           {collecte && (
-            <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ background: "#1A1A24", border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>Progression</span>
-                <span style={{ fontSize: 13, fontWeight: 900, color: T.gold, fontFamily: "monospace" }}>{pct}%</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.textSub }}>Progression</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: T.gold }}>{pct}%</span>
               </div>
-              <div style={{ height: 8, background: T.border, borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 8, background: pct >= 100 ? T.green : `linear-gradient(90deg, ${T.goldD}, ${T.gold})`, width: `${pct}%`, transition: "width .4s ease" }} />
+              <div style={{ height: 8, background: "#2A2A38", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", borderRadius: 8, background: pct >= 100 ? T.green : T.gold, width: `${pct}%`, transition: "width .4s" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12, color: T.muted }}>
-                <span>Versé : <strong style={{ color: T.gold }}>{Number(collecte.total_verse || 0).toLocaleString("fr-FR")} FCFA</strong></span>
-                <span>Total : <strong style={{ color: T.textSub }}>{Number(collecte.adhesion_price || 0).toLocaleString("fr-FR")} FCFA</strong></span>
+                <span>Versé : <strong style={{ color: T.text }}>{fmt(collecte.total_verse)} FCFA</strong></span>
+                <span>Total : <strong style={{ color: T.text }}>{fmt(collecte.adhesion_price)} FCFA</strong></span>
               </div>
-              {collecte.reste > 0 && (
-                <div style={{ marginTop: 6, fontSize: 12, color: "#EAB308", fontWeight: 700 }}>
-                  Reste à payer : {Number(collecte.reste).toLocaleString("fr-FR")} FCFA
-                </div>
-              )}
-              {collecte.complete && (
-                <div style={{ marginTop: 8, background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: T.green }}>
-                  ✅ Collecte complète — client activé !
-                </div>
-              )}
+              {collecte.reste > 0 && <div style={{ marginTop: 6, fontSize: 12, color: "#F59E0B", fontWeight: 600 }}>Reste : {fmt(collecte.reste)} FCFA</div>}
+              {collecte.complete && <div style={{ marginTop: 8, fontSize: 13, color: T.green, fontWeight: 700 }}>✅ Collecte complète — client activé !</div>}
             </div>
           )}
 
-          {/* Étape overview : saisie montant */}
-          {step === "overview" && !success && collecte && !collecte.complete && (
+          {/* Saisie + méthode */}
+          {!success && collecte && !collecte.complete && step === "overview" && (
             <>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 7 }}>
-                  Montant à encaisser (FCFA)
+                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 7 }}>
+                  Montant (FCFA) — min. 500
                 </label>
-                <input
-                  type="number"
-                  value={montant}
-                  onChange={e => setMontant(e.target.value)}
-                  placeholder={`Suggéré : ${Number(collecte.reste || 0).toLocaleString("fr-FR")} FCFA`}
-                  style={inp}
-                />
-                <div style={{ marginTop: 5, fontSize: 11, color: T.muted }}>Laissez vide pour proposer le reste complet.</div>
+                <input type="number" min={500} value={montant} onChange={e => setMontant(e.target.value)}
+                  placeholder={`Suggéré : ${fmt(collecte.reste)} FCFA`} style={inp} />
               </div>
-              <div style={{ background: T.blueL, border: `1px solid ${T.blue}30`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: T.blue }}>
-                Cliquez sur <strong>Générer QR Wave</strong> pour ouvrir le lien de paiement.
-                Après paiement, entrez la référence Wave pour confirmer.
-              </div>
-            </>
-          )}
 
-          {/* Étape QR : instructions paiement Wave */}
-          {step === "qr" && waveData && !success && (
-            <>
-              <div style={{ background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 14, padding: "20px 18px", textAlign: "center" }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🔵</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: T.gold, letterSpacing: "-0.02em", marginBottom: 4 }}>
-                  {Number(waveData.versement?.montant_suggere || 0).toLocaleString("fr-FR")} FCFA
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 10 }}>
+                  Moyen de paiement
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {COLLECTE_METHODS.map(m => (
+                    <div key={m.value} onClick={() => setMethod(m.value)} style={{
+                      border: method === m.value ? `2px solid ${T.gold}` : `2px solid ${T.border}`,
+                      borderRadius: 10, padding: "10px 12px", cursor: "pointer",
+                      background: method === m.value ? "#C9933A10" : "#1A1A24",
+                      display: "flex", alignItems: "center", gap: 8, transition: "all .15s",
+                    }}>
+                      <span style={{ fontSize: 18 }}>{m.icon}</span>
+                      <span style={{ fontSize: 13, fontWeight: method === m.value ? 700 : 500, color: method === m.value ? T.gold : T.textSub }}>
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>à envoyer via Wave</div>
-                <div style={{ background: "#0C0C12", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Numéro Wave destinataire</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: T.text, fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                    {waveData.wave_number || "0700000000"}
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(waveData.wave_number || "0700000000").then(() => alert("Numéro copié !"))}
-                  style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.blue}50`, background: `${T.blue}15`, color: T.blue, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  📋 Copier le numéro
+              </div>
+
+              {method === "wave" && (
+                <button onClick={() => setStep("confirm_wave")} style={{ background: "none", border: "none", color: T.gold, fontSize: 12, cursor: "pointer", textAlign: "left", textDecoration: "underline", padding: 0 }}>
+                  Paiement Wave déjà effectué ? Saisir la référence →
                 </button>
-              </div>
-              <div style={{ background: "#1C1208", border: "1px solid #92400E40", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, color: "#D97706" }}>
-                  <strong>Comment payer :</strong> Ouvrez Wave → Envoyer → saisissez le numéro et le montant → confirmez. Notez la <strong>référence de transaction</strong> sur le reçu.
-                </div>
-              </div>
+              )}
             </>
           )}
 
-          {/* Étape confirm : saisie référence */}
-          {step === "confirm" && waveData && !success && (
+          {/* Wave manuel */}
+          {step === "confirm_wave" && !success && (
             <>
-              <div style={{ background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 12, padding: "14px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.green, marginBottom: 4 }}>✅ Paiement Wave effectué ?</div>
-                <div style={{ fontSize: 13, color: T.green }}>
-                  Montant : <strong>{Number(waveData.versement?.montant_suggere || 0).toLocaleString("fr-FR")} FCFA</strong>
-                </div>
+              <div style={{ background: "#1E2A3A", border: `1px solid #3B82F640`, borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "#60A5FA" }}>
+                Entrez la référence visible sur le reçu Wave du client.
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 7 }}>
-                  Référence de transaction Wave <span style={{ color: T.red }}>*</span>
-                </label>
-                <input
-                  value={waveRef}
-                  onChange={e => setWaveRef(e.target.value)}
-                  placeholder="ex : WV-2024-XXXXXX"
-                  style={inp}
-                />
-                <div style={{ marginTop: 5, fontSize: 11, color: T.muted }}>Visible sur le reçu Wave (anti-doublon).</div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 7 }}>Montant (FCFA)</label>
+                <input type="number" min={500} value={montant} onChange={e => setMontant(e.target.value)} style={inp} />
               </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 7 }}>Référence Wave *</label>
+                <input value={waveRef} onChange={e => setWaveRef(e.target.value)} placeholder="ex : WV-2024-XXXXXX" style={inp} />
+              </div>
+              <button onClick={() => setStep("overview")} style={{ background: "none", border: "none", color: T.muted, fontSize: 12, cursor: "pointer", textAlign: "left", padding: 0 }}>← Retour</button>
             </>
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: "14px 24px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", gap: 10, background: "#0E0E16", flexShrink: 0 }}>
-          <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 10, border: `1px solid ${T.border}`, background: "transparent", color: T.textSub, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-            Fermer
-          </button>
+        {/* Pied */}
+        <div style={{ padding: "14px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Fermer</button>
+
           {step === "overview" && collecte && !collecte.complete && !success && (
-            <button
-              onClick={handleWaveInit}
-              disabled={loading}
-              style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: loading ? T.border : `linear-gradient(135deg, #2563EB, #1D4ED8)`, color: loading ? T.muted : "#fff", fontWeight: 900, fontSize: 13, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-            >
-              {loading ? "Chargement…" : "🔵 Générer QR Wave"}
+            <button onClick={handleJekoInit} disabled={loading || !montant || Number(montant) < 500}
+              style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: T.gold, color: "#0A0A0F", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: (loading || !montant || Number(montant) < 500) ? .5 : 1, fontFamily: "inherit" }}>
+              {loading ? "Chargement…" : `${selectedMethod?.icon} Payer via ${selectedMethod?.label}`}
             </button>
           )}
-          {step === "qr" && waveData && !success && (
-            <button
-              onClick={() => setStep("confirm")}
-              style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${T.green}, #15803D)`, color: "#fff", fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              ✅ Paiement effectué → Confirmer
-            </button>
-          )}
-          {step === "confirm" && !success && (
-            <button
-              onClick={handleWaveConfirm}
-              disabled={loading || !waveRef.trim()}
-              style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: (loading || !waveRef.trim()) ? T.border : `linear-gradient(135deg, ${T.green}, #15803D)`, color: (loading || !waveRef.trim()) ? T.muted : "#fff", fontWeight: 900, fontSize: 13, cursor: (loading || !waveRef.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-            >
-              {loading ? "Enregistrement…" : "✅ Confirmer le versement"}
+
+          {step === "confirm_wave" && !success && (
+            <button onClick={handleWaveConfirm} disabled={loading || !waveRef.trim() || !montant || Number(montant) < 500}
+              style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: T.green, color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: (loading || !waveRef.trim()) ? .5 : 1, fontFamily: "inherit" }}>
+              {loading ? "Enregistrement…" : "✅ Confirmer"}
             </button>
           )}
         </div>

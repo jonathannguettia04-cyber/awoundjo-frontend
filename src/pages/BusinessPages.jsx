@@ -1577,122 +1577,114 @@ function CreateClientModal({ onClose, onCreated }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MODAL — COLLECTE PROGRESSIVE WAVE (secteur informel)
-//  Flux : affichage état → QR Wave deeplink → confirmation ref
-//  Routes : GET  /clients/:id/collecte
-//           POST /clients/:id/collecte/wave-init
-//           POST /clients/:id/collecte/wave-confirm
+//  MODAL — COLLECTE PROGRESSIVE (Wave / Orange / MTN / Moov / Djamo)
+//  Flux JEKO : choix méthode + montant → jekoInit → redirect paiement
+//  Flux Wave manuel : confirm référence Wave
 // ─────────────────────────────────────────────────────────────
-function CollecteWaveModal({ client, onClose, onCompleted }) {
-  const [step,      setStep]      = useState("overview"); // overview | qr | confirm
-  const [collecte,  setCollecte]  = useState(null);
-  const [waveData,  setWaveData]  = useState(null);
-  const [montant,   setMontant]   = useState("");
-  const [waveRef,   setWaveRef]   = useState("");
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
-  const [success,   setSuccess]   = useState("");
+const COLLECTE_METHODS = [
+  { value: "wave",   label: "Wave",         icon: "🔵" },
+  { value: "orange", label: "Orange Money", icon: "🟠" },
+  { value: "mtn",    label: "MTN MoMo",     icon: "🟡" },
+  { value: "moov",   label: "Moov Money",   icon: "🟢" },
+  { value: "djamo",  label: "Djamo",        icon: "💜" },
+];
 
-  // Charger l'état de la collecte
+function CollecteWaveModal({ client, onClose, onCompleted }) {
+  const [step,     setStep]    = useState("overview"); // overview | confirm_wave
+  const [collecte, setCollecte]= useState(null);
+  const [montant,  setMontant] = useState("");
+  const [method,   setMethod]  = useState("wave");
+  const [waveRef,  setWaveRef] = useState("");
+  const [loading,  setLoading] = useState(false);
+  const [error,    setError]   = useState("");
+  const [success,  setSuccess] = useState("");
+
   useEffect(() => {
     apiBiz(`/clients/${client.id}/collecte`)
       .then(d => {
         setCollecte(d.collecte || d);
-        // pré-remplir le montant avec le reste suggéré
-        const reste = d.collecte?.reste ?? d.reste;
+        const reste = d.collecte?.reste ?? d.reste ?? 0;
         if (reste > 0) setMontant(String(reste));
       })
       .catch(() => setError("Impossible de charger la collecte."));
   }, [client.id]);
 
-  // Fermer sur Escape
   useEffect(() => {
     const h = e => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  async function handleWaveInit() {
+  async function handleJekoInit() {
     setError(""); setLoading(true);
     try {
-      const d = await apiBiz(`/clients/${client.id}/collecte/wave-init`, {
+      const mont = Number(montant);
+      if (!mont || mont < 500) { setError("Montant minimum : 500 FCFA"); return; }
+      const d = await apiBiz(`/clients/${client.id}/collecte/jeko-init`, {
         method: "POST",
-        body: JSON.stringify({ montant: montant ? Number(montant) : undefined }),
+        body: JSON.stringify({ montant: mont, jeko_method: method }),
       });
-      setWaveData(d);
-      setStep("qr");
+      const redirectUrl = d?.data?.redirect_url || d?.redirect_url || d?.payment_url;
+      if (redirectUrl) {
+        window.open(redirectUrl, "_blank");
+        setSuccess("Lien de paiement ouvert dans un nouvel onglet. Le versement sera enregistré automatiquement après confirmation.");
+      } else {
+        setError("Impossible d\'obtenir le lien de paiement JEKO.");
+      }
     } catch (e) {
-      setError(e?.error || e?.message || "Erreur lors de l'initialisation Wave.");
-    } finally {
-      setLoading(false);
-    }
+      setError(e?.error || e?.message || "Erreur initiation paiement.");
+    } finally { setLoading(false); }
   }
 
   async function handleWaveConfirm() {
     setError(""); setLoading(true);
     try {
+      const mont = Number(montant);
+      if (!mont || mont < 500) { setError("Montant minimum : 500 FCFA"); return; }
+      if (!waveRef.trim()) { setError("La référence Wave est requise."); return; }
       const d = await apiBiz(`/clients/${client.id}/collecte/wave-confirm`, {
         method: "POST",
-        body: JSON.stringify({
-          montant: waveData?.versement?.montant_suggere,
-          wave_ref: waveRef.trim(),
-        }),
+        body: JSON.stringify({ montant: mont, wave_ref: waveRef.trim() }),
       });
       setSuccess(d.message || "Versement enregistré !");
       setCollecte(d.collecte);
-      if (d.collecte?.complete) {
-        setTimeout(() => onCompleted(), 1800);
-      }
+      if (d.collecte?.complete) setTimeout(() => onCompleted(), 1800);
     } catch (e) {
-      setError(e?.error || e?.message || "Erreur lors de la confirmation.");
-    } finally {
-      setLoading(false);
-    }
+      setError(e?.error || e?.message || "Erreur confirmation versement.");
+    } finally { setLoading(false); }
   }
 
-  const overlayStyle = {
-    position: "fixed", inset: 0, zIndex: 1100,
-    background: "rgba(0,0,0,.55)", display: "flex",
-    alignItems: "center", justifyContent: "center", padding: 16,
-  };
-  const modalStyle = {
-    background: "#fff", borderRadius: 16,
-    boxShadow: "0 20px 60px rgba(0,0,0,.25)",
-    width: "100%", maxWidth: 460,
-    maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
-  };
+  const pct = collecte
+    ? Math.min(100, Math.round(((collecte.total_verse || 0) / (collecte.adhesion_price || 15000)) * 100))
+    : 0;
 
-  const pct = collecte ? Math.min(100, Math.round(((collecte.total_verse || 0) / (collecte.adhesion_price || 15000)) * 100)) : 0;
+  const fmt = n => Number(n || 0).toLocaleString("fr-FR");
 
   return (
-    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={modalStyle}>
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.25)", width: "100%", maxWidth: 460, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* En-tête */}
         <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
-                🔵 Collecte Wave
-              </h3>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                {client.name} — {client.mutual_number}
-              </p>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>💳 Collecte</h3>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>{client.name} — {client.mutual_number}</p>
             </div>
-            <button onClick={onClose} style={{
-              background: "none", border: "none", fontSize: 22,
-              cursor: "pointer", color: "#94A3B8", lineHeight: 1, padding: 0,
-            }}>×</button>
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94A3B8", lineHeight: 1, padding: 0 }}>×</button>
           </div>
         </div>
 
         {/* Corps */}
-        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
 
-          {error && <Alert type="error">{error}</Alert>}
-          {success && <Alert type="success">{success}</Alert>}
+          {error   && <div style={{ background: "#FFF1F2", color: "#BE123C", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{error}</div>}
+          {success && <div style={{ background: "#F0FDF4", color: "#15803D", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{success}</div>}
 
-          {/* Barre de progression collecte */}
+          {/* Progression */}
           {collecte && (
             <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -1700,142 +1692,102 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#7C3AED" }}>{pct}%</span>
               </div>
               <div style={{ height: 10, background: "#E2E8F0", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 8,
-                  background: pct >= 100 ? "#059669" : "#7C3AED",
-                  width: `${pct}%`, transition: "width .4s ease",
-                }} />
+                <div style={{ height: "100%", borderRadius: 8, background: pct >= 100 ? "#059669" : "#7C3AED", width: `${pct}%`, transition: "width .4s" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12, color: "#64748B" }}>
                 <span>Versé : <strong style={{ color: "#0F172A" }}>{fmt(collecte.total_verse)} FCFA</strong></span>
                 <span>Total : <strong style={{ color: "#0F172A" }}>{fmt(collecte.adhesion_price)} FCFA</strong></span>
               </div>
-              {collecte.reste > 0 && (
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#D97706", fontWeight: 600 }}>
-                  Reste à payer : {fmt(collecte.reste)} FCFA
-                </p>
-              )}
-              {collecte.complete && (
-                <Alert type="success" style={{ marginTop: 8 }}>✅ Collecte complète — client activé !</Alert>
-              )}
+              {collecte.reste > 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#D97706", fontWeight: 600 }}>Reste : {fmt(collecte.reste)} FCFA</p>}
+              {collecte.complete && <p style={{ margin: "8px 0 0", fontSize: 13, color: "#059669", fontWeight: 700 }}>✅ Collecte complète — client activé !</p>}
             </div>
           )}
 
-          {/* Étape overview : saisie montant */}
-          {step === "overview" && !success && collecte && !collecte.complete && (
+          {/* Saisie montant + méthode */}
+          {!success && collecte && !collecte.complete && step === "overview" && (
             <>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-                  Montant à encaisser (FCFA)
+                  Montant à encaisser (FCFA) <span style={{ fontSize: 11, color: "#94A3B8" }}>min. 500</span>
                 </label>
                 <input
-                  type="number"
+                  type="number" min={500}
                   value={montant}
                   onChange={e => setMontant(e.target.value)}
                   placeholder={`Suggéré : ${fmt(collecte.reste)} FCFA`}
-                  style={{ ...inputStyle }}
-                />
-                <p style={{ margin: "5px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                  Laissez vide pour proposer le reste complet.
-                </p>
-              </div>
-              <Alert type="info">
-                Cliquez sur <strong>Générer QR Wave</strong> pour ouvrir le lien de paiement Wave.
-                Après le paiement, entrez la référence de transaction Wave pour confirmer.
-              </Alert>
-            </>
-          )}
-
-          {/* Étape QR : instructions paiement Wave */}
-          {step === "qr" && waveData && !success && (
-            <>
-              <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 14, padding: "20px 18px", textAlign: "center" }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🔵</div>
-                <p style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 900, color: "#1D4ED8", letterSpacing: "-0.02em" }}>
-                  {fmt(waveData.versement?.montant_suggere)}
-                </p>
-                <p style={{ margin: "0 0 16px", fontSize: 12, color: "#3B82F6" }}>à envoyer via Wave</p>
-                <div style={{ background: "#fff", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 11, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>Numéro Wave destinataire</p>
-                  <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                    {waveData.wave_number || "0700000000"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(waveData.wave_number || "0700000000").then(() => alert("Numéro copié !"))}
-                  style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#2563EB", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  📋 Copier le numéro
-                </button>
-              </div>
-              <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 10, padding: "12px 14px" }}>
-                <p style={{ margin: 0, fontSize: 13, color: "#92400E" }}>
-                  <strong>Comment payer :</strong> Ouvrez Wave → Envoyer → saisissez le numéro et le montant → confirmez. Notez bien la <strong>référence de transaction</strong> affichée sur le reçu.
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* Étape confirm : saisie référence Wave */}
-          {step === "confirm" && waveData && !success && (
-            <>
-              <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: "14px 16px" }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#15803D" }}>
-                  ✅ Paiement Wave effectué ?
-                </p>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#16A34A" }}>
-                  Montant : <strong>{fmt(waveData.versement?.montant_suggere)} FCFA</strong>
-                </p>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-                  Référence de transaction Wave <span style={{ color: "#EF4444" }}>*</span>
-                </label>
-                <input
-                  value={waveRef}
-                  onChange={e => setWaveRef(e.target.value)}
-                  placeholder="ex : WV-2024-XXXXXX"
                   style={inputStyle}
                 />
-                <p style={{ margin: "5px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                  Visible sur le reçu Wave du client (anti-doublon).
-                </p>
               </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 10 }}>Moyen de paiement</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {COLLECTE_METHODS.map(m => (
+                    <div
+                      key={m.value}
+                      onClick={() => setMethod(m.value)}
+                      style={{
+                        border: method === m.value ? "2px solid #7C3AED" : "2px solid #E2E8F0",
+                        borderRadius: 10, padding: "10px 12px", cursor: "pointer",
+                        background: method === m.value ? "#F5F3FF" : "#fff",
+                        display: "flex", alignItems: "center", gap: 8, transition: "all .15s",
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>{m.icon}</span>
+                      <span style={{ fontSize: 13, fontWeight: method === m.value ? 700 : 500, color: method === m.value ? "#7C3AED" : "#374151" }}>
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {method === "wave" && (
+                <button
+                  onClick={() => setStep("confirm_wave")}
+                  style={{ background: "none", border: "none", color: "#7C3AED", fontSize: 12, cursor: "pointer", textAlign: "left", textDecoration: "underline", padding: 0 }}
+                >
+                  Paiement Wave déjà effectué ? Saisir la référence manuellement →
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Wave manuel */}
+          {step === "confirm_wave" && !success && (
+            <>
+              <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "#1D4ED8" }}>
+                Entrez la référence visible sur le reçu Wave du client.
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>Montant versé (FCFA)</label>
+                <input type="number" min={500} value={montant} onChange={e => setMontant(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>Référence Wave <span style={{ color: "#EF4444" }}>*</span></label>
+                <input value={waveRef} onChange={e => setWaveRef(e.target.value)} placeholder="ex : WV-2024-XXXXXX" style={inputStyle} />
+              </div>
+              <button onClick={() => setStep("overview")} style={{ background: "none", border: "none", color: "#64748B", fontSize: 12, cursor: "pointer", textAlign: "left", padding: 0 }}>← Retour</button>
             </>
           )}
         </div>
 
         {/* Pied */}
-        <div style={{
-          padding: "14px 24px", borderTop: "1px solid #F1F5F9",
-          display: "flex", justifyContent: "space-between", gap: 10,
-          background: "#FAFAFA", flexShrink: 0,
-        }}>
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", gap: 10, background: "#FAFAFA", flexShrink: 0 }}>
           <button onClick={onClose} style={btnSecondary}>Fermer</button>
-
           {step === "overview" && collecte && !collecte.complete && !success && (
             <button
-              onClick={handleWaveInit}
-              disabled={loading}
-              style={{ ...btnPrimary, background: "#2563EB", opacity: loading ? .7 : 1 }}
+              onClick={handleJekoInit}
+              disabled={loading || !montant || Number(montant) < 500}
+              style={{ ...btnPrimary, background: "#7C3AED", opacity: (loading || !montant || Number(montant) < 500) ? .6 : 1 }}
             >
-              {loading ? "Chargement…" : "🔵 Générer QR Wave"}
+              {loading ? "Chargement…" : `${COLLECTE_METHODS.find(m => m.value === method)?.icon} Payer via ${COLLECTE_METHODS.find(m => m.value === method)?.label}`}
             </button>
           )}
-
-          {step === "qr" && waveData && !success && (
-            <button
-              onClick={() => setStep("confirm")}
-              style={{ ...btnPrimary, background: "#059669" }}
-            >
-              ✅ Paiement effectué → Confirmer
-            </button>
-          )}
-
-          {step === "confirm" && !success && (
+          {step === "confirm_wave" && !success && (
             <button
               onClick={handleWaveConfirm}
-              disabled={loading || !waveRef.trim()}
+              disabled={loading || !waveRef.trim() || !montant || Number(montant) < 500}
               style={{ ...btnPrimary, background: "#059669", opacity: (loading || !waveRef.trim()) ? .6 : 1 }}
             >
               {loading ? "Enregistrement…" : "✅ Confirmer le versement"}
