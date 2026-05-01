@@ -2027,3 +2027,254 @@ const quickBtn = color => ({
   border: `1px solid ${color}30`, color, fontWeight: 600, fontSize: 13,
   textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
 });
+
+
+// ─────────────────────────────────────────────────────────────
+//  MODAL — NOUVELLE COLLECTE (créer client + démarrer collecte)
+// ─────────────────────────────────────────────────────────────
+function NouvelleCollecteModal({ onClose, onCreated }) {
+  const [step,         setStep]         = useState(0);
+  const [plans,        setPlans]        = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [city,         setCity]         = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+
+  useEffect(() => {
+    apiBiz("/plans").then(d => setPlans(d.plans || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  async function handleCreate() {
+    setError(""); setLoading(true);
+    try {
+      await apiBiz("/clients", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), city: city.trim() || undefined, plan_slug: selectedPlan.slug }),
+      });
+      setStep(2);
+      onCreated?.();
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la création.");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.25)", width: "100%", maxWidth: 480, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>💳 Nouvelle collecte</h3>
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>
+              {step === 0 ? "Informations du client" : step === 1 ? "Choisir la formule" : "Client créé ✅"}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748B" }}>✕</button>
+        </div>
+
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+          {error && <div style={{ background: "#FFF1F2", color: "#BE123C", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>{error}</div>}
+
+          {step === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Nom complet *</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Koné Mariam" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Téléphone *</label>
+                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: 0709876543" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Ville (optionnel)</label>
+                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Abidjan" style={inputStyle} />
+              </div>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {plans.map(p => (
+                <div key={p.id} onClick={() => setSelectedPlan(p)} style={{
+                  border: selectedPlan?.id === p.id ? "2px solid #7C3AED" : "2px solid #E2E8F0",
+                  borderRadius: 12, padding: "14px 16px", cursor: "pointer",
+                  background: selectedPlan?.id === p.id ? "#F5F3FF" : "#fff", transition: "all .15s",
+                }}>
+                  <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 15 }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>
+                    Adhésion : <strong>{(p.adhesion_price || 15000).toLocaleString("fr-FR")} FCFA</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {step === 2 && (
+            <div style={{ textAlign: "center", padding: "12px 0" }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+              <p style={{ margin: 0, color: "#64748B", fontSize: 13 }}>Client créé. Retrouvez-le dans <strong>Mes collectes</strong> pour enregistrer les versements.</p>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", gap: 10 }}>
+          {step === 0 && (
+            <>
+              <button onClick={onClose} style={btnSecondary}>Annuler</button>
+              <button onClick={() => { if (!name.trim()) return setError("Le nom est requis."); if (!phone.trim()) return setError("Le téléphone est requis."); setError(""); setStep(1); }} style={btnPrimary}>Suivant →</button>
+            </>
+          )}
+          {step === 1 && (
+            <>
+              <button onClick={() => setStep(0)} style={btnSecondary}>← Retour</button>
+              <button onClick={() => { if (!selectedPlan) return setError("Choisissez une formule."); handleCreate(); }} disabled={loading} style={{ ...btnPrimary, opacity: loading ? .6 : 1 }}>
+                {loading ? "Création…" : "Créer"}
+              </button>
+            </>
+          )}
+          {step === 2 && <button onClick={onClose} style={{ ...btnPrimary, width: "100%" }}>Fermer</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PAGE — COLLECTES WAVE (page dédiée menu latéral)
+// ─────────────────────────────────────────────────────────────
+export function BizCollectesPage() {
+  const [clients,        setClients]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [showModal,      setShowModal]      = useState(false);
+  const [collecteClient, setCollecteClient] = useState(null);
+  const [search,         setSearch]         = useState("");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiBiz("/my-clients?limit=200")
+      .then(d => setClients(d.clients || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const enCours   = clients.filter(c => c.status_payment !== "paid");
+  const completes = clients.filter(c => c.status_payment === "paid");
+
+  const filt = arr => arr.filter(c =>
+    !search ||
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search) ||
+    (c.mutual_number || "").includes(search)
+  );
+
+  function CollecteRow({ c, complete, onClick }) {
+    return (
+      <div
+        onClick={complete ? undefined : onClick}
+        style={{
+          display: "flex", alignItems: "center", gap: 14,
+          padding: "14px 16px", borderRadius: 12, marginBottom: 8,
+          background: "#fff",
+          border: complete ? "1.5px solid #D1FAE5" : "1.5px solid #EFF6FF",
+          cursor: complete ? "default" : "pointer",
+          boxShadow: "0 1px 4px rgba(0,0,0,.05)",
+          transition: "box-shadow .15s",
+        }}
+        onMouseEnter={e => { if (!complete) e.currentTarget.style.boxShadow = "0 4px 16px rgba(124,58,237,.12)"; }}
+        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,.05)"; }}
+      >
+        <div style={{ width: 42, height: 42, borderRadius: "50%", flexShrink: 0, background: complete ? "#D1FAE5" : "#EDE9FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+          {complete ? "✅" : "💳"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+          <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+            {c.phone} · <span style={{ fontFamily: "monospace", color: "#7C3AED" }}>{c.mutual_number}</span> · {c.plan}
+          </div>
+        </div>
+        <span style={{
+          background: complete ? "#D1FAE5" : "#EFF6FF",
+          color: complete ? "#065F46" : "#2563EB",
+          borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, flexShrink: 0,
+        }}>
+          {complete ? "Complète ✅" : "En cours →"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <BizLayout>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1E1B4B" }}>💳 Collectes</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748B" }}>Collectez les frais d'adhésion en plusieurs versements</p>
+        </div>
+        <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+          ➕ Nouvelle collecte
+        </button>
+      </div>
+
+      <input
+        placeholder="🔍 Nom, téléphone ou numéro mutualiste…"
+        value={search} onChange={e => setSearch(e.target.value)}
+        style={{ ...inputStyle, maxWidth: 340, marginBottom: 20 }}
+      />
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Chargement…</div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: ".08em" }}>
+              En cours ({filt(enCours).length})
+            </h3>
+            {filt(enCours).length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
+                Aucune collecte en cours.
+                <br />
+                <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, marginTop: 12, fontSize: 13 }}>➕ Démarrer une collecte</button>
+              </div>
+            ) : filt(enCours).map(c => (
+              <CollecteRow key={c.id} c={c} complete={false} onClick={() => setCollecteClient(c)} />
+            ))}
+          </div>
+
+          {filt(completes).length > 0 && (
+            <div>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Complètes ({filt(completes).length})
+              </h3>
+              {filt(completes).map(c => (
+                <CollecteRow key={c.id} c={c} complete={true} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {showModal && (
+        <NouvelleCollecteModal onClose={() => setShowModal(false)} onCreated={() => { setShowModal(false); load(); }} />
+      )}
+
+      {collecteClient && (
+        <CollecteWaveModal
+          client={collecteClient}
+          onClose={() => setCollecteClient(null)}
+          onCompleted={() => { setCollecteClient(null); load(); }}
+        />
+      )}
+    </BizLayout>
+  );
+}
