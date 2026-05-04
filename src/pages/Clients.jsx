@@ -61,6 +61,7 @@ export default function Clients() {
   const [payError,       setPayError]       = useState("");
   const [paySuccess,     setPaySuccess]     = useState("");
   const [paying,         setPaying]         = useState(false);
+  const [jekoMethod,     setJekoMethod]     = useState("orange");
 
   const [showImport,   setShowImport]   = useState(false);
   const [csvRows,      setCsvRows]      = useState([]);
@@ -180,16 +181,23 @@ export default function Clients() {
           client_email: pendingPayment.client.email || "client@awoundjo.ci",
           client_id:    pendingPayment.clientId,
           type:         "adhesion",
+          jeko_method:  jekoMethod,
           success_url: `${window.location.origin}/clients?payment=success&tx=${txId}`,
           failed_url:  `${window.location.origin}/clients?payment=failed`,
         }),
       });
 
       const data = await res.json();
-      const paymentUrl = data?.data?.payment_url;
+      console.log('[Jeko init] réponse:', JSON.stringify(data));
+      const paymentUrl =
+        data?.data?.redirect_url ||
+        data?.data?.payment_url ||
+        data?.data?.url ||
+        data?.payment_url ||
+        data?.url;
 
       if (!paymentUrl) {
-        throw new Error(data?.error || "URL de paiement JEKO non reçue");
+        throw new Error(data?.error || data?.message || "URL de paiement JEKO non reçue");
       }
 
       window.location.href = paymentUrl;
@@ -608,13 +616,20 @@ export default function Clients() {
                 </div>
               )}
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Moyens acceptés</p>
-                <div className="flex gap-2 flex-wrap">
-                  {["🟠 Orange Money","💛 MTN MoMo","🌊 Wave","🔵 Moov","💳 Carte"].map(m => (
-                    <span key={m} className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">{m}</span>
-                  ))}
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Réseau de paiement</label>
+                <select
+                  value={jekoMethod}
+                  onChange={(e) => setJekoMethod(e.target.value)}
+                  disabled={paying}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="orange">🟠 Orange Money</option>
+                  <option value="wave">🌊 Wave</option>
+                  <option value="mtn">💛 MTN Mobile Money</option>
+                  <option value="moov">🔵 Moov Money</option>
+                  <option value="djamo">💳 Djamo / Carte bancaire</option>
+                </select>
               </div>
 
               <div className="flex gap-3">
@@ -624,7 +639,7 @@ export default function Clients() {
                 </button>
                 <button onClick={handlePayAdhesion} disabled={paying}
                   className="flex-1 px-4 py-2.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold disabled:opacity-60 transition-all">
-                  {paying ? "⏳ Ouverture…" : "💳 Payer maintenant"}
+                  {paying ? "⏳ Ouverture…" : "💳 Payer via JEKO"}
                 </button>
               </div>
 
