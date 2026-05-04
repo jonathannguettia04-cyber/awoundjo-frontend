@@ -1,7 +1,23 @@
 // src/pages/AdminBusiness.jsx
 // ══════════════════════════════════════════════════════════════
 //  Awoundjô — Administration Réseau Business
-//  Onglets : Membres · Commissions · Bonus Pool · Demandes Commission · Clients
+//
+//  CORRECTIONS v2 :
+//  1. Mot de passe Sce Technique vérifié côté serveur (DB)
+//     POST /api/business/admin/sce-auth { password } → 200 | 401
+//     (suppression de la constante hardcodée SCE_TECH_PASSWORD)
+//  2. commissions_count → fallback ?? 0 (plus de null ambigu)
+//  3. Pagination membres : disabled={page * LIMIT >= totalMembers}
+//  4. Variable shadow `s` dans le .map statuts → renommée `stColor`
+//  5. loadScePayments enveloppé dans useCallback
+//  6. Pagination clients : disabled={clientPage * CLIENT_LIMIT >= clientsTotal}
+//
+//  AJOUTS v2 :
+//  7. Onglet "Collectes" — vue admin de toutes les collectes progressives
+//     GET  /api/business/admin/collectes?page&limit&search&status
+//     POST /api/business/admin/collectes/:clientId/wave-confirm
+//     POST /api/business/admin/collectes/:clientId/verse-commissions
+//  8. CollecteAdminModal — confirmer versements Wave + déclencher commissions
 // ══════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -21,8 +37,22 @@ const STATUS_COLORS = {
   SUSPENDED: { bg: "#FEF2F2", color: "#DC2626" },
 };
 
-const TABS = ["Membres", "Commissions", "Bonus Pool", "Demandes Commission", "Clients", "Sce Technique"];
-const SCE_TECH_PASSWORD = "AwSce2025#";
+const CLIENT_STATUS_MAP = {
+  actif:            { bg: "#ECFDF5", color: "#059669", label: "Actif"          },
+  attente:          { bg: "#FFFBEB", color: "#D97706", label: "En attente"     },
+  suspendu:         { bg: "#FEF2F2", color: "#DC2626", label: "Suspendu"       },
+  renewal_required: { bg: "#DBEAFE", color: "#1D4ED8", label: "Renouvellement" },
+};
+
+const TABS = [
+  "Membres",
+  "Commissions",
+  "Bonus Pool",
+  "Demandes Commission",
+  "Clients",
+  "Collectes",
+  "Sce Technique",
+];
 
 // ── Hook fetch générique ──────────────────────────────────────
 function useAdminFetch(token) {
@@ -74,32 +104,44 @@ export default function AdminBusiness() {
   const [commStatus, setCommStatus] = useState("");
 
   // Clients admin
-  const [clients,         setClients]         = useState([]);
-  const [clientsTotal,    setClientsTotal]    = useState(0);
-  const [clientOrigin,    setClientOrigin]    = useState("");
-  const [clientStatus,    setClientStatus]    = useState("");
-  const [clientSearch,    setClientSearch]    = useState("");
-  const [clientPage,      setClientPage]      = useState(1);
+  const [clients,      setClients]      = useState([]);
+  const [clientsTotal, setClientsTotal] = useState(0);
+  const [clientOrigin, setClientOrigin] = useState("");
+  const [clientStatus, setClientStatus] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientPage,   setClientPage]   = useState(1);
   const CLIENT_LIMIT = 30;
 
   // Demandes de commission (retrait)
-  const [demandesComm,          setDemandesComm]          = useState([]);
-  const [demandesStats,         setDemandesStats]         = useState({});
-  const [demandesStatusFilter,  setDemandesStatusFilter]  = useState("");
-  const [actionLoading,         setActionLoading]         = useState(null);
-  const [rejectModal,           setRejectModal]           = useState(null);
-  const [rejectNote,            setRejectNote]            = useState("");
+  const [demandesComm,         setDemandesComm]         = useState([]);
+  const [demandesStats,        setDemandesStats]        = useState({});
+  const [demandesStatusFilter, setDemandesStatusFilter] = useState("");
+  const [actionLoading,        setActionLoading]        = useState(null);
+  const [rejectModal,          setRejectModal]          = useState(null);
+  const [rejectNote,           setRejectNote]           = useState("");
 
-  // Sce Technique
-  const [sceUnlocked,      setSceUnlocked]      = useState(false);
-  const [scePwdInput,      setScePwdInput]      = useState("");
-  const [scePwdError,      setScePwdError]      = useState(false);
-  const [scePayments,      setScePayments]      = useState([]);
-  const [sceLoading,       setSceLoading]       = useState(false);
-  const [sceVerseLoading,  setSceVerseLoading]  = useState(null);
+  // Collectes admin
+  const [collectes,          setCollectes]          = useState([]);
+  const [collectesTotal,     setCollectesTotal]     = useState(0);
+  const [collecteSearch,     setCollecteSearch]     = useState("");
+  const [collecteStatusFilt, setCollecteStatusFilt] = useState(""); // "" | "en_cours" | "complete"
+  const [collectePage,       setCollectePage]       = useState(1);
+  const [collecteModal,      setCollecteModal]      = useState(null); // { client }
+  const COLLECTE_LIMIT = 30;
 
-  // Modal confirmation
-  const [modal, setModal] = useState(null); // { type, member/commission }
+  // Sce Technique — mot de passe vérifié côté serveur
+  const [sceUnlocked,     setSceUnlocked]     = useState(false);
+  const [scePwdInput,     setScePwdInput]     = useState("");
+  const [scePwdError,     setScePwdError]     = useState(false);
+  const [scePwdLoading,   setScePwdLoading]   = useState(false);
+  const [scePayments,     setScePayments]     = useState([]);
+  const [sceLoading,      setSceLoading]      = useState(false);
+  const [sceVerseLoading, setSceVerseLoading] = useState(null);
+
+  // Modal confirmation membres
+  const [modal,         setModal]         = useState(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [deleting,      setDeleting]      = useState(false);
 
   // ── Toast ─────────────────────────────────────────────────
   const showToast = (msg, isError = false) => {
@@ -107,7 +149,7 @@ export default function AdminBusiness() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Chargement données ────────────────────────────────────
+  // ── Loaders ───────────────────────────────────────────────
   const loadMembers = useCallback(async () => {
     setLoading(true);
     try {
@@ -117,7 +159,11 @@ export default function AdminBusiness() {
       if (search)       params.set("search", search);
       const d = await get(`/api/business/admin/members?${params}`);
       setMembers(d.data?.members || d.members || []);
-      setTotalMembers(d.data?.pagination?.total ?? d.pagination?.total ?? (d.data?.members || d.members || []).length);
+      setTotalMembers(
+        d.data?.pagination?.total ??
+        d.pagination?.total ??
+        (d.data?.members || d.members || []).length
+      );
     } catch (e) { showToast(e.message, true); }
     setLoading(false);
   }, [get, page, filterRole, filterStatus, search]);
@@ -136,16 +182,10 @@ export default function AdminBusiness() {
   const loadBonusPool = useCallback(async () => {
     setLoading(true);
     try {
-      // Route admin dédiée (à créer côté backend si absente)
-      // GET /api/business/admin/bonus-pool → { bonus_pool[], current_pool }
-      // Fallback : tente la route membre si la route admin n'existe pas encore
       let d;
       try {
         d = await get("/api/business/admin/bonus-pool");
       } catch {
-        // Route admin absente → la route /api/business/bonus-pool est réservée
-        // aux membres Business et retourne "Accès refusé" avec un token admin.
-        // Dans ce cas on affiche un message clair plutôt qu'un tableau vide.
         d = { bonus_pool: [], current_pool: 0, _routeMissing: true };
       }
       setBonusPool(d.data?.bonus_pool || d.bonus_pool || d.history || []);
@@ -164,7 +204,11 @@ export default function AdminBusiness() {
       if (clientSearch) params.set("search", clientSearch);
       const d = await get(`/api/business/admin/clients?${params}`);
       setClients(d.data?.clients || d.clients || []);
-      setClientsTotal(d.data?.pagination?.total ?? d.pagination?.total ?? (d.data?.clients || d.clients || []).length);
+      setClientsTotal(
+        d.data?.pagination?.total ??
+        d.pagination?.total ??
+        (d.data?.clients || d.clients || []).length
+      );
     } catch (e) { showToast(e.message, true); }
     setLoading(false);
   }, [get, clientPage, clientOrigin, clientStatus, clientSearch]);
@@ -181,13 +225,30 @@ export default function AdminBusiness() {
     setLoading(false);
   }, [get, demandesStatusFilter]);
 
-  const loadScePayments = async () => {
+  // FIX : loadCollectes — onglet admin collectes
+  const loadCollectes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: collectePage, limit: COLLECTE_LIMIT });
+      if (collecteSearch)     params.set("search", collecteSearch);
+      if (collecteStatusFilt) params.set("status", collecteStatusFilt);
+      const d = await get(`/api/business/admin/collectes?${params}`);
+      setCollectes(d.data?.collectes || d.collectes || []);
+      setCollectesTotal(
+        d.data?.pagination?.total ??
+        d.pagination?.total ??
+        (d.data?.collectes || d.collectes || []).length
+      );
+    } catch (e) { showToast(e.message, true); }
+    setLoading(false);
+  }, [get, collectePage, collecteSearch, collecteStatusFilt]);
+
+  // FIX : loadScePayments en useCallback (était une fonction normale)
+  const loadScePayments = useCallback(async () => {
     setSceLoading(true);
     try {
-      // Charger tous les membres (tous niveaux)
       const d = await get("/api/business/admin/members?page=1&limit=200");
       const allMembers = d.data?.members || d.members || [];
-      // Construire une ligne par membre avec ses infos de paiement d'adhésion
       const rows = allMembers.map(m => ({
         id:               m.id,
         member:           m,
@@ -195,31 +256,27 @@ export default function AdminBusiness() {
         payment_type:     "adhesion",
         status:           m.status_payment === "paid" ? "COMPLETED" : "PENDING",
         created_at:       m.created_at,
-        commissions_count: m.commissions_count ?? (m.status_payment === "paid" ? null : 0),
+        // FIX : fallback 0 au lieu de null pour éviter hasComm=false sur membres payés sans count
+        commissions_count: m.commissions_count ?? 0,
       }));
       setScePayments(rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     } catch (e) { showToast(e.message, true); }
     setSceLoading(false);
-  };
-
-  async function handleVerseCommissions(paymentId, memberId) {
-    setSceVerseLoading(paymentId);
-    try {
-      await post(`/api/business/admin/members/${memberId}/recalc-commissions`);
-      showToast("✅ Commissions versées avec succès");
-      loadScePayments();
-    } catch (e) { showToast(e.message, true); }
-    setSceVerseLoading(null);
-  }
+  }, [get]);
 
   useEffect(() => {
-    if (tab === "Membres")              loadMembers();
-    if (tab === "Commissions")          loadCommissions();
-    if (tab === "Bonus Pool")           loadBonusPool();
-    if (tab === "Demandes Commission")  loadDemandesCommission();
-    if (tab === "Clients")              loadClients();
+    if (tab === "Membres")             loadMembers();
+    if (tab === "Commissions")         loadCommissions();
+    if (tab === "Bonus Pool")          loadBonusPool();
+    if (tab === "Demandes Commission") loadDemandesCommission();
+    if (tab === "Clients")             loadClients();
+    if (tab === "Collectes")           loadCollectes();
     if (tab === "Sce Technique" && sceUnlocked) loadScePayments();
-  }, [tab, sceUnlocked, loadMembers, loadCommissions, loadBonusPool, loadDemandesCommission, loadClients]);
+  }, [
+    tab, sceUnlocked,
+    loadMembers, loadCommissions, loadBonusPool,
+    loadDemandesCommission, loadClients, loadCollectes, loadScePayments,
+  ]);
 
   // ── Actions membres ────────────────────────────────────────
   async function handleValidate(id, action, isCash = false) {
@@ -247,10 +304,6 @@ export default function AdminBusiness() {
     } catch (e) { showToast(e.message, true); }
     setModal(null);
   }
-
-  // ── Suppression membre ────────────────────────────────────
-  const [adminPassword, setAdminPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
 
   async function handleDelete(id) {
     if (!adminPassword.trim()) return showToast("Mot de passe admin requis", true);
@@ -298,7 +351,33 @@ export default function AdminBusiness() {
     setActionLoading(null);
   }
 
-  // La recherche est désormais transmise au serveur via loadMembers
+  // ── Sce Technique — auth via DB (FIX : plus de mot de passe hardcodé) ──
+  async function handleSceAuth() {
+    if (!scePwdInput.trim()) return;
+    setScePwdLoading(true);
+    setScePwdError(false);
+    try {
+      // POST /api/business/admin/sce-auth { password }
+      // Le backend compare au hash stocké en base (table settings ou admin_config)
+      await post("/api/business/admin/sce-auth", { password: scePwdInput });
+      setSceUnlocked(true);
+      setScePwdInput("");
+    } catch {
+      setScePwdError(true);
+    }
+    setScePwdLoading(false);
+  }
+
+  async function handleVerseCommissions(paymentId, memberId) {
+    setSceVerseLoading(paymentId);
+    try {
+      await post(`/api/business/admin/members/${memberId}/recalc-commissions`);
+      showToast("✅ Commissions versées avec succès");
+      loadScePayments();
+    } catch (e) { showToast(e.message, true); }
+    setSceVerseLoading(null);
+  }
+
   const filteredMembers = members;
 
   // ── Render ─────────────────────────────────────────────────
@@ -306,9 +385,12 @@ export default function AdminBusiness() {
     <div style={s.page}>
       {/* Toast */}
       {toast && (
-        <div style={{ ...s.toast, background: toast.isError ? "#FEF2F2" : "#ECFDF5",
-          color: toast.isError ? "#DC2626" : "#059669",
-          border: `1px solid ${toast.isError ? "#FECACA" : "#A7F3D0"}` }}>
+        <div style={{
+          ...s.toast,
+          background: toast.isError ? "#FEF2F2" : "#ECFDF5",
+          color:      toast.isError ? "#DC2626" : "#059669",
+          border:     `1px solid ${toast.isError ? "#FECACA" : "#A7F3D0"}`,
+        }}>
           {toast.msg}
         </div>
       )}
@@ -320,13 +402,14 @@ export default function AdminBusiness() {
           <p style={s.subtitle}>Administration — Directrices · Leaders · Superviseurs · Recruteurs</p>
         </div>
         <div style={s.headerStats}>
-          <StatBadge label="Membres" value={totalMembers} color="#7C3AED" />
+          <StatBadge label="Membres"    value={totalMembers}        color="#7C3AED" />
           <StatBadge label="Commissions" value={commissions.length} color="#0891B2" />
+          <StatBadge label="Collectes"  value={collectesTotal}      color="#059669" />
         </div>
       </div>
 
       {/* Onglets */}
-      <div style={s.tabs}>
+      <div style={{ ...s.tabs, flexWrap: "wrap" }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             ...s.tab,
@@ -340,10 +423,9 @@ export default function AdminBusiness() {
         ))}
       </div>
 
-      {/* ── ONGLET MEMBRES ────────────────────────────────── */}
+      {/* ══ ONGLET MEMBRES ══════════════════════════════════ */}
       {tab === "Membres" && (
         <div>
-          {/* Filtres */}
           <div style={s.filters}>
             <input
               style={s.input} placeholder="🔍 Nom, email, téléphone…"
@@ -357,8 +439,8 @@ export default function AdminBusiness() {
             </select>
             <select style={s.select} value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }}>
               <option value="">Tous les statuts</option>
-              {["ACTIVE","PENDING","SUSPENDED"].map(s => (
-                <option key={s} value={s}>{s}</option>
+              {["ACTIVE","PENDING","SUSPENDED"].map(sv => (
+                <option key={sv} value={sv}>{sv}</option>
               ))}
             </select>
             <button style={s.btnSecondary} onClick={loadMembers}>↻ Rafraîchir</button>
@@ -376,7 +458,7 @@ export default function AdminBusiness() {
                 </thead>
                 <tbody>
                   {filteredMembers.map(m => {
-                    const roleC = ROLE_COLORS[m.role] || {};
+                    const roleC   = ROLE_COLORS[m.role]   || {};
                     const statusC = STATUS_COLORS[m.status] || {};
                     return (
                       <tr key={m.id} style={s.tr}>
@@ -400,7 +482,6 @@ export default function AdminBusiness() {
                             </div>
                           )}
                         </td>
-                        {/* Colonne Paiement — status_payment + date d'adhésion */}
                         <td style={s.td}>
                           {m.status_payment
                             ? <span style={{ ...s.badge, background: m.status_payment === "paid" ? "#ECFDF5" : "#FFF7ED", color: m.status_payment === "paid" ? "#059669" : "#D97706" }}>
@@ -420,11 +501,9 @@ export default function AdminBusiness() {
                             : <span style={{ color: "#CBD5E1" }}>—</span>
                           }
                         </td>
-                        {/* Clients créés */}
                         <td style={{ ...s.td, textAlign: "center", fontWeight: 700, color: "#0891B2" }}>
                           {m.total_clients_created ?? "—"}
                         </td>
-                        {/* Commissions totales */}
                         <td style={{ ...s.td, fontWeight: 700, color: "#7C3AED" }}>
                           {m.total_commissions != null
                             ? `${Number(m.total_commissions).toLocaleString("fr-FR")} F`
@@ -436,7 +515,6 @@ export default function AdminBusiness() {
                         </td>
                         <td style={s.td}>
                           <div style={s.actionsCol}>
-                            {/* Groupe validation — visible seulement si en attente */}
                             {m.status_validation === "pending" && (
                               <div style={s.actionGroup}>
                                 <ActionBtn label="✅ Approuver" color="#059669" onClick={() => setModal({ type: "approve", member: m })} />
@@ -444,11 +522,10 @@ export default function AdminBusiness() {
                                 <ActionBtn label="❌ Rejeter"   color="#DC2626" onClick={() => setModal({ type: "reject",  member: m })} />
                               </div>
                             )}
-                            {/* Groupe outils */}
                             <div style={s.actionGroup}>
-                              <ActionBtn label="🔑 Réinit. MDP"   color="#7C3AED" onClick={() => setModal({ type: "password", member: m })} />
-                              <ActionBtn label="♻️ Commissions"   color="#D97706" onClick={() => setModal({ type: "recalc",   member: m })} />
-                              <ActionBtn label="🗑️ Supprimer"     color="#DC2626" onClick={() => { setAdminPassword(""); setModal({ type: "delete", member: m }); }} />
+                              <ActionBtn label="🔑 Réinit. MDP"  color="#7C3AED" onClick={() => setModal({ type: "password", member: m })} />
+                              <ActionBtn label="♻️ Commissions"  color="#D97706" onClick={() => setModal({ type: "recalc",   member: m })} />
+                              <ActionBtn label="🗑️ Supprimer"    color="#DC2626" onClick={() => { setAdminPassword(""); setModal({ type: "delete", member: m }); }} />
                             </div>
                           </div>
                         </td>
@@ -465,23 +542,32 @@ export default function AdminBusiness() {
             </div>
           )}
 
-          {/* Pagination */}
+          {/* Pagination — FIX : désactivation correcte avec totalMembers */}
           <div style={s.pagination}>
             <button style={s.btnSecondary} disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Préc.</button>
-            <span style={{ fontSize: 13, color: "#64748B" }}>Page {page}</span>
-            <button style={s.btnSecondary} disabled={members.length < LIMIT} onClick={() => setPage(p => p + 1)}>Suiv. →</button>
+            <span style={{ fontSize: 13, color: "#64748B" }}>
+              Page {page} · {totalMembers} membre{totalMembers !== 1 ? "s" : ""}
+            </span>
+            <button
+              style={s.btnSecondary}
+              disabled={page * LIMIT >= totalMembers}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Suiv. →
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── ONGLET COMMISSIONS ────────────────────────────── */}
+      {/* ══ ONGLET COMMISSIONS ══════════════════════════════ */}
       {tab === "Commissions" && (
         <div>
           <div style={s.filters}>
+            {/* FIX : variable renommée stColor pour éviter le shadow de l'objet s */}
             <select style={s.select} value={commStatus} onChange={e => setCommStatus(e.target.value)}>
               <option value="">Tous les statuts</option>
-              {["PENDING","VALIDATED","PAID","REJECTED"].map(s => (
-                <option key={s} value={s}>{s}</option>
+              {["PENDING","VALIDATED","PAID","REJECTED"].map(stColor => (
+                <option key={stColor} value={stColor}>{stColor}</option>
               ))}
             </select>
             <button style={s.btnSecondary} onClick={loadCommissions}>↻ Rafraîchir</button>
@@ -499,7 +585,8 @@ export default function AdminBusiness() {
                 </thead>
                 <tbody>
                   {commissions.map(c => {
-                    const statusC = {
+                    // FIX : variable renommée commSt pour éviter tout shadow
+                    const commSt = {
                       PENDING:   { bg: "#FFF7ED", color: "#D97706" },
                       VALIDATED: { bg: "#ECFEFF", color: "#0891B2" },
                       PAID:      { bg: "#ECFDF5", color: "#059669" },
@@ -526,7 +613,7 @@ export default function AdminBusiness() {
                           <div style={s.memberSub}>{c.payment_type}</div>
                         </td>
                         <td style={s.td}>
-                          <span style={{ ...s.badge, background: statusC.bg, color: statusC.color }}>
+                          <span style={{ ...s.badge, background: commSt.bg, color: commSt.color }}>
                             {c.status}
                           </span>
                         </td>
@@ -538,7 +625,7 @@ export default function AdminBusiness() {
                             {c.status === "PENDING" && (
                               <>
                                 <ActionBtn label="✅ Valider" color="#0891B2" onClick={() => handleCommAction(c.id, "validate")} />
-                                <ActionBtn label="💸 Payer"  color="#059669" onClick={() => handleCommAction(c.id, "pay")} />
+                                <ActionBtn label="💸 Payer"   color="#059669" onClick={() => handleCommAction(c.id, "pay")} />
                                 <ActionBtn label="❌ Rejeter" color="#DC2626" onClick={() => handleCommAction(c.id, "reject")} />
                               </>
                             )}
@@ -562,10 +649,9 @@ export default function AdminBusiness() {
         </div>
       )}
 
-      {/* ── ONGLET BONUS POOL ─────────────────────────────── */}
+      {/* ══ ONGLET BONUS POOL ═══════════════════════════════ */}
       {tab === "Bonus Pool" && (
         <div>
-          {/* Pool du mois en cours — aligné sur BusinessDashboard.jsx */}
           {!loading && (
             <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
               <div style={{ background: "#fff", border: "1.5px solid #FDE68A", borderRadius: 12, padding: "14px 20px", minWidth: 200 }}>
@@ -592,8 +678,8 @@ export default function AdminBusiness() {
                 La route <code style={{ background: "#FEF3C7", padding: "2px 6px", borderRadius: 4 }}>GET /api/business/admin/bonus-pool</code> n'existe pas encore.
               </p>
               <p style={{ margin: 0, fontSize: 12, color: "#B45309" }}>
-                Ajouter cet endpoint dans le contrôleur admin Business avec <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>authenticateAdmin</code> (pas le middleware membre Business).
-                Il doit retourner <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>{"{ bonus_pool[], current_pool }"}</code>.
+                Ajouter cet endpoint avec <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>authenticateAdmin</code>.
+                Retourner <code style={{ background: "#FEF3C7", padding: "2px 4px", borderRadius: 4 }}>{"{ bonus_pool[], current_pool }"}</code>.
               </p>
             </div>
           ) : bonusPool.length === 0 ? (
@@ -631,10 +717,9 @@ export default function AdminBusiness() {
         </div>
       )}
 
-      {/* ── ONGLET DEMANDES COMMISSION ──────────────────── */}
+      {/* ══ ONGLET DEMANDES COMMISSION ══════════════════════ */}
       {tab === "Demandes Commission" && (
         <div>
-          {/* Stats rapides */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
             {[
               { label: "En attente", key: "PENDING",   color: "#D97706", bg: "#FFFBEB" },
@@ -642,7 +727,8 @@ export default function AdminBusiness() {
               { label: "Payées",     key: "PAID",      color: "#059669", bg: "#ECFDF5" },
               { label: "Rejetées",   key: "REJECTED",  color: "#DC2626", bg: "#FEF2F2" },
             ].map(({ label, key, color, bg }) => (
-              <div key={key} onClick={() => setDemandesStatusFilter(demandesStatusFilter === key ? "" : key)}
+              <div key={key}
+                onClick={() => setDemandesStatusFilter(demandesStatusFilter === key ? "" : key)}
                 style={{ background: bg, border: `1.5px solid ${color}44`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", opacity: demandesStatusFilter && demandesStatusFilter !== key ? 0.5 : 1, transition: "opacity .15s" }}>
                 <div style={{ fontSize: 18, fontWeight: 900, color }}>{demandesStats[key] || 0}</div>
                 <div style={{ fontSize: 11, color, fontWeight: 700 }}>{label}</div>
@@ -660,7 +746,8 @@ export default function AdminBusiness() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {demandesComm.map(r => {
-                const details = typeof r.payment_details === "string" ? JSON.parse(r.payment_details || "{}") : (r.payment_details || {});
+                const details = typeof r.payment_details === "string"
+                  ? JSON.parse(r.payment_details || "{}") : (r.payment_details || {});
                 const STATUS_MAP = {
                   PENDING:   { label: "⏳ En attente", color: "#D97706", bg: "#FFFBEB" },
                   VALIDATED: { label: "✅ Validée",    color: "#1B4FD8", bg: "#EFF6FF" },
@@ -705,7 +792,6 @@ export default function AdminBusiness() {
                           </div>
                         )}
                       </div>
-                      {/* Actions */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {r.status === "PENDING" && (
                           <>
@@ -760,7 +846,7 @@ export default function AdminBusiness() {
         </div>
       )}
 
-      {/* ── ONGLET CLIENTS ────────────────────────────────── */}
+      {/* ══ ONGLET CLIENTS ══════════════════════════════════ */}
       {tab === "Clients" && (
         <div>
           <div style={s.filters}>
@@ -789,13 +875,14 @@ export default function AdminBusiness() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#F8FAFC" }}>
-                    {["Client","Statut","Origine","Recruteur","Formule","Date"].map(h => (
+                    {["Client","N° Mutualiste","Statut","Origine","Recruteur","Formule","Paiement","Date"].map(h => (
                       <th key={h} style={s.th}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {clients.map(c => {
+                    const cliSt = CLIENT_STATUS_MAP[c.status] || { bg: "#F1F5F9", color: "#64748B", label: c.status || "—" };
                     return (
                       <tr key={c.id} style={s.tr}>
                         <td style={s.td}>
@@ -804,16 +891,12 @@ export default function AdminBusiness() {
                           {c.phone && <div style={s.memberSub}>{c.phone}</div>}
                         </td>
                         <td style={s.td}>
-                          {(() => {
-                            const CLIENT_STATUS = {
-                              actif:            { bg: "#ECFDF5", color: "#059669", label: "Actif"          },
-                              attente:          { bg: "#FFFBEB", color: "#D97706", label: "En attente"     },
-                              suspendu:         { bg: "#FEF2F2", color: "#DC2626", label: "Suspendu"       },
-                              renewal_required: { bg: "#DBEAFE", color: "#1D4ED8", label: "Renouvellement" },
-                            };
-                            const st = CLIENT_STATUS[c.status] || { bg: "#F1F5F9", color: "#64748B", label: c.status || "—" };
-                            return <span style={{ ...s.badge, background: st.bg, color: st.color }}>{st.label}</span>;
-                          })()}
+                          <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#7C3AED" }}>
+                            {c.mutual_number || "—"}
+                          </span>
+                        </td>
+                        <td style={s.td}>
+                          <span style={{ ...s.badge, background: cliSt.bg, color: cliSt.color }}>{cliSt.label}</span>
                         </td>
                         <td style={s.td}>
                           <span style={{ ...s.badge, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD" }}>
@@ -827,14 +910,21 @@ export default function AdminBusiness() {
                           }
                         </td>
                         <td style={s.td}>{c.plan_name || c.formule || "—"}</td>
-                        <td style={{ ...s.td, fontSize: 12 }}>
+                        <td style={s.td}>
+                          <span style={{ ...s.badge,
+                            background: c.status_payment === "paid" ? "#ECFDF5" : "#FFF7ED",
+                            color:      c.status_payment === "paid" ? "#059669" : "#D97706" }}>
+                            {c.status_payment === "paid" ? "✅ Payé" : "⏳ Impayé"}
+                          </span>
+                        </td>
+                        <td style={{ ...s.td, fontSize: 12, whiteSpace: "nowrap" }}>
                           {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
                         </td>
                       </tr>
                     );
                   })}
                   {clients.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
+                    <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>
                       Aucun client trouvé
                     </td></tr>
                   )}
@@ -843,16 +933,230 @@ export default function AdminBusiness() {
             </div>
           )}
 
-          {/* Pagination */}
+          {/* Pagination — FIX */}
           <div style={s.pagination}>
             <button style={s.btnSecondary} disabled={clientPage === 1} onClick={() => setClientPage(p => p - 1)}>← Préc.</button>
-            <span style={{ fontSize: 13, color: "#64748B" }}>Page {clientPage} · {clientsTotal} client{clientsTotal !== 1 ? "s" : ""}</span>
-            <button style={s.btnSecondary} disabled={clients.length < CLIENT_LIMIT} onClick={() => setClientPage(p => p + 1)}>Suiv. →</button>
+            <span style={{ fontSize: 13, color: "#64748B" }}>
+              Page {clientPage} · {clientsTotal} client{clientsTotal !== 1 ? "s" : ""}
+            </span>
+            <button
+              style={s.btnSecondary}
+              disabled={clientPage * CLIENT_LIMIT >= clientsTotal}
+              onClick={() => setClientPage(p => p + 1)}
+            >
+              Suiv. →
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── MODAL CONFIRMATION ────────────────────────────── */}
+      {/* ══ ONGLET COLLECTES (NOUVEAU) ══════════════════════ */}
+      {tab === "Collectes" && (
+        <div>
+          {/* Résumé rapide */}
+          {!loading && (
+            <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ background: "#fff", border: "1.5px solid #BFDBFE", borderRadius: 12, padding: "14px 20px", minWidth: 180 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Total collectes</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#2563EB" }}>{collectesTotal}</div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #A7F3D0", borderRadius: 12, padding: "14px 20px", minWidth: 180 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Complètes</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#059669" }}>
+                  {collectes.filter(c => c.complete).length}
+                </div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #FDE68A", borderRadius: 12, padding: "14px 20px", minWidth: 180 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>En cours</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#D97706" }}>
+                  {collectes.filter(c => !c.complete).length}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filtres */}
+          <div style={s.filters}>
+            <input
+              style={s.input} placeholder="🔍 Nom client, téléphone, N° mutualiste…"
+              value={collecteSearch}
+              onChange={e => { setCollecteSearch(e.target.value); setCollectePage(1); }}
+            />
+            <select style={s.select} value={collecteStatusFilt} onChange={e => { setCollecteStatusFilt(e.target.value); setCollectePage(1); }}>
+              <option value="">Toutes les collectes</option>
+              <option value="en_cours">En cours</option>
+              <option value="complete">Complètes</option>
+            </select>
+            <button style={s.btnSecondary} onClick={loadCollectes}>↻ Rafraîchir</button>
+          </div>
+
+          {loading ? <Spinner /> : (
+            <div style={s.table}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {["Client","Recruteur","Formule","Progression","Statut","Date","Actions"].map(h => (
+                      <th key={h} style={s.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {collectes.map(c => {
+                    const pct = Math.min(100, Math.round(
+                      ((c.total_verse || 0) / (c.adhesion_price || 15000)) * 100
+                    ));
+                    return (
+                      <tr key={c.id || c.client_id} style={s.tr}>
+                        {/* Client */}
+                        <td style={s.td}>
+                          <div style={s.memberName}>{c.client_name || c.name}</div>
+                          <div style={s.memberSub}>{c.client_phone || c.phone}</div>
+                          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#7C3AED", marginTop: 2 }}>
+                            {c.mutual_number || "—"}
+                          </div>
+                        </td>
+                        {/* Recruteur */}
+                        <td style={s.td}>
+                          {c.recruteur_name
+                            ? <>
+                                <div style={s.memberName}>{c.recruteur_name}</div>
+                                <div style={s.memberSub}>
+                                  {c.recruteur_role && (
+                                    <span style={{ ...s.badge, ...ROLE_COLORS[c.recruteur_role], border: `1px solid ${ROLE_COLORS[c.recruteur_role]?.border}` }}>
+                                      {c.recruteur_role}
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            : <span style={{ color: "#CBD5E1" }}>—</span>
+                          }
+                        </td>
+                        {/* Formule */}
+                        <td style={s.td}>
+                          <span style={{ ...s.badge, background: "#F5F3FF", color: "#7C3AED", border: "1px solid #DDD6FE" }}>
+                            {c.plan || c.plan_name || "—"}
+                          </span>
+                          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                            {Number(c.adhesion_price || 0).toLocaleString("fr-FR")} FCFA
+                          </div>
+                        </td>
+                        {/* Progression */}
+                        <td style={{ ...s.td, minWidth: 160 }}>
+                          <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, color: pct >= 100 ? "#059669" : "#0F172A" }}>
+                              {Number(c.total_verse || 0).toLocaleString("fr-FR")}
+                            </span>
+                            {" / "}
+                            {Number(c.adhesion_price || 0).toLocaleString("fr-FR")} FCFA
+                          </div>
+                          <div style={{ height: 8, background: "#E2E8F0", borderRadius: 6, overflow: "hidden", width: "100%" }}>
+                            <div style={{
+                              height: "100%", borderRadius: 6, transition: "width .4s",
+                              background: pct >= 100 ? "#059669" : "#7C3AED",
+                              width: `${pct}%`,
+                            }} />
+                          </div>
+                          <div style={{ fontSize: 11, color: pct >= 100 ? "#059669" : "#7C3AED", fontWeight: 700, marginTop: 3 }}>
+                            {pct}%
+                            {c.reste > 0 && <span style={{ color: "#D97706", marginLeft: 8 }}>reste : {Number(c.reste).toLocaleString("fr-FR")} F</span>}
+                          </div>
+                          {/* Nb versements */}
+                          {c.versements_count != null && (
+                            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>
+                              {c.versements_count} versement{c.versements_count !== 1 ? "s" : ""}
+                            </div>
+                          )}
+                        </td>
+                        {/* Statut */}
+                        <td style={s.td}>
+                          {c.complete
+                            ? <span style={{ ...s.badge, background: "#ECFDF5", color: "#059669" }}>✅ Complète</span>
+                            : <span style={{ ...s.badge, background: "#FFF7ED", color: "#D97706" }}>⏳ En cours</span>
+                          }
+                          {c.commissions_versees != null && (
+                            <div style={{ fontSize: 10, marginTop: 4 }}>
+                              <span style={{ ...s.badge,
+                                background: c.commissions_versees ? "#ECFDF5" : "#FEF2F2",
+                                color:      c.commissions_versees ? "#059669" : "#DC2626",
+                                fontSize: 10 }}>
+                                {c.commissions_versees ? "💰 Comm. versées" : "⚠️ Comm. en attente"}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        {/* Date */}
+                        <td style={{ ...s.td, fontSize: 12, color: "#94A3B8", whiteSpace: "nowrap" }}>
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "—"}
+                        </td>
+                        {/* Actions */}
+                        <td style={s.td}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <button
+                              onClick={() => setCollecteModal(c)}
+                              style={{ ...s.btnSecondary, fontSize: 11, padding: "5px 10px" }}
+                            >
+                              📋 Détail
+                            </button>
+                            {c.complete && !c.commissions_versees && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await post(`/api/business/admin/collectes/${c.client_id || c.id}/verse-commissions`);
+                                    showToast("✅ Commissions déclenchées");
+                                    loadCollectes();
+                                  } catch (e) { showToast(e.message, true); }
+                                }}
+                                style={{ ...s.btnPrimary, fontSize: 11, padding: "5px 10px" }}
+                              >
+                                💸 Verser comm.
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {collectes.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>💳</div>
+                      <p style={{ fontWeight: 700 }}>Aucune collecte trouvée</p>
+                      <p style={{ fontSize: 12 }}>Les collectes progressives apparaîtront ici</p>
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination collectes */}
+          <div style={s.pagination}>
+            <button style={s.btnSecondary} disabled={collectePage === 1} onClick={() => setCollectePage(p => p - 1)}>← Préc.</button>
+            <span style={{ fontSize: 13, color: "#64748B" }}>
+              Page {collectePage} · {collectesTotal} collecte{collectesTotal !== 1 ? "s" : ""}
+            </span>
+            <button
+              style={s.btnSecondary}
+              disabled={collectePage * COLLECTE_LIMIT >= collectesTotal}
+              onClick={() => setCollectePage(p => p + 1)}
+            >
+              Suiv. →
+            </button>
+          </div>
+
+          {/* Modal détail collecte */}
+          {collecteModal && (
+            <CollecteAdminModal
+              collecte={collecteModal}
+              token={token}
+              onClose={() => setCollecteModal(null)}
+              onUpdated={() => { setCollecteModal(null); loadCollectes(); }}
+              showToast={showToast}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ══ MODAL CONFIRMATION MEMBRES ══════════════════════ */}
       {modal && (
         <div style={s.overlay}>
           <div style={s.modalBox}>
@@ -882,7 +1186,7 @@ export default function AdminBusiness() {
             </>}
             {modal.type === "password" && <>
               <h3 style={s.modalTitle}>🔑 Réinitialiser le mot de passe</h3>
-              <p style={s.modalText}>Un mot de passe temporaire sera généré pour <strong>{modal.member.name}</strong>. Notez-le avant de fermer ce dialog.</p>
+              <p style={s.modalText}>Un mot de passe temporaire sera généré pour <strong>{modal.member.name}</strong>. Notez-le avant de fermer.</p>
               <div style={s.modalActions}>
                 <button style={s.btnSecondary} onClick={() => setModal(null)}>Annuler</button>
                 <button style={s.btnPrimary}   onClick={() => handleResetPassword(modal.member.id)}>Générer</button>
@@ -931,39 +1235,46 @@ export default function AdminBusiness() {
         </div>
       )}
 
-      {/* ── ONGLET SCE TECHNIQUE ──────────────────────────── */}
+      {/* ══ ONGLET SCE TECHNIQUE ════════════════════════════ */}
       {tab === "Sce Technique" && (
         <div>
           {!sceUnlocked ? (
-            /* ── Écran de verrouillage ── */
+            /* ── Écran de verrouillage — mot de passe vérifié en DB (FIX) ── */
             <div style={{ display: "flex", justifyContent: "center", marginTop: 60 }}>
               <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: "40px 48px", maxWidth: 380, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,.07)", textAlign: "center" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
                 <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>Service Technique</h2>
-                <p style={{ fontSize: 13, color: "#94A3B8", margin: "0 0 24px" }}>Accès restreint — mot de passe requis</p>
+                <p style={{ fontSize: 13, color: "#94A3B8", margin: "0 0 24px" }}>
+                  Accès restreint — mot de passe vérifié en base de données
+                </p>
                 <input
                   type="password"
-                  placeholder="Mot de passe admin"
+                  placeholder="Mot de passe Sce Technique"
                   value={scePwdInput}
                   onChange={e => { setScePwdInput(e.target.value); setScePwdError(false); }}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      if (scePwdInput === SCE_TECH_PASSWORD) { setSceUnlocked(true); setScePwdInput(""); }
-                      else setScePwdError(true);
-                    }
+                  onKeyDown={e => { if (e.key === "Enter") handleSceAuth(); }}
+                  style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 8,
+                    border: `1.5px solid ${scePwdError ? "#DC2626" : "#E2E8F0"}`,
+                    fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 8, outline: "none",
                   }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${scePwdError ? "#DC2626" : "#E2E8F0"}`, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 8, outline: "none" }}
                 />
-                {scePwdError && <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 12px" }}>Mot de passe incorrect</p>}
+                {scePwdError && (
+                  <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 12px" }}>
+                    Mot de passe incorrect
+                  </p>
+                )}
                 <button
-                  onClick={() => {
-                    if (scePwdInput === SCE_TECH_PASSWORD) { setSceUnlocked(true); setScePwdInput(""); }
-                    else setScePwdError(true);
-                  }}
-                  style={{ ...s.btnPrimary, width: "100%", marginTop: 8 }}
+                  onClick={handleSceAuth}
+                  disabled={scePwdLoading}
+                  style={{ ...s.btnPrimary, width: "100%", marginTop: 8, opacity: scePwdLoading ? 0.6 : 1 }}
                 >
-                  🔓 Déverrouiller
+                  {scePwdLoading ? "Vérification…" : "🔓 Déverrouiller"}
                 </button>
+                <p style={{ fontSize: 11, color: "#CBD5E1", marginTop: 16 }}>
+                  Le mot de passe est stocké et vérifié côté serveur.<br/>
+                  Route : <code>POST /api/business/admin/sce-auth</code>
+                </p>
               </div>
             </div>
           ) : (
@@ -971,12 +1282,19 @@ export default function AdminBusiness() {
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <div>
-                  <h2 style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: 0 }}>🔧 Service Technique — Versement des commissions</h2>
-                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "4px 0 0" }}>Tous les paiements d'entrée (adhésions membres) · Tous niveaux</p>
+                  <h2 style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: 0 }}>
+                    🔧 Service Technique — Versement des commissions
+                  </h2>
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "4px 0 0" }}>
+                    Tous les paiements d'entrée (adhésions membres) · Tous niveaux
+                  </p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={loadScePayments} style={s.btnSecondary}>↻ Rafraîchir</button>
-                  <button onClick={() => { setSceUnlocked(false); setScePayments([]); }} style={{ ...s.btnSecondary, color: "#DC2626", borderColor: "#FECACA" }}>🔒 Verrouiller</button>
+                  <button onClick={() => { setSceUnlocked(false); setScePayments([]); }}
+                    style={{ ...s.btnSecondary, color: "#DC2626", borderColor: "#FECACA" }}>
+                    🔒 Verrouiller
+                  </button>
                 </div>
               </div>
 
@@ -997,11 +1315,14 @@ export default function AdminBusiness() {
                     </thead>
                     <tbody>
                       {scePayments.length === 0 && (
-                        <tr><td colSpan={8} style={{ ...s.td, textAlign: "center", color: "#94A3B8", padding: 40 }}>Aucun paiement trouvé</td></tr>
+                        <tr><td colSpan={8} style={{ ...s.td, textAlign: "center", color: "#94A3B8", padding: 40 }}>
+                          Aucun paiement trouvé
+                        </td></tr>
                       )}
                       {scePayments.map(p => {
                         const rc = ROLE_COLORS[p.member?.role] || ROLE_COLORS["RECRUTEUR"];
-                        const hasComm = p.commissions_count > 0;
+                        // FIX : hasComm fiable car commissions_count est maintenant ?? 0
+                        const hasComm = (p.commissions_count ?? 0) > 0;
                         return (
                           <tr key={p.id} style={s.tr}>
                             <td style={s.td}>
@@ -1017,7 +1338,9 @@ export default function AdminBusiness() {
                               {Number(p.amount || 0).toLocaleString("fr-FR")} FCFA
                             </td>
                             <td style={s.td}>
-                              <span style={{ fontSize: 11, color: "#64748B" }}>{p.payment_type || p.type || "adhesion"}</span>
+                              <span style={{ fontSize: 11, color: "#64748B" }}>
+                                {p.payment_type || p.type || "adhesion"}
+                              </span>
                             </td>
                             <td style={s.td}>
                               <span style={{ ...s.badge,
@@ -1041,9 +1364,11 @@ export default function AdminBusiness() {
                                 <button
                                   onClick={() => handleVerseCommissions(p.id, p.member?.id)}
                                   disabled={sceVerseLoading === p.id}
-                                  style={{ ...s.btnPrimary, fontSize: 12, padding: "5px 12px",
+                                  style={{
+                                    ...s.btnPrimary, fontSize: 12, padding: "5px 12px",
                                     background: hasComm ? "#64748B" : "#7C3AED",
-                                    opacity: sceVerseLoading === p.id ? 0.6 : 1 }}
+                                    opacity: sceVerseLoading === p.id ? 0.6 : 1,
+                                  }}
                                 >
                                   {sceVerseLoading === p.id ? "…" : hasComm ? "♻️ Recalculer" : "💸 Verser"}
                                 </button>
@@ -1065,6 +1390,234 @@ export default function AdminBusiness() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════
+//  MODAL — DÉTAIL COLLECTE ADMIN
+//  Affiche : progression, versements, formulaire Wave manuel,
+//  bouton déclencher commissions
+// ══════════════════════════════════════════════════════════════
+function CollecteAdminModal({ collecte, token, onClose, onUpdated, showToast }) {
+  const [detail,    setDetail]    = useState(null);
+  const [loadingD,  setLoadingD]  = useState(true);
+  const [waveRef,   setWaveRef]   = useState("");
+  const [montant,   setMontant]   = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [versingComm, setVersingComm] = useState(false);
+
+  const clientId = collecte.client_id || collecte.id;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/api/business/admin/collectes/${clientId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || r.statusText);
+        setDetail(d.collecte || d.data || d);
+        const reste = d.collecte?.reste ?? d.reste ?? 0;
+        if (reste > 0) setMontant(String(reste));
+      } catch (e) {
+        showToast(e.message, true);
+      }
+      setLoadingD(false);
+    })();
+  }, [clientId, token]);
+
+  async function handleWaveConfirm() {
+    const mont = Number(montant);
+    if (!mont || mont < 500) return showToast("Montant minimum : 500 FCFA", true);
+    if (!waveRef.trim())     return showToast("Référence Wave requise", true);
+    setSubmitting(true);
+    try {
+      const r = await fetch(`${API}/api/business/admin/collectes/${clientId}/wave-confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ montant: mont, wave_ref: waveRef.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || "Erreur");
+      showToast("✅ Versement enregistré");
+      setDetail(d.collecte || detail);
+      setWaveRef(""); setMontant("");
+      if (d.collecte?.complete) setTimeout(onUpdated, 1500);
+    } catch (e) { showToast(e.message, true); }
+    setSubmitting(false);
+  }
+
+  async function handleVerseCommissions() {
+    setVersingComm(true);
+    try {
+      const r = await fetch(`${API}/api/business/admin/collectes/${clientId}/verse-commissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || "Erreur");
+      showToast("💸 Commissions versées avec succès");
+      onUpdated();
+    } catch (e) { showToast(e.message, true); }
+    setVersingComm(false);
+  }
+
+  const pct = detail
+    ? Math.min(100, Math.round(((detail.total_verse || 0) / (detail.adhesion_price || 15000)) * 100))
+    : 0;
+  const fmt = n => Number(n || 0).toLocaleString("fr-FR");
+
+  return (
+    <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ ...s.modalBox, maxWidth: 540, maxHeight: "88vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+
+        {/* En-tête */}
+        <div style={{ marginBottom: 0 }}>
+          <h3 style={{ ...s.modalTitle, marginBottom: 4 }}>
+            💳 Collecte — {collecte.client_name || collecte.name}
+          </h3>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "#94A3B8" }}>
+            {collecte.mutual_number || ""} · {collecte.plan || ""}
+          </p>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {loadingD ? (
+            <div style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>Chargement…</div>
+          ) : detail ? (
+            <>
+              {/* Progression */}
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>Progression</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: pct >= 100 ? "#059669" : "#7C3AED" }}>{pct}%</span>
+                </div>
+                <div style={{ height: 10, background: "#E2E8F0", borderRadius: 6, overflow: "hidden" }}>
+                  <div style={{ height: "100%", borderRadius: 6, background: pct >= 100 ? "#059669" : "#7C3AED", width: `${pct}%`, transition: "width .4s" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12, color: "#64748B" }}>
+                  <span>Versé : <strong style={{ color: "#0F172A" }}>{fmt(detail.total_verse)} FCFA</strong></span>
+                  <span>Total : <strong style={{ color: "#0F172A" }}>{fmt(detail.adhesion_price)} FCFA</strong></span>
+                </div>
+                {detail.reste > 0 && (
+                  <p style={{ margin: "6px 0 0", fontSize: 12, color: "#D97706", fontWeight: 600 }}>
+                    Reste à collecter : {fmt(detail.reste)} FCFA
+                  </p>
+                )}
+                {detail.complete && (
+                  <p style={{ margin: "8px 0 0", fontSize: 13, color: "#059669", fontWeight: 700 }}>
+                    ✅ Collecte complète !
+                  </p>
+                )}
+              </div>
+
+              {/* Historique des versements */}
+              {detail.versements?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+                    Versements ({detail.versements.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {detail.versements.map((v, i) => (
+                      <div key={i} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <span style={{ fontWeight: 700, color: "#059669" }}>{fmt(v.montant)} FCFA</span>
+                          {v.wave_ref && (
+                            <span style={{ marginLeft: 10, fontSize: 11, color: "#64748B", fontFamily: "monospace" }}>
+                              réf: {v.wave_ref}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 11, color: "#94A3B8" }}>
+                          {v.created_at ? new Date(v.created_at).toLocaleDateString("fr-FR") : "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formulaire Wave manuel (si collecte en cours) */}
+              {!detail.complete && (
+                <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1D4ED8", marginBottom: 12 }}>
+                    🔵 Enregistrer un versement Wave
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <label style={{ fontSize: 12, color: "#374151", display: "block", marginBottom: 4, fontWeight: 600 }}>
+                        Montant (FCFA)
+                      </label>
+                      <input
+                        type="number" min={500}
+                        value={montant}
+                        onChange={e => setMontant(e.target.value)}
+                        placeholder="ex: 5000"
+                        style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #BFDBFE", fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                      />
+                    </div>
+                    <div style={{ flex: 2, minWidth: 160 }}>
+                      <label style={{ fontSize: 12, color: "#374151", display: "block", marginBottom: 4, fontWeight: 600 }}>
+                        Référence Wave <span style={{ color: "#EF4444" }}>*</span>
+                      </label>
+                      <input
+                        value={waveRef}
+                        onChange={e => setWaveRef(e.target.value)}
+                        placeholder="ex: WV-2025-XXXXXX"
+                        style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #BFDBFE", fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleWaveConfirm}
+                    disabled={submitting || !waveRef.trim() || !montant || Number(montant) < 500}
+                    style={{ ...s.btnPrimary, background: "#1D4ED8", fontSize: 13, opacity: (submitting || !waveRef.trim()) ? 0.6 : 1 }}
+                  >
+                    {submitting ? "Enregistrement…" : "✅ Confirmer le versement"}
+                  </button>
+                </div>
+              )}
+
+              {/* Déclencher commissions (si collecte complète) */}
+              {detail.complete && (
+                <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#059669", marginBottom: 8 }}>
+                    💰 Collecte complète — Commissions
+                  </div>
+                  {detail.commissions_versees ? (
+                    <p style={{ margin: 0, fontSize: 13, color: "#065F46" }}>
+                      ✅ Commissions déjà versées au recruteur.
+                    </p>
+                  ) : (
+                    <>
+                      <p style={{ margin: "0 0 12px", fontSize: 13, color: "#047857" }}>
+                        La collecte est complète mais les commissions n'ont pas encore été déclenchées.
+                      </p>
+                      <button
+                        onClick={handleVerseCommissions}
+                        disabled={versingComm}
+                        style={{ ...s.btnPrimary, background: "#059669", fontSize: 13, opacity: versingComm ? 0.6 : 1 }}
+                      >
+                        {versingComm ? "Traitement…" : "💸 Déclencher les commissions"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <p style={{ color: "#94A3B8", textAlign: "center", padding: 24 }}>
+              Impossible de charger les données de la collecte.
+            </p>
+          )}
+        </div>
+
+        {/* Pied */}
+        <div style={{ ...s.modalActions, marginTop: 16, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
+          <button style={s.btnSecondary} onClick={onClose}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Sous-composants ───────────────────────────────────────────
 function StatBadge({ label, value, color }) {
   return (
@@ -1079,9 +1632,11 @@ function ActionBtn({ label, color, onClick }) {
   return (
     <button
       onClick={onClick}
-      style={{ fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 6,
+      style={{
+        fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 6,
         background: color + "15", color, border: `1px solid ${color}30`,
-        cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
+        cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit",
+      }}
     >
       {label}
     </button>
@@ -1104,7 +1659,7 @@ const s = {
   header:      { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 24, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,.04)" },
   title:       { fontSize: 24, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" },
   subtitle:    { fontSize: 13, color: "#94A3B8", margin: 0 },
-  headerStats: { display: "flex", gap: 12 },
+  headerStats: { display: "flex", gap: 12, flexWrap: "wrap" },
   tabs:        { display: "flex", gap: 8, marginBottom: 20 },
   tab:         { padding: "8px 20px", borderRadius: 10, border: "1.5px solid", cursor: "pointer", fontFamily: "inherit", fontSize: 14, transition: "all .15s" },
   filters:     { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, alignItems: "center" },
@@ -1125,10 +1680,9 @@ const s = {
   btnPrimary:  { padding: "8px 18px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   btnSuccess:  { padding: "8px 18px", borderRadius: 8, border: "none", background: "#059669", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   btnDanger:   { padding: "8px 18px", borderRadius: 8, border: "none", background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
-
   toast:       { position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,.12)", maxWidth: 400 },
   overlay:     { position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center" },
-  modalBox:    { background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 420, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,.2)" },
+  modalBox:    { background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 480, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,.2)" },
   modalTitle:  { fontSize: 18, fontWeight: 800, color: "#0F172A", margin: "0 0 12px" },
   modalText:   { fontSize: 14, color: "#475569", lineHeight: 1.6, margin: "0 0 20px" },
   modalActions:{ display: "flex", gap: 10, justifyContent: "flex-end" },
