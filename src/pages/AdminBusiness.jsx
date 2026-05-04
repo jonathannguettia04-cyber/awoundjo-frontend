@@ -216,9 +216,9 @@ export default function AdminBusiness() {
   const loadDemandesCommission = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ network: "BUSINESS", limit: 100 });
+      const params = new URLSearchParams({ limit: 100 });
       if (demandesStatusFilter) params.set("status", demandesStatusFilter);
-      const d = await get(`/api/commissions/requests?${params}`);
+      const d = await get(`/api/business/admin/commission-requests?${params}`);
       setDemandesComm(d.requests || d.data?.requests || []);
       setDemandesStats(d.stats   || d.data?.stats   || {});
     } catch (e) { showToast(e.message, true); }
@@ -337,7 +337,7 @@ export default function AdminBusiness() {
   async function handleDemandeAction(id, action, note = "") {
     setActionLoading(id + action);
     try {
-      const r = await fetch(`${API}/api/commissions/requests/${id}`, {
+      const r = await fetch(`${API}/api/business/admin/commission-requests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action, admin_note: note }),
