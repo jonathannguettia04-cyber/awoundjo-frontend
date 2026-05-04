@@ -89,14 +89,35 @@ export default function Agents() {
     )) return;
     setTogglingId(agent.id);
     try {
-      await axios.patch(`/api/agents/${agent.id}/toggle-status`);
+      const BASE = import.meta.env.VITE_API_URL || "";
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE}/api/agents/${agent.id}/toggle-status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data?.error || "Erreur lors du changement de statut");
+      }
       load();
-    } catch { /* ignore */ }
-    finally { setTogglingId(null); }
+    } catch (e) {
+      alert(e.message || "Erreur réseau");
+    } finally { setTogglingId(null); }
   }
 
   async function handleDelete(password) {
-    await agentsAPI.delete(deleteTarget.id, { data: { adminPassword: password } });
+    const BASE = import.meta.env.VITE_API_URL || "";
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${BASE}/api/agents/${deleteTarget.id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ adminPassword: password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Erreur suppression");
     setDeleteTarget(null);
     load();
   }
