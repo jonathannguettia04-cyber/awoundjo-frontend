@@ -140,7 +140,12 @@ export default function ClientCotisations() {
     if (payment === "success") {
       setPayStatus("success");
       if (tx) {
-        clientContribAPI.confirm({ transaction_id: tx }).catch(() => {});
+        const token = localStorage.getItem("client_token");
+        fetch(`${BASE}/api/client/contributions/confirm-jeko`, {
+          method:  "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body:    JSON.stringify({ transaction_id: tx }),
+        }).catch(() => {});
       }
     } else if (payment === "failed") {
       setPayStatus("failed");
