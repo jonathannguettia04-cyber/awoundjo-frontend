@@ -151,4 +151,13 @@ export const diasporaAdminAPI = {
   payComm:          (id)     => api.put(`/admin/commissions/${id}/pay`),
 };
 
+// ── Clients finaux mutualistes (tous niveaux diaspora) ────────
+export const diasporaClientAPI = {
+  getPlans:    ()            => api.get("/plans"),
+  create:      (data)        => api.post("/clients", data),
+  payCash:     (clientId)    => api.post(`/clients/${clientId}/pay-adhesion`),
+  payJeko:     (clientId, d) => api.post(`/clients/${clientId}/pay-adhesion-jeko`, d),
+  getMyClients:(params)      => api.get("/my-clients", { params }),
+};
+
 export default api;

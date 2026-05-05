@@ -108,6 +108,8 @@ const DiasporaRegisterRUM       = diasporaPage("DiasporaRegisterRUM");
 const DiasporaRegisterRecruiter = diasporaPage("DiasporaRegisterRecruiter");
 const DiasporaBeneficiaries     = diasporaPage("DiasporaBeneficiaries");
 const DiasporaNewBeneficiary    = diasporaPage("DiasporaNewBeneficiary");
+const DiasporaNewClient         = diasporaPage("DiasporaNewClient");
+const DiasporaMyClients         = diasporaPage("DiasporaMyClients");
 const DiasporaCards             = diasporaPage("DiasporaCards");
 
 // ── Pages REFERRAL ───────────────────────────────────────────
@@ -394,6 +396,8 @@ export default function App() {
               <Route path="register-recruiter/new" element={<DiasporaRegisterRecruiter />} />
               <Route path="clients"                element={<DiasporaBeneficiaries />} />
               <Route path="clients/new"            element={<DiasporaNewBeneficiary />} />
+              <Route path="my-clients"             element={<DiasporaMyClients />} />
+              <Route path="my-clients/new"         element={<DiasporaNewClient />} />
               <Route path="beneficiaries"          element={<DiasporaBeneficiaries />} />
               <Route path="beneficiaries/new"      element={<DiasporaNewBeneficiary />} />
               <Route path="cards"                  element={<DiasporaCards />} />

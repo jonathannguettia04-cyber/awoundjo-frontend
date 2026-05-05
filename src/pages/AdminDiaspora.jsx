@@ -219,7 +219,7 @@ export default function AdminDiaspora() {
   const [resetResult, setResetResult]       = useState(null);   // { name, username, temp_password }
 
   // 💸 Demandes de paiement de commissions
-  const [activeTab, setActiveTab]               = useState("membres");  // "membres" | "demandes"
+  const [activeTab, setActiveTab]               = useState("membres");  // "membres" | "demandes" | "clients"
   const [demandesComm, setDemandesComm]         = useState([]);
   const [demandesStats, setDemandesStats]       = useState({});
   const [demandesFilter, setDemandesFilter]     = useState("");
@@ -228,15 +228,24 @@ export default function AdminDiaspora() {
   const [rejectModal, setRejectModal]           = useState(null);
   const [rejectNote, setRejectNote]             = useState("");
 
+  // 👥 Clients finaux diaspora
+  const [clients, setClients]                   = useState([]);
+  const [clientsLoading, setClientsLoading]     = useState(false);
+  const [clientsSearch, setClientsSearch]       = useState("");
+  const [clientsStatus, setClientsStatus]       = useState("");
+  const [clientsPage, setClientsPage]           = useState(1);
+  const [clientsPagination, setClientsPagination] = useState(null);
+
   const stats = {
-    total:      ambassadors.length,
-    actifs:     ambassadors.filter(a => a.status === "ACTIVE").length,
-    pending:    ambassadors.filter(a => a.status_validation === "pending" || !a.status_validation).length,
-    cartes:     ambassadors.reduce((s, a) => s + Number(a.beneficiary_count || 0), 0),
-    adhesions:  ambassadors.reduce((s, a) => s + Number(a.membership_fee || 0), 0),
-    diaspora:   ambassadors.filter(a => a.role === "AMBASSADEUR_DIASPORA").length,
-    pays:       ambassadors.filter(a => a.role === "AMBASSADEUR_PAYS").length,
-    recruteurs: ambassadors.filter(a => a.role === "RECRUTEUR").length,
+    total:          ambassadors.length,
+    actifs:         ambassadors.filter(a => a.status === "ACTIVE").length,
+    pending:        ambassadors.filter(a => a.status_validation === "pending" || !a.status_validation).length,
+    cartes:         ambassadors.reduce((s, a) => s + Number(a.beneficiary_count || 0), 0),
+    adhesions:      ambassadors.reduce((s, a) => s + Number(a.membership_fee || 0), 0),
+    diaspora:       ambassadors.filter(a => a.role === "AMBASSADEUR_DIASPORA").length,
+    pays:           ambassadors.filter(a => a.role === "AMBASSADEUR_PAYS").length,
+    recruteurs:     ambassadors.filter(a => a.role === "RECRUTEUR").length,
+    clients_finaux: clientsPagination?.total ?? clients.length,
   };
 
   useEffect(() => { fetchAmbassadors(); }, []);
@@ -397,6 +406,25 @@ export default function AdminDiaspora() {
   }
 
   useEffect(() => { if (activeTab === "demandes") fetchDemandes(); }, [activeTab, demandesFilter]);
+  useEffect(() => { if (activeTab === "clients")  fetchClients();  }, [activeTab, clientsPage, clientsSearch, clientsStatus]);
+
+  async function fetchClients() {
+    setClientsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: clientsPage, limit: 30 });
+      if (clientsSearch) params.set("search", clientsSearch);
+      if (clientsStatus) params.set("status", clientsStatus);
+      // Route admin : liste tous les clients diaspora, pas seulement ceux d'un ambassadeur
+      const { data } = await axios.get(
+        `${API}/api/diaspora/admin/clients?${params}`,
+        { headers: { Authorization: `Bearer ${agentToken()}` } }
+      );
+      setClients(data.clients || []);
+      setClientsPagination(data.pagination || null);
+    } catch (e) {
+      console.error("fetchClients diaspora", e.message);
+    } finally { setClientsLoading(false); }
+  }
 
   return (
     <div style={{ padding:"24px 20px", maxWidth:1100, margin:"0 auto" }}>
@@ -418,7 +446,8 @@ export default function AdminDiaspora() {
           { icon:"🌍", label:"Diaspora",        value:stats.diaspora,   color:C.blue,   bg:C.blueL   },
           { icon:"🗺️", label:"Pays",            value:stats.pays,       color:C.green,  bg:C.greenL  },
           { icon:"🤝", label:"Recruteurs",      value:stats.recruteurs, color:C.gold,   bg:C.goldL   },
-          { icon:"🎴", label:"Cartes",          value:stats.cartes,     color:C.teal,   bg:C.tealL   },
+          { icon:"🎴", label:"Cartes",          value:stats.cartes,          color:C.teal,   bg:C.tealL   },
+          { icon:"👥", label:"Clients finaux",   value:stats.clients_finaux,  color:C.purple, bg:C.purpleL },
         ].map(s => (
           <div key={s.label} style={{ background:s.bg, borderRadius:12, padding:"14px 16px", border:`1px solid ${s.color}22` }}>
             <span style={{ fontSize:20 }}>{s.icon}</span>
@@ -432,6 +461,7 @@ export default function AdminDiaspora() {
       <div style={{ display:"flex", gap:8, marginBottom:20 }}>
         {[
           { id:"membres",  label:"👥 Ambassadeurs" },
+          { id:"clients",  label:"👤 Clients finaux", badge: stats.clients_finaux || null },
           { id:"demandes", label:"💸 Demandes Commission", badge: demandesStats["PENDING"] || null },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -452,6 +482,114 @@ export default function AdminDiaspora() {
           </button>
         ))}
       </div>
+
+      {/* ── Onglet Clients finaux ── */}
+      {activeTab === "clients" && (
+        <div>
+          {/* Filtres */}
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
+            <input
+              placeholder="Rechercher nom, téléphone, numéro…"
+              value={clientsSearch}
+              onChange={e => { setClientsSearch(e.target.value); setClientsPage(1); }}
+              style={{ flex:1, minWidth:200, padding:"9px 14px", borderRadius:8, fontSize:13, border:`1.5px solid ${C.border}`, outline:"none" }}
+            />
+            <select value={clientsStatus} onChange={e => { setClientsStatus(e.target.value); setClientsPage(1); }}
+              style={{ padding:"9px 12px", borderRadius:8, fontSize:13, border:`1.5px solid ${C.border}`, background:"#fff", fontFamily:"inherit" }}>
+              <option value="">Tous les statuts</option>
+              <option value="actif">Actif</option>
+              <option value="attente">En attente</option>
+              <option value="suspendu">Suspendu</option>
+            </select>
+            <button onClick={() => fetchClients()}
+              style={{ padding:"9px 14px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+              ↻ Rafraîchir
+            </button>
+          </div>
+
+          {clientsLoading ? (
+            <div style={{ textAlign:"center", padding:48, color:C.slate }}>
+              <div style={{ fontSize:32, animation:"spin 1s linear infinite" }}>⏳</div>
+            </div>
+          ) : clients.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"48px 20px", color:C.slate, background:"#fff", borderRadius:14, border:`1px solid ${C.border}` }}>
+              <p style={{ fontSize:40, margin:"0 0 10px" }}>👥</p>
+              <p style={{ fontWeight:800, fontSize:15, margin:"0 0 6px", color:C.dark }}>Aucun client final</p>
+              <p style={{ fontSize:12, margin:0 }}>Les clients créés par les ambassadeurs diaspora apparaîtront ici</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {clients.map(c => {
+                  const statusCfg = {
+                    actif:    { label:"✅ Actif",       color:C.green,  bg:C.greenL },
+                    attente:  { label:"⏳ En attente",  color:C.gold,   bg:C.goldL  },
+                    suspendu: { label:"🚫 Suspendu",    color:C.red,    bg:C.redL   },
+                  }[c.status] || { label:c.status, color:C.slate, bg:C.bg };
+
+                  const paymentCfg = c.status_payment === "paid"
+                    ? { label:"💳 Payé",     color:C.green, bg:C.greenL }
+                    : { label:"⏳ Non payé", color:C.gold,  bg:C.goldL  };
+
+                  return (
+                    <div key={c.id} style={{ background:"#fff", borderRadius:12, border:`1px solid ${C.border}`, padding:"14px 18px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                        <div style={{ width:40, height:40, borderRadius:10, background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>👤</div>
+                        <div>
+                          <p style={{ margin:0, fontWeight:800, color:C.dark, fontSize:13 }}>{c.name}</p>
+                          <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{c.phone}{c.city ? ` · ${c.city}` : ""}</p>
+                          <div style={{ display:"flex", gap:6, marginTop:4, flexWrap:"wrap" }}>
+                            <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:C.blueL, padding:"1px 8px", borderRadius:999 }}>{c.plan}</span>
+                            <span style={{ fontSize:10, fontWeight:700, color:C.slate, fontFamily:"monospace" }}>{c.mutual_number}</span>
+                            {c.ambassador_name && (
+                              <span style={{ fontSize:10, color:C.slate }}>via {c.ambassador_name}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
+                        <span style={{ background:statusCfg.bg, color:statusCfg.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                          {statusCfg.label}
+                        </span>
+                        <span style={{ background:paymentCfg.bg, color:paymentCfg.color, padding:"2px 10px", borderRadius:999, fontSize:11, fontWeight:700 }}>
+                          {paymentCfg.label}
+                        </span>
+                        {c.expiration_date && (
+                          <span style={{ fontSize:10, color:C.slate }}>Exp. {fmtDate(c.expiration_date)}</span>
+                        )}
+                        <span style={{ fontSize:10, color:C.slate }}>{fmtDate(c.created_at)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {clientsPagination && clientsPagination.pages > 1 && (
+                <div style={{ display:"flex", justifyContent:"center", gap:8, marginTop:16 }}>
+                  <button disabled={clientsPage <= 1} onClick={() => setClientsPage(p => p - 1)}
+                    style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                    ← Précédent
+                  </button>
+                  <span style={{ padding:"8px 14px", fontSize:13, color:C.slate }}>
+                    Page {clientsPage} / {clientsPagination.pages}
+                  </span>
+                  <button disabled={clientsPage >= clientsPagination.pages} onClick={() => setClientsPage(p => p + 1)}
+                    style={{ padding:"8px 16px", borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", color:C.slate, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                    Suivant →
+                  </button>
+                </div>
+              )}
+
+              {clientsPagination && (
+                <p style={{ textAlign:"center", color:C.slate, fontSize:12, marginTop:12 }}>
+                  {clientsPagination.total} client(s) au total
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Onglet Demandes Commission ── */}
       {activeTab === "demandes" && (

@@ -20,6 +20,7 @@ import {
   diasporaRefAPI,
   diasporaCommAPI,
   diasporaBeneAPI,
+  diasporaClientAPI,
   getDiasporaData,
 } from "../../diasporaApi";
 import { usePlans, planIcon } from "../../hooks/usePlans";
@@ -76,7 +77,7 @@ function CreateClientInline({ onSuccess, onCancel }) {
     if (!form.name.trim()) return setError("Le nom est requis");
     setLoading(true); setError("");
     try {
-      const { data } = await diasporaBeneAPI.create(form);
+      const { data } = await diasporaClientAPI.create({ ...form, plan_slug: form.plan });
       onSuccess?.(data);
     } catch(e) {
       setError(e.response?.data?.error || "Erreur lors de la création");
@@ -184,21 +185,23 @@ function getNavItems(role) {
   ];
 
   if (role === "AMBASSADEUR_DIASPORA") {
-    // Crée Ambassadeurs Pays + RUM uniquement (ne crée plus de clients directs)
     base.push({ path:"/diaspora/register-pays",     icon:"🗺️", label:"Mes Ambassadeurs Pays" });
     base.push({ path:"/diaspora/register-pays/new", icon:"➕", label:"Enregistrer Amb. Pays"  });
     base.push({ path:"/diaspora/register-rum",      icon:"👑", label:"Mes RUM"                });
     base.push({ path:"/diaspora/register-rum/new",  icon:"➕", label:"Enregistrer RUM"         });
   } else if (role === "AMBASSADEUR_PAYS") {
-    // Crée Recruteurs uniquement (ne crée plus de clients directs)
     base.push({ path:"/diaspora/register-recruiter",     icon:"🤝", label:"Mes Recruteurs"       });
     base.push({ path:"/diaspora/register-recruiter/new", icon:"➕", label:"Enregistrer Recruteur" });
   } else {
-    // RECRUTEUR — crée Clients + vend cartes
+    // RECRUTEUR + tous rôles REFERRAL — ancien flux beneficiaries conservé
     base.push({ path:"/diaspora/clients",     icon:"👤", label:"Mes clients"          });
     base.push({ path:"/diaspora/clients/new", icon:"➕", label:"Enregistrer client"   });
     base.push({ path:"/diaspora/cards",       icon:"💳", label:"Cartes vendues"       });
   }
+
+  // ── Clients finaux mutualistes — TOUS LES NIVEAUX ──────────
+  base.push({ path:"/diaspora/my-clients",     icon:"👥", label:"Clients finaux"         });
+  base.push({ path:"/diaspora/my-clients/new", icon:"➕", label:"Nouveau client final"   });
 
   base.push(
     { path:"/diaspora/payments",      icon:"💰", label:"Paiements"      },
@@ -402,6 +405,12 @@ export default function DiasporaDashboard() {
         sub:   "Tous niveaux confondus",
         path:  "/diaspora/network",
       },
+      {
+        icon:"👥", label:"Clients finaux", color:C.green, bg:C.greenL,
+        value: stats.clients_finaux ?? stats.my_clients_count ?? 0,
+        sub:   "Créés par vous",
+        path:  "/diaspora/my-clients",
+      },
     ] : role === "AMBASSADEUR_PAYS" ? [
       {
         icon:"🤝", label:"Mes Recruteurs", color:C.blue,  bg:C.blueL,
@@ -414,6 +423,12 @@ export default function DiasporaDashboard() {
         value: stats.network_size ?? stats.total_network ?? 0,
         sub:   "Tous niveaux",
         path:  "/diaspora/network",
+      },
+      {
+        icon:"👥", label:"Clients finaux", color:C.teal, bg:C.tealL,
+        value: stats.clients_finaux ?? stats.my_clients_count ?? 0,
+        sub:   "Créés par vous",
+        path:  "/diaspora/my-clients",
       },
     ] : [
       // RECRUTEUR
