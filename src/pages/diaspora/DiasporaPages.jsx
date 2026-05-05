@@ -1785,6 +1785,14 @@ export function DiasporaMyClients() {
   const [page, setPage]         = useState(1);
   const [pagination, setPagination] = useState(null);
 
+  // ── Paiement inline ─────────────────────────────────────────
+  const [payingId,   setPayingId]   = useState(null); // client_id en cours
+  const [payMode,    setPayMode]    = useState(null); // 'cash' | 'jeko'
+  const [jekoMethod, setJekoMethod] = useState("orange");
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
+  const [paidId,     setPaidId]     = useState(null); // client_id venant d'être payé
+
   const load = useCallback(() => {
     setLoading(true);
     diasporaClientAPI.getMyClients({ page, search, status: statusFilter })
@@ -1797,6 +1805,37 @@ export function DiasporaMyClients() {
 
   useEffect(() => { load(); }, [load]);
 
+  function openPay(clientId) {
+    setPayingId(clientId); setPayMode(null);
+    setPayError(""); setPayLoading(false);
+  }
+  function closePay() { setPayingId(null); setPayMode(null); setPayError(""); }
+
+  async function payCash(clientId) {
+    setPayLoading(true); setPayError("");
+    try {
+      await diasporaClientAPI.payCash(clientId);
+      setPaidId(clientId);
+      closePay();
+      load(); // rafraîchit la liste
+    } catch (e) {
+      setPayError(e.response?.data?.error || "Erreur paiement cash");
+    } finally { setPayLoading(false); }
+  }
+
+  async function payJeko(clientId) {
+    setPayLoading(true); setPayError("");
+    try {
+      const { data } = await diasporaClientAPI.payJeko(clientId, { jeko_method: jekoMethod });
+      const url = data?.data?.redirect_url || data?.redirect_url;
+      if (!url) throw new Error("URL de paiement non reçue");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.response?.data?.error || e.message || "Erreur JEKO");
+      setPayLoading(false);
+    }
+  }
+
   const statusColor = (s) => ({
     actif:    { bg: C.greenL, color: C.green, label: "✅ Actif"       },
     attente:  { bg: C.goldL,  color: C.gold,  label: "⏳ En attente"  },
@@ -1808,7 +1847,7 @@ export function DiasporaMyClients() {
       <PageHeader
         title="👥 Mes clients finaux"
         subtitle={pagination ? `${pagination.total} client(s) au total` : ""}
-        action={<Btn onClick={() => navigate("/diaspora/clients/new")}>➕ Nouveau client</Btn>}
+        action={<Btn onClick={() => navigate("/diaspora/my-clients/new")}>➕ Nouveau client</Btn>}
       />
 
       {/* Filtres */}
@@ -1834,29 +1873,107 @@ export function DiasporaMyClients() {
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {clients.map(c => {
-              const sc = statusColor(c.status);
+              const sc      = statusColor(c.status);
+              const isPaid  = c.status_payment === "paid";
+              const isPayingThis = payingId === c.id;
+              const justPaid     = paidId === c.id;
+
               return (
-                <Card key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: 11, background: C.blueL, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</div>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 800, color: C.dark }}>{c.name}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{c.phone}{c.city ? ` • ${c.city}` : ""}</p>
-                      <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: C.blue, background: C.blueL, padding: "1px 8px", borderRadius: 999 }}>{c.plan}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: C.slate, fontFamily: "monospace" }}>{c.mutual_number}</span>
+                <Card key={c.id} style={{ flexDirection: "column", gap: 0 }}>
+                  {/* Ligne principale */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 11, background: C.blueL, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 800, color: C.dark }}>{c.name}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 12, color: C.slate }}>{c.phone}{c.city ? ` • ${c.city}` : ""}</p>
+                        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: C.blue, background: C.blueL, padding: "1px 8px", borderRadius: 999 }}>{c.plan}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: C.slate, fontFamily: "monospace" }}>{c.mutual_number}</span>
+                        </div>
                       </div>
                     </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                      <span style={{ background: sc.bg, color: sc.color, padding: "3px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
+                        {sc.label}
+                      </span>
+                      {c.expiration_date && (
+                        <span style={{ fontSize: 11, color: C.slate }}>Exp. {fmtDate(c.expiration_date)}</span>
+                      )}
+                      {/* Bouton payer — uniquement si non payé */}
+                      {!isPaid && !justPaid && (
+                        <button onClick={() => isPayingThis ? closePay() : openPay(c.id)}
+                          style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.green}`, background: isPayingThis ? C.greenL : "#fff", color: C.green, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                          {isPayingThis ? "✕ Annuler" : "💳 Payer l'adhésion"}
+                        </button>
+                      )}
+                      {justPaid && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>✅ Adhésion payée !</span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                    <span style={{ background: sc.bg, color: sc.color, padding: "3px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
-                      {sc.label}
-                    </span>
-                    {c.expiration_date && (
-                      <span style={{ fontSize: 11, color: C.slate }}>Exp. {fmtDate(c.expiration_date)}</span>
-                    )}
-                    <span style={{ fontSize: 11, color: C.slate }}>{fmtDate(c.created_at)}</span>
-                  </div>
+
+                  {/* Panel paiement inline */}
+                  {isPayingThis && (
+                    <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+                      {payError && (
+                        <div style={{ background: C.redL, color: C.red, padding: "8px 12px", borderRadius: 8, marginBottom: 10, fontSize: 12, fontWeight: 600 }}>
+                          ⚠️ {payError}
+                        </div>
+                      )}
+
+                      {!payMode && (
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <button disabled
+                            style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#e2e8f0", color: "#94a3b8", border: "none", fontWeight: 700, fontSize: 13, cursor: "not-allowed", fontFamily: "inherit" }}>
+                            💵 Cash (indisponible)
+                          </button>
+                          <button onClick={() => setPayMode("jeko")}
+                            style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: `linear-gradient(135deg, ${C.green}, #047857)`, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            📱 JEKO
+                          </button>
+                        </div>
+                      )}
+
+                      {payMode === "cash" && (
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <button onClick={() => setPayMode(null)}
+                            style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#fff", color: C.slate, border: `1.5px solid ${C.border}`, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            ← Retour
+                          </button>
+                          <button onClick={() => payCash(c.id)} disabled={payLoading}
+                            style={{ flex: 2, padding: "10px 0", borderRadius: 8, background: payLoading ? "#94a3b8" : C.blue, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                            {payLoading ? "Enregistrement…" : "✅ Confirmer paiement cash"}
+                          </button>
+                        </div>
+                      )}
+
+                      {payMode === "jeko" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)}
+                            style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
+                            <option value="orange">🟠 Orange Money</option>
+                            <option value="wave">🔵 Wave</option>
+                            <option value="mtn">🟡 MTN Mobile Money</option>
+                            <option value="moov">🟢 Moov Money</option>
+                            <option value="djamo">💜 Djamo / Carte bancaire</option>
+                          </select>
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <button onClick={() => setPayMode(null)}
+                              style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#fff", color: C.slate, border: `1.5px solid ${C.border}`, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                              ← Retour
+                            </button>
+                            <button onClick={() => payJeko(c.id)} disabled={payLoading}
+                              style={{ flex: 2, padding: "10px 0", borderRadius: 8, background: payLoading ? "#94a3b8" : `linear-gradient(135deg, ${C.green}, #047857)`, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                              {payLoading
+                                ? <><div style={{ width: 13, height: 13, border: "2px solid rgba(255,255,255,.4)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Redirection…</>
+                                : "💳 Payer via JEKO"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Card>
               );
             })}
