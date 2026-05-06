@@ -214,8 +214,8 @@ function getNavItems(role) {
   }
 
   // Clients finaux (Fédération) — disponible pour TOUS les rôles
-  base.push({ path:"/federation/my-clients",     icon:"👥", label:"Clients finaux"        });
-  base.push({ path:"/federation/my-clients/new", icon:"➕", label:"Nouveau client final"  });
+  base.push({ path:"/referral/my-clients",     icon:"👥", label:"Clients finaux"        });
+  base.push({ path:"/referral/my-clients/new", icon:"➕", label:"Nouveau client final"  });
 
   base.push(
     { path:"/referral/payments",      icon:"💰", label:"Paiements"     },
@@ -419,7 +419,7 @@ export default function FederationDashboard() {
         icon:"👥", label:"Clients finaux", color:C.green, bg:C.greenL,
         value: stats.federation_clients ?? stats.clients?.total ?? 0,
         sub:   "Créés via réseau Fédération",
-        path:  "/federation/my-clients",
+        path:  "/referral/my-clients",
       },
     ] : role === "LEADER" ? [
       {
@@ -438,7 +438,7 @@ export default function FederationDashboard() {
         icon:"👥", label:"Clients finaux", color:C.green, bg:C.greenL,
         value: stats.federation_clients ?? stats.clients?.total ?? 0,
         sub:   "Créés via réseau Fédération",
-        path:  "/federation/my-clients",
+        path:  "/referral/my-clients",
       },
     ] : role === "PASTEUR" ? [
       {

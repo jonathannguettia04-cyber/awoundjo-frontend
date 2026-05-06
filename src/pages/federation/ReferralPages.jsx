@@ -1444,7 +1444,7 @@ export function FederationNewClient() {
           <p style={{ color:C.slate, fontSize:13, marginBottom:20 }}>{client.name} est maintenant actif(ve).</p>
           <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
             <Btn onClick={() => { setSuccess(null); setCashDone(false); setForm({ name:"", phone:"", city:"", plan_slug: plans[0]?.slug?.toUpperCase()||"" }); }}>➕ Nouveau client</Btn>
-            <Btn outline onClick={() => navigate("/federation/my-clients")}>Voir mes clients</Btn>
+            <Btn outline onClick={() => navigate("/referral/my-clients")}>Voir mes clients</Btn>
           </div>
         </Card>
       </div>
@@ -1529,7 +1529,7 @@ export function FederationNewClient() {
 
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             <Btn onClick={() => { setSuccess(null); setPayMode(null); setForm({ name:"", phone:"", city:"", plan_slug: plans[0]?.slug?.toUpperCase()||"" }); }}>➕ Nouveau client</Btn>
-            <Btn outline onClick={() => navigate("/federation/my-clients")}>Voir mes clients</Btn>
+            <Btn outline onClick={() => navigate("/referral/my-clients")}>Voir mes clients</Btn>
           </div>
         </Card>
       </div>
@@ -1638,7 +1638,7 @@ export function FederationMyClients() {
       <PageHeader
         title="👥 Mes clients finaux"
         subtitle={pagination ? `${pagination.total} client(s) au total` : ""}
-        action={<Btn color={C.purple} onClick={() => navigate("/federation/my-clients/new")}>➕ Nouveau client</Btn>}
+        action={<Btn color={C.purple} onClick={() => navigate("/referral/my-clients/new")}>➕ Nouveau client</Btn>}
       />
 
       <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
