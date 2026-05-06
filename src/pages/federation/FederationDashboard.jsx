@@ -22,6 +22,7 @@ import {
   federationRecruitAPI,
   federationCommAPI,
   federationMemberAPI,
+  federationClientAPI,
 } from "../../federationApi";
 import { getDiasporaData } from "../../diasporaApi";
 import { usePlans, planIcon } from "../../hooks/usePlans";
@@ -66,28 +67,25 @@ const SOURCE_LABELS = {
 // Disponible pour TOUS les rôles
 function CreateClientInline({ onSuccess, onCancel }) {
   const { plans, plansLoading } = usePlans();
-  const [form, setForm]       = useState({ name:"", phone:"", city:"", plan:"" });
+  const [form, setForm]       = useState({ name:"", phone:"", city:"", plan_slug:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
   // Sélectionne le premier plan dès le chargement
   useEffect(() => {
-    if (plans.length && !form.plan) {
-      setForm(f => ({ ...f, plan: plans[0].slug.toUpperCase() }));
+    if (plans.length && !form.plan_slug) {
+      setForm(f => ({ ...f, plan_slug: plans[0].slug.toUpperCase() }));
     }
   }, [plans]);
 
   async function submit() {
     if (!form.name.trim()) return setError("Le nom est requis");
+    if (!form.phone.trim()) return setError("Le téléphone est requis");
     setLoading(true); setError("");
     try {
-      const { data } = await federationMemberAPI.createClient(form);
-      // data = { beneficiary, credentials: { mutual_number, temp_password }, source_type }
-      onSuccess?.({
-        beneficiary:  data.beneficiary,
-        credentials:  data.credentials,
-        source_type:  data.source_type,
-      });
+      const { data } = await federationClientAPI.create(form);
+      // shape : { client, mutual_number, access_code, adhesion_fee, portal_url }
+      onSuccess?.(data);
     } catch(e) {
       setError(e.response?.data?.error || "Erreur lors de la création");
     } finally { setLoading(false); }
@@ -122,11 +120,11 @@ function CreateClientInline({ onSuccess, onCancel }) {
               {plans.map(p => {
                 const slug = p.slug.toUpperCase();
                 return (
-                  <div key={slug} onClick={() => setForm(f => ({ ...f, plan: slug }))}
+                  <div key={slug} onClick={() => setForm(f => ({ ...f, plan_slug: slug }))}
                     style={{ flex:1, minWidth:100, padding:"10px 12px", borderRadius:10, cursor:"pointer",
-                      border:`2px solid ${form.plan===slug?C.purple:C.border}`,
-                      background:form.plan===slug?C.purpleL:C.bg }}>
-                    <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan===slug?C.purple:C.dark }}>{planIcon(slug)} {p.name}</p>
+                      border:`2px solid ${form.plan_slug===slug?C.purple:C.border}`,
+                      background:form.plan_slug===slug?C.purpleL:C.bg }}>
+                    <p style={{ margin:0, fontWeight:700, fontSize:12, color:form.plan_slug===slug?C.purple:C.dark }}>{planIcon(slug)} {p.name}</p>
                     <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>{Number(p.monthly_price).toLocaleString("fr-FR")} FCFA/mois</p>
                   </div>
                 );
@@ -145,27 +143,26 @@ function CreateClientInline({ onSuccess, onCancel }) {
 
 // ── Bannière succès après création client ─────────────────────
 function ClientCreatedBanner({ result, onClose }) {
-  // Le contrôleur retourne { beneficiary, credentials: { mutual_number, temp_password } }
-  // onSuccess passe l'objet complet { beneficiary, credentials, source_type }
-  const creds = result?.credentials ?? result;
+  // shape : { client, mutual_number, access_code, adhesion_fee, portal_url }
   const [copied, setCopied] = useState(false);
-  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
+  const text = `Client Awoundjô\nNuméro mutualiste : ${result?.mutual_number}\nCode d'accès : ${result?.access_code}\nPortail : ${result?.portal_url || "https://awoundjo-app.vercel.app"}`;
   return (
     <div style={{ background:C.greenL, border:"1.5px solid #05966944", borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-        <p style={{ margin:0, fontWeight:800, color:C.green, fontSize:15 }}>✅ Client créé — en attente de validation</p>
+        <p style={{ margin:0, fontWeight:800, color:C.green, fontSize:15 }}>✅ Client créé — en attente de paiement</p>
         <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:C.slate, fontSize:16 }}>✕</button>
       </div>
       <div style={{ background:"#fff", borderRadius:10, padding:"12px 16px", marginBottom:12 }}>
         {[
-          { label:"Numéro mutualiste", value: creds?.mutual_number  },
-          { label:"Mot de passe temp.", value: creds?.temp_password },
+          { label:"Numéro mutualiste", value: result?.mutual_number },
+          { label:"Code d'accès",      value: result?.access_code  },
         ].map(r => (
           <div key={r.label} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
             <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
             <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13 }}>{r.value}</span>
           </div>
         ))}
+        <p style={{ margin:"8px 0 0", fontSize:11, color:C.red }}>⚠️ Le code d'accès doit être changé à la première connexion</p>
       </div>
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
         <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
@@ -215,6 +212,10 @@ function getNavItems(role) {
     base.push({ path:"/referral/clients/new", icon:"➕", label:"Enregistrer client"  });
     base.push({ path:"/referral/cards",       icon:"💳", label:"Cartes vendues"      });
   }
+
+  // Clients finaux (Fédération) — disponible pour TOUS les rôles
+  base.push({ path:"/federation/my-clients",     icon:"👥", label:"Clients finaux"        });
+  base.push({ path:"/federation/my-clients/new", icon:"➕", label:"Nouveau client final"  });
 
   base.push(
     { path:"/referral/payments",      icon:"💰", label:"Paiements"     },
@@ -414,6 +415,12 @@ export default function FederationDashboard() {
         sub:   "Leaders + Pasteurs + Responsables + Clients",
         path:  "/referral/network",
       },
+      {
+        icon:"👥", label:"Clients finaux", color:C.green, bg:C.greenL,
+        value: stats.federation_clients ?? stats.clients?.total ?? 0,
+        sub:   "Créés via réseau Fédération",
+        path:  "/federation/my-clients",
+      },
     ] : role === "LEADER" ? [
       {
         icon:"⛪", label:"Mes Pasteurs", color:C.blue, bg:C.blueL,
@@ -426,6 +433,12 @@ export default function FederationDashboard() {
         value: stats.network_size ?? stats.total_network ?? 0,
         sub:   "Pasteurs + Responsables + Clients",
         path:  "/referral/network",
+      },
+      {
+        icon:"👥", label:"Clients finaux", color:C.green, bg:C.greenL,
+        value: stats.federation_clients ?? stats.clients?.total ?? 0,
+        sub:   "Créés via réseau Fédération",
+        path:  "/federation/my-clients",
       },
     ] : role === "PASTEUR" ? [
       {

@@ -17,6 +17,7 @@ import {
   federationRecruitAPI,
   federationProfileAPI,
   federationDashAPI,
+  federationClientAPI,
 } from "../../federationApi";
 import { diasporaBeneAPI } from "../../diasporaApi";
 import AdhesionForm from "../../components/AdhesionForm";
@@ -1368,6 +1369,381 @@ export function ReferralProfile() {
           </Btn>
         </form>
       </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGE : CRÉER UN CLIENT FINAL — Tous niveaux Fédération
+// RUM · LEADER · PASTEUR · RESPONSABLE
+// ─────────────────────────────────────────────────────────────
+export function FederationNewClient() {
+  const navigate = useNavigate();
+  const { plans, plansLoading } = usePlans();
+
+  const [form, setForm]       = useState({ name: "", phone: "", city: "", plan_slug: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState(null);
+  const [payMode, setPayMode] = useState(null);
+  const [jekoMethod, setJekoMethod] = useState("orange");
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError]     = useState("");
+  const [cashDone, setCashDone]     = useState(false);
+
+  useEffect(() => {
+    if (plans.length && !form.plan_slug)
+      setForm(f => ({ ...f, plan_slug: plans[0].slug.toUpperCase() }));
+  }, [plans]);
+
+  async function submit() {
+    if (!form.name || !form.phone || !form.plan_slug)
+      return setError("Nom, téléphone et formule sont requis");
+    setLoading(true); setError("");
+    try {
+      const { data } = await federationClientAPI.create({ ...form, plan_slug: form.plan_slug });
+      setSuccess(data);
+    } catch (e) {
+      setError(e.response?.data?.error || "Erreur lors de la création");
+    } finally { setLoading(false); }
+  }
+
+  async function payCash() {
+    setPayLoading(true); setPayError("");
+    try {
+      await federationClientAPI.payCash(success.client.id);
+      setCashDone(true);
+    } catch (e) {
+      setPayError(e.response?.data?.error || "Erreur paiement cash");
+    } finally { setPayLoading(false); }
+  }
+
+  async function payJeko() {
+    setPayLoading(true); setPayError("");
+    try {
+      const { data } = await federationClientAPI.payJeko(success.client.id, { jeko_method: jekoMethod });
+      const url = data?.data?.redirect_url || data?.redirect_url;
+      if (!url) throw new Error("URL de paiement non reçue");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.response?.data?.error || e.message || "Erreur JEKO");
+      setPayLoading(false);
+    }
+  }
+
+  if (success) {
+    const client  = success.client;
+    const fee     = success.adhesion_fee || 0;
+    const infoTxt = `Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nCode d'accès : ${success.access_code}\nPortail : ${success.portal_url}`;
+
+    if (cashDone) return (
+      <div style={{ padding:"24px 20px", maxWidth:520, margin:"0 auto" }}>
+        <Card style={{ textAlign:"center" }}>
+          <div style={{ fontSize:56, marginBottom:12 }}>✅</div>
+          <h2 style={{ margin:"0 0 6px", fontSize:20, fontWeight:900, color:C.green }}>Adhésion enregistrée !</h2>
+          <p style={{ color:C.slate, fontSize:13, marginBottom:20 }}>{client.name} est maintenant actif(ve).</p>
+          <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
+            <Btn onClick={() => { setSuccess(null); setCashDone(false); setForm({ name:"", phone:"", city:"", plan_slug: plans[0]?.slug?.toUpperCase()||"" }); }}>➕ Nouveau client</Btn>
+            <Btn outline onClick={() => navigate("/federation/my-clients")}>Voir mes clients</Btn>
+          </div>
+        </Card>
+      </div>
+    );
+
+    return (
+      <div style={{ padding:"24px 20px", maxWidth:520, margin:"0 auto" }}>
+        <Card>
+          <div style={{ textAlign:"center", marginBottom:20 }}>
+            <div style={{ fontSize:48, marginBottom:8 }}>🎉</div>
+            <h2 style={{ margin:0, fontSize:20, fontWeight:900, color:C.dark }}>Client créé !</h2>
+            <p style={{ margin:"4px 0 0", color:C.slate, fontSize:13 }}>Transmettez ces informations au client</p>
+          </div>
+
+          <div style={{ background:C.bg, borderRadius:12, padding:"16px 18px", marginBottom:16, border:`1px solid ${C.border}` }}>
+            {[
+              { label:"Numéro mutualiste", value:success.mutual_number },
+              { label:"Code d'accès",      value:success.access_code   },
+            ].map(f => (
+              <div key={f.label} style={{ marginBottom:10 }}>
+                <p style={{ margin:"0 0 3px", fontSize:11, fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:.8 }}>{f.label}</p>
+                <p style={{ margin:0, fontSize:15, fontWeight:800, color:C.dark, fontFamily:"monospace", background:"#fff", padding:"6px 10px", borderRadius:6, border:`1px solid ${C.border}` }}>{f.value}</p>
+              </div>
+            ))}
+            <p style={{ margin:"4px 0 0", fontSize:11, color:C.red }}>⚠️ Le code d'accès doit être changé à la première connexion</p>
+          </div>
+
+          <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+            <button onClick={() => navigator.clipboard.writeText(infoTxt)}
+              style={{ flex:1, padding:"9px 0", background:C.blueL, color:C.blue, border:`1.5px solid ${C.blue}`, borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+              📋 Copier
+            </button>
+            <a href={`https://wa.me/?text=${encodeURIComponent(infoTxt)}`} target="_blank" rel="noreferrer"
+              style={{ flex:1, padding:"9px 0", background:"#25D366", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+              📲 WhatsApp
+            </a>
+          </div>
+
+          {fee > 0 && (
+            <div style={{ background:C.greenL, border:`1.5px solid ${C.green}44`, borderRadius:12, padding:"16px 18px", marginBottom:16 }}>
+              <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:C.green }}>💳 Adhésion — {fee.toLocaleString("fr-FR")} FCFA</p>
+              <p style={{ margin:"0 0 14px", fontSize:12, color:C.slate }}>Activez immédiatement le compte en enregistrant le paiement.</p>
+
+              {payError && <div style={{ background:C.redL, borderRadius:8, padding:"8px 12px", marginBottom:10 }}><p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {payError}</p></div>}
+
+              {!payMode && (
+                <div style={{ display:"flex", gap:10 }}>
+                  <button disabled style={{ flex:1, padding:"11px 0", borderRadius:8, background:"#e2e8f0", color:"#94a3b8", border:"none", fontWeight:700, fontSize:13, cursor:"not-allowed", fontFamily:"inherit" }}>
+                    💵 Cash (indisponible)
+                  </button>
+                  <button onClick={() => setPayMode("jeko")}
+                    style={{ flex:1, padding:"11px 0", borderRadius:8, background:`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                    📱 Payer via JEKO
+                  </button>
+                </div>
+              )}
+
+              {payMode === "jeko" && (
+                <div>
+                  <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)} disabled={payLoading}
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:"inherit", background:"#fff", marginBottom:10 }}>
+                    <option value="orange">🟠 Orange Money</option>
+                    <option value="wave">🔵 Wave</option>
+                    <option value="mtn">🟡 MTN Mobile Money</option>
+                    <option value="moov">🟢 Moov Money</option>
+                    <option value="djamo">💜 Djamo / Carte bancaire</option>
+                  </select>
+                  <div style={{ display:"flex", gap:10 }}>
+                    <button onClick={() => setPayMode(null)}
+                      style={{ flex:1, padding:"10px 0", borderRadius:8, background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                      ← Retour
+                    </button>
+                    <button onClick={payJeko} disabled={payLoading}
+                      style={{ flex:2, padding:"10px 0", borderRadius:8, background:payLoading?"#94a3b8":`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:13, cursor:payLoading?"not-allowed":"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                      {payLoading ? <><div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />Redirection…</> : <>💳 Payer {fee.toLocaleString("fr-FR")} FCFA</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            <Btn onClick={() => { setSuccess(null); setPayMode(null); setForm({ name:"", phone:"", city:"", plan_slug: plans[0]?.slug?.toUpperCase()||"" }); }}>➕ Nouveau client</Btn>
+            <Btn outline onClick={() => navigate("/federation/my-clients")}>Voir mes clients</Btn>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:560, margin:"0 auto" }}>
+      <PageHeader title="👤 Créer un client final" subtitle="Génère automatiquement un numéro AWJ-YYYY-XXXX" />
+      <Card>
+        {error && <div style={{ background:C.redL, color:C.red, padding:"10px 14px", borderRadius:8, marginBottom:16, fontSize:13 }}>⚠️ {error}</div>}
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {[
+            { key:"name",  label:"Nom complet *",       placeholder:"Jean Dupont",         type:"text" },
+            { key:"phone", label:"Téléphone WhatsApp *", placeholder:"+225 07 00 00 00 00", type:"tel"  },
+            { key:"city",  label:"Ville",                placeholder:"Abidjan",             type:"text" },
+          ].map(f => (
+            <div key={f.key}>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:6 }}>{f.label}</label>
+              <input type={f.type} placeholder={f.placeholder} value={form[f.key]}
+                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                style={{ width:"100%", padding:"10px 14px", borderRadius:8, fontSize:14, border:`1.5px solid ${C.border}`, outline:"none", boxSizing:"border-box" }} />
+            </div>
+          ))}
+          <div>
+            <label style={{ display:"block", fontSize:13, fontWeight:700, color:C.dark, marginBottom:8 }}>Offre choisie *</label>
+            {plansLoading ? <p style={{ fontSize:12, color:C.slate }}>Chargement…</p> : (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {plans.map(p => {
+                  const slug = p.slug.toUpperCase();
+                  return (
+                    <div key={slug} onClick={() => setForm(f => ({ ...f, plan_slug: slug }))}
+                      style={{ padding:"12px 16px", borderRadius:10, border:`2px solid ${form.plan_slug===slug?C.purple:C.border}`, background:form.plan_slug===slug?C.purpleL:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", transition:"all .15s" }}>
+                      <div>
+                        <p style={{ margin:0, fontWeight:700, fontSize:14, color:form.plan_slug===slug?C.purple:C.dark }}>{planIcon(slug)} {p.name}</p>
+                        <p style={{ margin:0, fontSize:12, color:C.slate }}>Adhésion : {Number(p.adhesion_price).toLocaleString("fr-FR")} FCFA</p>
+                      </div>
+                      <span style={{ fontWeight:800, fontSize:13, color:form.plan_slug===slug?C.purple:C.slate }}>{fmt(p.monthly_price)} FCFA/mois</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <Btn onClick={submit} disabled={loading||plansLoading} color={C.purple}>
+            {loading ? "Enregistrement…" : "✅ Enregistrer le client"}
+          </Btn>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGE : MES CLIENTS FINAUX — Tous niveaux Fédération
+// ─────────────────────────────────────────────────────────────
+export function FederationMyClients() {
+  const navigate = useNavigate();
+  const [clients, setClients]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage]         = useState(1);
+  const [pagination, setPagination] = useState(null);
+
+  const [payingId,   setPayingId]   = useState(null);
+  const [payMode,    setPayMode]    = useState(null);
+  const [jekoMethod, setJekoMethod] = useState("orange");
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError,   setPayError]   = useState("");
+  const [paidId,     setPaidId]     = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    federationClientAPI.getMyClients({ page, search, status: statusFilter })
+      .then(r => { setClients(r.data.clients||[]); setPagination(r.data.pagination||null); })
+      .finally(() => setLoading(false));
+  }, [page, search, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function openPay(id)  { setPayingId(id); setPayMode(null); setPayError(""); }
+  function closePay()   { setPayingId(null); setPayMode(null); setPayError(""); }
+
+  async function payJeko(clientId) {
+    setPayLoading(true); setPayError("");
+    try {
+      const { data } = await federationClientAPI.payJeko(clientId, { jeko_method: jekoMethod });
+      const url = data?.data?.redirect_url || data?.redirect_url;
+      if (!url) throw new Error("URL de paiement non reçue");
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e.response?.data?.error || e.message || "Erreur JEKO");
+      setPayLoading(false);
+    }
+  }
+
+  const statusColor = s => ({
+    actif:    { bg:C.greenL, color:C.green,  label:"✅ Actif"      },
+    attente:  { bg:C.goldL,  color:C.gold,   label:"⏳ En attente" },
+    suspendu: { bg:C.redL,   color:C.red,    label:"🚫 Suspendu"   },
+  }[s] || { bg:C.bg, color:C.slate, label:s });
+
+  return (
+    <div style={{ padding:"24px 20px", maxWidth:900, margin:"0 auto" }}>
+      <PageHeader
+        title="👥 Mes clients finaux"
+        subtitle={pagination ? `${pagination.total} client(s) au total` : ""}
+        action={<Btn color={C.purple} onClick={() => navigate("/federation/my-clients/new")}>➕ Nouveau client</Btn>}
+      />
+
+      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+        <input placeholder="Rechercher nom, téléphone, numéro…" value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          style={{ flex:1, minWidth:200, padding:"9px 14px", borderRadius:8, fontSize:13, border:`1.5px solid ${C.border}`, outline:"none" }} />
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          style={{ padding:"9px 12px", borderRadius:8, fontSize:13, border:`1.5px solid ${C.border}`, background:"#fff", fontFamily:"inherit" }}>
+          <option value="">Tous les statuts</option>
+          <option value="actif">Actif</option>
+          <option value="attente">En attente</option>
+          <option value="suspendu">Suspendu</option>
+        </select>
+      </div>
+
+      {loading ? <Loader /> : clients.length === 0 ? (
+        <EmptyState icon="👥" title="Aucun client" desc="Créez votre premier client final" />
+      ) : (
+        <>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {clients.map(c => {
+              const sc           = statusColor(c.status);
+              const isPaid       = c.status_payment === "paid";
+              const isPayingThis = payingId === c.id;
+              const justPaid     = paidId === c.id;
+
+              return (
+                <Card key={c.id} style={{ flexDirection:"column", gap:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <div style={{ width:42, height:42, borderRadius:11, background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👤</div>
+                      <div>
+                        <p style={{ margin:0, fontWeight:800, color:C.dark }}>{c.name}</p>
+                        <p style={{ margin:"2px 0 0", fontSize:12, color:C.slate }}>{c.phone}{c.city?` • ${c.city}`:""}</p>
+                        <div style={{ display:"flex", gap:6, marginTop:4, flexWrap:"wrap" }}>
+                          <span style={{ fontSize:10, fontWeight:700, color:C.purple, background:C.purpleL, padding:"1px 8px", borderRadius:999 }}>{c.plan}</span>
+                          <span style={{ fontSize:10, fontWeight:700, color:C.slate, fontFamily:"monospace" }}>{c.mutual_number}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                      <span style={{ background:sc.bg, color:sc.color, padding:"3px 12px", borderRadius:999, fontSize:11, fontWeight:700 }}>{sc.label}</span>
+                      {c.expiration_date && <span style={{ fontSize:11, color:C.slate }}>Exp. {fmtDate(c.expiration_date)}</span>}
+                      {!isPaid && !justPaid && (
+                        <button onClick={() => isPayingThis ? closePay() : openPay(c.id)}
+                          style={{ padding:"6px 14px", borderRadius:8, border:`1.5px solid ${C.purple}`, background:isPayingThis?C.purpleL:"#fff", color:C.purple, fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                          {isPayingThis ? "✕ Annuler" : "💳 Payer l'adhésion"}
+                        </button>
+                      )}
+                      {justPaid && <span style={{ fontSize:12, fontWeight:700, color:C.green }}>✅ Adhésion payée !</span>}
+                    </div>
+                  </div>
+
+                  {isPayingThis && (
+                    <div style={{ marginTop:14, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+                      {payError && <div style={{ background:C.redL, color:C.red, padding:"8px 12px", borderRadius:8, marginBottom:10, fontSize:12, fontWeight:600 }}>⚠️ {payError}</div>}
+                      {!payMode && (
+                        <div style={{ display:"flex", gap:10 }}>
+                          <button disabled style={{ flex:1, padding:"10px 0", borderRadius:8, background:"#e2e8f0", color:"#94a3b8", border:"none", fontWeight:700, fontSize:13, cursor:"not-allowed", fontFamily:"inherit" }}>
+                            💵 Cash (indisponible)
+                          </button>
+                          <button onClick={() => setPayMode("jeko")}
+                            style={{ flex:1, padding:"10px 0", borderRadius:8, background:`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                            📱 JEKO
+                          </button>
+                        </div>
+                      )}
+                      {payMode === "jeko" && (
+                        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                          <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)}
+                            style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:"inherit", background:"#fff" }}>
+                            <option value="orange">🟠 Orange Money</option>
+                            <option value="wave">🔵 Wave</option>
+                            <option value="mtn">🟡 MTN Mobile Money</option>
+                            <option value="moov">🟢 Moov Money</option>
+                            <option value="djamo">💜 Djamo / Carte bancaire</option>
+                          </select>
+                          <div style={{ display:"flex", gap:10 }}>
+                            <button onClick={() => setPayMode(null)}
+                              style={{ flex:1, padding:"10px 0", borderRadius:8, background:"#fff", color:C.slate, border:`1.5px solid ${C.border}`, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+                              ← Retour
+                            </button>
+                            <button onClick={() => payJeko(c.id)} disabled={payLoading}
+                              style={{ flex:2, padding:"10px 0", borderRadius:8, background:payLoading?"#94a3b8":`linear-gradient(135deg, ${C.green}, #047857)`, color:"#fff", border:"none", fontWeight:700, fontSize:13, cursor:payLoading?"not-allowed":"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                              {payLoading ? <><div style={{ width:13, height:13, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />Redirection…</> : "💳 Payer via JEKO"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          {pagination && pagination.pages > 1 && (
+            <div style={{ display:"flex", justifyContent:"center", gap:8, marginTop:20 }}>
+              <Btn outline color={C.purple} disabled={page<=1} onClick={() => setPage(p=>p-1)}>← Précédent</Btn>
+              <span style={{ padding:"8px 14px", fontSize:13, color:C.slate }}>Page {page} / {pagination.pages}</span>
+              <Btn outline color={C.purple} disabled={page>=pagination.pages} onClick={() => setPage(p=>p+1)}>Suivant →</Btn>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -135,6 +135,8 @@ const ReferralRegisterResponsable = referralPage("ReferralRegisterResponsable");
 const ReferralRegisterClient      = referralPage("ReferralRegisterClient");
 const ReferralClients             = referralPage("ReferralClients");
 const ReferralCards               = referralPage("ReferralCards");
+const FederationMyClients         = referralPage("FederationMyClients");
+const FederationNewClient         = referralPage("FederationNewClient");
 
 // ── Pages AFFILIÉ ─────────────────────────────────────────────
 const AffilieAuth         = lazy(() => import("./pages/affilie/AffilieAuth"));
@@ -439,6 +441,8 @@ export default function App() {
               <Route path="notifications"              element={<ReferralNotifications />} />
               <Route path="profile"                    element={<ReferralProfile />} />
               <Route path="withdrawal"                 element={<CommissionWithdrawal accentColor="#7C3AED" backPath="/referral/earnings" />} />
+              <Route path="my-clients"                 element={<FederationMyClients />} />
+              <Route path="my-clients/new"             element={<FederationNewClient />} />
             </Route>
 
             {/* ═══════════════════════════════════════════════

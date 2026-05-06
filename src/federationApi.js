@@ -140,4 +140,14 @@ export const federationLeaderAPI = {
   getLeaderboard: (period = "month") => api.get("/leaderboard", { params: { period } }),
 };
 
+// ── Clients finaux mutualistes (tous niveaux fédération) ─────
+// Pointe sur /api/federation/* (même backend que diaspora via server.js)
+export const federationClientAPI = {
+  getPlans:    ()            => api.get("/plans"),
+  create:      (data)        => api.post("/clients", data),
+  payCash:     (clientId)    => api.post(`/clients/${clientId}/pay-adhesion`),
+  payJeko:     (clientId, d) => api.post(`/clients/${clientId}/pay-adhesion-jeko`, d),
+  getMyClients:(params)      => api.get("/my-clients", { params }),
+};
+
 export default api;
