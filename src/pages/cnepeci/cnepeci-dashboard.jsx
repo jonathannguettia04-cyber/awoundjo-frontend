@@ -1408,6 +1408,328 @@ function WithdrawalPage() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE CLIENTS FINAUX (MUTUALISTES)
+// Endpoints : POST /clients · GET /clients · POST /clients/:id/pay/jeko · POST /clients/:id/pay/cash
+// ══════════════════════════════════════════════════════════════════════════════
+function ClientsPage() {
+  const [tab, setTab]               = useState("list");           // "list" | "create" | "pay"
+  const [clients, setClients]       = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState("");
+  const [statusFilter, setStatus]   = useState("");
+
+  // Formulaire création
+  const [form, setForm]       = useState({ name: "", phone: "", city: "", plan_slug: "STANDARD" });
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState("");
+  const [createOk,  setCreateOk]  = useState(null); // { mutual_number, access_code, adhesion_fee, portal_url }
+
+  // Paiement
+  const [selClient,    setSelClient]    = useState(null);
+  const [payMethod,    setPayMethod]    = useState("orange");
+  const [payMode,      setPayMode]      = useState("jeko");   // "jeko" | "cash"
+  const [paying,       setPaying]       = useState(false);
+  const [payErr,       setPayErr]       = useState("");
+  const [payOk,        setPayOk]        = useState("");
+
+  const PLANS = ["STANDARD", "CONFORT", "PREMIUM"];
+
+  const loadClients = useCallback(async (page = 1) => {
+    setLoading(true);
+    const qs = new URLSearchParams({ page, limit: 20, ...(search && { search }), ...(statusFilter && { status: statusFilter }) });
+    const data = await apiFetch(`/clients?${qs}`);
+    setClients(data?.clients || []);
+    setPagination(data?.pagination || { total: 0, page: 1, pages: 1 });
+    setLoading(false);
+  }, [search, statusFilter]);
+
+  useEffect(() => { loadClients(1); }, [loadClients]);
+
+  async function handleCreate() {
+    setCreateErr(""); setCreateOk(null);
+    if (!form.name.trim()) { setCreateErr("Nom requis"); return; }
+    if (!form.phone.trim()) { setCreateErr("Téléphone requis"); return; }
+    setCreating(true);
+    const data = await apiFetch("/clients", { method: "POST", body: JSON.stringify(form) });
+    setCreating(false);
+    if (!data || data.success === false) { setCreateErr(data?.message || "Erreur création"); return; }
+    setCreateOk(data);
+    loadClients(1);
+  }
+
+  async function handlePayJeko() {
+    setPayErr(""); setPayOk("");
+    setPaying(true);
+    const data = await apiFetch(`/clients/${selClient.id}/pay/jeko`, {
+      method: "POST",
+      body: JSON.stringify({ jeko_method: payMethod }),
+    });
+    setPaying(false);
+    if (!data || data.success === false) { setPayErr(data?.message || "Erreur paiement"); return; }
+    const url = data.data?.redirect_url || data.redirect_url;
+    if (url) { setPayOk("Redirection vers JEKO…"); setTimeout(() => { window.location.href = url; }, 1000); }
+    else setPayErr("URL de paiement non reçue");
+  }
+
+  async function handlePayCash() {
+    setPayErr(""); setPayOk("");
+    if (!window.confirm(`Confirmer le paiement CASH pour ${selClient.name} ?`)) return;
+    setPaying(true);
+    const data = await apiFetch(`/clients/${selClient.id}/pay/cash`, { method: "POST" });
+    setPaying(false);
+    if (!data || data.success === false) { setPayErr(data?.message || "Erreur paiement"); return; }
+    setPayOk(`✅ ${selClient.name} activé (cash).`);
+    loadClients(1);
+    setTimeout(() => { setTab("list"); setSelClient(null); setPayOk(""); }, 2000);
+  }
+
+  const statusBadge = (s, sp) => {
+    if (sp === "paid")    return <Badge color={G.green} bg={G.greenLight}>● Actif</Badge>;
+    if (s  === "PENDING") return <Badge color={G.gold}  bg={G.goldLight}>● En attente</Badge>;
+    return <Badge color={G.muted} bg="#F3F4F6">● Inactif</Badge>;
+  };
+
+  const inputStyle = { width: "100%", padding: "11px 14px", border: `1px solid ${G.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#FAFBFE" };
+
+  return (
+    <div style={{ maxWidth: 800 }}>
+      {/* Hero */}
+      <div style={{ background: `linear-gradient(135deg,${G.blue} 0%,#1D4ED8 100%)`, borderRadius: 20, padding: "22px 28px", marginBottom: 22, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -24, top: -24, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,.07)" }} />
+        <div style={{ fontSize: 26, marginBottom: 6 }}>🫂</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: "#fff" }}>Clients finaux (Mutualistes)</div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)", marginTop: 3 }}>Créez et gérez les mutualistes de votre réseau</div>
+      </div>
+
+      {/* Onglets */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[
+          { id: "list",   label: "📋 Mes clients",       count: pagination.total },
+          { id: "create", label: "＋ Nouveau client",     count: null },
+        ].map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setCreateErr(""); setCreateOk(null); }}
+            style={{ padding: "9px 18px", borderRadius: 10, border: `2px solid ${tab===t.id?G.blue:G.border}`, background: tab===t.id?G.blueLight:"#fff", color: tab===t.id?G.blue:G.muted, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+            {t.label}{t.count !== null && <span style={{ background: G.blue, color: "#fff", borderRadius: 20, padding: "1px 7px", fontSize: 10, fontWeight: 700 }}>{t.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── LISTE ─── */}
+      {tab === "list" && (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          {/* Barre de recherche */}
+          <div style={{ padding: "14px 18px", borderBottom: `1px solid ${G.border}`, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input placeholder="🔍 Rechercher nom / tél / numéro…" value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ ...inputStyle, flex: 1, minWidth: 200, padding: "9px 12px" }} />
+            <select value={statusFilter} onChange={e => setStatus(e.target.value)}
+              style={{ ...inputStyle, width: 160, padding: "9px 12px" }}>
+              <option value="">Tous statuts</option>
+              <option value="ACTIVE">Actif</option>
+              <option value="PENDING">En attente</option>
+            </select>
+          </div>
+
+          {loading ? <Spinner /> : clients.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "48px 20px", color: G.muted }}>
+              <div style={{ fontSize: 42, marginBottom: 10 }}>👥</div>
+              <div style={{ fontSize: 14 }}>Aucun client trouvé</div>
+              <button onClick={() => setTab("create")} style={{ marginTop: 14, padding: "9px 20px", background: G.blue, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                Créer un client →
+              </button>
+            </div>
+          ) : (
+            <div>
+              {clients.map((c, i) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: i < clients.length - 1 ? `1px solid ${G.border}` : "none", transition: "background .15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAFBFE"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                      {c.phone} · {c.mutual_number} · <span style={{ textTransform: "uppercase" }}>{c.plan}</span>
+                    </div>
+                    {c.expiration_date && <div style={{ fontSize: 10, color: G.muted, marginTop: 2 }}>Expire : {new Date(c.expiration_date).toLocaleDateString("fr-FR")}</div>}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {statusBadge(c.status, c.status_payment)}
+                    {c.status_payment !== "paid" && (
+                      <button onClick={() => { setSelClient(c); setTab("pay"); setPayErr(""); setPayOk(""); }}
+                        style={{ padding: "6px 12px", background: G.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        💳 Payer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {/* Pagination */}
+              {pagination.pages > 1 && (
+                <div style={{ padding: "14px 18px", display: "flex", justifyContent: "center", gap: 8, borderTop: `1px solid ${G.border}` }}>
+                  {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => loadClients(p)}
+                      style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${pagination.page===p?G.blue:G.border}`, background: pagination.page===p?G.blueLight:"#fff", color: pagination.page===p?G.blue:G.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── CRÉATION ─── */}
+      {tab === "create" && (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.blue}0D,transparent)` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>📝 Nouveau client final</div>
+            <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>Le numéro mutualiste et le code d'accès seront générés automatiquement</div>
+          </div>
+          <div style={{ padding: 24 }}>
+            <Alert type="error"   msg={createErr} />
+
+            {createOk ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ background: G.greenLight, border: `1px solid ${G.green}44`, borderRadius: 14, padding: 20 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: G.green, marginBottom: 14 }}>✅ Client créé avec succès !</div>
+                  {[
+                    { label: "Numéro mutualiste", value: createOk.mutual_number, mono: true },
+                    { label: "Code d'accès temporaire", value: createOk.access_code, mono: true },
+                    { label: "Frais d'adhésion", value: fmt(createOk.adhesion_fee) },
+                    { label: "Portail client", value: createOk.portal_url, link: true },
+                  ].map((row, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${G.green}22` : "none" }}>
+                      <span style={{ fontSize: 12, color: G.green, fontWeight: 600 }}>{row.label}</span>
+                      {row.link
+                        ? <a href={row.value} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: G.blue, fontWeight: 700 }}>{row.value}</a>
+                        : <span style={{ fontSize: row.mono?14:13, fontWeight: 800, fontFamily: row.mono?"monospace":"inherit", color: G.text, letterSpacing: row.mono?1:0 }}>{row.value}</span>
+                      }
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => { setCreateOk(null); setForm({ name:"", phone:"", city:"", plan_slug:"STANDARD" }); }}
+                    style={{ flex:1, padding: "12px 16px", background: G.blue, color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+                    ＋ Créer un autre client
+                  </button>
+                  <button onClick={() => setTab("list")}
+                    style={{ flex:1, padding: "12px 16px", background:"#fff", color:G.blue, border:`1.5px solid ${G.blue}`, borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+                    Voir la liste →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {[
+                  { label: "Nom complet *", key: "name",     type: "text",  ph: "Jean Kouassi" },
+                  { label: "Téléphone *",   key: "phone",    type: "tel",   ph: "07 XX XX XX XX" },
+                  { label: "Ville",         key: "city",     type: "text",  ph: "Abidjan" },
+                ].map(f => (
+                  <div key={f.key} style={{ gridColumn: f.key === "name" ? "span 2" : "auto" }}>
+                    <label style={{ display:"block", fontSize:11, fontWeight:600, color:G.muted, marginBottom:7, textTransform:"uppercase", letterSpacing:".5px" }}>{f.label}</label>
+                    <input type={f.type} placeholder={f.ph} value={form[f.key]}
+                      onChange={e => setForm(d => ({ ...d, [f.key]: e.target.value }))}
+                      style={inputStyle}
+                      onFocus={e => e.target.style.borderColor = G.blue}
+                      onBlur={e  => e.target.style.borderColor = G.border} />
+                  </div>
+                ))}
+                <div style={{ gridColumn: "span 2" }}>
+                  <label style={{ display:"block", fontSize:11, fontWeight:600, color:G.muted, marginBottom:7, textTransform:"uppercase", letterSpacing:".5px" }}>Formule *</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {PLANS.map(p => (
+                      <div key={p} onClick={() => setForm(d => ({ ...d, plan_slug: p }))}
+                        style={{ flex:1, border:`2px solid ${form.plan_slug===p?G.blue:G.border}`, borderRadius:10, padding:"12px 14px", cursor:"pointer", background:form.plan_slug===p?G.blueLight:"#FAFBFE", textAlign:"center", transition:"all .15s" }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:form.plan_slug===p?G.blue:G.text }}>{p}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <button onClick={handleCreate} disabled={creating}
+                    style={{ width:"100%", padding:"13px 20px", background:`linear-gradient(135deg,${G.blue},#1D4ED8)`, color:"#fff", border:"none", borderRadius:12, fontSize:14, fontWeight:700, cursor:creating?"not-allowed":"pointer", fontFamily:"inherit", opacity:creating?0.7:1 }}>
+                    {creating ? "⏳ Création…" : "🫂 Créer le client →"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PAIEMENT ─── */}
+      {tab === "pay" && selClient && (
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.green}0D,transparent)`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>💳 Payer l'adhésion</div>
+              <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{selClient.name} · {selClient.mutual_number}</div>
+            </div>
+            <button onClick={() => { setTab("list"); setSelClient(null); }}
+              style={{ background:"#F3F4F6", border:"none", borderRadius:8, padding:"6px 12px", fontSize:12, color:G.muted, cursor:"pointer", fontFamily:"inherit" }}>
+              ← Retour
+            </button>
+          </div>
+          <div style={{ padding: 24 }}>
+            <Alert type="error"   msg={payErr} />
+            <Alert type="success" msg={payOk}  />
+
+            {/* Mode de paiement */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display:"block", fontSize:11, fontWeight:600, color:G.muted, marginBottom:10, textTransform:"uppercase", letterSpacing:".5px" }}>Mode de paiement</label>
+              <div style={{ display: "flex", gap: 10 }}>
+                {[{id:"jeko",label:"💳 Jeko (mobile money)",sub:"Paiement en ligne sécurisé",disabled:false},{id:"cash",label:"💵 Espèces (cash)",sub:"Bientôt disponible",disabled:true}].map(m => (
+                  <div key={m.id} onClick={() => !m.disabled && setPayMode(m.id)}
+                    style={{ flex:1, border:`2px solid ${m.disabled?"#E4E8F0":payMode===m.id?G.green:G.border}`, borderRadius:12, padding:"14px 16px", cursor:m.disabled?"not-allowed":"pointer", background:m.disabled?"#F3F4F6":payMode===m.id?G.greenLight:"#FAFBFE", transition:"all .15s", opacity:m.disabled?0.55:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:m.disabled?G.muted:payMode===m.id?G.green:G.text }}>{m.label}</div>
+                    <div style={{ fontSize:11, color:G.muted, marginTop:3 }}>{m.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Réseau JEKO */}
+            {payMode === "jeko" && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display:"block", fontSize:11, fontWeight:600, color:G.muted, marginBottom:8, textTransform:"uppercase", letterSpacing:".5px" }}>Réseau de paiement</label>
+                <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+                  style={{ ...inputStyle }}>
+                  <option value="orange">🟠 Orange Money</option>
+                  <option value="wave">🔵 Wave</option>
+                  <option value="mtn">🟡 MTN Mobile Money</option>
+                  <option value="moov">🟢 Moov Money</option>
+                  <option value="djamo">💜 Djamo / Carte bancaire</option>
+                </select>
+              </div>
+            )}
+
+            {/* Récap */}
+            <div style={{ background:"#FAFBFE", border:`1px solid ${G.border}`, borderRadius:12, padding:"14px 18px", marginBottom:20 }}>
+              {[
+                { label:"Client",     value: selClient.name },
+                { label:"Formule",    value: selClient.plan },
+                { label:"Mode",       value: payMode === "jeko" ? `Jeko — ${payMethod}` : "Cash" },
+              ].map((row,i,arr) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:i<arr.length-1?`1px solid ${G.border}`:"none" }}>
+                  <span style={{ fontSize:13, color:G.muted }}>{row.label}</span>
+                  <span style={{ fontSize:13, fontWeight:700, color:G.text, textTransform:"uppercase" }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={payMode==="jeko"?handlePayJeko:handlePayCash} disabled={paying||!!payOk}
+              style={{ width:"100%", padding:"13px 20px", background:`linear-gradient(135deg,${G.green},#047857)`, color:"#fff", border:"none", borderRadius:12, fontSize:14, fontWeight:700, cursor:paying||payOk?"not-allowed":"pointer", fontFamily:"inherit", opacity:paying||payOk?0.7:1 }}>
+              {paying ? "⏳ En cours…" : payMode==="jeko" ? `💳 Payer avec JEKO →` : "💵 Confirmer paiement cash →"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── NAV ITEMS ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: "dashboard",   label: "Tableau de bord",    icon: "◉" },
@@ -1415,6 +1737,7 @@ const NAV_ITEMS = [
   { id: "creer",       label: "Créer un membre",     icon: "＋" },
   { id: "commissions", label: "Commissions",         icon: "◎" },
   { id: "bonus",       label: "Bonus mensuel",       icon: "◆" },
+  { id: "clients",     label: "Clients finaux",      icon: "🫂" },
   { id: "paiement",    label: "Payer",               icon: "◑" },
   { id: "retrait",     label: "Retrait commission",  icon: "💸" },
   { id: "invite",      label: "Lien d'invitation",   icon: "◇" },
@@ -1482,6 +1805,7 @@ export default function App() {
       case "creer":       return <CreerMembrePage membre={membre} />;
       case "commissions": return <CommissionsPage />;
       case "bonus":       return <BonusPage />;
+      case "clients":     return <ClientsPage />;
       case "paiement":    return <PaiementPage />;
       case "retrait":     return <WithdrawalPage />;
       case "invite":      return <InvitePage membre={membre} />;

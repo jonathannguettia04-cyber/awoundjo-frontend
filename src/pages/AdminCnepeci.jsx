@@ -610,6 +610,258 @@ function CommissionsTable({ commissions }) {
   );
 }
 
+// ── Tableau Clients Finaux (Souscripteurs) ────────────────────────────────────
+function ClientsFinauxTable({ clients, onRefresh, onAlert }) {
+  const [search, setSearch]           = useState("");
+  const [filterPaiement, setFilterPaiement] = useState("ALL");
+  const [filterStatus, setFilterStatus]     = useState("ALL");
+  const [selected, setSelected]             = useState(null);
+  const [exportLoading, setExportLoading]   = useState(false);
+
+  // Filtrage
+  const filtered = clients.filter(c => {
+    const q = search.toLowerCase();
+    const matchSearch = !search ||
+      c.nom?.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q) ||
+      c.phone?.includes(search) ||
+      c.code_invitation?.toLowerCase().includes(q) ||
+      c.parrain_nom?.toLowerCase().includes(q);
+    const st = (c.statut || c.status || "").toLowerCase();
+    const matchStatus = filterStatus === "ALL" || st === filterStatus;
+    const ps = (c.paiement_statut || c.payment_status || "").toLowerCase();
+    const matchPaiement = filterPaiement === "ALL" || ps === filterPaiement;
+    return matchSearch && matchStatus && matchPaiement;
+  });
+
+  // Stats rapides
+  const totalClients   = clients.length;
+  const clientsActifs  = clients.filter(c => { const s = (c.statut || c.status || "").toLowerCase(); return s === "actif" || s === "active"; }).length;
+  const clientsPaye    = clients.filter(c => { const p = (c.paiement_statut || c.payment_status || "").toLowerCase(); return p === "paid" || p === "payé" || p === "success"; }).length;
+  const clientsEnAttente = clients.filter(c => { const p = (c.paiement_statut || c.payment_status || "").toLowerCase(); return p === "pending" || p === "en_attente"; }).length;
+  const clientsImpaye  = clients.filter(c => { const p = (c.paiement_statut || c.payment_status || "").toLowerCase(); return !p || p === "unpaid" || p === "impayé" || p === "failed"; }).length;
+
+  // Export CSV simple
+  const handleExport = () => {
+    setExportLoading(true);
+    const rows = [["Nom", "Email", "Téléphone", "Parrain", "Statut", "Paiement", "Cotisation", "Inscription"]];
+    filtered.forEach(c => rows.push([
+      c.nom || "", c.email || "", c.phone || "", c.parrain_nom || "",
+      c.statut || c.status || "", c.paiement_statut || c.payment_status || "",
+      c.montant_cotisation ? `${c.montant_cotisation} F` : "—",
+      c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : ""
+    ]));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "clients_finaux_cnepeci.csv"; a.click();
+    URL.revokeObjectURL(url);
+    setExportLoading(false);
+  };
+
+  const PAIEMENT_CONFIG = {
+    paid:       { label: "● Payé",      color: C.green,  bg: C.greenL },
+    payé:       { label: "● Payé",      color: C.green,  bg: C.greenL },
+    success:    { label: "● Payé",      color: C.green,  bg: C.greenL },
+    pending:    { label: "⏳ En attente", color: C.gold,  bg: C.goldL  },
+    en_attente: { label: "⏳ En attente", color: C.gold,  bg: C.goldL  },
+    unpaid:     { label: "✕ Impayé",   color: C.red,    bg: C.redL   },
+    impayé:     { label: "✕ Impayé",   color: C.red,    bg: C.redL   },
+    failed:     { label: "✕ Impayé",   color: C.red,    bg: C.redL   },
+  };
+
+  const getPaiementBadge = (raw) => {
+    const key = (raw || "").toLowerCase();
+    return PAIEMENT_CONFIG[key] || { label: "— Inconnu", color: C.slate, bg: C.bg };
+  };
+
+  return (
+    <div>
+      {/* Stats rapides */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {[
+          { icon: "👤", label: "Total clients", value: totalClients,      color: C.purple, onClick: () => { setFilterStatus("ALL"); setFilterPaiement("ALL"); } },
+          { icon: "✅", label: "Actifs",         value: clientsActifs,     color: C.green,  onClick: () => { setFilterStatus("actif"); setFilterPaiement("ALL"); } },
+          { icon: "💚", label: "Paiements OK",   value: clientsPaye,       color: C.green,  onClick: () => { setFilterPaiement("paid"); setFilterStatus("ALL"); } },
+          { icon: "⏳", label: "En attente",     value: clientsEnAttente,  color: C.gold,   onClick: () => { setFilterPaiement("pending"); setFilterStatus("ALL"); } },
+          { icon: "❌", label: "Impayés",        value: clientsImpaye,     color: C.red,    onClick: () => { setFilterPaiement("unpaid"); setFilterStatus("ALL"); } },
+        ].map(({ icon, label, value, color, onClick }) => (
+          <div key={label} onClick={onClick} style={{ background: "#fff", border: `1.5px solid ${color}33`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", transition: "transform .15s, box-shadow .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 18px ${color}22`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.slate, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color, lineHeight: 1 }}>{icon} {value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Barre d'outils */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          placeholder="🔍 Nom, email, téléphone, parrain, code…"
+          value={search} onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 240, padding: "9px 14px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", background: C.bg }}
+        />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}>
+          <option value="ALL">Tous statuts</option>
+          <option value="actif">● Actifs</option>
+          <option value="suspendu">● Suspendus</option>
+          <option value="pending">⏳ En attente</option>
+        </select>
+        <select value={filterPaiement} onChange={e => setFilterPaiement(e.target.value)}
+          style={{ padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}>
+          <option value="ALL">Tous paiements</option>
+          <option value="paid">💚 Payés</option>
+          <option value="pending">⏳ En attente</option>
+          <option value="unpaid">❌ Impayés</option>
+        </select>
+        <button onClick={handleExport} disabled={exportLoading}
+          style={{ padding: "9px 16px", border: `1px solid ${C.green}44`, borderRadius: 10, background: C.greenL, color: C.green, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          {exportLoading ? "⏳…" : "⬇️ Exporter CSV"}
+        </button>
+        {onRefresh && (
+          <button onClick={onRefresh}
+            style={{ padding: "9px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, color: C.slate, fontFamily: "inherit" }}>
+            🔄
+          </button>
+        )}
+      </div>
+
+      {/* Tableau */}
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "56px 20px", color: C.slate, background: C.surface, borderRadius: 16, border: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: 44, margin: "0 0 12px" }}>🔍</p>
+          <p style={{ fontWeight: 800, fontSize: 15, color: C.dark, margin: "0 0 6px" }}>Aucun client trouvé</p>
+          <p style={{ fontSize: 12, margin: 0 }}>Ajustez vos filtres ou vérifiez la source de données</p>
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto", borderRadius: 12, border: `1px solid ${C.border}` }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {["Client", "Contact", "Parrain", "Statut membre", "Statut paiement", "Cotisation", "Inscription", "Actions"].map(h => (
+                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, color: C.slate, fontSize: 11, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c, i) => {
+                const pb = getPaiementBadge(c.paiement_statut || c.payment_status);
+                const isPending = (c.paiement_statut || c.payment_status || "").toLowerCase() === "pending" || (c.paiement_statut || c.payment_status || "").toLowerCase() === "en_attente";
+                return (
+                  <tr key={c.id || i}
+                    style={{ borderBottom: `1px solid ${C.border}`, background: isPending ? "#FFFDF0" : "#fff", cursor: "pointer", transition: "background .1s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = isPending ? "#FEF9C3" : C.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = isPending ? "#FFFDF0" : "#fff"}
+                    onClick={() => setSelected(selected?.id === c.id ? null : c)}>
+                    {/* Client */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: C.slate + "18", color: C.slate, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                          {c.nom?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: C.dark, fontSize: 13 }}>{c.nom || "—"}</div>
+                          {c.code_invitation && <div style={{ fontSize: 10, color: C.purple, fontFamily: "monospace", marginTop: 1 }}>#{c.code_invitation}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    {/* Contact */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ color: C.dark, fontSize: 12 }}>{c.email || "—"}</div>
+                      <div style={{ color: C.slate, fontSize: 11, marginTop: 2 }}>{c.phone || "—"}</div>
+                    </td>
+                    {/* Parrain */}
+                    <td style={{ padding: "12px 14px", color: C.slate, fontSize: 12 }}>
+                      {c.parrain_nom ? (
+                        <>
+                          <div style={{ fontWeight: 600, color: C.dark }}>{c.parrain_nom}</div>
+                          {c.parrain_role && <div style={{ fontSize: 10, color: C.slate, marginTop: 1 }}>{ROLE_CONFIG[c.parrain_role]?.label || c.parrain_role}</div>}
+                        </>
+                      ) : <span style={{ color: "#ccc" }}>—</span>}
+                    </td>
+                    {/* Statut membre */}
+                    <td style={{ padding: "12px 14px" }}><StatusBadge status={c.statut || c.status} /></td>
+                    {/* Statut paiement */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <Badge color={pb.color} bg={pb.bg}>{pb.label}</Badge>
+                    </td>
+                    {/* Cotisation */}
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.dark, fontSize: 13, whiteSpace: "nowrap" }}>
+                      {c.montant_cotisation ? `${fmt(c.montant_cotisation)} F` : <span style={{ color: "#ccc" }}>—</span>}
+                    </td>
+                    {/* Date inscription */}
+                    <td style={{ padding: "12px 14px", color: C.slate, fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(c.created_at)}</td>
+                    {/* Actions */}
+                    <td style={{ padding: "12px 14px" }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: "flex", gap: 5 }}>
+                        <button
+                          onClick={() => setSelected(selected?.id === c.id ? null : c)}
+                          style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.blue}44`, background: C.blueL, color: C.blue, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                          👁 Détails
+                        </button>
+                        {isPending && onAlert && (
+                          <button
+                            onClick={() => onAlert({ type: "info", msg: `Redirection vers paiement de ${c.nom}…` })}
+                            style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.gold}44`, background: C.goldL, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                            ⚡ Relancer
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Panneau détail client */}
+      {selected && (
+        <div style={{ background: "#F0F9FF", border: `1px solid ${C.blue}33`, borderRadius: 14, padding: "18px 22px", marginTop: 14, animation: "fadeIn .2s ease" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.blue, textTransform: "uppercase", letterSpacing: ".5px" }}>
+              👤 Fiche client — {selected.nom}
+            </div>
+            <button onClick={() => setSelected(null)}
+              style={{ padding: "4px 12px", border: `1px solid ${C.border}`, borderRadius: 7, background: "#fff", cursor: "pointer", fontSize: 11, color: C.slate, fontFamily: "inherit" }}>
+              Fermer
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+            {[
+              ["ID",              selected.id || "—"],
+              ["Nom complet",     selected.nom || "—"],
+              ["Email",           selected.email || "—"],
+              ["Téléphone",       selected.phone || "—"],
+              ["Code invitation", selected.code_invitation || "—"],
+              ["Parrain",         selected.parrain_nom || "Aucun"],
+              ["Rôle parrain",    ROLE_CONFIG[selected.parrain_role]?.label || selected.parrain_role || "—"],
+              ["Statut membre",   selected.statut || selected.status || "—"],
+              ["Statut paiement", selected.paiement_statut || selected.payment_status || "—"],
+              ["Cotisation",      selected.montant_cotisation ? `${fmt(selected.montant_cotisation)} F` : "—"],
+              ["Type adhésion",   selected.type_adhesion || selected.adhesion_type || "—"],
+              ["Date inscription",fmtDate(selected.created_at)],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: "#fff", borderRadius: 8, padding: "10px 14px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 10, color: C.slate, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{k}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, wordBreak: "break-all" }}>{String(v)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ fontSize: 12, color: C.slate, marginTop: 12 }}>
+        <strong>{filtered.length}</strong> client{filtered.length > 1 ? "s" : ""} affiché{filtered.length > 1 ? "s" : ""}
+        {clients.length !== filtered.length && ` sur ${clients.length} total`}
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPOSANT PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
@@ -633,6 +885,10 @@ export default function AdminCnepeci() {
   const [actionLoading,        setActionLoading]        = useState(null);
   const [rejectModal,          setRejectModal]          = useState(null);
   const [rejectNote,           setRejectNote]           = useState("");
+
+  // 👤 Clients finaux (souscripteurs)
+  const [clientsFinaux,        setClientsFinaux]        = useState([]);
+  const [clientsLoading,       setClientsLoading]       = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -702,6 +958,22 @@ export default function AdminCnepeci() {
 
   useEffect(() => { if (tab === "demandes") fetchDemandes(); }, [tab, fetchDemandes]);
 
+  const fetchClientsFinaux = useCallback(async () => {
+    setClientsLoading(true);
+    try {
+      const res = await api("get", "/api/cnepeci/admin/clients-finaux?limit=500");
+      setClientsFinaux(
+        res.data?.clients || res.data?.data?.clients ||
+        res.data?.membres || res.data?.data?.membres ||
+        res.data?.data || []
+      );
+    } catch {
+      setClientsFinaux(membres.filter(m => m.role === "SOUSCRIPTEUR"));
+    } finally { setClientsLoading(false); }
+  }, [membres]);
+
+  useEffect(() => { if (tab === "clients") fetchClientsFinaux(); }, [tab, fetchClientsFinaux]);
+
   const TABS = [
     { id: "overview",   label: "📊 Vue d'ensemble" },
     { id: "membres",    label: `👥 Membres`, count: membres.length },
@@ -709,6 +981,7 @@ export default function AdminCnepeci() {
     { id: "commissions",label: `🏆 Commissions` },
     { id: "bureau",     label: "🏛️ Bureau Centrale" },
     { id: "demandes",   label: "💸 Demandes Retrait", alert: demandesStats["PENDING"] || 0 },
+    { id: "clients",    label: "👤 Clients Finaux", count: clientsFinaux.length },
   ];
 
   return (
@@ -1081,6 +1354,27 @@ export default function AdminCnepeci() {
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* ════ TAB : CLIENTS FINAUX ════ */}
+            {tab === "clients" && (
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "22px 24px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: C.dark }}>👤 Clients Finaux (Souscripteurs)</div>
+                    <div style={{ fontSize: 12, color: C.slate, marginTop: 2 }}>
+                      Liste complète des souscripteurs du réseau — statuts, paiements et actions
+                    </div>
+                  </div>
+                  <button onClick={fetchClientsFinaux} disabled={clientsLoading}
+                    style={{ padding: "9px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: "#fff", cursor: clientsLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", color: C.slate, opacity: clientsLoading ? .6 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    🔄 {clientsLoading ? "Chargement…" : "Actualiser"}
+                  </button>
+                </div>
+                {clientsLoading ? <Spinner /> : (
+                  <ClientsFinauxTable clients={clientsFinaux} onRefresh={fetchClientsFinaux} onAlert={setAlert} />
                 )}
               </div>
             )}
