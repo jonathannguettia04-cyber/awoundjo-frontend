@@ -141,13 +141,13 @@ export const federationLeaderAPI = {
 };
 
 // ── Clients finaux mutualistes (tous niveaux fédération) ─────
-// Pointe sur /api/federation/* (même backend que diaspora via server.js)
+// Les routes réelles sont sur /api/diaspora/* (diasporaAuth accepte RUM/LEADER/PASTEUR/RESPONSABLE)
 export const federationClientAPI = {
-  getPlans:    ()            => api.get("/plans"),
-  create:      (data)        => api.post("/clients", data),
-  payCash:     (clientId)    => api.post(`/clients/${clientId}/pay-adhesion`),
-  payJeko:     (clientId, d) => api.post(`/clients/${clientId}/pay-adhesion-jeko`, d),
-  getMyClients:(params)      => api.get("/my-clients", { params }),
+  getPlans:     ()            => diasporaApiForFed.get("/plans"),
+  create:       (data)        => diasporaApiForFed.post("/clients", data),
+  payCash:      (clientId)    => diasporaApiForFed.post(`/clients/${clientId}/pay-adhesion`),
+  payJeko:      (clientId, d) => diasporaApiForFed.post(`/clients/${clientId}/pay-adhesion-jeko`, d),
+  getMyClients: (params)      => diasporaApiForFed.get("/my-clients", { params }),
 };
 
 export default api;
