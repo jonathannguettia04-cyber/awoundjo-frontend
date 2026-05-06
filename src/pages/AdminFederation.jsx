@@ -381,6 +381,14 @@ export default function AdminFederation() {
   const [rejectModal,     setRejectModal]     = useState(null);
   const [rejectNote,      setRejectNote]      = useState("");
 
+  // ── Clients finaux ──────────────────────────────────────────
+  const [clients,          setClients]          = useState([]);
+  const [clientsLoading,   setClientsLoading]   = useState(false);
+  const [clientsSearch,    setClientsSearch]    = useState("");
+  const [clientsStatus,    setClientsStatus]    = useState("");
+  const [clientsPage,      setClientsPage]      = useState(1);
+  const [clientsPagination,setClientsPagination]= useState(null);
+
   const stats = {
     total:        members.length,
     actifs:       members.filter(m => m.status === "ACTIVE").length,
@@ -391,6 +399,7 @@ export default function AdminFederation() {
     cartes:       members.reduce((s, m) => s + Number(m.beneficiary_count || 0), 0),
     adhesions:    members.reduce((s, m) => s + Number(m.membership_fee || 0), 0),
     commissions:  members.reduce((s, m) => s + Number(m.commissions_total || m.total_payments_eur || 0), 0),
+    clients_finaux: clientsPagination?.total ?? clients.length,
   };
 
   useEffect(() => { fetchMembers(); }, []);
@@ -482,12 +491,31 @@ export default function AdminFederation() {
 
   useEffect(() => { if (tab === "demandes") fetchDemandes(); }, [tab, demandesFilter]);
 
+  async function fetchClients() {
+    setClientsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: clientsPage, limit: 30 });
+      if (clientsSearch) params.set("search", clientsSearch);
+      if (clientsStatus) params.set("status", clientsStatus);
+      const { data } = await axios.get(`${API}/api/federation/admin/clients?${params}`, {
+        headers: { Authorization: `Bearer ${agentToken()}` },
+      });
+      setClients(data.clients || []);
+      setClientsPagination(data.pagination || null);
+    } catch (e) {
+      console.error("fetchClients federation", e.message);
+    } finally { setClientsLoading(false); }
+  }
+
+  useEffect(() => { if (tab === "clients") fetchClients(); }, [tab, clientsPage, clientsSearch, clientsStatus]);
+
   const pendingBadge = demandesStats["PENDING"] || 0;
 
   const TABS = [
     { id:"members",    label:"Membres",         icon:"👥", count: stats.total },
     { id:"hierarchy",  label:"Hiérarchie",      icon:"🏛️" },
     { id:"commissions",label:"Commissions",     icon:"💰" },
+    { id:"clients",    label:"Clients finaux",  icon:"👤", count: stats.clients_finaux || undefined },
     { id:"demandes",   label:"Retraits",        icon:"💸", badge: pendingBadge },
   ];
 
@@ -897,6 +925,152 @@ export default function AdminFederation() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* TAB CLIENTS FINAUX                                    */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {tab === "clients" && (
+        <div>
+          {/* Filtres */}
+          <div style={{ background:"#fff", borderRadius:14, border:`1.5px solid ${C.border}`,
+            padding:"14px 16px", marginBottom:16, display:"flex", gap:10, flexWrap:"wrap",
+            boxShadow:"0 1px 4px rgba(0,0,0,.04)" }}>
+            <div style={{ flex:1, minWidth:200, position:"relative" }}>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none" }}>🔍</span>
+              <input value={clientsSearch}
+                onChange={e => { setClientsSearch(e.target.value); setClientsPage(1); }}
+                placeholder="Rechercher nom, téléphone, numéro mutualiste…"
+                style={{ width:"100%", padding:"9px 12px 9px 34px", borderRadius:9, border:`1.5px solid ${C.border}`,
+                  fontSize:13, outline:"none", boxSizing:"border-box", transition:"border-color .15s", fontFamily:"inherit" }}
+                onFocus={e => e.target.style.borderColor=C.purple}
+                onBlur={e => e.target.style.borderColor=C.border}
+              />
+            </div>
+            <select value={clientsStatus} onChange={e => { setClientsStatus(e.target.value); setClientsPage(1); }}
+              style={{ padding:"9px 12px", borderRadius:9, border:`1.5px solid ${C.border}`, fontSize:13,
+                outline:"none", background:"#fff", color:C.dark, cursor:"pointer", fontFamily:"inherit" }}>
+              <option value="">Tous les statuts</option>
+              <option value="actif">✅ Actif</option>
+              <option value="attente">⏳ En attente</option>
+              <option value="suspendu">🚫 Suspendu</option>
+            </select>
+            <button onClick={fetchClients} className="fed-btn-ghost"
+              style={{ padding:"9px 16px", borderRadius:9, border:`1.5px solid ${C.border}`,
+                background:"#fff", color:C.slate, fontWeight:700, fontSize:12, cursor:"pointer",
+                display:"flex", alignItems:"center", gap:6, transition:"background .15s" }}>
+              <span style={{ fontSize:14 }}>↻</span> Actualiser
+            </button>
+          </div>
+
+          {clientsLoading ? <Spinner /> : clients.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"56px 20px", color:C.slate, background:"#fff",
+              borderRadius:16, border:`1.5px solid ${C.border}`, boxShadow:"0 2px 8px rgba(0,0,0,.04)" }}>
+              <p style={{ fontSize:42, margin:"0 0 12px" }}>👥</p>
+              <p style={{ fontWeight:800, fontSize:15, margin:"0 0 6px", color:C.dark }}>Aucun client final</p>
+              <p style={{ fontSize:13, margin:0 }}>Les clients créés par les membres Fédération apparaîtront ici</p>
+            </div>
+          ) : (
+            <>
+              {/* Compteur */}
+              <div style={{ padding:"10px 16px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:13, color:C.slate, fontWeight:600 }}>
+                  {clientsPagination ? `${clientsPagination.total} client(s) au total` : `${clients.length} client(s)`}
+                </span>
+              </div>
+
+              <div style={{ background:"#fff", borderRadius:16, border:`1.5px solid ${C.border}`,
+                overflow:"hidden", boxShadow:"0 2px 8px rgba(0,0,0,.05)" }}>
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                    <thead>
+                      <tr style={{ background:C.bg }}>
+                        {["Client","Plan","N° Mutualiste","Recruteur","Statut","Paiement","Expiration","Inscrit le"].map(h => (
+                          <th key={h} style={{ padding:"11px 14px", textAlign:"left", fontWeight:700,
+                            color:C.slate, fontSize:11, textTransform:"uppercase", letterSpacing:.6,
+                            whiteSpace:"nowrap", borderBottom:`1px solid ${C.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clients.map((c, i) => {
+                        const sCfg = {
+                          actif:    { label:"✅ Actif",       color:C.green, bg:"#D1FAE5" },
+                          attente:  { label:"⏳ En attente",  color:C.gold,  bg:"#FEF3C7" },
+                          suspendu: { label:"🚫 Suspendu",    color:C.red,   bg:"#FEE2E2" },
+                        }[c.status] || { label:c.status||"—", color:C.slate, bg:C.bg };
+                        const pCfg = c.status_payment === "paid"
+                          ? { label:"💳 Payé",     color:C.green, bg:"#D1FAE5" }
+                          : { label:"⏳ Non payé", color:C.gold,  bg:"#FEF3C7" };
+                        return (
+                          <tr key={c.id} className="fed-row"
+                            style={{ borderTop: i > 0 ? `1px solid ${C.border}` : "none", transition:"background .12s" }}>
+                            <td style={{ padding:"13px 14px" }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                <div style={{ width:34, height:34, borderRadius:9, flexShrink:0,
+                                  background:C.purpleL, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>👤</div>
+                                <div>
+                                  <p style={{ margin:0, fontWeight:700, color:C.dark, fontSize:13 }}>{c.name}</p>
+                                  <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
+                                    {c.phone}{c.city ? ` · ${c.city}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding:"13px 14px" }}>
+                              <PlanBadge plan={c.plan} />
+                            </td>
+                            <td style={{ padding:"13px 14px", fontWeight:700, color:C.purple, fontFamily:"monospace", fontSize:12 }}>
+                              {c.mutual_number || "—"}
+                            </td>
+                            <td style={{ padding:"13px 14px", fontSize:12, color:C.slate }}>
+                              {c.ambassador_name || <span style={{ color:C.border }}>—</span>}
+                            </td>
+                            <td style={{ padding:"13px 14px" }}>
+                              <span style={{ background:sCfg.bg, color:sCfg.color, padding:"3px 10px",
+                                borderRadius:6, fontSize:11, fontWeight:700 }}>{sCfg.label}</span>
+                            </td>
+                            <td style={{ padding:"13px 14px" }}>
+                              <span style={{ background:pCfg.bg, color:pCfg.color, padding:"3px 10px",
+                                borderRadius:6, fontSize:11, fontWeight:700 }}>{pCfg.label}</span>
+                            </td>
+                            <td style={{ padding:"13px 14px", fontSize:12, color:C.slate, whiteSpace:"nowrap" }}>
+                              {c.expiration_date ? fmtDate(c.expiration_date) : <span style={{ color:C.border }}>—</span>}
+                            </td>
+                            <td style={{ padding:"13px 14px", fontSize:12, color:C.slate, whiteSpace:"nowrap" }}>
+                              {fmtDate(c.created_at)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Pagination */}
+              {clientsPagination && clientsPagination.pages > 1 && (
+                <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:8, marginTop:16 }}>
+                  <button disabled={clientsPage <= 1} onClick={() => setClientsPage(p => p - 1)}
+                    style={{ padding:"8px 18px", borderRadius:9, border:`1.5px solid ${C.border}`,
+                      background:"#fff", color:C.slate, fontWeight:700, fontSize:13, cursor:"pointer",
+                      opacity:clientsPage<=1?.4:1, fontFamily:"inherit" }}>
+                    ← Précédent
+                  </button>
+                  <span style={{ padding:"8px 14px", fontSize:13, color:C.slate, fontWeight:600 }}>
+                    Page {clientsPage} / {clientsPagination.pages}
+                  </span>
+                  <button disabled={clientsPage >= clientsPagination.pages} onClick={() => setClientsPage(p => p + 1)}
+                    style={{ padding:"8px 18px", borderRadius:9, border:`1.5px solid ${C.border}`,
+                      background:"#fff", color:C.slate, fontWeight:700, fontSize:13, cursor:"pointer",
+                      opacity:clientsPage>=clientsPagination.pages?.4:1, fontFamily:"inherit" }}>
+                    Suivant →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
