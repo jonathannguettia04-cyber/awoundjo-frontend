@@ -131,8 +131,8 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+      const token = localStorage.getItem("diaspora_token");
+      const res = await fetch(`${BASE}/api/referral/pay/jeko`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -282,8 +282,8 @@ function PaymentModal({ member, roleLabel, onClose }) {
   async function handlePay() {
     setPayLoading(true); setPayError("");
     try {
-      const token = localStorage.getItem("diaspora_token") || localStorage.getItem("token") || localStorage.getItem("agent_token");
-      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+      const token = localStorage.getItem("diaspora_token");
+      const res = await fetch(`${BASE}/api/referral/pay/jeko`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
