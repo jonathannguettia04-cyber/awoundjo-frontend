@@ -1539,7 +1539,7 @@ function ClientsPage() {
   // ── Helpers UI ───────────────────────────────────────────────
   const statusBadge = (s, sp) => {
     if (sp === "paid")    return <Badge color={G.green} bg={G.greenLight}>● Actif</Badge>;
-    if (s  === "PENDING") return <Badge color={G.gold}  bg={G.goldLight}>● En attente</Badge>;
+    if (s  === "attente" || s === "PENDING") return <Badge color={G.gold}  bg={G.goldLight}>● En attente</Badge>;
     return <Badge color={G.muted} bg="#F3F4F6">● Inactif</Badge>;
   };
 
@@ -1585,8 +1585,8 @@ function ClientsPage() {
             <select value={statusFilter} onChange={e => setStatus(e.target.value)}
               style={{ ...inputStyle, width: 160, padding: "9px 12px" }}>
               <option value="">Tous statuts</option>
-              <option value="ACTIVE">Actif</option>
-              <option value="PENDING">En attente</option>
+              <option value="actif">Actif</option>
+              <option value="attente">En attente</option>
             </select>
           </div>
 
