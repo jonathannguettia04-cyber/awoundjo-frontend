@@ -1416,12 +1416,18 @@ function WithdrawalPage() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Helper : charge les plans depuis /api/plans ───────────────────────────────
-const PLANS_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 async function fetchPlans() {
   try {
-    const res  = await fetch(`${PLANS_BASE}/plans`);
+    const token = localStorage.getItem("cnepeci_token");
+    const base  = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
+    const res   = await fetch(`${base}/plans`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!res.ok) { console.warn("[fetchPlans] HTTP", res.status); return []; }
     const json = await res.json();
-    // Retourne le tableau de plans selon la forme { data: [...] } ou { plans: [...] } ou [...]
     return json?.data || json?.plans || (Array.isArray(json) ? json : []);
   } catch (e) {
     console.error("[fetchPlans]", e.message);
