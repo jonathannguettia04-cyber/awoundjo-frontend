@@ -1416,19 +1416,15 @@ function WithdrawalPage() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Helper : charge les plans depuis /api/plans ───────────────────────────────
+// Utilise /api/cnepeci/plans (authCnepeci) plutôt que /api/plans (authMiddleware générique)
+// pour éviter le rejet du JWT CNEPECI par le middleware agent standard.
 async function fetchPlans() {
   try {
     const token = localStorage.getItem("cnepeci_token");
-    const base  = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
-    const res   = await fetch(`${base}/plans`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) { console.warn("[fetchPlans] HTTP", res.status); return []; }
-    const json = await res.json();
-    return json?.data || json?.plans || (Array.isArray(json) ? json : []);
+    const data  = await apiFetch("/plans");          // → /api/cnepeci/plans
+    // apiFetch retourne null ou { success, data/plans/[] }
+    if (!data) return [];
+    return data?.data || data?.plans || (Array.isArray(data) ? data : []);
   } catch (e) {
     console.error("[fetchPlans]", e.message);
     return [];
