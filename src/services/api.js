@@ -105,11 +105,16 @@ export const commissionAPI = commissionsAPI;
 
 // ── GROUPES ──────────────────────────────────────────────────────
 export const groupsAPI = {
-  getAll:  (params)   => api.get("/groups", { params }),
-  getById: (id)       => api.get(`/groups/${id}`),
-  create:  (data)     => api.post("/groups", data),
-  update:  (id, data) => api.put(`/groups/${id}`, data),
-  delete:  (id)       => api.delete(`/groups/${id}`),
+  getAll:       (params)       => api.get("/groups", { params }),
+  getById:      (id)           => api.get(`/groups/${id}`),
+  create:       (data)         => api.post("/groups", data),
+  update:       (id, data)     => api.put(`/groups/${id}`, data),
+  delete:       (id)           => api.delete(`/groups/${id}`),
+  // Membres — manquaient (causaient "Erreur ajout membre")
+  addMembers:   (id, data)     => api.post(`/groups/${id}/members`, data),
+  removeMember: (id, clientId) => api.delete(`/groups/${id}/members/${clientId}`),
+  // Paiement groupe — manquait aussi
+  pay:          (id, data)     => api.post(`/groups/${id}/payment`, data),
 };
 // Alias sans "s" pour compatibilité
 export const groupAPI = groupsAPI;

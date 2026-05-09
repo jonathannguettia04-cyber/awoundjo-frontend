@@ -78,6 +78,7 @@ export default function Groups() {
   // Modal ajout membres
   const [showAddMember, setShowAddMember] = useState(false);
   const [addingMember,  setAddingMember]  = useState(false);
+  const [addMemberError, setAddMemberError] = useState("");
 
   async function loadGroups() {
     setLoading(true);
@@ -150,13 +151,14 @@ export default function Groups() {
 
   async function handleAddMember(client) {
     setAddingMember(true);
+    setAddMemberError("");
     try {
       await groupAPI.addMembers(selected.id, { member_ids: [client.id] });
-      loadGroupDetail(selected.id);
+      await loadGroupDetail(selected.id);
       loadGroups();
       setShowAddMember(false);
     } catch (err) {
-      alert(err.response?.data?.error || "Erreur ajout membre");
+      setAddMemberError(err.response?.data?.error || "Erreur lors de l'ajout du membre");
     } finally { setAddingMember(false); }
   }
 
@@ -432,14 +434,24 @@ export default function Groups() {
       </Modal>
 
       {/* ── Modal ajout membre ─────────────────────────────── */}
-      <Modal open={showAddMember} onClose={() => setShowAddMember(false)} title="Ajouter un membre">
+      <Modal open={showAddMember} onClose={() => { setShowAddMember(false); setAddMemberError(""); }} title="Ajouter un membre">
         <div className="space-y-3">
           <p className="text-sm text-slate-500">Recherchez un client à ajouter au groupe</p>
+          {addMemberError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+              ❌ {addMemberError}
+            </div>
+          )}
           <ClientSearch
             onSelect={handleAddMember}
             exclude={groupDetail?.group?.members?.map((m) => m.id) || []}
           />
-          {addingMember && <p className="text-sm text-center text-slate-400">Ajout en cours…</p>}
+          {addingMember && (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              Ajout en cours…
+            </div>
+          )}
         </div>
       </Modal>
     </div>
