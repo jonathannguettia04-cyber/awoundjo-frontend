@@ -1135,7 +1135,7 @@ function CreateClientModal({ onClose, onCreated }) {
   // Étape 2
   const [selectedPlan, setSelectedPlan] = useState(null);
   // Étape 3
-  const [payMethod,    setPayMethod]    = useState("cash");
+  const [payMethod,    setPayMethod]    = useState("jeko");
   const [jekoMethod,   setJekoMethod]   = useState("orange");
   // Étape 4
   const [result,       setResult]       = useState(null);
@@ -1178,6 +1178,12 @@ function CreateClientModal({ onClose, onCreated }) {
 
   async function handleSubmit() {
     setError("");
+
+    // ── Garde : Jeko obligatoire sauf ancien client ──────────
+    if (!isReturning && payMethod !== "jeko") {
+      return setError("Veuillez sélectionner le paiement mobile (JEKO).");
+    }
+
     setLoading(true);
     try {
       // 1. Créer le client
@@ -1204,30 +1210,39 @@ function CreateClientModal({ onClose, onCreated }) {
         return;
       }
 
-      // Paiement CASH
-      if (payMethod === "cash") {
-        await apiBiz(`/clients/${clientId}/pay-adhesion-cash`, {
-          method: "POST",
-          body: JSON.stringify({ amount: adhesion_fee }),
-        });
-        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "cash" });
-        setStep(3);
-        onCreated?.();
-        return;
+      // ── Paiement JEKO obligatoire ────────────────────────────
+      const jekoData = await apiBiz(`/clients/${clientId}/pay-adhesion-jeko`, {
+        method: "POST",
+        body: JSON.stringify({
+          jeko_method: jekoMethod,
+          success_url: `${window.location.origin}/business/clients?payment=success&mut=${mutual_number}`,
+          failure_url: `${window.location.origin}/business/clients?payment=failed&client=${clientId}`,
+        }),
+      });
+
+      // Le backend peut retourner le lien dans data.payment_url, data.redirect_url,
+      // ou data.data.payment_url selon la version de paymentController
+      const raw = jekoData?.data ?? jekoData;
+      const redirectUrl =
+        raw?.payment_url    ||
+        raw?.redirect_url   ||
+        raw?.data?.payment_url ||
+        raw?.data?.redirect_url ||
+        null;
+
+      // Afficher d'abord le numéro + MDP, puis rediriger
+      setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", redirectUrl });
+      setStep(3);
+      onCreated?.();
+
+      // Ouvrir la page de paiement dans un nouvel onglet
+      if (redirectUrl) {
+        setTimeout(() => window.open(redirectUrl, "_blank"), 800);
+      } else {
+        // URL non reçue : log pour debug
+        console.warn("[Jeko] URL de paiement non trouvée dans la réponse :", jekoData);
       }
 
-      // Paiement JEKO
-      if (payMethod === "jeko") {
-        const jekoData = await apiBiz(`/clients/${clientId}/pay-adhesion-jeko`, {
-          method: "POST",
-          body: JSON.stringify({ jeko_method: jekoMethod }),
-        });
-        const redirectUrl = jekoData?.data?.redirect_url;
-        if (redirectUrl) window.open(redirectUrl, "_blank");
-        setResult({ client, access_code, mutual_number, adhesion_fee, paymentMethod: "jeko", pending: !redirectUrl });
-        setStep(3);
-        onCreated?.();
-      }
     } catch (e) {
       setError(e?.error || e?.message || "Une erreur est survenue.");
     } finally {
@@ -1453,26 +1468,50 @@ function CreateClientModal({ onClose, onCreated }) {
           {/* ── Étape 4 : Confirmation ── */}
           {step === 3 && result && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ textAlign: "center", padding: "16px 0" }}>
+
+              {/* En-tête */}
+              <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
                 <div style={{
                   width: 64, height: 64, borderRadius: "50%",
-                  background: result.pending ? "#FEF3C7" : "#D1FAE5",
+                  background: result.isReturning ? "#D1FAE5" : "#EDE9FE",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 32, margin: "0 auto 12px",
                 }}>
-                  {result.pending ? "⏳" : "✅"}
+                  {result.isReturning ? "✅" : "📋"}
                 </div>
                 <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
-                  {result.pending ? "Paiement en attente" : "Client enregistré !"}
+                  {result.isReturning ? "Client migré !" : "Client créé !"}
                 </h3>
-                {result.pending && (
-                  <p style={{ margin: 0, fontSize: 13, color: "#64748B" }}>
-                    La page de paiement s'est ouverte. Le compte sera activé automatiquement.
-                  </p>
-                )}
+                <p style={{ margin: 0, fontSize: 13, color: "#64748B" }}>
+                  {result.isReturning
+                    ? "Dossier enregistré avec succès."
+                    : "Notez le numéro et le code, puis finalisez le paiement."}
+                </p>
               </div>
 
-              {/* Numéro mutualiste */}
+              {/* Bouton paiement Jeko — si URL reçue */}
+              {result.redirectUrl && (
+                <a
+                  href={result.redirectUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    padding: "14px 20px", borderRadius: 12, textDecoration: "none",
+                    background: "#7C3AED", color: "#fff", fontWeight: 700, fontSize: 15,
+                    boxShadow: "0 4px 14px rgba(124,58,237,.35)",
+                  }}
+                >
+                  📱 Ouvrir la page de paiement JEKO →
+                </a>
+              )}
+              {result.paymentMethod === "jeko" && !result.redirectUrl && (
+                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "#92400E" }}>
+                  ⚠️ Lien de paiement non reçu. Réessayez depuis la liste des clients via le bouton Jeko.
+                </div>
+              )}
+
+              {/* ── Numéro mutualiste ── */}
               <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 12, padding: "14px 16px" }}>
                 <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 1 }}>
                   Numéro mutualiste
@@ -1491,13 +1530,13 @@ function CreateClientModal({ onClose, onCreated }) {
                 </div>
               </div>
 
-              {/* Code d'accès */}
-              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "14px 16px" }}>
+              {/* ── Code d'accès / MDP temporaire ── */}
+              <div style={{ background: "#FFFBEB", border: "2px solid #FDE68A", borderRadius: 12, padding: "14px 16px" }}>
                 <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: 1 }}>
-                  Code d'accès temporaire (portail client)
+                  🔑 Mot de passe temporaire (portail client)
                 </p>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 800, letterSpacing: 4, color: "#78350F" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 24, fontWeight: 800, letterSpacing: 4, color: "#78350F" }}>
                     {result.access_code}
                   </span>
                   <button onClick={() => copy(result.access_code, "code")} style={{
@@ -1513,7 +1552,7 @@ function CreateClientModal({ onClose, onCreated }) {
                 </p>
               </div>
 
-              {/* Résumé client */}
+              {/* ── Résumé client ── */}
               <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px", fontSize: 13 }}>
                 <p style={{ margin: "0 0 4px" }}><span style={{ color: "#64748B" }}>Nom :</span> <strong>{result.client?.name}</strong></p>
                 <p style={{ margin: "0 0 4px" }}><span style={{ color: "#64748B" }}>Téléphone :</span> {result.client?.phone}</p>
@@ -1526,12 +1565,12 @@ function CreateClientModal({ onClose, onCreated }) {
                 </p>
               </div>
 
-              {/* Copier tout */}
+              {/* ── Copier tout ── */}
               <button onClick={() => copy(
-                `Numéro mutualiste : ${result.mutual_number}\nCode d'accès : ${result.access_code}\nPortail : ${API_BASE.replace("/api/business","")}/client/login`,
+                `Numéro mutualiste : ${result.mutual_number}\nMot de passe : ${result.access_code}\nPortail : ${API_BASE.replace("/api/business","")}/client/login`,
                 "all"
               )} style={{ ...btnSecondary, width: "100%", textAlign: "center" }}>
-                {copied === "all" ? "✅ Copié !" : "📋 Copier numéro + code"}
+                {copied === "all" ? "✅ Copié !" : "📋 Copier numéro + mot de passe"}
               </button>
             </div>
           )}
@@ -1559,15 +1598,20 @@ function CreateClientModal({ onClose, onCreated }) {
             <button type="button" onClick={validateStep2} style={btnPrimary}>Suivant →</button>
           )}
           {step === 2 && (
-            <button type="button" onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? .7 : 1 }}>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading || (!isReturning && payMethod !== "jeko")}
+              style={{ ...btnPrimary, opacity: (loading || (!isReturning && payMethod !== "jeko")) ? .7 : 1 }}
+            >
               {loading ? "Traitement…" :
                 isReturning ? "✅ Enregistrer" :
-                payMethod === "cash" ? "💵 Confirmer le paiement" : "📱 Payer par mobile"}
+                "📱 Créer & payer par JEKO"}
             </button>
           )}
           {step === 3 && (
             <button type="button" onClick={onClose} style={{ ...btnPrimary, background: "#059669" }}>
-              Fermer
+              ✅ Fermer
             </button>
           )}
         </div>
