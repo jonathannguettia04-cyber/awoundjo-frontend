@@ -348,9 +348,10 @@ function TabDirect() {
   const [amount,     setAmount]     = useState("");          // montant de la vente directe
 
   /* — Soumission — */
-  const [submitting, setSubmitting] = useState(false);
-  const [formErr,    setFormErr]    = useState("");
-  const [result,     setResult]     = useState(null);       // résultat après création
+  const [submitting,       setSubmitting]       = useState(false);
+  const [formErr,          setFormErr]          = useState("");
+  const [result,           setResult]           = useState(null);       // résultat après création
+  const [practitionerName, setPractitionerName] = useState("");         // nom praticien/pharmacie
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -378,13 +379,23 @@ function TabDirect() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + Number(validDays));
 
+      // Récupère le nom du praticien / pharmacie depuis le localStorage
+      let pName = "";
+      try {
+        const stored = localStorage.getItem("provider_data") || localStorage.getItem("providerData") || "{}";
+        const pd = JSON.parse(stored);
+        pName = pd.name || pd.provider_name || pd.etablissement_name || "";
+      } catch (_) {}
+      setPractitionerName(pName);
+
       // Créer l'ordonnance + service pharmacie en une seule opération
       const { data } = await providerPharmacyAPI.createDirectPrescription({
-        client_id:        patient.client.id,
-        content:          content.trim(),
-        expires_at:       expiresAt.toISOString(),
-        total_bons:       Number(totalBons),
-        total_amount:     Number(amount),
+        client_id:         patient.client.id,
+        content:           content.trim(),
+        expires_at:        expiresAt.toISOString(),
+        total_bons:        Number(totalBons),
+        total_amount:      Number(amount),
+        practitioner_name: pName,
       });
 
       setResult(data);
@@ -396,7 +407,7 @@ function TabDirect() {
   function reset() {
     setResult(null); setPatient(null); setQuery("");
     setContent(""); setValidDays(7); setTotalBons(1); setAmount("");
-    setFormErr(""); setSearchErr("");
+    setFormErr(""); setSearchErr(""); setPractitionerName("");
   }
 
   const elig = patient?.pharmacy_eligibility;
@@ -411,6 +422,7 @@ function TabDirect() {
         </p>
         {[
           { label: "Patient",        value: patient.client.name },
+          ...(practitionerName ? [{ label: "Praticien", value: practitionerName }] : []),
           { label: "Montant total",  value: fmt(bon.amount || amount) },
           ...(bon.mutual_part != null
             ? [
@@ -471,6 +483,33 @@ function TabDirect() {
           </div>
         )}
       </div>
+
+      {/* Bloc éligibilité pharmacie — affiché dès que le patient est trouvé */}
+      {patient && elig && (
+        <div style={{
+          ...s.card, marginBottom: 16,
+          background: elig.eligible ? "#FFFBEB" : "#FEF2F2",
+          border: `1px solid ${elig.eligible ? "#FDE68A" : "#FECACA"}`,
+        }}>
+          <p style={{ fontWeight: 700, fontSize: 13, color: elig.eligible ? "#92400E" : "#DC2626", margin: "0 0 4px" }}>
+            {elig.eligible ? "💛 Couverture pharmacie active" : "⛔ Pas de couverture pharmacie"}
+          </p>
+          {elig.eligible ? (
+            <p style={{ fontSize: 12, color: "#78350F", margin: "8px 0 0" }}>
+              Plafond par bon : <strong>{fmt(elig.cap_per_bon)}</strong>
+              {elig.cap_annual && <> · Plafond annuel : <strong>{fmt(elig.cap_annual)}</strong></>}
+              {" · "}Couverture : <strong>{elig.coverage_pct}%</strong>
+              {elig.bons_remaining_this_month != null && (
+                <> · Bons restants ce mois : <strong>{elig.bons_remaining_this_month}</strong></>
+              )}
+            </p>
+          ) : (
+            <p style={{ fontSize: 12, color: "#DC2626", margin: "8px 0 0" }}>
+              Ce patient ne bénéficie pas de couverture pharmacie — la vente sera enregistrée sans remboursement mutuelle.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Step 2 — Rédiger l'ordonnance */}
       {patient && (
@@ -548,7 +587,7 @@ function TabDirect() {
               <input
                 required type="number" min="0"
                 value={amount} onChange={e => setAmount(e.target.value)}
-                placeholder="Ex : 12500"
+                placeholder="Ex : 12 500"
                 style={{ ...s.input, fontSize: 22, fontWeight: 800 }}
               />
               {amount && elig?.eligible && (
