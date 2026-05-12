@@ -1642,6 +1642,7 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
   const [loading,  setLoading] = useState(false);
   const [error,    setError]   = useState("");
   const [success,  setSuccess] = useState("");
+  const [showLienModal, setShowLienModal] = useState(false); // lien token
 
   useEffect(() => {
     apiBiz(`/clients/${client.id}/collecte`)
@@ -1794,6 +1795,26 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
                   Paiement Wave déjà effectué ? Saisir la référence manuellement →
                 </button>
               )}
+
+              {/* Lien autonome client */}
+              <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: 12 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#94A3B8", textAlign: "center" }}>— ou —</p>
+                <button
+                  onClick={() => setShowLienModal(true)}
+                  style={{
+                    width: "100%", padding: "11px 16px", borderRadius: 10,
+                    border: "1.5px solid #7C3AED", background: "#F5F3FF",
+                    color: "#7C3AED", fontWeight: 700, fontSize: 13,
+                    fontFamily: "inherit", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  📤 Envoyer un lien de paiement au client
+                </button>
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#94A3B8", textAlign: "center" }}>
+                  Le client paie lui-même depuis son téléphone (Wave, Orange, MTN, Moov)
+                </p>
+              </div>
             </>
           )}
 
@@ -1839,6 +1860,13 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
           )}
         </div>
       </div>
+
+      {showLienModal && (
+        <CollecteLienModal
+          client={client}
+          onClose={() => setShowLienModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2041,10 +2069,16 @@ export function BizClientsPage() {
           onCompleted={() => { setCollecteClient(null); load(); }}
         />
       )}
+
+      {lienClient && (
+        <CollecteLienModal
+          client={lienClient}
+          onClose={() => setLienClient(null)}
+        />
+      )}
     </BizLayout>
   );
 }
-
 
 const inputStyle = {
   width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 14,
@@ -2192,6 +2226,184 @@ function NouvelleCollecteModal({ onClose, onCreated }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  MODAL — LIEN DE COLLECTE CLIENT AUTONOME
+//  Permet à l'agent de générer/partager un lien unique
+//  que le client peut utiliser sans se connecter.
+//  Backend : POST /clients/:id/collecte/generer-lien
+//            DELETE /clients/:id/collecte/lien
+// ─────────────────────────────────────────────────────────────
+function CollecteLienModal({ client, onClose }) {
+  const [lienData,  setLienData]  = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [revoking,  setRevoking]  = useState(false);
+  const [error,     setError]     = useState("");
+  const [copied,    setCopied]    = useState(null);
+  const [liveData,  setLiveData]  = useState(null);
+  const [lastSince, setLastSince] = useState(null);
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  async function handleGenerer() {
+    setError(""); setLoading(true);
+    try {
+      const res = await apiBiz(`/clients/${client.id}/collecte/generer-lien`, { method: "POST" });
+      setLienData(res.data ?? res);
+      setLastSince(new Date().toISOString());
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la génération du lien.");
+    } finally { setLoading(false); }
+  }
+
+  async function handleRevoquer() {
+    if (!window.confirm("Révoquer ce lien ? Le client ne pourra plus l'utiliser.")) return;
+    setRevoking(true);
+    try {
+      await apiBiz(`/clients/${client.id}/collecte/lien`, { method: "DELETE" });
+      setLienData(null); setLastSince(null);
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la révocation.");
+    } finally { setRevoking(false); }
+  }
+
+  function copy(text, key) {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(key); setTimeout(() => setCopied(null), 2500);
+    });
+  }
+
+  function partagerWhatsApp() {
+    if (!lienData?.url) return;
+    const msg = encodeURIComponent(
+      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.url}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
+    );
+    window.open(`https://wa.me/${client.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
+  }
+
+  // Polling live des versements (toutes les 8s tant que le lien est actif)
+  useEffect(() => {
+    if (!lienData || !lastSince) return;
+    const poll = async () => {
+      try {
+        const res = await apiBiz(`/collectes/live?since=${encodeURIComponent(lastSince)}`);
+        if (res.versements?.length > 0 || res.summary) {
+          setLiveData(res);
+          setLastSince(new Date().toISOString());
+        }
+      } catch {}
+    };
+    const id = setInterval(poll, 8000);
+    return () => clearInterval(id);
+  }, [lienData, lastSince]);
+
+  const fmtL = n => Number(n || 0).toLocaleString("fr-FR");
+
+  const _btnInline = { padding: "6px 14px", borderRadius: 8, cursor: "pointer", background: "#fff", border: "1px solid #E2E8F0", color: "#374151", fontWeight: 600, fontSize: 12, fontFamily: "inherit" };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 24px 64px rgba(0,0,0,.3)", width: "100%", maxWidth: 480, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0F172A" }}>📤 Lien de collecte client</h3>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>{client.name} — {client.mutual_number}</p>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94A3B8", lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {error && <div style={{ background: "#FFF1F2", color: "#BE123C", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{error}</div>}
+
+          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#1D4ED8" }}>
+            <strong>📲 Comment ça marche :</strong> Générez un lien sécurisé à envoyer au client par WhatsApp ou SMS. Il pourra payer ses versements directement depuis son téléphone, sans se connecter.
+          </div>
+
+          {!lienData && (
+            <button onClick={handleGenerer} disabled={loading} style={{
+              padding: "14px 20px", borderRadius: 10, border: "none", cursor: loading ? "not-allowed" : "pointer",
+              background: loading ? "#E2E8F0" : "#7C3AED", color: loading ? "#94A3B8" : "#fff",
+              fontWeight: 700, fontSize: 15, fontFamily: "inherit",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              {loading ? "Génération…" : "✨ Générer le lien de collecte"}
+            </button>
+          )}
+
+          {lienData && (
+            <>
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: .8 }}>Lien client</p>
+                <p style={{ margin: "0 0 10px", fontSize: 13, color: "#2563EB", wordBreak: "break-all", fontFamily: "monospace" }}>{lienData.url}</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={() => copy(lienData.url, "url")} style={_btnInline}>
+                    {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
+                  </button>
+                  <button onClick={partagerWhatsApp} style={{ ..._btnInline, background: "#25D366", color: "#fff", border: "none" }}>
+                    📲 WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              {lienData.qr_code && (
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748B" }}>QR Code à montrer ou imprimer</p>
+                  <img src={lienData.qr_code} alt="QR Code collecte" style={{ width: 160, height: 160, border: "1px solid #E2E8F0", borderRadius: 10 }} />
+                </div>
+              )}
+
+              {lienData.expires_at && (
+                <div style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
+                  ⏳ Lien valide jusqu'au {new Date(lienData.expires_at).toLocaleDateString("fr-FR")}
+                </div>
+              )}
+
+              {liveData && (
+                <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "12px 16px" }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#166534" }}>🟢 Versements reçus (temps réel)</p>
+                  {liveData.summary && (
+                    <p style={{ margin: "0 0 8px", fontSize: 13, color: "#15803D" }}>
+                      Total versé : <strong>{fmtL(liveData.summary.total_verse_global)} FCFA</strong>
+                      {" · "}{liveData.summary.clients_actifs_ce_soir} client(s) actif(s)
+                    </p>
+                  )}
+                  {liveData.versements?.map((v, i) => (
+                    <div key={i} style={{ fontSize: 12, color: "#166534", padding: "4px 0", borderTop: i > 0 ? "1px solid #BBF7D0" : "none", display: "flex", gap: 8, alignItems: "center" }}>
+                      <span>✅</span>
+                      <span><strong>{fmtL(v.montant)} FCFA</strong> via {v.payment_method?.toUpperCase() || "WAVE"}</span>
+                      <span style={{ color: "#86EFAC", marginLeft: "auto" }}>{new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={handleRevoquer} disabled={revoking} style={{
+                padding: "9px 16px", borderRadius: 8, cursor: "pointer",
+                background: "#FFF1F2", border: "1px solid #FECDD3",
+                color: "#BE123C", fontWeight: 600, fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start",
+              }}>
+                {revoking ? "Révocation…" : "🗑 Révoquer ce lien"}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "12px 24px", borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "flex-end", background: "#FAFAFA", flexShrink: 0 }}>
+          <button onClick={onClose} style={btnSecondary}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 //  PAGE — COLLECTES WAVE (page dédiée menu latéral)
 // ─────────────────────────────────────────────────────────────
 export function BizCollectesPage() {
@@ -2199,6 +2411,7 @@ export function BizCollectesPage() {
   const [loading,        setLoading]        = useState(true);
   const [showModal,      setShowModal]      = useState(false);
   const [collecteClient, setCollecteClient] = useState(null);
+  const [lienClient,     setLienClient]     = useState(null); // modal lien token
   const [search,         setSearch]         = useState("");
 
   const load = useCallback(() => {
@@ -2221,7 +2434,7 @@ export function BizCollectesPage() {
     (c.mutual_number || "").includes(search)
   );
 
-  function CollecteRow({ c, complete, onClick }) {
+  function CollecteRow({ c, complete, onClick, onLien }) {
     return (
       <div
         onClick={complete ? undefined : onClick}
@@ -2246,13 +2459,28 @@ export function BizCollectesPage() {
             {c.phone} · <span style={{ fontFamily: "monospace", color: "#7C3AED" }}>{c.mutual_number}</span> · {c.plan}
           </div>
         </div>
-        <span style={{
-          background: complete ? "#D1FAE5" : "#EFF6FF",
-          color: complete ? "#065F46" : "#2563EB",
-          borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, flexShrink: 0,
-        }}>
-          {complete ? "Complète ✅" : "En cours →"}
-        </span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          {!complete && (
+            <button
+              onClick={e => { e.stopPropagation(); onLien?.(); }}
+              title="Envoyer un lien de paiement au client"
+              style={{
+                padding: "5px 10px", borderRadius: 8, border: "1px solid #DDD6FE",
+                background: "#F5F3FF", color: "#7C3AED", cursor: "pointer",
+                fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+              }}
+            >
+              📤 Lien
+            </button>
+          )}
+          <span style={{
+            background: complete ? "#D1FAE5" : "#EFF6FF",
+            color: complete ? "#065F46" : "#2563EB",
+            borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, flexShrink: 0,
+          }}>
+            {complete ? "Complète ✅" : "En cours →"}
+          </span>
+        </div>
       </div>
     );
   }
@@ -2291,7 +2519,7 @@ export function BizCollectesPage() {
                 <button onClick={() => setShowModal(true)} style={{ ...btnPrimary, marginTop: 12, fontSize: 13 }}>➕ Démarrer une collecte</button>
               </div>
             ) : filt(enCours).map(c => (
-              <CollecteRow key={c.id} c={c} complete={false} onClick={() => setCollecteClient(c)} />
+              <CollecteRow key={c.id} c={c} complete={false} onClick={() => setCollecteClient(c)} onLien={() => setLienClient(c)} />
             ))}
           </div>
 

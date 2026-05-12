@@ -174,6 +174,11 @@ const BizCollectesPage  = bizPage("BizCollectesPage");
 // ── Page partagée : Retrait de commissions ───────────────────
 const CommissionWithdrawal = lazy(() => import("./pages/shared/CommissionWithdrawal"));
 
+// ── [COLLECTE] Page publique de collecte d'adhésion ──────────
+// Accessible sans authentification via un lien token unique
+// généré par l'agent depuis businessController.js
+const CollectePage = lazy(() => import("./pages/collecte/CollectePage"));
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -197,7 +202,8 @@ function ProtectedRoute({ children, allowedRoles = null }) {
   const isIndependentPortal = pathname.startsWith("/business") ||
     pathname.startsWith("/diaspora") || pathname.startsWith("/referral") ||
     pathname.startsWith("/affilie") || pathname.startsWith("/client") ||
-    pathname.startsWith("/etablissement") || pathname.startsWith("/cnepeci");
+    pathname.startsWith("/etablissement") || pathname.startsWith("/cnepeci") ||
+    pathname.startsWith("/collecte"); // [COLLECTE] route publique exclue
   if (isIndependentPortal) return children;
 
   // Attend que le localStorage soit lu avant de décider
@@ -262,7 +268,12 @@ export default function App() {
   const isAffiliePage  = pathname.startsWith("/affilie");
   const isBusinessPage = pathname.startsWith("/business");
   const isCnepeciPage  = pathname.startsWith("/cnepeci");
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage;
+  // [COLLECTE] La page de collecte est publique — pas de navbar
+  const isCollectePage = pathname.startsWith("/collecte");
+
+  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage
+    && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
+    && !isCollectePage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -483,6 +494,14 @@ export default function App() {
             ══════════════════════════════════════════════════*/}
             <Route path="/cnepeci/login" element={<CnepeciApp />} />
             <Route path="/cnepeci/*"     element={<CnepeciApp />} />
+
+            {/* ═══════════════════════════════════════════════
+                [COLLECTE] LIEN PUBLIC CLIENT — SANS AUTH
+                Route placée avant le fallback "*" pour garantir
+                la priorité sur la redirection vers /login.
+                Format : /collecte/:token (token 64 hex, 90 jours)
+            ══════════════════════════════════════════════════*/}
+            <Route path="/collecte/:token" element={<CollectePage />} />
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}

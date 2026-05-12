@@ -1497,6 +1497,7 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
   const [loading,  setLoading] = useState(false);
   const [error,    setError]   = useState("");
   const [success,  setSuccess] = useState("");
+  const [showLienModal, setShowLienModal] = useState(false); // lien token
 
   const fmt = n => Number(n || 0).toLocaleString("fr-FR");
 
@@ -1638,6 +1639,26 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
                   Paiement Wave déjà effectué ? Saisir la référence →
                 </button>
               )}
+
+              {/* Lien autonome client */}
+              <div style={{ borderTop: `1px dashed ${T.border}`, paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: T.muted, textAlign: "center", marginBottom: 8 }}>— ou —</div>
+                <button
+                  onClick={() => setShowLienModal(true)}
+                  style={{
+                    width: "100%", padding: "11px 16px", borderRadius: 10,
+                    border: `1.5px solid #8B5CF6`, background: "#2D1B5A",
+                    color: "#C4B5FD", fontWeight: 700, fontSize: 13,
+                    fontFamily: "inherit", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  📤 Envoyer un lien de paiement au client
+                </button>
+                <div style={{ fontSize: 11, color: T.muted, textAlign: "center", marginTop: 6 }}>
+                  Le client paie lui-même depuis son téléphone (Wave, Orange, MTN, Moov)
+                </div>
+              </div>
             </>
           )}
 
@@ -1679,6 +1700,198 @@ function CollecteWaveModal({ client, onClose, onCompleted }) {
           )}
         </div>
       </div>
+
+      {showLienModal && (
+        <CollecteLienModal
+          client={client}
+          onClose={() => setShowLienModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modal Lien de collecte client ────────────────────────────────
+//  Backend : POST /clients/:id/collecte/generer-lien
+//            DELETE /clients/:id/collecte/lien
+function CollecteLienModal({ client, onClose }) {
+  const [lienData,  setLienData]  = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [revoking,  setRevoking]  = useState(false);
+  const [error,     setError]     = useState("");
+  const [copied,    setCopied]    = useState(null);
+  const [liveData,  setLiveData]  = useState(null);
+  const [lastSince, setLastSince] = useState(null);
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  async function handleGenerer() {
+    setError(""); setLoading(true);
+    try {
+      const res = await apiFetch(`/clients/${client.id}/collecte/generer-lien`, { method: "POST" });
+      setLienData(res.data ?? res);
+      setLastSince(new Date().toISOString());
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la génération du lien.");
+    } finally { setLoading(false); }
+  }
+
+  async function handleRevoquer() {
+    if (!window.confirm("Révoquer ce lien ? Le client ne pourra plus l'utiliser.")) return;
+    setRevoking(true);
+    try {
+      await apiFetch(`/clients/${client.id}/collecte/lien`, { method: "DELETE" });
+      setLienData(null); setLastSince(null);
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la révocation.");
+    } finally { setRevoking(false); }
+  }
+
+  function copyText(text, key) {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(key); setTimeout(() => setCopied(null), 2500);
+    });
+  }
+
+  function partagerWhatsApp() {
+    if (!lienData?.url) return;
+    const msg = encodeURIComponent(
+      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.url}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
+    );
+    window.open(`https://wa.me/${client.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
+  }
+
+  // Polling live des versements (toutes les 8s tant que le lien est actif)
+  useEffect(() => {
+    if (!lienData || !lastSince) return;
+    const poll = async () => {
+      try {
+        const res = await apiFetch(`/collectes/live?since=${encodeURIComponent(lastSince)}`);
+        if (res.versements?.length > 0 || res.summary) {
+          setLiveData(res);
+          setLastSince(new Date().toISOString());
+        }
+      } catch {}
+    };
+    const id = setInterval(poll, 8000);
+    return () => clearInterval(id);
+  }, [lienData, lastSince]);
+
+  const fmtL = n => Number(n || 0).toLocaleString("fr-FR");
+
+  const _btnInline = {
+    padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+    background: T.card, border: `1px solid ${T.border}`,
+    color: T.text, fontWeight: 600, fontSize: 12, fontFamily: "inherit",
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: "0 24px 80px rgba(0,0,0,.8)", width: "100%", maxWidth: 480, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: T.text }}>📤 Lien de collecte client</div>
+              <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>{client.name} — {client.mutual_number}</div>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: T.muted, lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {error && (
+            <div style={{ background: T.redL, color: T.red, borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>{error}</div>
+          )}
+
+          <div style={{ background: T.blueL, border: `1px solid ${T.blue}40`, borderRadius: 10, padding: "12px 16px", fontSize: 13, color: T.blue }}>
+            <strong>📲 Comment ça marche :</strong> Générez un lien sécurisé à envoyer au client par WhatsApp ou SMS. Il pourra payer ses versements directement depuis son téléphone, sans se connecter.
+          </div>
+
+          {!lienData && (
+            <button onClick={handleGenerer} disabled={loading} style={{
+              padding: "14px 20px", borderRadius: 10, border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              background: loading ? T.border : "#7C3AED",
+              color: loading ? T.muted : "#fff",
+              fontWeight: 700, fontSize: 15, fontFamily: "inherit",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              {loading ? "Génération…" : "✨ Générer le lien de collecte"}
+            </button>
+          )}
+
+          {lienData && (
+            <>
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Lien client</div>
+                <div style={{ fontSize: 13, color: T.blue, wordBreak: "break-all", fontFamily: "monospace", marginBottom: 10 }}>{lienData.url}</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={() => copyText(lienData.url, "url")} style={_btnInline}>
+                    {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
+                  </button>
+                  <button onClick={partagerWhatsApp} style={{ ..._btnInline, background: "#25D366", color: "#fff", border: "none" }}>
+                    📲 WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              {lienData.qr_code && (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>QR Code à montrer ou imprimer</div>
+                  <img src={lienData.qr_code} alt="QR Code collecte" style={{ width: 160, height: 160, border: `1px solid ${T.border}`, borderRadius: 10 }} />
+                </div>
+              )}
+
+              {lienData.expires_at && (
+                <div style={{ fontSize: 12, color: T.muted, textAlign: "center" }}>
+                  ⏳ Lien valide jusqu'au {new Date(lienData.expires_at).toLocaleDateString("fr-FR")}
+                </div>
+              )}
+
+              {liveData && (
+                <div style={{ background: T.greenL, border: `1px solid ${T.green}40`, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.green, marginBottom: 8 }}>🟢 Versements reçus (temps réel)</div>
+                  {liveData.summary && (
+                    <div style={{ fontSize: 13, color: T.green, marginBottom: 8 }}>
+                      Total versé : <strong>{fmtL(liveData.summary.total_verse_global)} FCFA</strong>
+                      {" · "}{liveData.summary.clients_actifs_ce_soir} client(s) actif(s)
+                    </div>
+                  )}
+                  {liveData.versements?.map((v, i) => (
+                    <div key={i} style={{ fontSize: 12, color: T.green, padding: "4px 0", borderTop: i > 0 ? `1px solid ${T.green}30` : "none", display: "flex", gap: 8, alignItems: "center" }}>
+                      <span>✅</span>
+                      <span><strong>{fmtL(v.montant)} FCFA</strong> via {v.payment_method?.toUpperCase() || "WAVE"}</span>
+                      <span style={{ color: T.muted, marginLeft: "auto" }}>{new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={handleRevoquer} disabled={revoking} style={{
+                padding: "9px 16px", borderRadius: 8, cursor: "pointer",
+                background: T.redL, border: `1px solid ${T.red}40`,
+                color: T.red, fontWeight: 600, fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start",
+              }}>
+                {revoking ? "Révocation…" : "🗑 Révoquer ce lien"}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "12px 24px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "flex-end", background: T.darker, flexShrink: 0 }}>
+          <button onClick={onClose} style={{
+            padding: "9px 20px", borderRadius: 8, border: `1px solid ${T.border}`,
+            background: "transparent", color: T.muted, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit",
+          }}>Fermer</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1689,6 +1902,7 @@ function TabCollectes() {
   const [loading,        setLoading]        = useState(true);
   const [showNew,        setShowNew]        = useState(false);
   const [collecteClient, setCollecteClient] = useState(null);
+  const [lienClient,     setLienClient]     = useState(null); // modal lien token
   const [search,         setSearch]         = useState("");
 
   // États création client
@@ -1787,7 +2001,7 @@ function TabCollectes() {
               }}>➕ Démarrer une collecte</button>
             </div>
           ) : filt(enCours).map(c => (
-            <div key={c.id} style={rowStyle(false)}
+            <div key={c.id} style={{ ...rowStyle(false), position: "relative" }}
               onClick={() => setCollecteClient(c)}
               onMouseEnter={e => e.currentTarget.style.borderColor = T.gold + "60"}
               onMouseLeave={e => e.currentTarget.style.borderColor = "#2A2A38"}
@@ -1797,7 +2011,18 @@ function TabCollectes() {
                 <div style={{ fontWeight: 700, color: T.text, fontSize: 14 }}>{c.name}</div>
                 <div style={{ fontSize: 11, color: "#6B6B85", marginTop: 2 }}>{c.phone} · <span style={{ fontFamily: "monospace", color: T.gold }}>{c.mutual_number}</span> · {c.plan}</div>
               </div>
-              <span style={{ background: "#1E3A5F", color: "#60A5FA", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>En cours →</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setLienClient(c); }}
+                  style={{
+                    fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    color: "#8B5CF6", background: "#2D1B5A",
+                    border: "1px solid #8B5CF640", borderRadius: 6,
+                    padding: "3px 10px", fontFamily: "inherit",
+                  }}
+                >📤 Lien</button>
+                <span style={{ background: "#1E3A5F", color: "#60A5FA", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>En cours →</span>
+              </div>
             </div>
           ))}
 
@@ -1915,6 +2140,12 @@ function TabCollectes() {
           client={collecteClient}
           onClose={() => setCollecteClient(null)}
           onCompleted={() => { setCollecteClient(null); load(); }}
+        />
+      )}
+      {lienClient && (
+        <CollecteLienModal
+          client={lienClient}
+          onClose={() => setLienClient(null)}
         />
       )}
     </div>
