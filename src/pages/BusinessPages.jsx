@@ -1883,6 +1883,7 @@ export function BizClientsPage() {
   const [page,       setPage]       = useState(1);
   const [pagination, setPagination] = useState({});
   const [collecteClient, setCollecteClient] = useState(null);
+  const [lienClient,     setLienClient]     = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
