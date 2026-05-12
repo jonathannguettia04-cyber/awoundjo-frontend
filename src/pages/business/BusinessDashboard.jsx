@@ -1758,9 +1758,9 @@ function CollecteLienModal({ client, onClose }) {
   }
 
   function partagerWhatsApp() {
-    if (!lienData?.url) return;
+    if (!lienData?.collecte_link) return;
     const msg = encodeURIComponent(
-      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.url}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
+      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.collecte_link}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
     );
     window.open(`https://wa.me/${client.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -1831,9 +1831,9 @@ function CollecteLienModal({ client, onClose }) {
             <>
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Lien client</div>
-                <div style={{ fontSize: 13, color: T.blue, wordBreak: "break-all", fontFamily: "monospace", marginBottom: 10 }}>{lienData.url}</div>
+                <div style={{ fontSize: 13, color: T.blue, wordBreak: "break-all", fontFamily: "monospace", marginBottom: 10 }}>{lienData.collecte_link}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => copyText(lienData.url, "url")} style={_btnInline}>
+                  <button onClick={() => copyText(lienData.collecte_link, "url")} style={_btnInline}>
                     {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
                   </button>
                   <button onClick={partagerWhatsApp} style={{ ..._btnInline, background: "#25D366", color: "#fff", border: "none" }}>
@@ -1842,10 +1842,10 @@ function CollecteLienModal({ client, onClose }) {
                 </div>
               </div>
 
-              {lienData.qr_code && (
+              {lienData.qr_data && (
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>QR Code à montrer ou imprimer</div>
-                  <img src={lienData.qr_code} alt="QR Code collecte" style={{ width: 160, height: 160, border: `1px solid ${T.border}`, borderRadius: 10 }} />
+                  <img src={lienData.qr_data} alt="QR Code collecte" style={{ width: 160, height: 160, border: `1px solid ${T.border}`, borderRadius: 10 }} />
                 </div>
               )}
 
