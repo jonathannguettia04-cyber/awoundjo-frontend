@@ -443,7 +443,7 @@ export default function ProviderScan() {
               <input
                 required type="number" min="0"
                 value={totalAmount} onChange={e => setTotalAmount(e.target.value)}
-                placeholder="Ex : 15000"
+                placeholder="Ex : 3000"
                 style={{ ...s.input, fontSize: 20, fontWeight: 800 }}
               />
               {eligibility?.cap_per_act && (
