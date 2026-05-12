@@ -1733,7 +1733,14 @@ function CollecteLienModal({ client, onClose }) {
     setError(""); setLoading(true);
     try {
       const res = await apiFetch(`/clients/${client.id}/collecte/generer-lien`, { method: "POST" });
-      setLienData(res.data ?? res);
+      // ok() retourne à plat : { success, collecte_link, token, qr_data, ... }
+      const payload = res.data ?? res;
+      const normalized = {
+        ...payload,
+        collecte_link: payload.collecte_link || payload.url || payload.lien || payload.link,
+        qr_data:       payload.qr_data || payload.qr_code || payload.qr,
+      };
+      setLienData(normalized);
       setLastSince(new Date().toISOString());
     } catch (e) {
       setError(e?.error || e?.message || "Erreur lors de la génération du lien.");

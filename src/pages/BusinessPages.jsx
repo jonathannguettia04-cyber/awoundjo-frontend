@@ -2251,7 +2251,15 @@ function CollecteLienModal({ client, onClose }) {
     setError(""); setLoading(true);
     try {
       const res = await apiBiz(`/clients/${client.id}/collecte/generer-lien`, { method: "POST" });
-      setLienData(res.data ?? res);
+      // ok() retourne à plat : { success, collecte_link, token, qr_data, ... }
+      // On normalise en un objet uniforme
+      const payload = res.data ?? res;
+      const normalized = {
+        ...payload,
+        collecte_link: payload.collecte_link || payload.url || payload.lien || payload.link,
+        qr_data:       payload.qr_data || payload.qr_code || payload.qr,
+      };
+      setLienData(normalized);
       setLastSince(new Date().toISOString());
     } catch (e) {
       setError(e?.error || e?.message || "Erreur lors de la génération du lien.");
@@ -2276,9 +2284,9 @@ function CollecteLienModal({ client, onClose }) {
   }
 
   function partagerWhatsApp() {
-    if (!lienData?.url) return;
+    if (!lienData?.collecte_link) return;
     const msg = encodeURIComponent(
-      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.url}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
+      `Bonjour ${client.name} 👋\n\nVoici votre lien sécurisé pour régler votre adhésion Awoundjô en plusieurs versements :\n\n${lienData.collecte_link}\n\nCe lien est valable 90 jours. Cliquez dessus pour payer via Wave, Orange Money, MTN ou Moov.`
     );
     window.open(`https://wa.me/${client.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -2341,9 +2349,9 @@ function CollecteLienModal({ client, onClose }) {
             <>
               <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px" }}>
                 <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: .8 }}>Lien client</p>
-                <p style={{ margin: "0 0 10px", fontSize: 13, color: "#2563EB", wordBreak: "break-all", fontFamily: "monospace" }}>{lienData.url}</p>
+                <p style={{ margin: "0 0 10px", fontSize: 13, color: "#2563EB", wordBreak: "break-all", fontFamily: "monospace" }}>{lienData.collecte_link}</p>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => copy(lienData.url, "url")} style={_btnInline}>
+                  <button onClick={() => copy(lienData.collecte_link, "url")} style={_btnInline}>
                     {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
                   </button>
                   <button onClick={partagerWhatsApp} style={{ ..._btnInline, background: "#25D366", color: "#fff", border: "none" }}>
@@ -2352,10 +2360,10 @@ function CollecteLienModal({ client, onClose }) {
                 </div>
               </div>
 
-              {lienData.qr_code && (
+              {lienData.qr_data && (
                 <div style={{ textAlign: "center" }}>
                   <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748B" }}>QR Code à montrer ou imprimer</p>
-                  <img src={lienData.qr_code} alt="QR Code collecte" style={{ width: 160, height: 160, border: "1px solid #E2E8F0", borderRadius: 10 }} />
+                  <img src={lienData.qr_data} alt="QR Code collecte" style={{ width: 160, height: 160, border: "1px solid #E2E8F0", borderRadius: 10 }} />
                 </div>
               )}
 
