@@ -3,9 +3,11 @@
 //  Page publique de collecte — accessible via /collecte/:token
 //  Sans authentification requise.
 //  Flux :
-//    1. GET  /api/collecte/:token          → affiche état collecte
-//    2. POST /api/collecte/:token/payer    → initie un versement
-//    3. POST /api/collecte/:token/wave-confirm → confirme un paiement Wave
+//    1. GET  /api/collecte/:token       → affiche état collecte
+//    2. POST /api/collecte/:token/payer → initie un versement via Jeko
+//                                         (Wave, Orange, MTN, Moov)
+//                                         → redirect_url Jeko pour tous
+//    3. Retour depuis Jeko avec ?payment=success|failed
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -24,12 +26,10 @@ async function apiFetch(path, options = {}) {
 }
 
 // ── Icônes SVG inline ─────────────────────────────────────────
-const IconWave    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M2 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/></svg>;
 const IconPhone   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>;
 const IconCheck   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconRefresh = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
 const IconArrow   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg>;
-const IconCopy    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const IconStar    = () => <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 
 // ── Méthodes de paiement ──────────────────────────────────────
@@ -70,15 +70,12 @@ export default function CollectePage() {
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
 
-  // Étape : "home" | "choix" | "wave_instruct" | "wave_confirm" | "success"
+  // Étape : "home" | "choix" | "success"
   const [step,       setStep]       = useState("home");
   const [methode,    setMethode]    = useState(null);
   const [montant,    setMontant]    = useState("");
-  const [wavePayData,setWavePayData]= useState(null); // réponse /payer pour wave
-  const [waveRef,    setWaveRef]    = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback,   setFeedback]   = useState(null); // { type: "ok"|"err", msg }
-  const [copied,     setCopied]     = useState(false);
 
   // ── Chargement initial ────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -108,6 +105,8 @@ export default function CollectePage() {
   }, [paymentStatus, fetchData]);
 
   // ── Initier un versement ─────────────────────────────────
+  // Tous les opérateurs (Wave, Orange, MTN, Moov) passent par Jeko
+  // et retournent un redirect_url → redirection directe, pas de saisie manuelle
   async function handlePayer() {
     if (!methode) return;
     setSubmitting(true);
@@ -123,66 +122,23 @@ export default function CollectePage() {
       });
       const payload = res.data ?? res;
 
-      if (methode === "wave") {
-        setWavePayData(payload);
-        setMontant(String(payload.montant));
-        setStep("wave_instruct");
-        // Ouvre le deeplink Wave si disponible
-        if (payload.wave_qr_data) {
-          setTimeout(() => { window.location.href = payload.wave_qr_data; }, 400);
-        }
+      // Jeko retourne toujours un redirect_url quel que soit l'opérateur
+      const redirectUrl =
+        payload.data?.redirect_url ||
+        payload.data?.payment_url  ||
+        payload.redirect_url       ||
+        payload.payment_url;
+
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
       } else {
-        // Orange / MTN / Moov → redirection vers lien Jeko
-        const redirectUrl =
-          payload.data?.redirect_url  ||
-          payload.data?.payment_url   ||
-          payload.redirect_url        ||
-          payload.payment_url;
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        } else {
-          setFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez." });
-        }
+        setFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez." });
       }
     } catch (e) {
       setFeedback({ type: "err", msg: e.message });
     } finally {
       setSubmitting(false);
     }
-  }
-
-  // ── Confirmer versement Wave ──────────────────────────────
-  async function handleWaveConfirm() {
-    if (!waveRef.trim()) return;
-    setSubmitting(true);
-    setFeedback(null);
-    try {
-      const m = parseInt(montant, 10);
-      const res = await apiFetch(`/api/collecte/${token}/wave-confirm`, {
-        method: "POST",
-        body: JSON.stringify({ montant: m, wave_ref: waveRef.trim() }),
-      });
-      const payload = res.data ?? res;
-      setData((prev) => ({
-        ...prev,
-        collecte: payload.collecte,
-        client:   { ...prev?.client, status_payment: payload.client_active ? "paid" : prev?.client?.status_payment },
-      }));
-      setStep("success");
-      setFeedback({ type: "ok", msg: payload.message });
-    } catch (e) {
-      setFeedback({ type: "err", msg: e.message });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  // ── Copier la référence Wave ──────────────────────────────
-  function copyWaveNumber(num) {
-    navigator.clipboard?.writeText(num).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   }
 
   // ── Rendu états ───────────────────────────────────────────
@@ -312,68 +268,6 @@ export default function CollectePage() {
               >
                 {submitting ? <span className="spinner" /> : null}
                 {submitting ? "Chargement…" : "Continuer"}
-              </button>
-            </div>
-          )}
-
-          {/* ÉTAPE : instructions Wave + QR */}
-          {step === "wave_instruct" && wavePayData && (
-            <div className="step-section">
-              <button className="btn-back" onClick={() => setStep("choix")}>
-                <IconArrow /> Retour
-              </button>
-              <p className="step-title">Paiement Wave</p>
-
-              <div className="wave-box">
-                <p className="wave-amount">{fcfa(wavePayData.montant)}</p>
-                <p className="wave-desc">à envoyer au numéro Wave :</p>
-                <div className="wave-number-row">
-                  <span className="wave-number">{wavePayData.wave_number}</span>
-                  <button className="btn-copy" onClick={() => copyWaveNumber(wavePayData.wave_number)}>
-                    {copied ? <IconCheck /> : <IconCopy />}
-                    {copied ? "Copié !" : "Copier"}
-                  </button>
-                </div>
-                <p className="wave-instructions">{wavePayData.instructions}</p>
-                <a
-                  href={wavePayData.wave_qr_data}
-                  className="btn-wave-open"
-                >
-                  <IconWave /> Ouvrir l'app Wave
-                </a>
-              </div>
-
-              <p className="step-subtitle">Une fois le paiement effectué, saisissez votre référence de transaction Wave :</p>
-
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Ex : WT-XXXXXXXXXX"
-                value={waveRef}
-                onChange={(e) => setWaveRef(e.target.value)}
-              />
-
-              <input
-                type="number"
-                className="input-field mt-2"
-                placeholder={`Montant versé (${wavePayData.montant} FCFA)`}
-                value={montant}
-                onChange={(e) => setMontant(e.target.value)}
-              />
-
-              {feedback && (
-                <div className={`feedback feedback-${feedback.type}`}>
-                  {feedback.type === "ok" ? <IconCheck /> : "⚠"} {feedback.msg}
-                </div>
-              )}
-
-              <button
-                className="btn-primary"
-                disabled={!waveRef.trim() || submitting}
-                onClick={handleWaveConfirm}
-              >
-                {submitting ? <span className="spinner" /> : null}
-                {submitting ? "Vérification…" : "Confirmer le versement"}
               </button>
             </div>
           )}
