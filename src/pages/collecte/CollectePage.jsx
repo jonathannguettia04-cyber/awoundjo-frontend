@@ -722,60 +722,6 @@ const STYLES = `
   .input-field:focus { border-color: var(--green); }
   .input-field.mt-2 { margin-top: 8px; }
 
-  /* ── Wave box ── */
-  .wave-box {
-    background: #EBF7FF;
-    border: 1.5px solid #BDE4FF;
-    border-radius: var(--radius-sm);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    text-align: center;
-  }
-  .wave-amount {
-    font-family: 'Sora', sans-serif;
-    font-size: 26px;
-    font-weight: 700;
-    color: #0094F0;
-  }
-  .wave-desc { font-size: 13px; color: var(--muted); }
-  .wave-number-row {
-    display: flex; align-items: center; gap: 8px;
-    background: #fff; padding: 8px 14px; border-radius: var(--radius-sm);
-    border: 1px solid #BDE4FF;
-  }
-  .wave-number {
-    font-family: 'Sora', sans-serif;
-    font-size: 17px;
-    font-weight: 700;
-    color: #0094F0;
-    letter-spacing: 1px;
-  }
-  .wave-instructions {
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.5;
-    text-align: center;
-  }
-  .btn-wave-open {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #0094F0;
-    color: #fff;
-    padding: 10px 18px;
-    border-radius: var(--radius-sm);
-    font-family: 'Sora', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    margin-top: 4px;
-    transition: background .2s;
-  }
-  .btn-wave-open:hover { background: #007ACC; }
-
   /* ── Succès ── */
   .success-section {
     align-items: center;
