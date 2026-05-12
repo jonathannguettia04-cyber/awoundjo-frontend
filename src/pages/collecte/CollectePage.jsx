@@ -84,7 +84,7 @@ export default function CollectePage() {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const res = await apiFetch(`/api/business/collecte/${token}`);
+      const res = await apiFetch(`/api/collecte/${token}`);
       setData(res.data ?? res);
     } catch (e) {
       setError(e.message);
@@ -117,7 +117,7 @@ export default function CollectePage() {
       const m = parseInt(montant, 10);
       if (m && m >= 500) body.montant = m;
 
-      const res = await apiFetch(`/api/business/collecte/${token}/payer`, {
+      const res = await apiFetch(`/api/collecte/${token}/payer`, {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -133,8 +133,13 @@ export default function CollectePage() {
         }
       } else {
         // Orange / MTN / Moov → redirection vers lien Jeko
-        if (payload.payment_url) {
-          window.location.href = payload.payment_url;
+        const redirectUrl =
+          payload.data?.redirect_url  ||
+          payload.data?.payment_url   ||
+          payload.redirect_url        ||
+          payload.payment_url;
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
         } else {
           setFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez." });
         }
@@ -153,7 +158,7 @@ export default function CollectePage() {
     setFeedback(null);
     try {
       const m = parseInt(montant, 10);
-      const res = await apiFetch(`/api/business/collecte/${token}/wave-confirm`, {
+      const res = await apiFetch(`/api/collecte/${token}/wave-confirm`, {
         method: "POST",
         body: JSON.stringify({ montant: m, wave_ref: waveRef.trim() }),
       });
