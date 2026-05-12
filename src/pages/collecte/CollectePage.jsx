@@ -84,7 +84,7 @@ export default function CollectePage() {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const res = await apiFetch(`/api/collecte/${token}`);
+      const res = await apiFetch(`/api/business/collecte/${token}`);
       setData(res.data ?? res);
     } catch (e) {
       setError(e.message);
@@ -117,7 +117,7 @@ export default function CollectePage() {
       const m = parseInt(montant, 10);
       if (m && m >= 500) body.montant = m;
 
-      const res = await apiFetch(`/api/collecte/${token}/payer`, {
+      const res = await apiFetch(`/api/business/collecte/${token}/payer`, {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -153,7 +153,7 @@ export default function CollectePage() {
     setFeedback(null);
     try {
       const m = parseInt(montant, 10);
-      const res = await apiFetch(`/api/collecte/${token}/wave-confirm`, {
+      const res = await apiFetch(`/api/business/collecte/${token}/wave-confirm`, {
         method: "POST",
         body: JSON.stringify({ montant: m, wave_ref: waveRef.trim() }),
       });
