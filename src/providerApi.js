@@ -78,6 +78,11 @@ export const providerPharmacyAPI = {
   dispense: (data) =>
     providerApi.post("/dispense", data),
     // data = { prescription_id, items: [...], total_amount }
+
+  // Créer une ordonnance directe (pharmacie sans prescription préalable)
+  createDirectPrescription: (data) =>
+    providerApi.post("/prescriptions/direct", data),
+    // data = { client_id, items: [...], notes? }
 };
 
 // ── Dossier médical ───────────────────────────────────────────
