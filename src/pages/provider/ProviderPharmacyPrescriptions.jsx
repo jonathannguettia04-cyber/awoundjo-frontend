@@ -379,15 +379,6 @@ function TabDirect() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + Number(validDays));
 
-      // Récupère le nom du praticien / pharmacie depuis le localStorage
-      let pName = "";
-      try {
-        const stored = localStorage.getItem("provider_data") || localStorage.getItem("providerData") || "{}";
-        const pd = JSON.parse(stored);
-        pName = pd.name || pd.provider_name || pd.etablissement_name || "";
-      } catch (_) {}
-      setPractitionerName(pName);
-
       // Créer l'ordonnance + service pharmacie en une seule opération
       const { data } = await providerPharmacyAPI.createDirectPrescription({
         client_id:         patient.client.id,
@@ -395,7 +386,7 @@ function TabDirect() {
         expires_at:        expiresAt.toISOString(),
         total_bons:        Number(totalBons),
         total_amount:      Number(amount),
-        practitioner_name: pName,
+        practitioner_name: practitionerName.trim(),
       });
 
       setResult(data);
@@ -520,6 +511,16 @@ function TabDirect() {
             </p>
 
             <div style={{ marginBottom: 14 }}>
+              <label style={s.label}>Nom du praticien prescripteur *</label>
+              <input
+                required
+                value={practitionerName} onChange={e => setPractitionerName(e.target.value)}
+                placeholder="Dr. Kouassi Jean-Baptiste"
+                style={s.input}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
               <label style={s.label}>Médicaments prescrits *</label>
               <textarea
                 required
@@ -615,8 +616,8 @@ function TabDirect() {
 
             <button
               type="submit"
-              disabled={submitting || !content.trim() || !amount}
-              style={{ ...s.btnPrimary, opacity: (!content.trim() || !amount) ? 0.5 : 1 }}
+              disabled={submitting || !practitionerName.trim() || !content.trim() || !amount}
+              style={{ ...s.btnPrimary, opacity: (!practitionerName.trim() || !content.trim() || !amount) ? 0.5 : 1 }}
             >
               {submitting
                 ? <><Spin /> Création en cours…</>
