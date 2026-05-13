@@ -1915,6 +1915,16 @@ export default function App() {
     }).finally(() => setChecking(false));
   }, []);
 
+  // ✅ FIX : useEffect déplacé AVANT les returns conditionnels
+  // (les Hooks React doivent toujours être appelés avant tout return)
+  useEffect(() => {
+    if (!membre) return;
+    apiFetch("/reseau/roles-creables").then(d => {
+      const roles = d?.roles || d?.data?.roles || [];
+      setPeutCreer(roles.length > 0);
+    }).catch(() => {});
+  }, [membre?.id]);
+
   const role = simRole || membre?.role || "SOUSCRIPTEUR";
   const roleInfo = ROLES[role] || ROLES.SOUSCRIPTEUR;
   const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || "Tableau de bord";
@@ -1932,15 +1942,6 @@ export default function App() {
   );
 
   if (!membre) return <AuthPage onAuth={m => setMembre(m)} />;
-
-  // Charger peutCreer depuis le backend dès que le membre est connu
-  useEffect(() => {
-    if (!membre) return;
-    apiFetch("/reseau/roles-creables").then(d => {
-      const roles = d?.roles || d?.data?.roles || [];
-      setPeutCreer(roles.length > 0);
-    }).catch(() => {});
-  }, [membre?.id]);
 
   const navVisible = NAV_ITEMS.filter(item => item.id !== "creer" || peutCreer);
 
