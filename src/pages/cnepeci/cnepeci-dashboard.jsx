@@ -1010,7 +1010,8 @@ function CreerMembrePage({ membre }) {
     if (!form.role) { setError("Veuillez sélectionner un rôle."); return; }
     setLoading(true);
     try {
-      const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(form) });
+      const body = { nom: form.nom, email: form.email, phone: form.phone, role_a_creer: form.role };
+      const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(body) });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur création"); return; }
       setSuccess(data.credentials || data);
