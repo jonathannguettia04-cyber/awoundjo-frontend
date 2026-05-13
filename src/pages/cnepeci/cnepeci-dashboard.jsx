@@ -80,13 +80,6 @@ const ROLES = {
   SOUSCRIPTEUR:          { label: "Souscripteur Final",    abbr: "SF", color: "#6B7280", grad: "linear-gradient(135deg,#6B7280,#4B5563)", level: 6 },
 };
 
-const CREATION_MAP = {
-  BUREAU_CENTRALE:       "COORDONNATEUR_GENERAL",
-  COORDONNATEUR_GENERAL: "BUREAU_LOCAL",
-  BUREAU_LOCAL:          "COORDONNATEUR_LOCAL",
-  COORDONNATEUR_LOCAL:   "PASTEUR",
-  PASTEUR:               "SOUSCRIPTEUR",
-};
 
 const fmt = n => (parseFloat(n) || 0).toLocaleString("fr-FR") + " F";
 const fmtShort = n => {
@@ -831,16 +824,20 @@ function PaiementPage() {
 function InvitePage({ membre }) {
   const [copied, setCopied] = useState(null);
   const [profil, setProfil] = useState(null);
+  const [canRecruit, setCanRecruit] = useState(false);
 
   // Chargement frais depuis l'API pour avoir code_invitation à jour
   useEffect(() => {
     apiFetch("/profile").then(data => {
       if (data?.success) setProfil(data.profil || data.data?.profil || null);
     });
+    apiFetch("/reseau/roles-creables").then(d => {
+      const roles = d?.roles || d?.data?.roles || [];
+      setCanRecruit(roles.length > 0);
+    }).catch(() => {});
   }, []);
 
   const code = profil?.code_invitation || membre?.code_invitation || null;
-  const canRecruit = !!CREATION_MAP[membre?.role];
   const frontUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
   const url = code ? `${frontUrl}/join?ref=${code}` : null;
 
@@ -982,18 +979,27 @@ function HistoryPage() {
 // PAGE CRÉER MEMBRE
 // ══════════════════════════════════════════════════════════════════════════════
 function CreerMembrePage({ membre }) {
-  const [form, setForm] = useState({ nom: "", email: "", phone: "" });
+  const [form, setForm] = useState({ nom: "", email: "", phone: "", role: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
   const [membresCreés, setMembresCreés] = useState([]);
   const [listLoading, setListLoading] = useState(true);
-  const roleACreer = CREATION_MAP[membre?.role];
+  // Rôles créables chargés dynamiquement depuis le backend
+  const [rolesCreables, setRolesCreables] = useState(null); // null = chargement en cours
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    apiFetch("/reseau/membres-crees").then(data => {
-      if (data?.success) setMembresCreés(data.membres || []);
+    // Charger en parallèle les rôles créables et la liste des membres déjà créés
+    Promise.all([
+      apiFetch("/reseau/roles-creables"),
+      apiFetch("/reseau/membres-crees"),
+    ]).then(([rolesRes, membresRes]) => {
+      const roles = rolesRes?.roles || rolesRes?.data?.roles || [];
+      setRolesCreables(roles);
+      // Présélectionner le premier rôle disponible
+      if (roles.length > 0) setForm(f => ({ ...f, role: roles[0] }));
+      if (membresRes?.success) setMembresCreés(membresRes.membres || []);
       setListLoading(false);
     });
   }, []);
@@ -1001,19 +1007,24 @@ function CreerMembrePage({ membre }) {
   const handleCreer = async () => {
     setError(""); setSuccess(null);
     if (!form.nom || !form.email) { setError("Nom et email requis."); return; }
+    if (!form.role) { setError("Veuillez sélectionner un rôle."); return; }
     setLoading(true);
     try {
       const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(form) });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur création"); return; }
       setSuccess(data.credentials || data);
-      setForm({ nom: "", email: "", phone: "" });
+      setForm(f => ({ nom: "", email: "", phone: "", role: f.role }));
       apiFetch("/reseau/membres-crees").then(d => { if (d?.success) setMembresCreés(d.membres || []); });
     } catch { setError("Erreur réseau."); }
     finally { setLoading(false); }
   };
 
-  if (!roleACreer) return (
+  // Tant que les rôles ne sont pas chargés, afficher un spinner
+  if (rolesCreables === null) return <Spinner />;
+
+  // Aucun rôle créable pour ce compte
+  if (rolesCreables.length === 0) return (
     <div style={{ textAlign: "center", padding: 48, color: G.muted, fontSize: 13 }}>
       <div style={{ fontSize: 36, marginBottom: 12 }}>🔒</div>Votre rôle ne permet pas de créer des membres.
     </div>
@@ -1024,7 +1035,7 @@ function CreerMembrePage({ membre }) {
       <div>
         <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "20px 24px", borderBottom: `1px solid ${G.border}`, background: `linear-gradient(135deg,${G.blue}0D,transparent)` }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>➕ Créer un {ROLES[roleACreer]?.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.text }}>➕ Créer un membre</div>
             <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>Votre rôle : {ROLES[membre?.role]?.label}</div>
           </div>
           <div style={{ padding: 24 }}>
@@ -1055,6 +1066,26 @@ function CreerMembrePage({ membre }) {
                 </div>
               );
             })()}
+
+            {/* Sélecteur de rôle — affiché seulement si plusieurs rôles disponibles */}
+            {rolesCreables.length > 1 && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>Rôle à créer *</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {rolesCreables.map(r => {
+                    const ri = ROLES[r] || { label: r, color: G.muted };
+                    const isSelected = form.role === r;
+                    return (
+                      <button key={r} onClick={() => set("role", r)}
+                        style={{ padding: "8px 16px", borderRadius: 20, border: `2px solid ${isSelected ? ri.color : G.border}`, background: isSelected ? ri.color : "#fff", color: isSelected ? "#fff" : G.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+                        {ri.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {[{label:"Nom complet *",key:"nom",type:"text"},{label:"Email *",key:"email",type:"email"},{label:"Téléphone",key:"phone",type:"tel"}].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>{f.label}</label>
@@ -1063,9 +1094,9 @@ function CreerMembrePage({ membre }) {
                   onFocus={e=>e.target.style.borderColor=G.blue} onBlur={e=>e.target.style.borderColor=G.border} />
               </div>
             ))}
-            <button onClick={handleCreer} disabled={loading}
-              style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg,${G.blue},#1D4ED8)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: loading?"not-allowed":"pointer", fontFamily: "inherit", opacity: loading?0.7:1 }}>
-              {loading ? "Création…" : `Créer le ${ROLES[roleACreer]?.label}`}
+            <button onClick={handleCreer} disabled={loading || !form.role}
+              style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg,${G.blue},#1D4ED8)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: (loading||!form.role)?"not-allowed":"pointer", fontFamily: "inherit", opacity: (loading||!form.role)?0.7:1 }}>
+              {loading ? "Création…" : `Créer le ${ROLES[form.role]?.label || form.role}`}
             </button>
           </div>
         </div>
@@ -1078,16 +1109,22 @@ function CreerMembrePage({ membre }) {
         <div style={{ padding: 16, maxHeight: 400, overflowY: "auto" }}>
           {listLoading ? <Spinner /> : membresCreés.length === 0
             ? <div style={{ textAlign: "center", padding: 32, color: G.muted, fontSize: 13 }}>Aucun membre créé</div>
-            : membresCreés.map((m, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, marginBottom: 6, background: "#FAFBFE" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: G.purpleLight, color: G.purple, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>{m.nom?.charAt(0)?.toUpperCase()||"?"}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{m.nom}</div>
-                  <div style={{ fontSize: 11, color: G.muted }}>{m.email}</div>
-                </div>
-                <ActiveBadge statut={m.statut} />
-              </div>
-            ))}
+            : membresCreés.map((m, i) => {
+                const ri = ROLES[m.role];
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, marginBottom: 6, background: "#FAFBFE" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: (ri?.color||G.purple)+"22", color: ri?.color||G.purple, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>{m.nom?.charAt(0)?.toUpperCase()||"?"}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{m.nom}</div>
+                      <div style={{ fontSize: 11, color: G.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                      {ri && <Badge color={ri.color} bg={ri.color+"18"}>{ri.abbr}</Badge>}
+                      <ActiveBadge statut={m.statut} />
+                    </div>
+                  </div>
+                );
+              })}
         </div>
       </div>
     </div>
@@ -1852,6 +1889,7 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [page, setPage] = useState("dashboard");
   const [simRole, setSimRole] = useState(null);
+  const [peutCreer, setPeutCreer] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("cnepeci_token");
@@ -1895,7 +1933,16 @@ export default function App() {
 
   if (!membre) return <AuthPage onAuth={m => setMembre(m)} />;
 
-  const navVisible = NAV_ITEMS.filter(item => item.id !== "creer" || !!CREATION_MAP[membre.role]);
+  // Charger peutCreer depuis le backend dès que le membre est connu
+  useEffect(() => {
+    if (!membre) return;
+    apiFetch("/reseau/roles-creables").then(d => {
+      const roles = d?.roles || d?.data?.roles || [];
+      setPeutCreer(roles.length > 0);
+    }).catch(() => {});
+  }, [membre?.id]);
+
+  const navVisible = NAV_ITEMS.filter(item => item.id !== "creer" || peutCreer);
 
   const renderPage = () => {
     switch (page) {
