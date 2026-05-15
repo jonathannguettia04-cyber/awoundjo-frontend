@@ -311,6 +311,11 @@ export default function Dashboard() {
                       <span>👥</span> Agents
                     </button>
                   </Link>
+                  <Link to="/admin/broadcasts" style={{ textDecoration: "none" }}>
+                    <button className="awj-btn-ghost">
+                      <span>📣</span> Broadcasts
+                    </button>
+                  </Link>
                 </>
               )}
               <Link to="/clients/new" style={{ textDecoration: "none" }}>
