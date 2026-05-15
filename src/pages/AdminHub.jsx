@@ -28,6 +28,7 @@ const SECTIONS = [
       { icon: "🌍", label: "Ambassadeurs Diaspora",       path: "/admin/diaspora",                desc: "Gérer le réseau ambassadeurs" },
       { icon: "⛪", label: "Ambassadeurs Fédérations",    path: "/admin/federation",              desc: "Gérer fédérations & églises" },
       { icon: "💼", label: "Réseau Business",             path: "/admin/business",                desc: "Directrices, Leaders, Superviseurs" },
+      { icon: "📣", label: "Notifications Broadcast",    path: "/admin/broadcasts",              desc: "Envoyer des messages à tous les clients" },
     ],
   },
   {
