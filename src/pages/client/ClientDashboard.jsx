@@ -1,8 +1,7 @@
 // src/pages/client/ClientDashboard.jsx
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { clientProfileAPI, PLANS, STATUS_LABELS } from "../../clientApi";
-import axios from "axios";
+import { clientProfileAPI, clientApi, PLANS, STATUS_LABELS } from "../../clientApi";
 
 const MENU = [
   { path: "/client/dossier",          icon: "📋", label: "Dossier Médical",  color: "#7C3AED", bg: "linear-gradient(135deg,#EDE9FE,#F5F3FF)" },
@@ -184,7 +183,8 @@ export default function ClientDashboard() {
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
 
-    axios.get("/api/client/broadcasts", { withCredentials: true })
+    // ✅ CORRECTION : clientApi injecte automatiquement le client_token
+    clientApi.get("/broadcasts")
       .then(res => {
         if (res.data.success) {
           setBroadcasts(res.data.data.notifications || []);
@@ -199,7 +199,8 @@ export default function ClientDashboard() {
     setShareLink(null);
     if (!notif.is_read) {
       try {
-        await axios.patch(`/api/client/broadcasts/${notif.id}/read`, {}, { withCredentials: true });
+        // ✅ CORRECTION : clientApi avec baseURL /api/client
+        await clientApi.patch(`/broadcasts/${notif.id}/read`);
         setBroadcasts(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
       } catch (_) {}
@@ -210,7 +211,8 @@ export default function ClientDashboard() {
     if (!activeNotif) return;
     setShareLoading(true);
     try {
-      const res = await axios.post(`/api/client/broadcasts/${activeNotif.id}/share`, {}, { withCredentials: true });
+      // ✅ CORRECTION : clientApi avec baseURL /api/client
+      const res = await clientApi.post(`/broadcasts/${activeNotif.id}/share`);
       if (res.data.success) setShareLink(res.data.data);
     } catch (_) {}
     setShareLoading(false);
