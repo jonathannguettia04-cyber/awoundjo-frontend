@@ -7,7 +7,7 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Instance axios dédiée portail client (séparée de l'instance agent)
-const clientApi = axios.create({
+export const clientApi = axios.create({
   baseURL: `${API_URL}/api/client`,
   headers: { "Content-Type": "application/json" },
   timeout: 15000,
@@ -51,11 +51,12 @@ export const clientCardAPI = {
 
 // ── COTISATIONS ──────────────────────────────────────────────────
 export const clientContribAPI = {
-  get:     ()     => clientApi.get("/contributions"),
-  pay:     (data) => clientApi.post("/contributions/pay", { ...data, payment_method: "CinetPay" }),
-  initiate: (data) => clientApi.post("/contributions/initiate", data), // ✅ CORRECTION : route exacte du backend
-  confirm: (data) => clientApi.post("/contributions/confirm", data), // ← ajoute ça
+  get:      ()     => clientApi.get("/contributions"),
+  pay:      (data) => clientApi.post("/contributions/pay", { ...data, payment_method: "CinetPay" }),
+  initiate: (data) => clientApi.post("/contributions/initiate", data),
+  confirm:  (data) => clientApi.post("/contributions/confirm", data),
 };
+
 // ── DÉPENDANTS ───────────────────────────────────────────────────
 export const clientDepsAPI = {
   get:    ()     => clientApi.get("/dependents"),
