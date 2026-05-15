@@ -1,6 +1,8 @@
 // pages/admin/AdminBroadcasts.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
-import api from "../../utils/apiClient";
+import { useAuth } from "../../context/AuthContext";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /* ─────────── ICÔNES ─────────── */
 const Icon = {
@@ -15,12 +17,6 @@ const Icon = {
 };
 
 /* ─────────── HELPERS ─────────── */
-// Lit { success: true, data: {...} } → retourne data ou null
-function extract(res) {
-  if (res?.data?.success === false) return null;
-  return res?.data?.data ?? null;
-}
-
 function fmtDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("fr-FR", {
     day: "2-digit", month: "short", year: "numeric",
@@ -28,34 +24,77 @@ function fmtDate(dateStr) {
   });
 }
 
+/* ─────────── HOOK FETCH ADMIN (même pattern qu'AdminBusiness) ─────────── */
+function useAdminFetch(token) {
+  const get = useCallback(async (path) => {
+    const r = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    return r.json();
+  }, [token]);
+
+  const post = useCallback(async (path, body = {}) => {
+    const r = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || d.message || r.statusText);
+    return d;
+  }, [token]);
+
+  const postForm = useCallback(async (path, formData) => {
+    const r = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      // Pas de Content-Type → le navigateur pose le boundary multipart automatiquement
+      body: formData,
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || d.message || r.statusText);
+    return d;
+  }, [token]);
+
+  const del = useCallback(async (path) => {
+    const r = await fetch(`${API}${path}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    return r.json();
+  }, [token]);
+
+  return { get, post, postForm, del };
+}
+
 /* ─────────── MODAL LEADERBOARD ─────────── */
-function LeaderboardModal({ notif, onClose, onRefresh }) {
+function LeaderboardModal({ notif, onClose, onRefresh, token }) {
+  const { get, post } = useAdminFetch(token);
   const [rows, setRows]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
-    api.get(`/broadcasts/${notif.id}/leaderboard`)
-      .then(res => {
-        const d = extract(res);
-        setRows(d?.leaderboard ?? []);
-      })
+    get(`/api/broadcasts/${notif.id}/leaderboard`)
+      .then(res => setRows(res?.data?.leaderboard ?? []))
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [notif.id]);
+  }, [notif.id, get]);
 
   const handleResolve = async () => {
     if (!confirm("Désigner le gagnant maintenant ? Cette action est irréversible.")) return;
     setResolving(true);
     try {
-      const res = await api.post(`/broadcasts/${notif.id}/contest/resolve`);
-      const d   = extract(res);
-      if (d?.winner) {
+      const d = await post(`/api/broadcasts/${notif.id}/contest/resolve`);
+      if (d?.data?.winner) {
         alert(`🏆 ${d.message}`);
         onRefresh();
         onClose();
       }
     } catch (e) {
-      alert(e?.response?.data?.error ?? "Erreur lors de la résolution");
+      alert(e.message ?? "Erreur lors de la résolution");
     } finally {
       setResolving(false);
     }
@@ -148,7 +187,8 @@ function LeaderboardModal({ notif, onClose, onRefresh }) {
 }
 
 /* ─────────── MODAL CRÉATION ─────────── */
-function CreateModal({ onClose, onSuccess }) {
+function CreateModal({ onClose, onSuccess, token }) {
+  const { post, postForm } = useAdminFetch(token);
   const [form, setForm]       = useState({ title: "", body: "", type: "text" });
   const [file, setFile]       = useState(null);
   const [preview, setPreview] = useState(null);
@@ -162,8 +202,7 @@ function CreateModal({ onClose, onSuccess }) {
     if (!f) return;
     setFile(f);
     if (form.type === "image") {
-      const prev = URL.createObjectURL(f);
-      setPreview(prev);
+      setPreview(URL.createObjectURL(f));
     }
   };
 
@@ -187,14 +226,13 @@ function CreateModal({ onClose, onSuccess }) {
       if (form.body.trim()) fd.append("body", form.body.trim());
       if (file) fd.append("media", file);
 
-      const res     = await api.post("/broadcasts", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      const created = extract(res);
+      const created = await postForm("/api/broadcasts", fd);
 
-      if (!created) throw new Error("Réponse invalide du serveur");
+      if (!created?.data) throw new Error("Réponse invalide du serveur");
 
       // Créer le concours si activé
-      if (contest.enabled && created.notification?.id) {
-        await api.post(`/broadcasts/${created.notification.id}/contest`, {
+      if (contest.enabled && created.data?.notification?.id) {
+        await post(`/api/broadcasts/${created.data.notification.id}/contest`, {
           prize_description: contest.prize.trim(),
           end_date:          contest.end_date || null,
         });
@@ -203,7 +241,7 @@ function CreateModal({ onClose, onSuccess }) {
       onSuccess();
       onClose();
     } catch (e) {
-      setError(e?.response?.data?.error ?? "Erreur lors de l'envoi");
+      setError(e.message ?? "Erreur lors de l'envoi");
     } finally {
       setSending(false);
     }
@@ -378,14 +416,15 @@ function CreateModal({ onClose, onSuccess }) {
 }
 
 /* ─────────── CARTE NOTIFICATION ADMIN ─────────── */
-function NotifCard({ notif, onLeaderboard, onRefresh }) {
+function NotifCard({ notif, onLeaderboard, onRefresh, token }) {
+  const { del } = useAdminFetch(token);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
     if (!confirm(`Supprimer la notification "${notif.title}" ?`)) return;
     setDeleting(true);
     try {
-      await api.delete(`/broadcasts/${notif.id}`);
+      await del(`/api/broadcasts/${notif.id}`);
       onRefresh();
     } catch {
       alert("Erreur lors de la suppression");
@@ -495,6 +534,9 @@ function NotifCard({ notif, onLeaderboard, onRefresh }) {
 
 /* ─────────── PAGE PRINCIPALE ─────────── */
 export default function AdminBroadcasts() {
+  const { token } = useAuth();
+  const { get }   = useAdminFetch(token);
+
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading]             = useState(true);
   const [showCreate, setShowCreate]       = useState(false);
@@ -503,12 +545,11 @@ export default function AdminBroadcasts() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/broadcasts");
-      const d   = extract(res);
-      setNotifications(d?.notifications ?? []);
+      const res = await get("/api/broadcasts");
+      setNotifications(res?.data?.notifications ?? []);
     } catch { /* silencieux */ }
     finally { setLoading(false); }
-  }, []);
+  }, [get]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -545,9 +586,9 @@ export default function AdminBroadcasts() {
       {notifications.length > 0 && (
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: "Clients atteints",   value: totals.recipients,  color: "text-gray-800"   },
-            { label: "Partageurs actifs",  value: totals.sharers,     color: "text-indigo-600" },
-            { label: "Nouvelles adhésions",value: totals.conversions, color: "text-teal-600"   },
+            { label: "Clients atteints",    value: totals.recipients,  color: "text-gray-800"   },
+            { label: "Partageurs actifs",   value: totals.sharers,     color: "text-indigo-600" },
+            { label: "Nouvelles adhésions", value: totals.conversions, color: "text-teal-600"   },
           ].map(s => (
             <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 text-center shadow-sm">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -581,6 +622,7 @@ export default function AdminBroadcasts() {
             <NotifCard
               key={n.id}
               notif={n}
+              token={token}
               onLeaderboard={setLeaderTarget}
               onRefresh={fetchAll}
             />
@@ -590,11 +632,12 @@ export default function AdminBroadcasts() {
 
       {/* Modals */}
       {showCreate && (
-        <CreateModal onClose={() => setShowCreate(false)} onSuccess={fetchAll} />
+        <CreateModal onClose={() => setShowCreate(false)} onSuccess={fetchAll} token={token} />
       )}
       {leaderTarget && (
         <LeaderboardModal
           notif={leaderTarget}
+          token={token}
           onClose={() => setLeaderTarget(null)}
           onRefresh={fetchAll}
         />
