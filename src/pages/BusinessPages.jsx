@@ -2610,7 +2610,7 @@ export function BizParrainagePage() {
   const handleGenerer = async () => {
     setError(""); setBusy(true);
     try {
-      const res = await apiBiz("/parrainage/lien", { method: "POST", body: JSON.stringify({}) });
+      const res = await apiBiz("/parrainage/generer-lien", { method: "POST", body: JSON.stringify({}) });
       setData(res); // contient parrainage_link, token, expires_at, whatsapp_message
       // Rafraîchir les stats
       apiBiz("/parrainage/stats").then(d => setStats(d)).catch(() => {});
