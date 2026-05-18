@@ -171,6 +171,7 @@ const NAV = [
   { to: "/business/members",      icon: "👥", label: "Mes membres"     },
   { to: "/business/collectes",    icon: "💳", label: "Collectes"       },
   { to: "/business/clients",      icon: "🏥", label: "Mes clients"     },
+  { to: "/business/parrainage",   icon: "🎯", label: "Parrainage"      },
 ];
 
 export function BizLayout({ children }) {
@@ -2555,6 +2556,259 @@ export function BizCollectesPage() {
           onClose={() => setCollecteClient(null)}
           onCompleted={() => { setCollecteClient(null); load(); }}
         />
+      )}
+    </BizLayout>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PAGE — PARRAINAGE CLIENT MUTUALISTE
+//  Permet à chaque membre Business de générer un lien public
+//  pour recruter un prospect → commission 10 % à l'activation.
+// ─────────────────────────────────────────────────────────────
+export function BizParrainagePage() {
+  const [data,     setData]     = useState(null);   // { token, url, expires_at }
+  const [stats,    setStats]    = useState(null);   // { total_clics, total_conversions, commissions_generees, liens[] }
+  const [busy,     setBusy]     = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [error,    setError]    = useState("");
+  const [copied,   setCopied]   = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // ── Charger les stats au montage ────────────────────────────
+  useEffect(() => {
+    apiBiz("/parrainage/stats")
+      .then(d => setStats(d))
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
+  }, []);
+
+  // ── Copier dans le presse-papiers ───────────────────────────
+  const copy = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2500);
+    });
+  };
+
+  // ── Générer (ou récupérer) le lien de parrainage ────────────
+  const handleGenerer = async () => {
+    setError(""); setBusy(true);
+    try {
+      const res = await apiBiz("/parrainage/generer-lien", { method: "POST", body: JSON.stringify({}) });
+      setData(res);
+      // Rafraîchir les stats
+      apiBiz("/parrainage/stats").then(d => setStats(d)).catch(() => {});
+    } catch (e) {
+      setError(e?.error || e?.message || "Impossible de générer le lien.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Révoquer le lien actif ───────────────────────────────────
+  const handleRevoquer = async () => {
+    if (!window.confirm("Révoquer ce lien ? Les prospects qui l'ont déjà reçu ne pourront plus s'inscrire via ce lien.")) return;
+    setRevoking(true);
+    try {
+      await apiBiz("/parrainage/lien", { method: "DELETE" });
+      setData(null);
+      apiBiz("/parrainage/stats").then(d => setStats(d)).catch(() => {});
+    } catch (e) {
+      setError(e?.error || e?.message || "Erreur lors de la révocation.");
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+  // ── Message WhatsApp pré-rempli ──────────────────────────────
+  const whatsappHref = data?.url
+    ? `https://wa.me/?text=${encodeURIComponent(
+        `🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`
+      )}`
+    : null;
+
+  return (
+    <BizLayout>
+      {/* ── En-tête ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1E1B4B" }}>
+          🎯 Parrainage client mutualiste
+        </h2>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748B" }}>
+          Partagez votre lien — chaque adhésion payée vous rapporte <strong style={{ color: "#7C3AED" }}>10 %</strong> de commission.
+        </p>
+      </div>
+
+      {/* ── Règles de commission ─────────────────────────────── */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
+        <CommRule label="Vous (niveau 1)" pct="10%" desc="Commission sur l'adhésion payée"    color="#7C3AED" />
+        <CommRule label="Votre parrain"   pct="5%"  desc="Si votre parrain a un compte actif" color="#2563EB" />
+        <CommRule label="Bonus pool"      pct="2%"  desc="Pool mensuel commun"                color="#D97706" />
+      </div>
+
+      {error && <Alert type="error" style={{ marginBottom: 16 }}>{error}</Alert>}
+
+      {/* ── Stats ────────────────────────────────────────────── */}
+      {!loadingStats && stats && (
+        <div className="biz-stats-grid" style={{ ...grid4, marginBottom: 20 }}>
+          <StatCard
+            label="Clics sur vos liens"
+            value={stats.total_clics ?? 0}
+            color="#2563EB" icon="👆"
+          />
+          <StatCard
+            label="Conversions (paiements)"
+            value={stats.total_conversions ?? 0}
+            color="#059669" icon="✅"
+          />
+          <StatCard
+            label="Commissions générées"
+            value={`${fmt(stats.commissions_generees)} FCFA`}
+            color="#7C3AED" icon="💰"
+          />
+          <StatCard
+            label="Liens actifs"
+            value={(stats.liens || []).filter(l => !l.revoked).length}
+            color="#D97706" icon="🔗"
+          />
+        </div>
+      )}
+
+      {/* ── Bloc lien actif ou bouton génération ─────────────── */}
+      <Card style={{ marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#1E1B4B" }}>
+          🔗 Votre lien de parrainage
+        </h3>
+
+        {!data ? (
+          /* ─ Pas encore de lien généré ─ */
+          <div style={{ textAlign: "center", padding: "28px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
+            <p style={{ margin: "0 0 20px", color: "#64748B", fontSize: 14 }}>
+              Générez votre lien unique et commencez à recruter des clients mutualistes.
+            </p>
+            <button onClick={handleGenerer} disabled={busy} style={{ ...btnPrimary, fontSize: 15, padding: "12px 28px" }}>
+              {busy ? "Génération…" : "✨ Générer mon lien de parrainage"}
+            </button>
+          </div>
+        ) : (
+          /* ─ Lien actif ─ */
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* URL */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 6 }}>
+                URL de parrainage
+              </label>
+              <div style={{
+                background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8,
+                padding: "12px 16px", fontFamily: "monospace", fontSize: 13,
+                color: "#2563EB", wordBreak: "break-all",
+              }}>
+                {data.url}
+              </div>
+            </div>
+
+            {/* Expiration */}
+            {data.expires_at && (
+              <Alert type="warning" style={{ fontSize: 13 }}>
+                ⏳ Ce lien expire le <strong>{new Date(data.expires_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</strong>.
+                Vous pourrez en générer un nouveau ensuite.
+              </Alert>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => copy(data.url, "url")} style={btnPrimary}>
+                {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
+              </button>
+              {whatsappHref && (
+                <a href={whatsappHref} target="_blank" rel="noreferrer" style={{
+                  ...btnPrimary, background: "#25D366", textDecoration: "none",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                }}>
+                  📲 Partager WhatsApp
+                </a>
+              )}
+              <button
+                onClick={handleGenerer}
+                disabled={busy}
+                title="Régénérer un nouveau token (révoque l'ancien)"
+                style={{ ...btnSecondary }}
+              >
+                {busy ? "…" : "🔄 Nouveau lien"}
+              </button>
+              <button onClick={handleRevoquer} disabled={revoking} style={{
+                ...btnSecondary, color: "#BE123C", borderColor: "#FECDD3",
+              }}>
+                {revoking ? "Révocation…" : "🗑 Révoquer"}
+              </button>
+            </div>
+
+            {/* Message prêt à coller */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 6 }}>
+                Message prêt à envoyer
+              </label>
+              <div style={{
+                background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8,
+                padding: "12px 16px", fontSize: 13, color: "#166534", lineHeight: 1.6,
+                whiteSpace: "pre-line",
+              }}>
+                {`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`}
+              </div>
+              <button
+                onClick={() => copy(`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`, "msg")}
+                style={{ ...btnSecondary, marginTop: 8, fontSize: 13 }}
+              >
+                {copied === "msg" ? "✅ Copié !" : "📋 Copier le message"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Historique des liens ─────────────────────────────── */}
+      {stats?.liens?.length > 0 && (
+        <Card>
+          <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1E1B4B" }}>
+            📋 Historique de vos liens
+          </h3>
+          <div className="biz-table-wrap" style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #F1F5F9" }}>
+                  {["Token", "Clics", "Conversions", "Expiration", "Statut"].map(h => (
+                    <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#64748B", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {stats.liens.map((l, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "9px 12px", fontFamily: "monospace", color: "#64748B", fontSize: 12 }}>
+                      {l.token?.slice(0, 12)}…
+                    </td>
+                    <td style={{ padding: "9px 12px" }}>{l.click_count ?? 0}</td>
+                    <td style={{ padding: "9px 12px", fontWeight: 700, color: "#059669" }}>{l.conversion_count ?? 0}</td>
+                    <td style={{ padding: "9px 12px", color: "#64748B", whiteSpace: "nowrap" }}>
+                      {l.expires_at ? new Date(l.expires_at).toLocaleDateString("fr-FR") : "—"}
+                    </td>
+                    <td style={{ padding: "9px 12px" }}>
+                      {l.revoked
+                        ? <span style={{ background: "#FFF1F2", color: "#BE123C", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>Révoqué</span>
+                        : new Date(l.expires_at) < new Date()
+                          ? <span style={{ background: "#FEF3C7", color: "#92400E", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>Expiré</span>
+                          : <span style={{ background: "#D1FAE5", color: "#065F46", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>✅ Actif</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </BizLayout>
   );

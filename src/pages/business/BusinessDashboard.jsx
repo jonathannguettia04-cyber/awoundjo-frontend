@@ -585,14 +585,20 @@ function TabBonus() {
 // ── Tab Inviter ────────────────────────────────────────────────────
 // FIX : data.code / data.link / data.child_role / data.whatsapp_message
 //       (pas data.lien_invitation ni data.member.code_invitation)
+// AJOUT : lien de collecte de parrainage (data.collect_link)
 function TabInviter() {
-  const [data,   setData]   = useState(null);
-  const [copied, setCopied] = useState(null);
-  const [loading,setLoading]= useState(true);
+  const [data,         setData]         = useState(null);
+  const [collectData,  setCollectData]  = useState(null);
+  const [copied,       setCopied]       = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [collectLoad,  setCollectLoad]  = useState(true);
 
   useEffect(() => {
     apiFetch("/invitation-link")
       .then(d => setData(d)).catch(console.error).finally(() => setLoading(false));
+    // Chargement du lien de collecte parrainage
+    apiFetch("/collect-link")
+      .then(d => setCollectData(d)).catch(() => setCollectData(null)).finally(() => setCollectLoad(false));
   }, []);
 
   function copy(text, key) {
@@ -685,6 +691,149 @@ function TabInviter() {
           </div>
         </div>
       </div>
+
+      {/* ── Lien de collecte de parrainage ── */}
+      {(collectLoad || collectData) && (
+        <div style={{
+          background: `linear-gradient(135deg, ${T.blueL}, #0F1A2A)`,
+          border: `1px solid ${T.blue}40`, borderRadius: 16, overflow: "hidden",
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: "16px 20px", borderBottom: `1px solid ${T.blue}25`,
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: `${T.blue}20`, border: `1px solid ${T.blue}40`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0,
+            }}>🤝</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: T.text }}>
+                Lien de collecte de parrainage
+              </div>
+              <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
+                Partagez ce lien pour que vos filleuls règlent leur adhésion directement
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: 18 }}>
+            {collectLoad ? (
+              <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
+            ) : collectData?.collect_link ? (
+              <>
+                {/* Explication */}
+                <div style={{
+                  background: `${T.blue}12`, border: `1px solid ${T.blue}25`,
+                  borderRadius: 10, padding: "12px 16px", marginBottom: 14,
+                  fontSize: 12, color: T.textSub, lineHeight: 1.6,
+                }}>
+                  📌 Ce lien permet à vos parrainés de <strong style={{ color: T.blue }}>payer leur adhésion</strong> en ligne.
+                  Une fois le paiement validé, votre commission est créditée automatiquement.
+                </div>
+
+                {/* Lien affiché */}
+                <div style={{
+                  background: "#0A0A14", borderRadius: 10, padding: "12px 16px",
+                  border: `1px solid ${T.border}`, marginBottom: 12,
+                  fontSize: 12, color: T.muted, fontFamily: "monospace",
+                  wordBreak: "break-all", lineHeight: 1.6,
+                }}>
+                  {collectData.collect_link}
+                </div>
+
+                {/* Badges info */}
+                {(collectData.amount_xof || collectData.plan_label) && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                    {collectData.plan_label && (
+                      <span style={{
+                        padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                        background: `${T.gold}15`, color: T.gold, border: `1px solid ${T.gold}30`,
+                      }}>📦 {collectData.plan_label}</span>
+                    )}
+                    {collectData.amount_xof && (
+                      <span style={{
+                        padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                        background: `${T.green}15`, color: T.green, border: `1px solid ${T.green}30`,
+                      }}>💵 {Number(collectData.amount_xof).toLocaleString("fr-FR")} FCFA</span>
+                    )}
+                    {collectData.commission_rate && (
+                      <span style={{
+                        padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                        background: `${T.blue}15`, color: T.blue, border: `1px solid ${T.blue}30`,
+                      }}>📈 Commission {collectData.commission_rate}%</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Boutons d'action */}
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => copy(collectData.collect_link, "collect")}
+                    style={{
+                      flex: 1, minWidth: 120, padding: "12px", borderRadius: 10, cursor: "pointer",
+                      background: copied === "collect" ? T.greenL : `${T.blue}20`,
+                      color:      copied === "collect" ? T.green   : T.blue,
+                      border: `1px solid ${copied === "collect" ? T.green : T.blue}40`,
+                      fontWeight: 800, fontSize: 13, transition: "all .2s", fontFamily: "inherit",
+                    }}
+                  >
+                    {copied === "collect" ? "✅ Copié !" : "📋 Copier le lien"}
+                  </button>
+                  {collectData.whatsapp_collect && (
+                    <a
+                      href={collectData.whatsapp_collect}
+                      target="_blank" rel="noreferrer"
+                      style={{
+                        flex: 1, minWidth: 120, padding: "12px", borderRadius: 10, textDecoration: "none",
+                        background: "#0D2318", color: "#22C55E",
+                        border: "1px solid #22C55E40",
+                        fontWeight: 800, fontSize: 13, textAlign: "center",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      }}
+                    >
+                      📲 Partager WhatsApp
+                    </a>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Fallback si l'API /collect-link n'existe pas encore */
+              <div style={{ textAlign: "center", padding: "24px 20px", color: T.muted }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🔗</div>
+                <div style={{ fontSize: 13, color: T.textSub, marginBottom: 16 }}>
+                  Votre lien de collecte de parrainage n'est pas encore disponible.
+                </div>
+                {/* Fallback : construire depuis le lien d'invitation */}
+                {data?.link && (
+                  <>
+                    <div style={{
+                      background: "#0A0A14", borderRadius: 10, padding: "10px 14px",
+                      border: `1px solid ${T.border}`, marginBottom: 12,
+                      fontSize: 11, color: T.muted, fontFamily: "monospace", wordBreak: "break-all",
+                    }}>
+                      {data.link.replace("/register", "/collect")}
+                    </div>
+                    <button
+                      onClick={() => copy(data.link.replace("/register", "/collect"), "collect-fb")}
+                      style={{
+                        padding: "10px 22px", borderRadius: 10, cursor: "pointer",
+                        background: copied === "collect-fb" ? T.greenL : `${T.blue}15`,
+                        color:      copied === "collect-fb" ? T.green   : T.blue,
+                        border: `1px solid ${copied === "collect-fb" ? T.green : T.blue}30`,
+                        fontWeight: 800, fontSize: 12, fontFamily: "inherit",
+                      }}
+                    >
+                      {copied === "collect-fb" ? "✅ Copié !" : "📋 Copier le lien de collecte"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hiérarchie */}
       <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20 }}>
