@@ -2567,8 +2567,8 @@ export function BizCollectesPage() {
 //  pour recruter un prospect → commission 10 % à l'activation.
 // ─────────────────────────────────────────────────────────────
 export function BizParrainagePage() {
-  const [data,     setData]     = useState(null);   // { token, url, expires_at }
-  const [stats,    setStats]    = useState(null);   // { total_clics, total_conversions, commissions_generees, liens[] }
+  const [data,     setData]     = useState(null);   // { parrainage_link, token, expires_at, whatsapp_message, stats:{click_count,conversion_count} }
+  const [stats,    setStats]    = useState(null);   // { active_link, totals:{total_filleuls,filleuls_actifs,total_commissions}, filleuls[], links_history[] }
   const [busy,     setBusy]     = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [error,    setError]    = useState("");
@@ -2578,7 +2578,22 @@ export function BizParrainagePage() {
   // ── Charger les stats au montage ────────────────────────────
   useEffect(() => {
     apiBiz("/parrainage/stats")
-      .then(d => setStats(d))
+      .then(d => {
+        setStats(d);
+        // Pré-remplir data si un lien actif existe déjà
+        if (d?.active_link) {
+          setData({
+            parrainage_link:  d.active_link.url,
+            token:            d.active_link.token,
+            expires_at:       d.active_link.expires_at,
+            whatsapp_message: null, // disponible seulement après génération via POST
+            stats: {
+              click_count:      d.active_link.click_count,
+              conversion_count: d.active_link.conversion_count,
+            },
+          });
+        }
+      })
       .catch(() => {})
       .finally(() => setLoadingStats(false));
   }, []);
@@ -2595,8 +2610,8 @@ export function BizParrainagePage() {
   const handleGenerer = async () => {
     setError(""); setBusy(true);
     try {
-      const res = await apiBiz("/parrainage/generer-lien", { method: "POST", body: JSON.stringify({}) });
-      setData(res);
+      const res = await apiBiz("/parrainage/lien", { method: "POST", body: JSON.stringify({}) });
+      setData(res); // contient parrainage_link, token, expires_at, whatsapp_message
       // Rafraîchir les stats
       apiBiz("/parrainage/stats").then(d => setStats(d)).catch(() => {});
     } catch (e) {
@@ -2622,11 +2637,15 @@ export function BizParrainagePage() {
   };
 
   // ── Message WhatsApp pré-rempli ──────────────────────────────
-  const whatsappHref = data?.url
-    ? `https://wa.me/?text=${encodeURIComponent(
-        `🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`
-      )}`
-    : null;
+  // Le backend retourne déjà whatsapp_message (lien wa.me complet) après POST
+  // Fallback : on le reconstruit à partir de parrainage_link
+  const parrainageUrl = data?.parrainage_link;
+  const whatsappHref  = data?.whatsapp_message
+    ?? (parrainageUrl
+      ? `https://wa.me/?text=${encodeURIComponent(
+          `🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${parrainageUrl}`
+        )}`
+      : null);
 
   return (
     <BizLayout>
@@ -2654,22 +2673,22 @@ export function BizParrainagePage() {
         <div className="biz-stats-grid" style={{ ...grid4, marginBottom: 20 }}>
           <StatCard
             label="Clics sur vos liens"
-            value={stats.total_clics ?? 0}
+            value={stats.active_link?.click_count ?? 0}
             color="#2563EB" icon="👆"
           />
           <StatCard
             label="Conversions (paiements)"
-            value={stats.total_conversions ?? 0}
+            value={stats.active_link?.conversion_count ?? 0}
             color="#059669" icon="✅"
           />
           <StatCard
             label="Commissions générées"
-            value={`${fmt(stats.commissions_generees)} FCFA`}
+            value={`${fmt(stats.totals?.total_commissions)} FCFA`}
             color="#7C3AED" icon="💰"
           />
           <StatCard
-            label="Liens actifs"
-            value={(stats.liens || []).filter(l => !l.revoked).length}
+            label="Filleuls actifs"
+            value={stats.totals?.filleuls_actifs ?? 0}
             color="#D97706" icon="🔗"
           />
         </div>
@@ -2706,7 +2725,7 @@ export function BizParrainagePage() {
                 padding: "12px 16px", fontFamily: "monospace", fontSize: 13,
                 color: "#2563EB", wordBreak: "break-all",
               }}>
-                {data.url}
+                {parrainageUrl}
               </div>
             </div>
 
@@ -2720,7 +2739,7 @@ export function BizParrainagePage() {
 
             {/* Actions */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => copy(data.url, "url")} style={btnPrimary}>
+              <button onClick={() => copy(parrainageUrl, "url")} style={btnPrimary}>
                 {copied === "url" ? "✅ Copié !" : "📋 Copier le lien"}
               </button>
               {whatsappHref && (
@@ -2756,10 +2775,10 @@ export function BizParrainagePage() {
                 padding: "12px 16px", fontSize: 13, color: "#166534", lineHeight: 1.6,
                 whiteSpace: "pre-line",
               }}>
-                {`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`}
+                {`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${parrainageUrl}`}
               </div>
               <button
-                onClick={() => copy(`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${data.url}`, "msg")}
+                onClick={() => copy(`🏥 Rejoignez Awoundjô Mutuelle !\n\nInscrivez-vous en quelques clics et bénéficiez d'une couverture santé dès le premier mois.\n\n👉 ${parrainageUrl}`, "msg")}
                 style={{ ...btnSecondary, marginTop: 8, fontSize: 13 }}
               >
                 {copied === "msg" ? "✅ Copié !" : "📋 Copier le message"}
@@ -2770,7 +2789,7 @@ export function BizParrainagePage() {
       </Card>
 
       {/* ── Historique des liens ─────────────────────────────── */}
-      {stats?.liens?.length > 0 && (
+      {stats?.links_history?.length > 0 && (
         <Card>
           <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1E1B4B" }}>
             📋 Historique de vos liens
@@ -2785,7 +2804,7 @@ export function BizParrainagePage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.liens.map((l, i) => (
+                {stats.links_history.map((l, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
                     <td style={{ padding: "9px 12px", fontFamily: "monospace", color: "#64748B", fontSize: 12 }}>
                       {l.token?.slice(0, 12)}…
