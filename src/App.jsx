@@ -183,6 +183,11 @@ const CommissionWithdrawal = lazy(() => import("./pages/shared/CommissionWithdra
 // généré par l'agent depuis businessController.js
 const CollectePage = lazy(() => import("./pages/collecte/CollectePage"));
 
+// ── [PARRAINAGE] Page publique Business ──────────────────────
+// Accessible sans authentification via lien de parrainage
+// généré par un membre Business depuis /business/parrainage
+const BusinessParrainagePage = lazy(() => import("./pages/parrainage/BusinessParrainagePage"));
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -513,6 +518,14 @@ export default function App() {
             ══════════════════════════════════════════════════*/}
             <Route path="/collecte/:token" element={<CollectePage />} />
 
+            {/* ═══════════════════════════════════════════════
+                [PARRAINAGE] LIEN PUBLIC BUSINESS — SANS AUTH
+                Généré depuis /business/parrainage
+                Format : /parrainage/:token
+            ══════════════════════════════════════════════════*/}
+            <Route path="/parrainage/:token"       element={<BusinessParrainagePage />} />
+            <Route path="/parrainage/:token/merci" element={<BusinessParrainagePage />} />
+            <Route path="/parrainage/:token/echec" element={<BusinessParrainagePage />} />
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
             <Route path="*" element={
