@@ -164,6 +164,212 @@ function NotifModal({ notif, onClose, onShare, shareLink, shareLoading, copied, 
   );
 }
 
+// ─── Widget Parrainage ─────────────────────────────────────────────────────
+function ParrainageWidget({ visible }) {
+  const [link,    setLink]    = useState(null);
+  const [stats,   setStats]   = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [copied,  setCopied]  = useState(false);
+  const [open,    setOpen]    = useState(false);
+
+  useEffect(() => {
+    clientApi.get("/parrainage/mes-stats")
+      .then(res => {
+        if (res.data.success) {
+          setStats(res.data.data);
+          if (res.data.data.share_url) {
+            setLink({ code: res.data.data.referral_code, share_url: res.data.data.share_url });
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const generateLink = async () => {
+    setLoading(true);
+    try {
+      const res = await clientApi.get("/parrainage/mon-lien");
+      if (res.data.success) {
+        setLink(res.data.data);
+        const s = await clientApi.get("/parrainage/mes-stats");
+        if (s.data.success) setStats(s.data.data);
+      }
+    } catch (_) {}
+    setLoading(false);
+  };
+
+  const copy = () => {
+    if (!link?.share_url) return;
+    navigator.clipboard.writeText(link.share_url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const share = () => {
+    if (!link?.share_url) return;
+    if (navigator.share) {
+      navigator.share({
+        title: "Rejoignez Awoundjô Mutuelle",
+        text:  "Inscrivez-vous avec mon lien et bénéficiez d'une couverture santé dès le 1er mois !",
+        url:   link.share_url,
+      }).catch(() => copy());
+    } else {
+      copy();
+    }
+  };
+
+  const totalFilleuls = stats?.total_filleuls      || 0;
+  const totalComm     = stats?.total_commission    || 0;
+  const commEnAttente = stats?.commission_en_attente || 0;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg,#ECFDF5,#F0FDF4)",
+      border: "1.5px solid #86EFAC",
+      borderRadius: 20,
+      padding: "16px",
+      marginBottom: 20,
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(10px)",
+      transition: "all .5s .6s cubic-bezier(.34,1.56,.64,1)",
+    }}>
+      {/* Header cliquable */}
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+          background: "linear-gradient(135deg,#059669,#047857)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20, boxShadow: "0 4px 12px rgba(5,150,105,.3)",
+        }}>🤝</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 14, fontWeight: 800, color: "#065F46", margin: 0 }}>Parrainez & Gagnez</p>
+          <p style={{ fontSize: 11, color: "#6B7280", margin: 0 }}>10% de commission sur chaque adhésion</p>
+        </div>
+        {totalFilleuls > 0 && (
+          <span style={{
+            background: "linear-gradient(135deg,#059669,#047857)",
+            color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700,
+            padding: "3px 10px", boxShadow: "0 2px 6px rgba(5,150,105,.4)", flexShrink: 0,
+          }}>
+            {totalFilleuls} filleul{totalFilleuls > 1 ? "s" : ""}
+          </span>
+        )}
+        <span style={{ color: "#9CA3AF", fontSize: 16, flexShrink: 0, transition: "transform .2s", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>›</span>
+      </div>
+
+      {/* Corps dépliable */}
+      {open && (
+        <div style={{ marginTop: 14 }}>
+
+          {/* Stats */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[
+              { label: "Filleuls",     val: totalFilleuls,                        color: "#059669" },
+              { label: "Comm. totale", val: `${totalComm.toLocaleString()} F`,    color: "#0891B2" },
+              { label: "En attente",   val: `${commEnAttente.toLocaleString()} F`, color: "#D97706" },
+            ].map((s, i) => (
+              <div key={i} style={{
+                flex: 1, textAlign: "center", background: "#fff",
+                borderRadius: 12, padding: "10px 6px",
+                border: "1px solid #D1FAE5", boxShadow: "0 2px 6px rgba(0,0,0,.04)",
+              }}>
+                <p style={{ fontSize: 15, fontWeight: 800, color: s.color, margin: "0 0 2px" }}>{s.val}</p>
+                <p style={{ fontSize: 9, color: "#9CA3AF", margin: 0, fontWeight: 500 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Derniers filleuls */}
+          {stats?.filleuls?.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: .8 }}>
+                Derniers filleuls
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {stats.filleuls.slice(0, 3).map((f, i) => (
+                  <div key={i} style={{
+                    background: "#fff", borderRadius: 10, padding: "10px 12px",
+                    border: "1px solid #D1FAE5", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", margin: "0 0 1px" }}>{f.name}</p>
+                      <p style={{ fontSize: 10, color: "#9CA3AF", margin: 0 }}>
+                        {f.plan} · {new Date(f.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: "#059669", margin: "0 0 1px" }}>
+                        +{(f.commission_fcfa || 0).toLocaleString()} F
+                      </p>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                        background: f.paid ? "#D1FAE5" : "#FEF3C7",
+                        color: f.paid ? "#065F46" : "#92400E",
+                      }}>
+                        {f.paid ? "Payée" : "En attente"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lien */}
+          {!link ? (
+            <button onClick={generateLink} disabled={loading} style={{
+              width: "100%", padding: "13px", borderRadius: 14,
+              background: loading ? "#D1FAE5" : "linear-gradient(135deg,#059669,#047857)",
+              color: loading ? "#6B7280" : "#fff",
+              border: "none", fontSize: 13, fontWeight: 700,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontFamily: "'Poppins',sans-serif",
+              boxShadow: loading ? "none" : "0 4px 14px rgba(5,150,105,.35)",
+              transition: "all .2s",
+            }}>
+              {loading ? "Génération en cours..." : "🔗 Obtenir mon lien de parrainage"}
+            </button>
+          ) : (
+            <div>
+              <div style={{
+                background: "#fff", borderRadius: 10, padding: "10px 12px",
+                border: "1px solid #BBF7D0", marginBottom: 10,
+                fontSize: 11, color: "#065F46", fontFamily: "monospace",
+                wordBreak: "break-all", lineHeight: 1.5,
+              }}>
+                {link.share_url}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={copy} style={{
+                  flex: 1, padding: "11px", borderRadius: 12,
+                  background: copied ? "#059669" : "#fff",
+                  color: copied ? "#fff" : "#059669",
+                  border: `1.5px solid ${copied ? "#059669" : "#86EFAC"}`,
+                  fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'Poppins',sans-serif", transition: "all .2s",
+                }}>
+                  {copied ? "✓ Copié !" : "📋 Copier"}
+                </button>
+                <button onClick={share} style={{
+                  flex: 1, padding: "11px", borderRadius: 12,
+                  background: "linear-gradient(135deg,#059669,#047857)",
+                  color: "#fff", border: "none",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'Poppins',sans-serif",
+                  boxShadow: "0 4px 10px rgba(5,150,105,.3)",
+                }}>
+                  📤 Partager
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const [profile,      setProfile]      = useState(null);
@@ -563,6 +769,9 @@ export default function ClientDashboard() {
           </button>
         ))}
       </div>
+
+      {/* ── Parrainage ─────────────────────────────────────────────── */}
+      <ParrainageWidget visible={visible} />
 
       {/* ── Agent card ─────────────────────────────────────────────── */}
       {profile.agent_name && (

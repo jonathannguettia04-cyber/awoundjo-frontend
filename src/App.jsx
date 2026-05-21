@@ -188,6 +188,11 @@ const CollectePage = lazy(() => import("./pages/collecte/CollectePage"));
 // généré par un membre Business depuis /business/parrainage
 const BusinessParrainagePage = lazy(() => import("./pages/parrainage/BusinessParrainagePage"));
 
+// ── [PARRAINAGE] Page publique Client ────────────────────────
+// Accessible sans authentification via lien de parrainage
+// généré par un client final depuis son dashboard
+const ClientParrainagePage = lazy(() => import("./pages/parrainage/ClientParrainagePage"));
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -278,11 +283,13 @@ export default function App() {
   const isBusinessPage = pathname.startsWith("/business");
   const isCnepeciPage  = pathname.startsWith("/cnepeci");
   // [COLLECTE] La page de collecte est publique — pas de navbar
-  const isCollectePage = pathname.startsWith("/collecte");
+  const isCollectePage  = pathname.startsWith("/collecte");
+  // [PARRAINAGE CLIENT] La page publique de parrainage client — pas de navbar
+  const isRejoindrePage = pathname.startsWith("/rejoindre");
 
   const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage
     && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
-    && !isCollectePage;
+    && !isCollectePage && !isRejoindrePage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -526,6 +533,15 @@ export default function App() {
             <Route path="/parrainage/:token"       element={<BusinessParrainagePage />} />
             <Route path="/parrainage/:token/merci" element={<BusinessParrainagePage />} />
             <Route path="/parrainage/:token/echec" element={<BusinessParrainagePage />} />
+
+            {/* ═══════════════════════════════════════════════
+                [PARRAINAGE] LIEN PUBLIC CLIENT — SANS AUTH
+                Généré depuis le dashboard client
+                Format : /rejoindre/:code
+            ══════════════════════════════════════════════════*/}
+            <Route path="/rejoindre/:code"       element={<ClientParrainagePage />} />
+            <Route path="/rejoindre/:code/merci" element={<ClientParrainagePage />} />
+            <Route path="/rejoindre/:code/echec" element={<ClientParrainagePage />} />
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
             <Route path="*" element={
