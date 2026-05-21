@@ -1,6 +1,5 @@
 // src/pages/client/ClientCotisations.jsx
 import { useState, useEffect } from "react";
-import { clientContribAPI } from "../../clientApi";
 
 const C = {
   primary: "#059669", primaryL: "#ECFDF5",
@@ -10,11 +9,15 @@ const C = {
   slate:   "#64748B", dark:     "#0F172A",
   border:  "#E2E8F0", bg:       "#F8FAFC",
   jeko:    "#0D9488", jekoL:    "#F0FDFA",
+  purple:  "#7C3AED", purpleL:  "#F5F3FF",
 };
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" })
+  : "—";
+const fmtShort = (d) => d
+  ? new Date(d).toLocaleDateString("fr-FR", { month:"long", year:"numeric" })
   : "—";
 
 const PLAN_PRICES = {
@@ -25,6 +28,46 @@ const PLAN_PRICES = {
 };
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LOGIQUE PAIEMENT ÉCHELONNÉ
+   ─────────────────────────────────────────────────────────────────────────
+   • La fenêtre s'ouvre dès que la cotisation du mois courant est payée
+   • Elle se referme le dernier jour du mois à 23:59:59
+   • Si la collecte n'est pas terminée à la fin du mois, le reliquat est
+     cumulé sur la collecte du mois suivant (et ainsi de suite)
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Dernier instant du mois courant */
+function endOfCurrentMonth() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+/** La fenêtre échelonnée est-elle ouverte ? */
+function isEchelonneWindowOpen(cotisations, monthly) {
+  const now = new Date();
+  const currentMonthPaid = cotisations.some(c => {
+    const d = new Date(c.paid_at || c.created_at);
+    return (c.status === "payé" || c.status === "paid") &&
+           d.getMonth()    === now.getMonth() &&
+           d.getFullYear() === now.getFullYear();
+  });
+  const beforeEndOfMonth = now <= endOfCurrentMonth();
+  return currentMonthPaid && beforeEndOfMonth;
+}
+
+/** Calcule le cumul des reliquats des mois précédents non soldés */
+function computeCarryOver(collectes) {
+  // collectes = tableau de { month (YYYY-MM), target, paid, closed }
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  return collectes
+    .filter(c => c.month < currentKey && !c.closed)
+    .reduce((sum, c) => sum + Math.max(0, c.target - c.paid), 0);
+}
+
+// ─── Composants UI ─────────────────────────────────────────────────────────
 
 function Card({ children, style = {} }) {
   return (
@@ -72,7 +115,41 @@ function statusStyle(status) {
   return                                                    { color: C.slate,  bg: C.bg,       label: status           };
 }
 
-// ── Écran bloquant si validation en cours ────────────────────────────────────
+// ── Barre de progression ──────────────────────────────────────────────────
+function ProgressBar({ value, max, color }) {
+  const pct = Math.min(100, Math.round((value / Math.max(max, 1)) * 100));
+  return (
+    <div style={{ position:"relative", height: 10, background: "#E2E8F0", borderRadius: 999, overflow:"hidden" }}>
+      <div style={{
+        position:"absolute", left:0, top:0, bottom:0,
+        width: `${pct}%`,
+        background: color,
+        borderRadius: 999,
+        transition: "width .4s ease",
+      }} />
+    </div>
+  );
+}
+
+// ── Compteur de jours restants ────────────────────────────────────────────
+function DaysRemaining() {
+  const now  = new Date();
+  const last = endOfCurrentMonth();
+  const diff = Math.ceil((last - now) / (1000 * 60 * 60 * 24));
+  const urgent = diff <= 3;
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700,
+      color: urgent ? C.red : C.gold,
+      background: urgent ? C.redL : C.goldL,
+      padding: "2px 10px", borderRadius: 999,
+    }}>
+      ⏱ {diff <= 0 ? "Dernier jour" : `Ferme dans ${diff} jour${diff > 1 ? "s" : ""}`}
+    </span>
+  );
+}
+
+// ── Écrans bloquants ──────────────────────────────────────────────────────
 function ValidationPendingScreen({ client }) {
   return (
     <div style={{ padding: "20px 16px", maxWidth: 560, margin: "0 auto" }}>
@@ -123,25 +200,407 @@ function ValidationRejectedScreen() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  SECTION PAIEMENT ÉCHELONNÉ
+// ══════════════════════════════════════════════════════════════════════════════
+function EchelonneSection({ client, monthly, collectes, onRefresh }) {
+  const now         = new Date();
+  const currentKey  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+  // Collecte du mois en cours (ou création d'une virtuelle)
+  const currentCollecte = collectes.find(c => c.month === currentKey) || {
+    month: currentKey,
+    target: monthly,
+    paid: 0,
+    closed: false,
+    carry_over: 0,
+    versements: [],
+  };
+
+  const carryOver     = computeCarryOver(collectes);
+  const totalTarget   = (currentCollecte.target || monthly) + carryOver;
+  const totalPaid     = currentCollecte.paid || 0;
+  const remaining     = Math.max(0, totalTarget - totalPaid);
+  const pct           = Math.min(100, Math.round((totalPaid / Math.max(totalTarget,1)) * 100));
+
+  const [amount,      setAmount]      = useState("");
+  const [jekoMethod,  setJekoMethod]  = useState("orange");
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+  const [success,     setSuccess]     = useState("");
+
+  const quickAmounts = [
+    Math.round(totalTarget * 0.25),
+    Math.round(totalTarget * 0.50),
+    Math.round(totalTarget * 0.75),
+    totalTarget,
+  ].filter((v, i, arr) => arr.indexOf(v) === i && v > 0 && v <= remaining);
+
+  const handlePay = async () => {
+    const val = Number(amount);
+    if (!val || val <= 0)         { setError("Entrez un montant valide."); return; }
+    if (val > remaining)          { setError(`Maximum autorisé : ${fmt(remaining)}`); return; }
+    if (val < 500)                { setError("Minimum : 500 FCFA"); return; }
+
+    setError(""); setLoading(true);
+
+    try {
+      const token = localStorage.getItem("client_token");
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          amount:       val,
+          description:  `Collecte échelonnée Awoundjô — ${fmtShort(new Date())} — ${client?.name || ""}`,
+          client_id:    client?.id    || undefined,
+          client_name:  client?.name  || "Client",
+          client_email: client?.email || "client@awoundjo.ci",
+          client_phone: client?.phone || "",
+          type:         "echelonne",
+          month:        currentKey,
+          jeko_method:  jekoMethod,
+          success_url:  `${window.location.origin}/client/cotisations?payment=success&type=echelonne`,
+          failed_url:   `${window.location.origin}/client/cotisations?payment=failed`,
+        }),
+      });
+
+      const data = await res.json();
+      const url  =
+        data?.data?.redirect_url || data?.data?.payment_url ||
+        data?.redirect_url       || data?.payment_url       || null;
+
+      if (!url) throw new Error(data?.error || "URL de paiement non reçue");
+      window.location.href = url;
+
+    } catch (e) {
+      setError(e.message || "Paiement échoué. Réessayez.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card style={{
+      marginBottom: 20,
+      border: `2px solid ${C.purple}`,
+      background: C.purpleL,
+    }}>
+      {/* Entête */}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:16 }}>
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{ fontSize:20 }}>📦</span>
+            <p style={{ margin:0, fontWeight:900, fontSize:15, color:C.dark }}>
+              Paiement Échelonné
+            </p>
+            <DaysRemaining />
+          </div>
+          <p style={{ margin:0, fontSize:12, color:C.slate }}>
+            {fmtShort(new Date())} — Fenêtre ouverte jusqu'au {fmtDate(endOfCurrentMonth())}
+          </p>
+        </div>
+        <div style={{
+          background: C.purple, color:"#fff",
+          padding:"4px 14px", borderRadius:999,
+          fontSize:11, fontWeight:700,
+        }}>
+          🟢 OUVERT
+        </div>
+      </div>
+
+      {/* Reliquat cumulé si présent */}
+      {carryOver > 0 && (
+        <div style={{
+          marginBottom:14, padding:"10px 14px",
+          background:"#FEF3C7", border:`1.5px solid ${C.gold}`,
+          borderRadius:10, display:"flex", alignItems:"center", gap:10,
+        }}>
+          <span style={{ fontSize:18 }}>⚠️</span>
+          <div>
+            <p style={{ margin:0, fontSize:12, fontWeight:800, color:C.gold }}>
+              Reliquat du mois précédent inclus
+            </p>
+            <p style={{ margin:"2px 0 0", fontSize:12, color:"#92400E" }}>
+              {fmt(carryOver)} ont été ajoutés à la collecte de ce mois.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Barre de progression */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+          <span style={{ fontSize:12, color:C.slate, fontWeight:600 }}>Progression collecte</span>
+          <span style={{ fontSize:13, fontWeight:900, color:C.purple }}>{pct}%</span>
+        </div>
+        <ProgressBar value={totalPaid} max={totalTarget} color={C.purple} />
+        <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
+          <span style={{ fontSize:12, color:C.primary, fontWeight:700 }}>
+            Versé : {fmt(totalPaid)}
+          </span>
+          <span style={{ fontSize:12, color:C.red, fontWeight:700 }}>
+            Reste : {fmt(remaining)}
+          </span>
+        </div>
+        <p style={{ margin:"4px 0 0", fontSize:11, color:C.slate, textAlign:"right" }}>
+          Objectif : {fmt(totalTarget)}
+          {carryOver > 0 && ` (dont ${fmt(carryOver)} reporté)`}
+        </p>
+      </div>
+
+      {remaining <= 0 ? (
+        /* Collecte soldée */
+        <div style={{
+          textAlign:"center", padding:"20px 0",
+          background:C.primaryL, borderRadius:12,
+          border:`1.5px solid ${C.primary}`,
+        }}>
+          <p style={{ margin:"0 0 4px", fontSize:28 }}>🎉</p>
+          <p style={{ margin:0, fontWeight:900, fontSize:15, color:C.primary }}>
+            Collecte soldée !
+          </p>
+          <p style={{ margin:"4px 0 0", fontSize:12, color:C.slate }}>
+            Vous avez atteint l'objectif de ce mois. Bravo !
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Montants rapides */}
+          {quickAmounts.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <p style={{ margin:"0 0 8px", fontSize:12, color:C.slate, fontWeight:600 }}>
+                Versements rapides
+              </p>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {quickAmounts.map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setAmount(String(v))}
+                    style={{
+                      padding:"6px 14px",
+                      background: amount === String(v) ? C.purple : "#fff",
+                      color:      amount === String(v) ? "#fff"   : C.purple,
+                      border:`1.5px solid ${C.purple}`,
+                      borderRadius:8, fontSize:12, fontWeight:700,
+                      cursor:"pointer", fontFamily:"inherit",
+                      transition:"all .15s",
+                    }}
+                  >
+                    {v === totalTarget ? "Tout solder" : fmt(v)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Champ montant libre */}
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:6 }}>
+              Montant du versement (FCFA)
+            </label>
+            <input
+              type="number"
+              min="500"
+              max={remaining}
+              value={amount}
+              onChange={e => { setAmount(e.target.value); setError(""); }}
+              placeholder={`500 – ${Number(remaining).toLocaleString("fr-FR")}`}
+              style={{
+                width:"100%", boxSizing:"border-box",
+                padding:"10px 12px", borderRadius:8,
+                border:`1.5px solid ${error ? C.red : C.purple}44`,
+                fontSize:14, fontFamily:"inherit", background:"#fff",
+                outline:"none",
+              }}
+            />
+          </div>
+
+          {/* Réseau */}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:6 }}>
+              Réseau de paiement
+            </label>
+            <select
+              value={jekoMethod}
+              onChange={e => setJekoMethod(e.target.value)}
+              disabled={loading}
+              style={{
+                width:"100%", padding:"10px 12px", borderRadius:8,
+                border:"1.5px solid #e2e8f0", fontSize:14, fontFamily:"inherit",
+                background:"#fff", cursor: loading ? "not-allowed":"pointer",
+              }}
+            >
+              <option value="orange">🟠 Orange Money</option>
+              <option value="wave">🔵 Wave</option>
+              <option value="mtn">🟡 MTN Mobile Money</option>
+              <option value="moov">🟢 Moov Money</option>
+              <option value="djamo">💜 Djamo / Carte bancaire</option>
+            </select>
+          </div>
+
+          {error && (
+            <div style={{ marginBottom:10, padding:"8px 12px", background:C.redL, borderRadius:8, border:`1px solid ${C.red}33` }}>
+              <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:600 }}>⚠️ {error}</p>
+            </div>
+          )}
+
+          <button
+            onClick={handlePay}
+            disabled={loading || !amount}
+            style={{
+              width:"100%", padding:"12px 22px",
+              background: loading || !amount
+                ? "#94a3b8"
+                : `linear-gradient(135deg,${C.purple},#6D28D9)`,
+              color:"#fff", fontWeight:900, fontSize:15,
+              border:"none", borderRadius:12,
+              cursor: loading || !amount ? "not-allowed":"pointer",
+              fontFamily:"inherit",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+              boxShadow: loading ? "none":"0 4px 16px rgba(124,58,237,.3)",
+              transition:"all .2s",
+            }}
+          >
+            {loading ? (
+              <>
+                <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
+                Redirection…
+              </>
+            ) : (
+              <>💜 Verser {amount ? fmt(Number(amount)) : "un montant"}</>
+            )}
+          </button>
+
+          {/* Historique des versements du mois */}
+          {currentCollecte.versements?.length > 0 && (
+            <div style={{ marginTop:16, paddingTop:14, borderTop:`1px solid ${C.border}` }}>
+              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:C.slate }}>
+                Versements effectués ce mois
+              </p>
+              {currentCollecte.versements.map((v, i) => (
+                <div key={i} style={{
+                  display:"flex", justifyContent:"space-between", alignItems:"center",
+                  padding:"8px 0",
+                  borderTop: i > 0 ? `1px dashed ${C.border}` : "none",
+                }}>
+                  <div>
+                    <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.dark }}>
+                      {fmtDate(v.paid_at)}
+                    </p>
+                    <p style={{ margin:"1px 0 0", fontSize:11, color:C.slate }}>
+                      {v.payment_method === "jeko" ? "💳 JEKO" : v.payment_method}
+                    </p>
+                  </div>
+                  <span style={{ fontSize:13, fontWeight:900, color:C.primary }}>
+                    +{fmt(v.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={{
+        marginTop:14, paddingTop:12, borderTop:`1px solid ${C.purple}22`,
+        display:"flex", alignItems:"flex-start", gap:8,
+      }}>
+        <span style={{ fontSize:14, flexShrink:0 }}>ℹ️</span>
+        <p style={{ margin:0, fontSize:11, color:C.slate, lineHeight:1.5 }}>
+          Versez en plusieurs fois avant la fin du mois. Tout reliquat non soldé sera
+          automatiquement ajouté à la collecte du mois suivant.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  COMPOSANT PRINCIPAL
+// ══════════════════════════════════════════════════════════════════════════════
 export default function ClientCotisations() {
   const [client,      setClient]      = useState(null);
   const [cotisations, setCotisations] = useState([]);
+  const [collectes,   setCollectes]   = useState([]); // historique échelonné
   const [loading,     setLoading]     = useState(true);
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
-  const [payStatus,   setPayStatus]   = useState(null); // "success" | "failed" | null
+  const [payStatus,   setPayStatus]   = useState(null);
   const [jekoMethod,  setJekoMethod]  = useState("orange");
+
+  const loadData = () => {
+    const token   = localStorage.getItem("client_token");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+    Promise.all([
+      fetch(`${BASE}/api/client/profile`,                { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/contributions`,          { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/collectes-echelonnees`,  { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([me, cots, col]) => {
+      setClient(me.data || me);
+      setCotisations(cots.data?.payments || []);
+      setCollectes(col.data || []);
+    }).catch(() => {
+      // ── Données de démo ───────────────────────────────────────────────
+      const now = new Date();
+      const currentKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+      const prevDate   = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevKey    = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,"0")}`;
+
+      setClient({
+        name: "Jean Koua", mutual_number: "AWJ-2024-0042",
+        plan: "IVOIRIENNE", status: "actif",
+        status_validation: "approved", status_payment: "paid",
+        monthly_amount: 15000,
+      });
+      setCotisations([
+        { id:1, created_at:"2024-12-05", amount:15000, status:"paid", paid_at:"2024-12-05", payment_method:"jeko" },
+        { id:2, created_at:"2025-01-07", amount:15000, status:"paid", paid_at:"2025-01-07", payment_method:"jeko" },
+        { id:3, created_at:"2025-02-04", amount:15000, status:"paid", paid_at:"2025-02-04", payment_method:"jeko" },
+        { id:4, created_at: now.toISOString(), amount:15000, status:"paid", paid_at: now.toISOString(), payment_method:"jeko" },
+      ]);
+      // Démo : mois précédent partiellement payé (reliquat de 6 000 FCFA)
+      setCollectes([
+        {
+          month:       prevKey,
+          target:      15000,
+          paid:        9000,
+          closed:      false,
+          carry_over:  0,
+          versements: [
+            { paid_at: prevDate.toISOString(), amount: 5000, payment_method:"jeko" },
+            { paid_at: prevDate.toISOString(), amount: 4000, payment_method:"jeko" },
+          ],
+        },
+        {
+          month:       currentKey,
+          target:      15000,
+          paid:        4000,
+          closed:      false,
+          carry_over:  6000,
+          versements: [
+            { paid_at: now.toISOString(), amount: 4000, payment_method:"jeko" },
+          ],
+        },
+      ]);
+    }).finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
     const payment = params.get("payment");
+    const type    = params.get("type");
     const tx      = params.get("tx");
 
     if (payment === "success") {
       setPayStatus("success");
       if (tx) {
         const token = localStorage.getItem("client_token");
-        fetch(`${BASE}/api/client/contributions/confirm-jeko`, {
+        const endpoint = type === "echelonne"
+          ? `${BASE}/api/client/collectes-echelonnees/confirm`
+          : `${BASE}/api/client/contributions/confirm-jeko`;
+        fetch(endpoint, {
           method:  "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body:    JSON.stringify({ transaction_id: tx }),
@@ -151,45 +610,15 @@ export default function ClientCotisations() {
       setPayStatus("failed");
     }
 
-    if (payment) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    if (payment) window.history.replaceState({}, "", window.location.pathname);
 
-    const token   = localStorage.getItem("client_token");
-    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-
-    Promise.all([
-  fetch(`${BASE}/api/client/profile`,       { headers }).then(r => r.json()),
-  fetch(`${BASE}/api/client/contributions`, { headers }).then(r => r.json()),
-]).then(([me, cots]) => {
-  setClient(me.data || me);
-  setCotisations(cots.data?.payments || []);
-}).catch(() => {
-  // Données de démo
-  setClient({
-    name: "Jean Koua", mutual_number: "AWJ-2024-0042",
-    plan: "IVOIRIENNE", status: "actif",
-    status_validation: "approved", status_payment: "paid",
-    monthly_amount: 15000,
-  });
-  setCotisations([
-    { id:1, created_at:"2024-12-05", amount:15000, status:"paid",    paid_at:"2024-12-05", payment_method:"jeko" },
-    { id:2, created_at:"2025-01-07", amount:15000, status:"paid",    paid_at:"2025-01-07", payment_method:"jeko" },
-    { id:3, created_at:"2025-02-04", amount:15000, status:"paid",    paid_at:"2025-02-04", payment_method:"jeko" },
-    { id:4, created_at:"2025-03-01", amount:15000, status:"pending", paid_at:null,         payment_method:null       },
-  ]);
-}).finally(() => setLoading(false));
+    loadData();
   }, []);
 
   if (loading) return <Loader />;
 
-  // ── Gardes validation ────────────────────────────────────────────────────
-  if (client?.status_validation === "pending") {
-    return <ValidationPendingScreen client={client} />;
-  }
-  if (client?.status_validation === "rejected") {
-    return <ValidationRejectedScreen />;
-  }
+  if (client?.status_validation === "pending")  return <ValidationPendingScreen client={client} />;
+  if (client?.status_validation === "rejected") return <ValidationRejectedScreen />;
 
   const plan    = client?.plan || "IVOIRIENNE";
   const monthly = client?.monthly_amount ?? PLAN_PRICES[plan] ?? 15000;
@@ -209,20 +638,18 @@ export default function ClientCotisations() {
 
   let monthsAhead = 0;
   if (firstPaid && paidCount > 0) {
-    const start = new Date(firstPaid.paid_at);
+    const start        = new Date(firstPaid.paid_at);
     const monthsElapsed =
       (currentYear - start.getFullYear()) * 12 + (currentMonth - start.getMonth()) + 1;
     monthsAhead = paidCount - monthsElapsed;
   }
 
-  const isUpToDate = !pending && paidCount > 0;
+  const isUpToDate         = !pending && paidCount > 0;
+  const windowOpen         = isEchelonneWindowOpen(cotisations, monthly);
 
-  // ── Déclencheur paiement JEKO ────────────────────────────────────────────
+  // ── Paiement cotisation normale ─────────────────────────────────────────
   const handlePayJeko = async () => {
-    setPayError("");
-    setPayStatus(null);
-    setPayLoading(true);
-
+    setPayError(""); setPayStatus(null); setPayLoading(true);
     try {
       const token   = localStorage.getItem("client_token");
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -247,17 +674,10 @@ export default function ClientCotisations() {
 
       const initData = await initRes.json();
       const paymentUrl =
-        initData?.data?.redirect_url ||
-        initData?.data?.payment_url  ||
-        initData?.redirect_url       ||
-        initData?.payment_url        ||
-        null;
+        initData?.data?.redirect_url || initData?.data?.payment_url ||
+        initData?.redirect_url       || initData?.payment_url       || null;
 
-      if (!paymentUrl) {
-        console.error("[ClientCotisations] JEKO réponse:", initData);
-        throw new Error(initData?.error || "URL de paiement JEKO non reçue");
-      }
-
+      if (!paymentUrl) throw new Error(initData?.error || "URL de paiement JEKO non reçue");
       window.location.href = paymentUrl;
 
     } catch (e) {
@@ -270,7 +690,7 @@ export default function ClientCotisations() {
     <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Bannière retour paiement ─────────────────────────────────── */}
+      {/* Bannières retour paiement */}
       {payStatus === "success" && (
         <div style={{
           marginBottom: 20, padding: "14px 18px", borderRadius: 12,
@@ -285,12 +705,9 @@ export default function ClientCotisations() {
             </p>
           </div>
           <button onClick={() => setPayStatus(null)}
-            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.primary }}>
-            ✕
-          </button>
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.primary }}>✕</button>
         </div>
       )}
-
       {payStatus === "failed" && (
         <div style={{
           marginBottom: 20, padding: "14px 18px", borderRadius: 12,
@@ -305,13 +722,11 @@ export default function ClientCotisations() {
             </p>
           </div>
           <button onClick={() => setPayStatus(null)}
-            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.red }}>
-            ✕
-          </button>
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.red }}>✕</button>
         </div>
       )}
 
-      {/* ── Carte identité client ───────────────────────────────── */}
+      {/* Carte identité client */}
       <Card style={{ marginBottom: 20, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
         <div>
           <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: C.dark }}>{client?.name}</p>
@@ -325,86 +740,94 @@ export default function ClientCotisations() {
         </div>
       </Card>
 
-      {/* ── Cartes résumé ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
+      {/* Cartes résumé */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { icon: "✅", label: "Total payé",    value: fmt(totalPaid),                                        color: C.primary, bg: C.primaryL },
-          { icon: "📅", label: "Mensualité",    value: fmt(monthly),                                          color: C.blue,    bg: C.blueL    },
-          { icon: "🧾", label: "Paiements",     value: `${paidCount} / ${cotisations.length}`,               color: C.gold,    bg: C.goldL    },
-          { icon: "⏩", label: "Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",
+          { icon:"✅", label:"Total payé",    value: fmt(totalPaid),                                       color:C.primary, bg:C.primaryL },
+          { icon:"📅", label:"Mensualité",    value: fmt(monthly),                                         color:C.blue,    bg:C.blueL    },
+          { icon:"🧾", label:"Paiements",     value: `${paidCount} / ${cotisations.length}`,              color:C.gold,    bg:C.goldL    },
+          { icon:"⏩", label:"Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",
             color: monthsAhead > 0 ? C.primary : C.slate,
             bg:    monthsAhead > 0 ? C.primaryL : C.bg },
         ].map(s => (
-          <Card key={s.label} style={{ textAlign: "center", padding: "16px 12px" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 28 }}>{s.icon}</p>
-            <p style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 900, color: s.color }}>{s.value}</p>
-            <p style={{ margin: 0, fontSize: 11, color: C.slate, fontWeight: 600 }}>{s.label}</p>
+          <Card key={s.label} style={{ textAlign:"center", padding:"16px 12px" }}>
+            <p style={{ margin:"0 0 4px", fontSize:28 }}>{s.icon}</p>
+            <p style={{ margin:"0 0 2px", fontSize:16, fontWeight:900, color:s.color }}>{s.value}</p>
+            <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>{s.label}</p>
           </Card>
         ))}
       </div>
 
-      {/* ── Bloc paiement — JEKO ──────────────────── */}
+      {/* ════ SECTION PAIEMENT ÉCHELONNÉ (si fenêtre ouverte) ════ */}
+      {windowOpen && (
+        <EchelonneSection
+          client={client}
+          monthly={monthly}
+          collectes={collectes}
+          onRefresh={loadData}
+        />
+      )}
+
+      {/* ════ BLOC PAIEMENT COTISATION NORMALE ════ */}
       <Card style={{
         marginBottom: 20,
         border: `2px solid ${isUpToDate ? C.primary : C.jeko}`,
         background: isUpToDate ? C.primaryL : C.jekoL,
       }}>
-
-        {/* Montant + badge à jour */}
-        <div style={{ marginBottom: 14 }}>
-          <p style={{ margin: "0 0 4px", fontSize: 13, color: C.slate, fontWeight: 600 }}>
+        <div style={{ marginBottom:14 }}>
+          <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate, fontWeight:600 }}>
             {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "COTISATION EN COURS"}
           </p>
 
           {isUpToDate && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, borderRadius: 20, padding: "4px 12px", marginBottom: 8 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>À JOUR</span>
+            <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:C.primary, borderRadius:20, padding:"4px 12px", marginBottom:8 }}>
+              <span style={{ width:7, height:7, borderRadius:"50%", background:"#fff", display:"inline-block" }} />
+              <span style={{ fontSize:11, fontWeight:700, color:"#fff" }}>À JOUR</span>
             </div>
           )}
 
           {pending && (
-            <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 900, color: C.dark }}>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:900, color:C.dark }}>
               {fmtDate(pending.createdAt)}
             </p>
           )}
 
-          <p style={{ margin: 0, fontSize: 22, fontWeight: 900, color: isUpToDate ? C.primary : C.jeko }}>
+          <p style={{ margin:0, fontSize:22, fontWeight:900, color: isUpToDate ? C.primary : C.jeko }}>
             {fmt(pending?.amount || monthly)}
           </p>
 
           {monthsAhead > 0 && (
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: C.primary, fontWeight: 600 }}>
+            <p style={{ margin:"6px 0 0", fontSize:12, color:C.primary, fontWeight:600 }}>
               ⏩ Vous êtes en avance de <strong>{monthsAhead} mois</strong>
             </p>
           )}
         </div>
 
-        {/* ── Info JEKO ─────────────────────────────────────────── */}
-        <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Info JEKO */}
+        <div style={{ marginBottom:14, display:"flex", alignItems:"center", gap:10 }}>
           <div style={{
-            background: C.jeko, borderRadius: 8,
-            padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6,
+            background:C.jeko, borderRadius:8,
+            padding:"6px 14px", display:"inline-flex", alignItems:"center", gap:6,
           }}>
-            <span style={{ fontSize: 14 }}>💳</span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>JEKO</span>
+            <span style={{ fontSize:14 }}>💳</span>
+            <span style={{ fontSize:12, fontWeight:800, color:"#fff" }}>JEKO</span>
           </div>
-          <span style={{ fontSize: 12, color: C.slate }}>Orange · Wave · MTN · Moov · Carte</span>
+          <span style={{ fontSize:12, color:C.slate }}>Orange · Wave · MTN · Moov · Carte</span>
         </div>
 
-        {/* ── Sélecteur réseau JEKO ────────────────────────────────── */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: C.slate, display: "block", marginBottom: 6 }}>
+        {/* Sélecteur réseau */}
+        <div style={{ marginBottom:14 }}>
+          <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:6 }}>
             Réseau de paiement
           </label>
           <select
             value={jekoMethod}
-            onChange={(e) => setJekoMethod(e.target.value)}
+            onChange={e => setJekoMethod(e.target.value)}
             disabled={payLoading}
             style={{
-              width: "100%", padding: "10px 12px", borderRadius: 8,
-              border: "1.5px solid #e2e8f0", fontSize: 14, fontFamily: "inherit",
-              background: "#fff", cursor: payLoading ? "not-allowed" : "pointer",
+              width:"100%", padding:"10px 12px", borderRadius:8,
+              border:"1.5px solid #e2e8f0", fontSize:14, fontFamily:"inherit",
+              background:"#fff", cursor: payLoading ? "not-allowed":"pointer",
             }}
           >
             <option value="orange">🟠 Orange Money</option>
@@ -415,25 +838,24 @@ export default function ClientCotisations() {
           </select>
         </div>
 
-        {/* ── Bouton payer ─────────────────────────────────────────── */}
+        {/* Bouton payer */}
         <button
           onClick={handlePayJeko}
           disabled={payLoading}
           style={{
-            width: "100%",
-            padding: "13px 22px",
+            width:"100%", padding:"13px 22px",
             background: payLoading
               ? "#94a3b8"
               : isUpToDate
                 ? "linear-gradient(135deg,#059669,#047857)"
                 : "linear-gradient(135deg,#0D9488,#0f766e)",
-            color: "#fff", fontWeight: 900, fontSize: 15,
-            border: "none", borderRadius: 12,
-            cursor: payLoading ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            boxShadow: payLoading ? "none" : "0 4px 16px rgba(0,0,0,.18)",
-            transition: "all .2s",
+            color:"#fff", fontWeight:900, fontSize:15,
+            border:"none", borderRadius:12,
+            cursor: payLoading ? "not-allowed":"pointer",
+            fontFamily:"inherit",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+            boxShadow: payLoading ? "none":"0 4px 16px rgba(0,0,0,.18)",
+            transition:"all .2s",
           }}
         >
           {payLoading ? (
@@ -442,9 +864,7 @@ export default function ClientCotisations() {
               Redirection en cours…
             </>
           ) : (
-            <>
-              💳 {isUpToDate ? "Payer en avance" : "Payer avec JEKO"}
-            </>
+            <>💳 {isUpToDate ? "Payer en avance" : "Payer avec JEKO"}</>
           )}
         </button>
 
@@ -455,12 +875,11 @@ export default function ClientCotisations() {
         )}
 
         <div style={{
-          marginTop: 14, paddingTop: 12,
-          borderTop: `1px solid ${C.border}`,
-          display: "flex", alignItems: "center", gap: 8,
+          marginTop:14, paddingTop:12, borderTop:`1px solid ${C.border}`,
+          display:"flex", alignItems:"center", gap:8,
         }}>
-          <span style={{ fontSize: 14 }}>ℹ️</span>
-          <p style={{ margin: 0, fontSize: 12, color: C.slate }}>
+          <span style={{ fontSize:14 }}>ℹ️</span>
+          <p style={{ margin:0, fontSize:12, color:C.slate }}>
             {isUpToDate
               ? "Votre cotisation est à jour. Vous pouvez payer des mois à l'avance pour rester serein."
               : "Vous serez redirigé vers la page de paiement sécurisée. Paiement 100% sécurisé."
@@ -469,57 +888,56 @@ export default function ClientCotisations() {
         </div>
       </Card>
 
-      {/* ── Historique des cotisations ──────────────────────── */}
+      {/* Historique des cotisations */}
       <Card>
-        <p style={{ margin: "0 0 16px", fontWeight: 800, fontSize: 15, color: C.dark }}>
+        <p style={{ margin:"0 0 16px", fontWeight:800, fontSize:15, color:C.dark }}>
           📋 Historique des paiements
         </p>
 
         {cotisations.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 0" }}>
-            <p style={{ fontSize: 36, margin: "0 0 10px" }}>🧾</p>
-            <p style={{ margin: 0, color: C.slate, fontSize: 14 }}>Aucun historique disponible</p>
+          <div style={{ textAlign:"center", padding:"32px 0" }}>
+            <p style={{ fontSize:36, margin:"0 0 10px" }}>🧾</p>
+            <p style={{ margin:0, color:C.slate, fontSize:14 }}>Aucun historique disponible</p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
             {cotisations.map((cot, i) => {
-              const s = statusStyle(cot.status);
+              const s         = statusStyle(cot.status);
               const isPending = cot.status === "attente" || cot.status === "pending";
               return (
                 <div
                   key={cot.id || i}
                   style={{
-                    display: "flex", alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 4px",
+                    display:"flex", alignItems:"center",
+                    justifyContent:"space-between",
+                    padding:"14px 4px",
                     borderTop: i > 0 ? `1px solid ${C.border}` : "none",
-                    flexWrap: "wrap", gap: 10,
+                    flexWrap:"wrap", gap:10,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                     <div style={{
-                      width: 40, height: 40, borderRadius: 10,
+                      width:40, height:40, borderRadius:10,
                       background: isPending ? C.goldL : C.primaryL,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 18, flexShrink: 0,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontSize:18, flexShrink:0,
                     }}>
                       {isPending ? "⏳" : "✅"}
                     </div>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.dark }}>
-                        {fmtDate(cot.createdAt)}
+                      <p style={{ margin:0, fontWeight:700, fontSize:14, color:C.dark }}>
+                        {fmtDate(cot.createdAt || cot.created_at)}
                       </p>
-                      <p style={{ margin: "2px 0 0", fontSize: 11, color: C.slate }}>
+                      <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
                         {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
                         {cot.payment_method === "jeko" && (
-                          <span style={{ marginLeft: 6, color: C.jeko, fontWeight: 700 }}>· 💳 JEKO</span>
+                          <span style={{ marginLeft:6, color:C.jeko, fontWeight:700 }}>· 💳 JEKO</span>
                         )}
                       </p>
                     </div>
                   </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, color: isPending ? C.gold : C.primary }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:15, fontWeight:900, color: isPending ? C.gold : C.primary }}>
                       {fmt(cot.amount || monthly)}
                     </span>
                     <Badge label={s.label} color={s.color} bg={s.bg} />
@@ -528,13 +946,13 @@ export default function ClientCotisations() {
                         onClick={handlePayJeko}
                         disabled={payLoading}
                         style={{
-                          padding: "6px 14px",
-                          background: "linear-gradient(135deg,#0D9488,#0f766e)",
-                          color: "#fff", fontWeight: 700, fontSize: 12,
-                          border: "none", borderRadius: 8,
-                          cursor: payLoading ? "not-allowed" : "pointer",
-                          fontFamily: "inherit",
-                          display: "flex", alignItems: "center", gap: 6,
+                          padding:"6px 14px",
+                          background:"linear-gradient(135deg,#0D9488,#0f766e)",
+                          color:"#fff", fontWeight:700, fontSize:12,
+                          border:"none", borderRadius:8,
+                          cursor: payLoading ? "not-allowed":"pointer",
+                          fontFamily:"inherit",
+                          display:"flex", alignItems:"center", gap:6,
                         }}
                       >
                         💳 Payer
@@ -548,7 +966,65 @@ export default function ClientCotisations() {
         )}
       </Card>
 
-      <p style={{ textAlign: "center", fontSize: 12, color: C.slate, marginTop: 20 }}>
+      {/* Historique collectes échelonnées */}
+      {collectes.length > 0 && (
+        <Card style={{ marginTop:20 }}>
+          <p style={{ margin:"0 0 16px", fontWeight:800, fontSize:15, color:C.dark }}>
+            📦 Historique des collectes échelonnées
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+            {[...collectes].reverse().map((col, i) => {
+              const pct  = Math.min(100, Math.round(((col.paid||0) / Math.max(col.target||1,1)) * 100));
+              const done = col.paid >= col.target;
+              return (
+                <div key={col.month || i} style={{
+                  padding:"14px 4px",
+                  borderTop: i > 0 ? `1px solid ${C.border}` : "none",
+                }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <div style={{
+                        width:36, height:36, borderRadius:10,
+                        background: done ? C.primaryL : C.purpleL,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:16, flexShrink:0,
+                      }}>
+                        {done ? "✅" : "📦"}
+                      </div>
+                      <div>
+                        <p style={{ margin:0, fontWeight:700, fontSize:13, color:C.dark }}>
+                          {col.month ? new Date(col.month + "-01").toLocaleDateString("fr-FR", { month:"long", year:"numeric" }) : "—"}
+                        </p>
+                        {col.carry_over > 0 && (
+                          <p style={{ margin:"1px 0 0", fontSize:11, color:C.gold, fontWeight:600 }}>
+                            +{fmt(col.carry_over)} reporté du mois préc.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <p style={{ margin:0, fontSize:13, fontWeight:900, color: done ? C.primary : C.purple }}>
+                        {fmt(col.paid || 0)} / {fmt(col.target || 0)}
+                      </p>
+                      <span style={{
+                        fontSize:11, fontWeight:700,
+                        color: done ? C.primary : C.purple,
+                        background: done ? C.primaryL : C.purpleL,
+                        padding:"2px 8px", borderRadius:999,
+                      }}>
+                        {done ? "Soldé ✅" : `${pct}% versé`}
+                      </span>
+                    </div>
+                  </div>
+                  <ProgressBar value={col.paid||0} max={col.target||1} color={done ? C.primary : C.purple} />
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      <p style={{ textAlign:"center", fontSize:12, color:C.slate, marginTop:20 }}>
         🔒 Paiements sécurisés via JEKO · Awoundjô Mutuelle Santé CI<br />
         En cas de problème : <strong>+225 01 71 72 16 68</strong>
       </p>
