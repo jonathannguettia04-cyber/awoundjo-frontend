@@ -225,7 +225,6 @@ function EchelonneSection({ client, monthly, collectes, onRefresh, windowOpen = 
 
   const [amount,      setAmount]      = useState("");
   const [jekoMethod,  setJekoMethod]  = useState("orange");
-  const [windowOpen,  setWindowOpen]  = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState("");
   const [success,     setSuccess]     = useState("");
@@ -249,21 +248,14 @@ function EchelonneSection({ client, monthly, collectes, onRefresh, windowOpen = 
       const token = localStorage.getItem("client_token");
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-      const res = await fetch(`${BASE}/api/payments/jeko/init`, {
+      const res = await fetch(`${BASE}/api/client/collectes-echelonnees/verser`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          amount:       val,
-          description:  `Collecte échelonnée Awoundjô — ${fmtShort(new Date())} — ${client?.name || ""}`,
-          client_id:    client?.id    || undefined,
-          client_name:  client?.name  || "Client",
-          client_email: client?.email || "client@awoundjo.ci",
-          client_phone: client?.phone || "",
-          type:         "echelonne",
-          month:        currentKey,
-          jeko_method:  jekoMethod,
-          success_url:  `${window.location.origin}/client/cotisations?payment=success&type=echelonne`,
-          failed_url:   `${window.location.origin}/client/cotisations?payment=failed`,
+          amount:      val,
+          jeko_method: jekoMethod,
+          success_url: `${window.location.origin}/client/cotisations?payment=success&type=echelonne&tx=`,
+          failed_url:  `${window.location.origin}/client/cotisations?payment=failed`,
         }),
       });
 
