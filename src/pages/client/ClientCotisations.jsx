@@ -63,7 +63,7 @@ function computeCarryOver(collectes) {
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
   return collectes
-    .filter(c => c.month < currentKey && !c.closed)
+    .filter(c => (c.collecte_month || c.month) < currentKey && !c.closed)
     .reduce((sum, c) => sum + Math.max(0, c.target - c.paid), 0);
 }
 
@@ -208,7 +208,7 @@ function EchelonneSection({ client, monthly, collectes, onRefresh }) {
   const currentKey  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
 
   // Collecte du mois en cours (ou création d'une virtuelle)
-  const currentCollecte = collectes.find(c => c.month === currentKey) || {
+  const currentCollecte = collectes.find(c => (c.collecte_month || c.month) === currentKey) || {
     month: currentKey,
     target: monthly,
     paid: 0,
@@ -524,6 +524,7 @@ export default function ClientCotisations() {
   const [client,      setClient]      = useState(null);
   const [cotisations, setCotisations] = useState([]);
   const [collectes,   setCollectes]   = useState([]); // historique échelonné
+  const [windowOpen,  setWindowOpen]  = useState(false); // fenêtre paiement échelonné
   const [loading,     setLoading]     = useState(true);
   const [payLoading,  setPayLoading]  = useState(false);
   const [payError,    setPayError]    = useState("");
@@ -996,7 +997,7 @@ export default function ClientCotisations() {
               const pct  = Math.min(100, Math.round(((col.paid||0) / Math.max(col.target||1,1)) * 100));
               const done = col.paid >= col.target;
               return (
-                <div key={col.month || i} style={{
+                <div key={(col.collecte_month || col.month) || i} style={{
                   padding:"14px 4px",
                   borderTop: i > 0 ? `1px solid ${C.border}` : "none",
                 }}>
@@ -1012,7 +1013,7 @@ export default function ClientCotisations() {
                       </div>
                       <div>
                         <p style={{ margin:0, fontWeight:700, fontSize:13, color:C.dark }}>
-                          {col.month ? new Date(col.month + "-01").toLocaleDateString("fr-FR", { month:"long", year:"numeric" }) : "—"}
+                          {(col.collecte_month || col.month) ? new Date((col.collecte_month || col.month) + "-01").toLocaleDateString("fr-FR", { month:"long", year:"numeric" }) : "—"}
                         </p>
                         {col.carry_over > 0 && (
                           <p style={{ margin:"1px 0 0", fontSize:11, color:C.gold, fontWeight:600 }}>
