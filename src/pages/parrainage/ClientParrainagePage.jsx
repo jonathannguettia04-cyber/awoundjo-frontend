@@ -146,6 +146,11 @@ export default function ClientParrainagePage() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [methode,      setMethode]      = useState("orange");
 
+  // ── Paiement échelonné ───────────────────────────────────
+  const [echelonne,      setEchelonne]      = useState(false);
+  const [montantInitial, setMontantInitial] = useState("");
+  const [montantError,   setMontantError]   = useState(null);
+
   // ── Soumission ────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [feedback,   setFeedback]   = useState(null);
@@ -190,6 +195,22 @@ export default function ClientParrainagePage() {
   // ── Inscription + redirection Jeko ───────────────────────
   async function handleInscrireEtPayer() {
     if (!selectedPlan || !methode) return;
+
+    // Validation montant échelonné
+    if (echelonne) {
+      const mi = Number(montantInitial);
+      if (!montantInitial || isNaN(mi) || mi < 500) {
+        setMontantError("Montant minimum : 500 FCFA");
+        return;
+      }
+      const adhesion = Number(selectedPlan.adhesion_price) || 0;
+      if (mi > adhesion) {
+        setMontantError(`Maximum : ${fcfa(adhesion)} (prix d'adhésion)`);
+        return;
+      }
+      setMontantError(null);
+    }
+
     setSubmitting(true);
     setFeedback(null);
 
@@ -199,11 +220,13 @@ export default function ClientParrainagePage() {
       const res = await apiFetch(`/api/client/parrainage/${code}/inscrire`, {
         method: "POST",
         body: JSON.stringify({
-          name:        form.name.trim(),
-          phone:       form.phone.trim(),
-          city:        form.city.trim() || undefined,
-          plan_slug:   selectedPlan.slug,
-          jeko_method: methode,
+          name:               form.name.trim(),
+          phone:              form.phone.trim(),
+          city:               form.city.trim() || undefined,
+          plan_slug:          selectedPlan.slug,
+          jeko_method:        methode,
+          paiement_echelonne: echelonne,
+          montant_initial:    echelonne ? Number(montantInitial) : undefined,
           success_url: `${BASE}/rejoindre/${code}/merci`,
           failure_url: `${BASE}/rejoindre/${code}/echec`,
         }),
@@ -379,6 +402,89 @@ export default function ClientParrainagePage() {
                 </div>
               )}
 
+              {/* ── Toggle paiement échelonné ─────────────── */}
+              {selectedPlan && Number(selectedPlan.adhesion_price) > 0 && (
+                <div style={{
+                  border: `1.5px solid ${echelonne ? "#00875A" : "#E5E7EB"}`,
+                  borderRadius: 10, overflow: "hidden", transition: "border-color .2s",
+                }}>
+                  <div
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "12px 14px", cursor: "pointer",
+                      background: echelonne ? "#E6F6F0" : "#FAFAFA", transition: "background .2s",
+                    }}
+                    onClick={() => { setEchelonne(e => !e); setMontantError(null); }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1A2E" }}>
+                        💰 Paiement échelonné
+                      </span>
+                      <span style={{ fontSize: 11, color: "#6B7280" }}>
+                        Commencez à partir de 500 FCFA, payez le reste à votre rythme
+                      </span>
+                    </div>
+                    <div style={{
+                      width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+                      background: echelonne ? "#00875A" : "#E5E7EB",
+                      position: "relative", transition: "background .2s",
+                    }}>
+                      <div style={{
+                        position: "absolute", top: 3,
+                        left: echelonne ? 23 : 3,
+                        width: 18, height: 18, borderRadius: "50%",
+                        background: "#fff", transition: "left .2s",
+                        boxShadow: "0 1px 4px rgba(0,0,0,.2)",
+                      }} />
+                    </div>
+                  </div>
+
+                  {echelonne && (
+                    <div style={{ padding: "12px 14px", borderTop: "1px solid #E5E7EB", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: "#1A1A2E" }}>
+                        Montant à payer aujourd'hui <span style={{ color: "#C0392B" }}>*</span>
+                      </label>
+                      <div style={{ position: "relative" }}>
+                        <input
+                          type="number"
+                          min="500"
+                          max={Number(selectedPlan.adhesion_price) || 99999}
+                          value={montantInitial}
+                          onChange={e => { setMontantInitial(e.target.value); setMontantError(null); }}
+                          placeholder="Ex : 5000"
+                          style={{
+                            width: "100%", padding: "10px 60px 10px 14px",
+                            border: `1.5px solid ${montantError ? "#C0392B" : "#00875A"}`,
+                            borderRadius: 8, fontSize: 14, outline: "none",
+                            fontFamily: "'DM Sans', sans-serif", color: "#1A1A2E",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        <span style={{
+                          position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                          fontSize: 12, color: "#6B7280", fontWeight: 600,
+                        }}>FCFA</span>
+                      </div>
+                      {montantError && (
+                        <span style={{ fontSize: 11, color: "#C0392B" }}>⚠ {montantError}</span>
+                      )}
+                      {montantInitial && !isNaN(Number(montantInitial)) && Number(montantInitial) >= 500 && (
+                        <div style={{
+                          background: "#F0FDF4", border: "1px solid #BBF7D0",
+                          borderRadius: 8, padding: "8px 12px",
+                          display: "flex", justifyContent: "space-between", fontSize: 12,
+                        }}>
+                          <span style={{ color: "#6B7280" }}>Reste à payer après :</span>
+                          <strong style={{ color: "#006644" }}>
+                            {fcfa(Math.max(0, (Number(selectedPlan.adhesion_price) || 0) - Number(montantInitial)))}
+                          </strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Méthode de paiement */}
               <p className="cp-step-title">Choisissez votre moyen de paiement</p>
               <div className="cp-methodes-grid">
@@ -408,7 +514,9 @@ export default function ClientParrainagePage() {
               >
                 {submitting
                   ? <><span className="cp-spinner" /> Création du dossier…</>
-                  : <>💳 S'inscrire et payer maintenant</>}
+                  : echelonne
+                    ? <>💰 S'inscrire et payer {montantInitial ? fcfa(montantInitial) : "un premier versement"}</>
+                    : <>💳 S'inscrire et payer maintenant</>}
               </button>
 
               <p className="cp-legal">
