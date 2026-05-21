@@ -225,6 +225,7 @@ function EchelonneSection({ client, monthly, collectes, onRefresh }) {
 
   const [amount,      setAmount]      = useState("");
   const [jekoMethod,  setJekoMethod]  = useState("orange");
+  const [windowOpen,  setWindowOpen]  = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState("");
   const [success,     setSuccess]     = useState("");
@@ -534,13 +535,30 @@ export default function ClientCotisations() {
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
     Promise.all([
-      fetch(`${BASE}/api/client/profile`,                { headers }).then(r => r.json()),
-      fetch(`${BASE}/api/client/contributions`,          { headers }).then(r => r.json()),
-      fetch(`${BASE}/api/client/collectes-echelonnees`,  { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      fetch(`${BASE}/api/client/profile`,       { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/contributions`, { headers }).then(r => r.json()),
+      fetch(`${BASE}/api/client/collectes-echelonnees`, { headers })
+        .then(r => r.json())
+        .catch(() => ({ data: [], window_open: false })),
     ]).then(([me, cots, col]) => {
+      const payments = cots.data?.payments || [];
       setClient(me.data || me);
-      setCotisations(cots.data?.payments || []);
+      setCotisations(payments);
       setCollectes(col.data || []);
+
+      // window_open vient du backend OU calculé localement depuis les paiements
+      if (typeof col.window_open === "boolean") {
+        setWindowOpen(col.window_open);
+      } else {
+        const n = new Date();
+        const cotMoisPaye = payments.some(c => {
+          const d = new Date(c.paid_at || c.created_at);
+          return (c.status === "payé" || c.status === "paid") &&
+                 d.getMonth()    === n.getMonth() &&
+                 d.getFullYear() === n.getFullYear();
+        });
+        setWindowOpen(cotMoisPaye);
+      }
     }).catch(() => {
       // ── Données de démo ───────────────────────────────────────────────
       const now = new Date();
@@ -584,6 +602,7 @@ export default function ClientCotisations() {
           ],
         },
       ]);
+      setWindowOpen(true); // démo : fenêtre toujours ouverte
     }).finally(() => setLoading(false));
   };
 
@@ -645,7 +664,7 @@ export default function ClientCotisations() {
   }
 
   const isUpToDate         = !pending && paidCount > 0;
-  const windowOpen         = isEchelonneWindowOpen(cotisations, monthly);
+  // windowOpen est géré par le state (mis à jour dans loadData)
 
   // ── Paiement cotisation normale ─────────────────────────────────────────
   const handlePayJeko = async () => {
