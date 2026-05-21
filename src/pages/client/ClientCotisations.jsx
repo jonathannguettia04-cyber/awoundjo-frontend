@@ -203,7 +203,7 @@ function ValidationRejectedScreen() {
 // ══════════════════════════════════════════════════════════════════════════════
 //  SECTION PAIEMENT ÉCHELONNÉ
 // ══════════════════════════════════════════════════════════════════════════════
-function EchelonneSection({ client, monthly, collectes, onRefresh }) {
+function EchelonneSection({ client, monthly, collectes, onRefresh, windowOpen = true }) {
   const now         = new Date();
   const currentKey  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
 
@@ -284,8 +284,8 @@ function EchelonneSection({ client, monthly, collectes, onRefresh }) {
   return (
     <Card style={{
       marginBottom: 20,
-      border: `2px solid ${C.purple}`,
-      background: C.purpleL,
+      border: `2px solid ${windowOpen ? C.purple : C.slate}`,
+      background: windowOpen ? C.purpleL : C.bg,
     }}>
       {/* Entête */}
       <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:16 }}>
@@ -302,11 +302,11 @@ function EchelonneSection({ client, monthly, collectes, onRefresh }) {
           </p>
         </div>
         <div style={{
-          background: C.purple, color:"#fff",
+          background: windowOpen ? C.purple : C.slate, color:"#fff",
           padding:"4px 14px", borderRadius:999,
           fontSize:11, fontWeight:700,
         }}>
-          🟢 OUVERT
+          {windowOpen ? "🟢 OUVERT" : "🔴 FERMÉ"}
         </div>
       </div>
 
@@ -350,7 +350,22 @@ function EchelonneSection({ client, monthly, collectes, onRefresh }) {
         </p>
       </div>
 
-      {remaining <= 0 ? (
+      {!windowOpen ? (
+        /* Fenêtre fermée : message explicatif */
+        <div style={{
+          textAlign:"center", padding:"20px 16px",
+          background:"#F8FAFC", borderRadius:12,
+          border:`1.5px dashed ${C.slate}44`,
+        }}>
+          <p style={{ margin:"0 0 6px", fontSize:22 }}>🔒</p>
+          <p style={{ margin:"0 0 6px", fontWeight:800, fontSize:14, color:C.dark }}>
+            Fenêtre de versement fermée
+          </p>
+          <p style={{ margin:0, fontSize:12, color:C.slate, lineHeight:1.6 }}>
+            La fenêtre s'ouvre automatiquement dès que votre cotisation du mois en cours est payée, et reste disponible jusqu'au dernier jour du mois.
+          </p>
+        </div>
+      ) : remaining <= 0 ? (
         /* Collecte soldée */
         <div style={{
           textAlign:"center", padding:"20px 0",
@@ -778,15 +793,14 @@ export default function ClientCotisations() {
         ))}
       </div>
 
-      {/* ════ SECTION PAIEMENT ÉCHELONNÉ (si fenêtre ouverte) ════ */}
-      {windowOpen && (
-        <EchelonneSection
-          client={client}
-          monthly={monthly}
-          collectes={collectes}
-          onRefresh={loadData}
-        />
-      )}
+      {/* ════ SECTION PAIEMENT ÉCHELONNÉ (toujours visible) ════ */}
+      <EchelonneSection
+        client={client}
+        monthly={monthly}
+        collectes={collectes}
+        onRefresh={loadData}
+        windowOpen={windowOpen}
+      />
 
       {/* ════ BLOC PAIEMENT COTISATION NORMALE ════ */}
       <Card style={{
