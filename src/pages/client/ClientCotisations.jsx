@@ -694,7 +694,7 @@ export default function ClientCotisations() {
           client_phone: client?.phone || "",
           type:         "mensualite",
           jeko_method:  jekoMethod,
-          success_url:  `${window.location.origin}/client/cotisations?payment=success`,
+          success_url:  `${window.location.origin}/client/cotisations?payment=success&tx=`,
           failed_url:   `${window.location.origin}/client/cotisations?payment=failed`,
         }),
       });
@@ -955,7 +955,12 @@ export default function ClientCotisations() {
                         {fmtDate(cot.createdAt || cot.created_at)}
                       </p>
                       <p style={{ margin:"2px 0 0", fontSize:11, color:C.slate }}>
-                        {cot.paid_at ? `Payé le ${fmtDate(cot.paid_at)}` : "Non payé"}
+                        {cot.paid_at
+                          ? `Payé le ${fmtDate(cot.paid_at)}`
+                          : (cot.status === "payé" || cot.status === "paid")
+                            ? "Payé ✓"
+                            : "Non payé"
+                        }
                         {cot.payment_method === "jeko" && (
                           <span style={{ marginLeft:6, color:C.jeko, fontWeight:700 }}>· 💳 JEKO</span>
                         )}
