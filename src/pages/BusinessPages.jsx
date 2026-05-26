@@ -2140,7 +2140,7 @@ function NouvelleCollecteModal({ onClose, onCreated }) {
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), city: city.trim() || undefined, plan_slug: selectedPlan.slug }),
       });
       setStep(2);
-      onCreated?.();
+      // onCreated appelé à la fermeture (step 2) pour ne pas fermer la modal prématurément
     } catch (e) {
       setError(e?.error || e?.message || "Erreur lors de la création.");
     } finally { setLoading(false); }
@@ -2220,7 +2220,7 @@ function NouvelleCollecteModal({ onClose, onCreated }) {
               </button>
             </>
           )}
-          {step === 2 && <button onClick={onClose} style={{ ...btnPrimary, width: "100%" }}>Fermer</button>}
+          {step === 2 && <button onClick={() => { onCreated?.(); onClose(); }} style={{ ...btnPrimary, width: "100%" }}>Fermer</button>}
         </div>
       </div>
     </div>
@@ -2555,6 +2555,13 @@ export function BizCollectesPage() {
           client={collecteClient}
           onClose={() => setCollecteClient(null)}
           onCompleted={() => { setCollecteClient(null); load(); }}
+        />
+      )}
+
+      {lienClient && (
+        <CollecteLienModal
+          client={lienClient}
+          onClose={() => setLienClient(null)}
         />
       )}
     </BizLayout>
