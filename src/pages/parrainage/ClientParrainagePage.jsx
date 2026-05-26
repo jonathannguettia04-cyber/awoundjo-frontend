@@ -129,6 +129,7 @@ export default function ClientParrainagePage() {
   const mutualNumber   = searchParams.get("m");
   const accessCode     = searchParams.get("ac");  // affiché sur la page succès
   const paymentFailed  = searchParams.get("client");
+  const txParam        = searchParams.get("tx");  // tx retourné par Jeko
 
   // ── Données initiales ─────────────────────────────────────
   const [pageData, setPageData] = useState(null);
@@ -137,6 +138,12 @@ export default function ClientParrainagePage() {
 
   // ── Étapes ────────────────────────────────────────────────
   const [step, setStep] = useState("infos");
+
+  // ── Accès récupérés depuis le backend après paiement ─────
+  const [merciData,      setMerciData]      = useState(null);
+  const [merciLoading,   setMerciLoading]   = useState(false);
+  const [merciAttempts,  setMerciAttempts]  = useState(0);
+  const [copied,         setCopied]         = useState(null);
 
   // ── Formulaire ────────────────────────────────────────────
   const [form,       setForm]       = useState({ name: "", phone: "", city: "" });
@@ -176,7 +183,45 @@ export default function ClientParrainagePage() {
   useEffect(() => {
     if (mutualNumber)  setStep("success");
     if (paymentFailed) setStep("echec");
-  }, [mutualNumber, paymentFailed]);
+    if (txParam && !mutualNumber) setStep("success");
+  }, [mutualNumber, paymentFailed, txParam]);
+
+  // ── Récupérer les accès depuis le backend (polling) ──────
+  useEffect(() => {
+    if (!txParam || merciData) return;
+    let cancelled = false;
+
+    async function fetchMerciData() {
+      setMerciLoading(true);
+      try {
+        const res = await apiFetch(`/api/client/parrainage/merci-data?tx=${txParam}`);
+        if (!cancelled && res.success && res.data?.mutual_number) {
+          setMerciData(res.data);
+          setMerciLoading(false);
+        } else if (!cancelled && res.pending && merciAttempts < 8) {
+          // Retry après 3s si paiement encore en traitement
+          setTimeout(() => {
+            if (!cancelled) setMerciAttempts(n => n + 1);
+          }, 3000);
+        } else {
+          setMerciLoading(false);
+        }
+      } catch {
+        if (!cancelled) setMerciLoading(false);
+      }
+    }
+
+    fetchMerciData();
+    return () => { cancelled = true; };
+  }, [txParam, merciAttempts]);
+
+  // ── Copier dans le presse-papier ─────────────────────────
+  function copyToClipboard(text, key) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
 
   // ── Validation étape 1 ────────────────────────────────────
   function validateForm() {
@@ -537,41 +582,93 @@ export default function ClientParrainagePage() {
               </div>
               <p className="cp-success-title">Bienvenue dans la mutuelle Awoundjô ! 🎉</p>
               <p className="cp-success-body">
-                Votre paiement a bien été reçu. Votre adhésion est en cours de traitement.
-                Vous recevrez un appel de confirmation prochainement.
+                Votre paiement a bien été reçu. Voici vos identifiants de connexion à votre espace adhérent.
               </p>
 
-              {mutualNumber && (
-                <div className="cp-success-num">
-                  <p className="cp-success-num-label">Votre numéro mutualiste</p>
-                  <p className="cp-success-num-value">{mutualNumber}</p>
+              {/* ── Loader pendant récupération des accès ── */}
+              {merciLoading && !merciData && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0" }}>
+                  <span className="cp-spinner-lg" />
+                  <p style={{ fontSize: 13, color: "#6B7280" }}>Génération de vos accès en cours…</p>
                 </div>
               )}
 
-              {/* Code d'accès si disponible dans l'URL */}
-              {accessCode && (
-                <div style={{
-                  background: "#FFFBEB", border: "1px solid #FCD34D",
-                  borderRadius: 10, padding: "14px 20px", width: "100%", textAlign: "center",
-                }}>
-                  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".6px", color: "#92400E", marginBottom: 4 }}>
-                    Votre code d'accès provisoire
-                  </p>
-                  <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 900, color: "#D97706", letterSpacing: 3 }}>
-                    {accessCode}
-                  </p>
-                  <p style={{ fontSize: 11, color: "#92400E", marginTop: 4 }}>
-                    Conservez ce code — il vous servira à vous connecter la première fois.
-                  </p>
-                </div>
-              )}
+              {/* ── Accès récupérés dynamiquement ── */}
+              {(merciData || mutualNumber) && (() => {
+                const mn  = merciData?.mutual_number || mutualNumber;
+                const ac  = merciData?.access_code   || accessCode;
+                const url = merciData?.login_url      || "https://mutuelleawoundjo.org/client/login";
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+                    {/* Numéro mutualiste */}
+                    <div className="cp-success-num" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <p className="cp-success-num-label">📋 Numéro mutualiste</p>
+                        <p className="cp-success-num-value">{mn}</p>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(mn, "mn")}
+                        style={{ background: "none", border: "1px solid #00875A", borderRadius: 6, padding: "4px 10px", fontSize: 12, color: "#00875A", cursor: "pointer" }}
+                      >
+                        {copied === "mn" ? "✅ Copié" : "📋 Copier"}
+                      </button>
+                    </div>
+
+                    {/* Code d'accès */}
+                    {ac && (
+                      <div style={{
+                        background: "#FFFBEB", border: "1px solid #FCD34D",
+                        borderRadius: 10, padding: "14px 20px", width: "100%",
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        boxSizing: "border-box",
+                      }}>
+                        <div>
+                          <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".6px", color: "#92400E", marginBottom: 4 }}>
+                            🔑 Mot de passe provisoire
+                          </p>
+                          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 900, color: "#D97706", letterSpacing: 3 }}>
+                            {ac}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#92400E", marginTop: 4 }}>
+                            Vous pourrez le modifier après votre première connexion.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(ac, "ac")}
+                          style={{ background: "none", border: "1px solid #D97706", borderRadius: 6, padding: "4px 10px", fontSize: 12, color: "#D97706", cursor: "pointer", flexShrink: 0 }}
+                        >
+                          {copied === "ac" ? "✅ Copié" : "📋 Copier"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Lien de connexion */}
+                    <a
+                      href={url}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        width: "100%", padding: "13px", borderRadius: 8, boxSizing: "border-box",
+                        background: "#00875A", color: "#fff",
+                        fontFamily: "'Sora', sans-serif", fontSize: 14, fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      🚀 Accéder à mon espace adhérent
+                    </a>
+
+                    <p style={{ fontSize: 11, color: "#6B7280", textAlign: "center" }}>
+                      Identifiant : <strong>{mn}</strong> · Mot de passe : <strong>{ac || "envoyé par SMS"}</strong>
+                    </p>
+                  </div>
+                );
+              })()}
 
               <div className="cp-success-steps">
                 {[
-                  { icon: "✅", label: "Dossier créé",    done: true },
-                  { icon: "💳", label: "Paiement reçu",   done: true },
-                  { icon: "⏳", label: "Validation admin", done: false },
-                  { icon: "🎉", label: "Activation",       done: false },
+                  { icon: "✅", label: "Dossier créé",   done: true },
+                  { icon: "💳", label: "Paiement reçu",  done: true },
+                  { icon: "✅", label: "Accès générés",   done: !!(merciData || mutualNumber) },
+                  { icon: "🎉", label: "Connectez-vous", done: !!(merciData || mutualNumber) },
                 ].map((s, i) => (
                   <div key={i} className={`cp-success-step ${s.done ? "done" : ""}`}>
                     <span>{s.icon}</span>
@@ -581,7 +678,7 @@ export default function ClientParrainagePage() {
               </div>
 
               <p className="cp-success-agent">
-                Parrainé par <strong>{parrain?.name}</strong> — vous serez contacté prochainement.
+                Parrainé par <strong>{parrain?.name}</strong>
               </p>
             </div>
           )}
