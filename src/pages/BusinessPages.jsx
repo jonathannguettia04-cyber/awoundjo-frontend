@@ -2421,20 +2421,35 @@ export function BizCollectesPage() {
   const [loading,        setLoading]        = useState(true);
   const [showModal,      setShowModal]      = useState(false);
   const [collecteClient, setCollecteClient] = useState(null);
-  const [lienClient,     setLienClient]     = useState(null); // modal lien token
+  const [lienClient,     setLienClient]     = useState(null);
   const [search,         setSearch]         = useState("");
 
-  const load = useCallback(() => {
+  // Charge TOUTES les pages pour ne rater aucun client
+  const load = useCallback(async () => {
     setLoading(true);
-    apiBiz("/my-clients?limit=200")
-      .then(d => setClients(d.clients || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    try {
+      let all = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const d = await apiBiz(`/my-clients?page=${page}&limit=50`);
+        all = [...all, ...(d.clients || [])];
+        totalPages = d.pagination?.pages || 1;
+        page++;
+      } while (page <= totalPages);
+      setClients(all);
+    } catch (e) {
+      console.error("Erreur chargement collectes", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const enCours   = clients.filter(c => c.status_payment !== "paid");
+  // "En cours" = tout client dont le paiement n'est PAS encore complet
+  // status_payment peut être null, undefined, "pending", "partial" → tous sont "en cours"
+  const enCours   = clients.filter(c => !c.status_payment || c.status_payment !== "paid");
   const completes = clients.filter(c => c.status_payment === "paid");
 
   const filt = arr => arr.filter(c =>
@@ -2510,6 +2525,7 @@ export function BizCollectesPage() {
       <input
         placeholder="🔍 Nom, téléphone ou numéro mutualiste…"
         value={search} onChange={e => setSearch(e.target.value)}
+        autoComplete="off"
         style={{ ...inputStyle, maxWidth: 340, marginBottom: 20 }}
       />
 
