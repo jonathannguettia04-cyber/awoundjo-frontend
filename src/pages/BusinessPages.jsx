@@ -2148,7 +2148,7 @@ function NouvelleCollecteModal({ onClose, onCreated }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      onClick={e => { if (e.target === e.currentTarget) { if (step === 2) onCreated?.(); onClose(); } }}>
       <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.25)", width: "100%", maxWidth: 480, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
@@ -2157,7 +2157,7 @@ function NouvelleCollecteModal({ onClose, onCreated }) {
               {step === 0 ? "Informations du client" : step === 1 ? "Choisir la formule" : "Client créé ✅"}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748B" }}>✕</button>
+          <button onClick={() => { if (step === 2) onCreated?.(); onClose(); }} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748B" }}>✕</button>
         </div>
 
         <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
