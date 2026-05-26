@@ -2432,7 +2432,7 @@ export function BizCollectesPage() {
       let page = 1;
       let totalPages = 1;
       do {
-        const d = await apiBiz(`/my-clients?page=${page}&limit=50`);
+        const d = await apiBiz(`/my-clients?page=${page}&limit=50&include_pending=true`);
         all = [...all, ...(d.clients || [])];
         totalPages = d.pagination?.pages || 1;
         page++;
