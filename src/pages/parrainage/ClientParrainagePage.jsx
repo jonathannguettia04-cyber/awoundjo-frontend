@@ -149,6 +149,22 @@ export default function ClientParrainagePage() {
   const [form,       setForm]       = useState({ name: "", phone: "", city: "" });
   const [formErrors, setFormErrors] = useState({});
 
+  // Pathologies
+  const PATHO_LIST = [
+    "Diabète", "Hypertension artérielle", "Asthme", "Drépanocytose",
+    "Insuffisance rénale", "Maladie cardiaque", "VIH/SIDA", "Tuberculose",
+    "Cancer", "Épilepsie", "Hépatite B/C", "Ulcère gastrique",
+  ];
+  const [pathologies,     setPathologies]     = useState([]);
+  const [pathologieAutre, setPathologieAutre] = useState("");
+
+  // Prospect
+  const [isProspect, setIsProspect] = useState(false);
+
+  function togglePathologie(p) {
+    setPathologies(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  }
+
   // ── Plan + méthode ────────────────────────────────────────
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [methode,      setMethode]      = useState("orange");
@@ -256,6 +272,32 @@ export default function ClientParrainagePage() {
       setMontantError(null);
     }
 
+    // ── Mode prospect : inscription sans paiement ───────────
+    if (isProspect) {
+      setSubmitting(true);
+      setFeedback(null);
+      try {
+        await apiFetch(`/api/client/parrainage/${code}/inscrire`, {
+          method: "POST",
+          body: JSON.stringify({
+            name:        form.name.trim(),
+            phone:       form.phone.trim(),
+            city:        form.city.trim() || undefined,
+            plan_slug:   selectedPlan.slug,
+            is_prospect: true,
+            status:      "prospect",
+            pathologies: [...pathologies, ...(pathologieAutre.trim() ? [pathologieAutre.trim()] : [])],
+          }),
+        });
+        setStep("prospect_success");
+      } catch (e) {
+        setFeedback({ type: "err", msg: e.message });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     setSubmitting(true);
     setFeedback(null);
 
@@ -268,6 +310,12 @@ export default function ClientParrainagePage() {
           name:               form.name.trim(),
           phone:              form.phone.trim(),
           city:               form.city.trim() || undefined,
+          is_prospect:        isProspect,
+          status:             isProspect ? "prospect" : undefined,
+          pathologies:        [
+            ...pathologies,
+            ...(pathologieAutre.trim() ? [pathologieAutre.trim()] : []),
+          ],
           plan_slug:          selectedPlan.slug,
           jeko_method:        methode,
           paiement_echelonne: echelonne,
@@ -373,6 +421,108 @@ export default function ClientParrainagePage() {
                     placeholder="Ex : Abidjan"
                   />
                 </Field>
+              </div>
+
+              {/* Toggle Prospect */}
+              <div style={{
+                border: `1.5px solid ${isProspect ? "#F59E0B" : "#E5E7EB"}`,
+                borderRadius: 10, overflow: "hidden", transition: "border-color .2s",
+              }}>
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 14px", cursor: "pointer",
+                    background: isProspect ? "#FFFBEB" : "#FAFAFA", transition: "background .2s",
+                  }}
+                  onClick={() => setIsProspect(p => !p)}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1A2E" }}>
+                      👁️ Inscrire comme prospect
+                    </span>
+                    <span style={{ fontSize: 11, color: "#6B7280" }}>
+                      Aucun paiement requis — le client sera contacté ultérieurement
+                    </span>
+                  </div>
+                  <div style={{
+                    width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+                    background: isProspect ? "#F59E0B" : "#E5E7EB",
+                    position: "relative", transition: "background .2s",
+                  }}>
+                    <div style={{
+                      position: "absolute", top: 3,
+                      left: isProspect ? 23 : 3,
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: "#fff", transition: "left .2s",
+                      boxShadow: "0 1px 4px rgba(0,0,0,.2)",
+                    }} />
+                  </div>
+                </div>
+                {isProspect && (
+                  <div style={{
+                    padding: "10px 14px", borderTop: "1px solid #FDE68A",
+                    background: "#FFFBEB", fontSize: 12, color: "#92400E", lineHeight: 1.6,
+                    display: "flex", gap: 8, alignItems: "flex-start",
+                  }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>ℹ️</span>
+                    <div>
+                      <strong>Notice prospect :</strong> Ce dossier sera créé sans paiement immédiat.
+                      Le prospect recevra un numéro mutualiste provisoire.
+                      Son compte restera en statut <strong>«&nbsp;prospect&nbsp;»</strong> jusqu'à régularisation
+                      du paiement d'adhésion. Il ne bénéficiera d'aucune couverture médicale
+                      tant que son statut n'est pas activé.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pathologies */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A2E" }}>
+                  🏥 Pathologies / Antécédents médicaux
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "#6B7280", marginLeft: 6 }}>(facultatif)</span>
+                </label>
+                <p style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.5 }}>
+                  Ces informations sont confidentielles et servent uniquement à adapter votre couverture.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {PATHO_LIST.map(p => {
+                    const checked = pathologies.includes(p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => togglePathologie(p)}
+                        style={{
+                          padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          border: `1.5px solid ${checked ? "#00875A" : "#E5E7EB"}`,
+                          background: checked ? "#E6F6F0" : "#F9FAFB",
+                          color: checked ? "#00875A" : "#6B7280",
+                          cursor: "pointer", transition: "all .15s",
+                          display: "flex", alignItems: "center", gap: 5,
+                        }}
+                      >
+                        {checked ? "✓ " : ""}{p}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  value={pathologieAutre}
+                  onChange={e => setPathologieAutre(e.target.value)}
+                  placeholder="Autre pathologie (précisez)…"
+                  style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 13,
+                    border: "1.5px solid #E5E7EB", outline: "none",
+                    fontFamily: "'DM Sans', sans-serif", color: "#1A1A2E", boxSizing: "border-box",
+                  }}
+                />
+                {pathologies.length > 0 && (
+                  <div style={{ fontSize: 11, color: "#00875A", background: "#E6F6F0", borderRadius: 8, padding: "6px 10px" }}>
+                    ✓ {pathologies.length} pathologie(s) sélectionnée(s){pathologieAutre.trim() ? " + autre" : ""}
+                  </div>
+                )}
               </div>
 
               <button className="cp-btn-primary" onClick={handleInfosNext}>
@@ -559,9 +709,11 @@ export default function ClientParrainagePage() {
               >
                 {submitting
                   ? <><span className="cp-spinner" /> Création du dossier…</>
-                  : echelonne
-                    ? <>💰 S'inscrire et payer {montantInitial ? fcfa(montantInitial) : "un premier versement"}</>
-                    : <>💳 S'inscrire et payer maintenant</>}
+                  : isProspect
+                    ? <>👁️ Enregistrer comme prospect (sans paiement)</>
+                    : echelonne
+                      ? <>💰 S'inscrire et payer {montantInitial ? fcfa(montantInitial) : "un premier versement"}</>
+                      : <>💳 S'inscrire et payer maintenant</>}
               </button>
 
               <p className="cp-legal">
@@ -679,6 +831,37 @@ export default function ClientParrainagePage() {
 
               <p className="cp-success-agent">
                 Parrainé par <strong>{parrain?.name}</strong>
+              </p>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════
+              PROSPECT SUCCÈS
+          ═══════════════════════════════════════════ */}
+          {step === "prospect_success" && (
+            <div className="cp-section cp-success-section">
+              <div className="cp-success-icon" style={{ background: "#FFFBEB", fontSize: 28 }}>
+                👁️
+              </div>
+              <p className="cp-success-title" style={{ color: "#92400E" }}>Prospect enregistré !</p>
+              <p className="cp-success-body">
+                Le dossier de <strong>{form.name}</strong> a été créé en tant que prospect.
+                Aucun paiement n'a été effectué.
+              </p>
+              <div style={{
+                width: "100%", background: "#FFFBEB", border: "1px solid #FDE68A",
+                borderRadius: 10, padding: "14px 16px", fontSize: 13, color: "#92400E", lineHeight: 1.7,
+              }}>
+                <p style={{ fontWeight: 700, marginBottom: 6 }}>📋 Prochaines étapes :</p>
+                <ul style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <li>Recontacter le prospect pour finaliser son adhésion</li>
+                  <li>Son compte est en statut <strong>«&nbsp;prospect&nbsp;»</strong> — aucune couverture active</li>
+                  <li>Dès paiement reçu, son statut sera mis à jour vers <strong>«&nbsp;actif&nbsp;»</strong></li>
+                </ul>
+              </div>
+              <p className="cp-success-agent">
+                Parrainé par <strong>{parrain?.name}</strong>
+                {parrain?.phone && <> · 📞 {parrain.phone}</>}
               </p>
             </div>
           )}
