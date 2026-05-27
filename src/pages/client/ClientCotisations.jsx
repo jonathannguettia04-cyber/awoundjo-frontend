@@ -567,50 +567,8 @@ export default function ClientCotisations() {
         });
         setWindowOpen(cotMoisPaye);
       }
-    }).catch(() => {
-      // ── Données de démo ───────────────────────────────────────────────
-      const now = new Date();
-      const currentKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-      const prevDate   = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevKey    = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,"0")}`;
-
-      setClient({
-        name: "Jean Koua", mutual_number: "AWJ-2024-0042",
-        plan: "IVOIRIENNE", status: "actif",
-        status_validation: "approved", status_payment: "paid",
-        monthly_amount: 15000,
-      });
-      setCotisations([
-        { id:1, created_at:"2024-12-05", amount:15000, status:"paid", paid_at:"2024-12-05", payment_method:"jeko" },
-        { id:2, created_at:"2025-01-07", amount:15000, status:"paid", paid_at:"2025-01-07", payment_method:"jeko" },
-        { id:3, created_at:"2025-02-04", amount:15000, status:"paid", paid_at:"2025-02-04", payment_method:"jeko" },
-        { id:4, created_at: now.toISOString(), amount:15000, status:"paid", paid_at: now.toISOString(), payment_method:"jeko" },
-      ]);
-      // Démo : mois précédent partiellement payé (reliquat de 6 000 FCFA)
-      setCollectes([
-        {
-          month:       prevKey,
-          target:      15000,
-          paid:        9000,
-          closed:      false,
-          carry_over:  0,
-          versements: [
-            { paid_at: prevDate.toISOString(), amount: 5000, payment_method:"jeko" },
-            { paid_at: prevDate.toISOString(), amount: 4000, payment_method:"jeko" },
-          ],
-        },
-        {
-          month:       currentKey,
-          target:      15000,
-          paid:        4000,
-          closed:      false,
-          carry_over:  6000,
-          versements: [
-            { paid_at: now.toISOString(), amount: 4000, payment_method:"jeko" },
-          ],
-        },
-      ]);
-      setWindowOpen(true); // démo : fenêtre toujours ouverte
+    }).catch((e) => {
+      console.error("[ClientCotisations] Erreur chargement données:", e?.message || e);
     }).finally(() => setLoading(false));
   };
 
