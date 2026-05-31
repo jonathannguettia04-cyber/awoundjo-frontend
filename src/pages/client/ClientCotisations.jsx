@@ -537,6 +537,7 @@ export default function ClientCotisations() {
   const [payError,    setPayError]    = useState("");
   const [payStatus,   setPayStatus]   = useState(null);
   const [jekoMethod,  setJekoMethod]  = useState("orange");
+  const [monthsToPay, setMonthsToPay] = useState(1);
 
   const loadData = () => {
     const token   = localStorage.getItem("client_token");
@@ -638,14 +639,16 @@ export default function ClientCotisations() {
     try {
       const token   = localStorage.getItem("client_token");
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-      const amount  = pending?.amount || monthly;
+      // Si cotisation en attente (mois en retard), payer 1 mois ; sinon payer le nombre de mois choisi
+      const amount  = pending ? (pending.amount || monthly) : monthly * monthsToPay;
 
       const initRes = await fetch(`${BASE}/api/payments/jeko/init`, {
         method:  "POST",
         headers,
         body: JSON.stringify({
           amount,
-          description:  `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})`,
+          months_count: pending ? 1 : monthsToPay,
+          description:  `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})${!pending && monthsToPay > 1 ? ` — ${monthsToPay} mois` : ""}`,
           client_id:    client?.id    || undefined,
           client_name:  client?.name  || "Client",
           client_email: client?.email || "client@awoundjo.ci",
@@ -731,7 +734,13 @@ export default function ClientCotisations() {
           { icon:"✅", label:"Total payé",    value: fmt(totalPaid),                                       color:C.primary, bg:C.primaryL },
           { icon:"📅", label:"Mensualité",    value: fmt(monthly),                                         color:C.blue,    bg:C.blueL    },
           { icon:"🧾", label:"Paiements",     value: `${paidCount} / ${cotisations.length}`,              color:C.gold,    bg:C.goldL    },
-          { icon:"⏩", label:"Mois d'avance", value: monthsAhead > 0 ? `+${monthsAhead} mois` : "À jour",
+          { icon:"🛡️", label:"Compte actif jusqu'au",
+            value: (() => {
+              if (monthsAhead <= 0) return "Ce mois";
+              const d = new Date();
+              d.setMonth(d.getMonth() + monthsAhead);
+              return d.toLocaleDateString("fr-FR", { month:"short", year:"numeric" });
+            })(),
             color: monthsAhead > 0 ? C.primary : C.slate,
             bg:    monthsAhead > 0 ? C.primaryL : C.bg },
         ].map(s => (
@@ -776,9 +785,71 @@ export default function ClientCotisations() {
             </p>
           )}
 
-          <p style={{ margin:0, fontSize:22, fontWeight:900, color: isUpToDate ? C.primary : C.jeko }}>
-            {fmt(pending?.amount || monthly)}
-          </p>
+          {/* Sélecteur du nombre de mois — visible uniquement si le client est à jour */}
+          {isUpToDate && !pending && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:8 }}>
+                📅 Nombre de mois à payer
+              </label>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
+                {[1, 2, 3, 6, 12].map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setMonthsToPay(m)}
+                    style={{
+                      padding:"8px 16px",
+                      background: monthsToPay === m ? C.primary : "#fff",
+                      color:      monthsToPay === m ? "#fff"    : C.primary,
+                      border:`1.5px solid ${C.primary}`,
+                      borderRadius:10, fontSize:13, fontWeight:700,
+                      cursor:"pointer", fontFamily:"inherit",
+                      transition:"all .15s",
+                    }}
+                  >
+                    {m === 1 ? "1 mois" : `${m} mois`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Résumé du montant et date d'expiration */}
+              {(() => {
+                const expiresDate = new Date();
+                expiresDate.setMonth(expiresDate.getMonth() + monthsAhead + monthsToPay);
+                return (
+                  <div style={{
+                    background:"#fff", border:`1.5px solid ${C.primary}44`,
+                    borderRadius:12, padding:"12px 16px",
+                    display:"flex", justifyContent:"space-between", alignItems:"center",
+                    flexWrap:"wrap", gap:8,
+                  }}>
+                    <div>
+                      <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
+                        Montant total à payer
+                      </p>
+                      <p style={{ margin:"2px 0 0", fontSize:22, fontWeight:900, color:C.primary }}>
+                        {fmt(monthly * monthsToPay)}
+                      </p>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
+                        Compte actif jusqu'au
+                      </p>
+                      <p style={{ margin:"2px 0 0", fontSize:13, fontWeight:800, color:C.primary }}>
+                        🛡️ {fmtDate(expiresDate)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Montant affiché en cas de paiement en retard (1 mois) */}
+          {(!isUpToDate || pending) && (
+            <p style={{ margin:0, fontSize:22, fontWeight:900, color: isUpToDate ? C.primary : C.jeko }}>
+              {fmt(pending?.amount || monthly)}
+            </p>
+          )}
 
           {monthsAhead > 0 && (
             <p style={{ margin:"6px 0 0", fontSize:12, color:C.primary, fontWeight:600 }}>
@@ -848,7 +919,10 @@ export default function ClientCotisations() {
               Redirection en cours…
             </>
           ) : (
-            <>💳 {isUpToDate ? "Payer en avance" : "Payer avec JEKO"}</>
+            <>💳 {isUpToDate
+              ? (monthsToPay > 1 ? `Payer ${monthsToPay} mois (${fmt(monthly * monthsToPay)})` : "Payer 1 mois en avance")
+              : "Payer avec JEKO"
+            }</>
           )}
         </button>
 
@@ -865,7 +939,7 @@ export default function ClientCotisations() {
           <span style={{ fontSize:14 }}>ℹ️</span>
           <p style={{ margin:0, fontSize:12, color:C.slate }}>
             {isUpToDate
-              ? "Votre cotisation est à jour. Vous pouvez payer des mois à l'avance pour rester serein."
+              ? `Payer ${monthsToPay > 1 ? `${monthsToPay} mois à l'avance` : "1 mois à l'avance"} pour garder votre compte actif plus longtemps.`
               : "Vous serez redirigé vers la page de paiement sécurisée. Paiement 100% sécurisé."
             }
           </p>
