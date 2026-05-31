@@ -601,6 +601,15 @@ export default function ClientCotisations() {
     loadData();
   }, []);
 
+  // Initialiser monthsToPay au nombre de mois en retard dès le chargement
+  useEffect(() => {
+    const overdue = cotisations.filter(c =>
+      c.status === 'attente' || c.status === 'pending' ||
+      c.status === 'retard'  || c.status === 'overdue'
+    ).length;
+    if (overdue > 0) setMonthsToPay(overdue);
+  }, [cotisations]);
+
   if (loading) return <Loader />;
 
   if (client?.status_validation === "pending")  return <ValidationPendingScreen client={client} />;
@@ -630,7 +639,14 @@ export default function ClientCotisations() {
     monthsAhead = paidCount - monthsElapsed;
   }
 
-  const isUpToDate         = !pending && paidCount > 0;
+  const isUpToDate = !pending && paidCount > 0;
+
+  // Nombre de mois en retard (cotisations pending/overdue)
+  const overdueCount = cotisations.filter(c =>
+    c.status === 'attente' || c.status === 'pending' ||
+    c.status === 'retard'  || c.status === 'overdue'
+  ).length;
+  // Par défaut : sélectionner tous les mois en retard (min 1)
   // windowOpen est géré par le state (mis à jour dans loadData)
 
   // ── Paiement cotisation normale ─────────────────────────────────────────
@@ -639,16 +655,16 @@ export default function ClientCotisations() {
     try {
       const token   = localStorage.getItem("client_token");
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-      // Si cotisation en attente (mois en retard), payer 1 mois ; sinon payer le nombre de mois choisi
-      const amount  = pending ? (pending.amount || monthly) : monthly * monthsToPay;
+      // Montant = mensualité × nombre de mois choisi (arrierés ou avance)
+      const amount  = monthly * monthsToPay;
 
       const initRes = await fetch(`${BASE}/api/payments/jeko/init`, {
         method:  "POST",
         headers,
         body: JSON.stringify({
           amount,
-          months_count: pending ? 1 : monthsToPay,
-          description:  `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""})${!pending && monthsToPay > 1 ? ` — ${monthsToPay} mois` : ""}`,
+          months_count: monthsToPay,
+          description:  `Cotisation Awoundjô — ${client?.name || ""} (${client?.mutual_number || ""}) — ${monthsToPay} mois`,
           client_id:    client?.id    || undefined,
           client_name:  client?.name  || "Client",
           client_email: client?.email || "client@awoundjo.ci",
@@ -768,91 +784,120 @@ export default function ClientCotisations() {
         background: isUpToDate ? C.primaryL : C.jekoL,
       }}>
         <div style={{ marginBottom:14 }}>
-          <p style={{ margin:"0 0 4px", fontSize:13, color:C.slate, fontWeight:600 }}>
-            {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "COTISATION EN COURS"}
-          </p>
-
-          {isUpToDate && (
-            <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:C.primary, borderRadius:20, padding:"4px 12px", marginBottom:8 }}>
-              <span style={{ width:7, height:7, borderRadius:"50%", background:"#fff", display:"inline-block" }} />
-              <span style={{ fontSize:11, fontWeight:700, color:"#fff" }}>À JOUR</span>
-            </div>
-          )}
-
-          {pending && (
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:900, color:C.dark }}>
-              {fmtDate(pending.createdAt)}
+          {/* Badge statut */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+            <p style={{ margin:0, fontSize:13, color:C.slate, fontWeight:600 }}>
+              {isUpToDate ? "COTISATION — PAYER EN AVANCE" : "ARRIERÉS DE COTISATION"}
             </p>
-          )}
-
-          {/* Sélecteur du nombre de mois — visible uniquement si le client est à jour */}
-          {isUpToDate && !pending && (
-            <div style={{ marginBottom:14 }}>
-              <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:8 }}>
-                📅 Nombre de mois à payer
-              </label>
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
-                {[1, 2, 3, 6, 12].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setMonthsToPay(m)}
-                    style={{
-                      padding:"8px 16px",
-                      background: monthsToPay === m ? C.primary : "#fff",
-                      color:      monthsToPay === m ? "#fff"    : C.primary,
-                      border:`1.5px solid ${C.primary}`,
-                      borderRadius:10, fontSize:13, fontWeight:700,
-                      cursor:"pointer", fontFamily:"inherit",
-                      transition:"all .15s",
-                    }}
-                  >
-                    {m === 1 ? "1 mois" : `${m} mois`}
-                  </button>
-                ))}
+            {isUpToDate ? (
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:C.primary, borderRadius:20, padding:"3px 12px" }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:"#fff", display:"inline-block" }} />
+                <span style={{ fontSize:11, fontWeight:700, color:"#fff" }}>À JOUR</span>
               </div>
+            ) : (
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:C.red, borderRadius:20, padding:"3px 12px" }}>
+                <span style={{ fontSize:11, fontWeight:700, color:"#fff" }}>
+                  🔴 {overdueCount} mois impayé{overdueCount > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+          </div>
 
-              {/* Résumé du montant et date d'expiration */}
-              {(() => {
-                const expiresDate = new Date();
-                expiresDate.setMonth(expiresDate.getMonth() + monthsAhead + monthsToPay);
-                return (
-                  <div style={{
-                    background:"#fff", border:`1.5px solid ${C.primary}44`,
-                    borderRadius:12, padding:"12px 16px",
-                    display:"flex", justifyContent:"space-between", alignItems:"center",
-                    flexWrap:"wrap", gap:8,
-                  }}>
-                    <div>
-                      <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
-                        Montant total à payer
-                      </p>
-                      <p style={{ margin:"2px 0 0", fontSize:22, fontWeight:900, color:C.primary }}>
-                        {fmt(monthly * monthsToPay)}
-                      </p>
-                    </div>
-                    <div style={{ textAlign:"right" }}>
-                      <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
-                        Compte actif jusqu'au
-                      </p>
-                      <p style={{ margin:"2px 0 0", fontSize:13, fontWeight:800, color:C.primary }}>
-                        🛡️ {fmtDate(expiresDate)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
+          {/* Sélecteur de mois — toujours visible */}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:12, fontWeight:700, color:C.slate, display:"block", marginBottom:8 }}>
+              {isUpToDate ? "📅 Nombre de mois à payer en avance" : "📅 Nombre de mois à régulariser"}
+            </label>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
+              {(isUpToDate
+                ? [1, 2, 3, 6, 12]
+                : Array.from({ length: Math.min(overdueCount + 2, 12) }, (_, i) => i + 1)
+              ).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMonthsToPay(m)}
+                  style={{
+                    padding:"8px 14px",
+                    background: monthsToPay === m
+                      ? (isUpToDate ? C.primary : C.red)
+                      : "#fff",
+                    color: monthsToPay === m ? "#fff"
+                      : (isUpToDate ? C.primary : C.red),
+                    border:`1.5px solid ${isUpToDate ? C.primary : C.red}`,
+                    borderRadius:10, fontSize:13, fontWeight:700,
+                    cursor:"pointer", fontFamily:"inherit",
+                    transition:"all .15s",
+                    position:"relative",
+                  }}
+                >
+                  {m === 1 ? "1 mois" : `${m} mois`}
+                  {!isUpToDate && m === overdueCount && (
+                    <span style={{
+                      position:"absolute", top:-8, right:-6,
+                      background:C.gold, color:"#fff",
+                      fontSize:9, fontWeight:900,
+                      padding:"1px 5px", borderRadius:999,
+                    }}>
+                      DÛ
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-          )}
 
-          {/* Montant affiché en cas de paiement en retard (1 mois) */}
-          {(!isUpToDate || pending) && (
-            <p style={{ margin:0, fontSize:22, fontWeight:900, color: isUpToDate ? C.primary : C.jeko }}>
-              {fmt(pending?.amount || monthly)}
-            </p>
-          )}
+            {/* Résumé montant + date expiration */}
+            {(() => {
+              const totalAmount = monthly * monthsToPay;
+              const expiresDate = new Date();
+              if (isUpToDate) {
+                expiresDate.setMonth(expiresDate.getMonth() + monthsAhead + monthsToPay);
+              } else {
+                // depuis aujourd'hui + mois payés
+                expiresDate.setMonth(expiresDate.getMonth() + monthsToPay - overdueCount);
+              }
+              const accentColor = isUpToDate ? C.primary : C.red;
+              const accentBg    = isUpToDate ? C.primaryL : C.redL;
+              return (
+                <div style={{
+                  background:"#fff",
+                  border:`1.5px solid ${accentColor}44`,
+                  borderRadius:12, padding:"12px 16px",
+                  display:"flex", justifyContent:"space-between", alignItems:"center",
+                  flexWrap:"wrap", gap:8,
+                }}>
+                  <div>
+                    <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
+                      Montant total à payer
+                    </p>
+                    <p style={{ margin:"2px 0 0", fontSize:22, fontWeight:900, color:accentColor }}>
+                      {fmt(totalAmount)}
+                    </p>
+                    {!isUpToDate && monthsToPay < overdueCount && (
+                      <p style={{ margin:"2px 0 0", fontSize:11, color:C.gold, fontWeight:700 }}>
+                        ⚠️ Reste {fmt((overdueCount - monthsToPay) * monthly)} non régularisé
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <p style={{ margin:0, fontSize:11, color:C.slate, fontWeight:600 }}>
+                      Compte actif jusqu'au
+                    </p>
+                    <p style={{ margin:"2px 0 0", fontSize:13, fontWeight:800, color:accentColor }}>
+                      🛡️ {fmtDate(expiresDate)}
+                    </p>
+                    {!isUpToDate && monthsToPay >= overdueCount && (
+                      <p style={{ margin:"2px 0 0", fontSize:11, color:C.primary, fontWeight:700 }}>
+                        ✅ Tous les arrierés couverts
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
 
           {monthsAhead > 0 && (
-            <p style={{ margin:"6px 0 0", fontSize:12, color:C.primary, fontWeight:600 }}>
+            <p style={{ margin:"0 0 10px", fontSize:12, color:C.primary, fontWeight:600 }}>
               ⏩ Vous êtes en avance de <strong>{monthsAhead} mois</strong>
             </p>
           )}
@@ -920,8 +965,8 @@ export default function ClientCotisations() {
             </>
           ) : (
             <>💳 {isUpToDate
-              ? (monthsToPay > 1 ? `Payer ${monthsToPay} mois (${fmt(monthly * monthsToPay)})` : "Payer 1 mois en avance")
-              : "Payer avec JEKO"
+              ? (monthsToPay > 1 ? `Payer ${monthsToPay} mois en avance (${fmt(monthly * monthsToPay)})` : "Payer 1 mois en avance")
+              : `Régulariser ${monthsToPay} mois (${fmt(monthly * monthsToPay)})`
             }</>
           )}
         </button>
@@ -940,7 +985,7 @@ export default function ClientCotisations() {
           <p style={{ margin:0, fontSize:12, color:C.slate }}>
             {isUpToDate
               ? `Payer ${monthsToPay > 1 ? `${monthsToPay} mois à l'avance` : "1 mois à l'avance"} pour garder votre compte actif plus longtemps.`
-              : "Vous serez redirigé vers la page de paiement sécurisée. Paiement 100% sécurisé."
+              : `Régularisez ${monthsToPay} mois d'arriérés en un seul paiement sécurisé.`
             }
           </p>
         </div>
