@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { healthcareAPI } from "../services/api";
 import Modal from "../components/Modal";
 import * as XLSX from "xlsx";
+import { Copy, Check, ExternalLink } from "lucide-react";
 
 const TYPES = [
   { id: "pharmacy", label: "Pharmacie",   icon: "💊", color: "bg-green-100 text-green-700 border-green-200" },
@@ -26,6 +27,8 @@ export default function HealthcareAdmin() {
   const [saving,       setSaving]       = useState(false);
   const [formError,    setFormError]    = useState("");
 
+  const [accessData,   setAccessData]   = useState(null);
+  const [copiedField,  setCopiedField]  = useState(null);
   const [confirm,      setConfirm]      = useState(null);
   const [importing,    setImporting]    = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -64,11 +67,14 @@ export default function HealthcareAdmin() {
     try {
       if (editing) {
         await healthcareAPI.updateProvider(editing.id, form);
+        setShowModal(false);
+        load();
       } else {
-        await healthcareAPI.createProvider(form);
+        const res = await healthcareAPI.createProvider(form);
+        setShowModal(false);
+        load();
+        if (res.data?.data) setAccessData(res.data.data);
       }
-      setShowModal(false);
-      load();
     } catch (err) {
       setFormError(err.response?.data?.error || "Erreur");
     } finally { setSaving(false); }
@@ -436,6 +442,118 @@ export default function HealthcareAdmin() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal accès établissement */}
+      {accessData && (() => {
+        const { provider, access_code, provider_code } = accessData;
+        const identifier = provider_code || provider?.id || "";
+        const portalUrl  = `https://www.mutuelleawoundjo.org/etablissement/login?id=${identifier}`;
+        const t = TYPE_MAP[provider?.type] || TYPE_MAP.pharmacy;
+
+        const copyToClipboard = async (text, field) => {
+          try { await navigator.clipboard.writeText(text); }
+          catch {
+            const ta = document.createElement("textarea");
+            ta.value = text; document.body.appendChild(ta);
+            ta.select(); document.execCommand("copy");
+            document.body.removeChild(ta);
+          }
+          setCopiedField(field);
+          setTimeout(() => setCopiedField(null), 2000);
+        };
+
+        const CopyBtn = ({ text, field }) => (
+          <button onClick={() => copyToClipboard(text, field)}
+            className="ml-2 p-1.5 rounded hover:bg-gray-100 transition-colors flex-shrink-0" title="Copier">
+            {copiedField === field
+              ? <Check size={15} className="text-green-600" />
+              : <Copy size={15} className="text-gray-400" />}
+          </button>
+        );
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+
+              {/* Header */}
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl border flex items-center justify-center text-xl flex-shrink-0 ${t.color}`}>
+                    {t.icon}
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800">✅ Établissement enregistré</h2>
+                    <p className="text-sm text-slate-500">{provider?.name}</p>
+                    {provider?.city && <p className="text-xs text-slate-400">{provider.city}{provider.commune ? ` · ${provider.commune}` : ""}</p>}
+                  </div>
+                </div>
+                <button onClick={() => setAccessData(null)} className="p-1 hover:bg-slate-100 rounded-lg ml-2 text-slate-400 text-xl leading-none">×</button>
+              </div>
+
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">
+                ⚠️ Transmettez ces identifiants à l'établissement. Le code ne sera plus visible après fermeture.
+              </p>
+
+              <div className="space-y-3">
+
+                {identifier && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Code établissement</label>
+                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                      <span className="flex-1 font-mono text-sm font-semibold tracking-wider text-slate-800">{identifier}</span>
+                      <CopyBtn text={identifier} field="identifier" />
+                    </div>
+                  </div>
+                )}
+
+                {access_code && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Code d'accès provisoire</label>
+                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                      <span className="flex-1 font-mono text-sm font-semibold tracking-wider text-slate-800">{access_code}</span>
+                      <CopyBtn text={access_code} field="access_code" />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Lien portail établissement</label>
+                  <div className="flex items-center bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 gap-1">
+                    <span className="flex-1 text-xs text-blue-700 truncate">{portalUrl}</span>
+                    <CopyBtn text={portalUrl} field="portal_url" />
+                    <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+                      className="p-1.5 rounded hover:bg-blue-100 transition-colors flex-shrink-0" title="Ouvrir le portail">
+                      <ExternalLink size={15} className="text-blue-600" />
+                    </a>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(
+                    [
+                      `Établissement : ${provider?.name || ""}`,
+                      identifier ? `Code établissement : ${identifier}` : "",
+                      access_code ? `Code d'accès : ${access_code}` : "",
+                      `Portail : ${portalUrl}`,
+                    ].filter(Boolean).join("\n"),
+                    "all"
+                  )}
+                  className="w-full mt-1 flex items-center justify-center gap-2 py-2 px-4 border-2 border-dashed border-slate-200 rounded-lg text-sm text-slate-500 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                >
+                  {copiedField === "all"
+                    ? <><Check size={14} className="text-green-600" /> Copié !</>
+                    : <><Copy size={14} /> Tout copier</>}
+                </button>
+              </div>
+
+              <button onClick={() => setAccessData(null)}
+                className="mt-5 w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                J'ai transmis les informations ✓
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal confirmation désactivation */}
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title="Désactiver l'établissement">

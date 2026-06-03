@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Copy, Check, ExternalLink, Shield, Key, User } from "lucide-react";
 import { clientAPI } from "../services/api";
 import { StatusBadge, PlanBadge } from "../components/Badge";
 import Modal from "../components/Modal";
@@ -54,6 +55,7 @@ export default function Clients() {
 
   const [accessCode, setAccessCode] = useState("");
   const [showCode,   setShowCode]   = useState(false);
+  const [copiedField, setCopiedField] = useState(null);
 
   // États pour le paiement JEKO après création
   const [pendingPayment, setPendingPayment] = useState(null); // { client, accessCode }
@@ -650,32 +652,138 @@ export default function Clients() {
       </Modal>
 
       {/* ── Modal code d'accès ───────────────────────────────── */}
-      <Modal open={showCode} onClose={() => setShowCode(false)} title="🔑 Identifiants du client">
-        <div className="text-center space-y-4 py-2">
-          <p className="text-slate-600 text-sm">Communiquez ces identifiants au client pour sa première connexion :</p>
+      {showCode && pendingPayment && (() => {
+        const mutualNumber = pendingPayment.mutualNumber;
+        const portalUrl = `https://www.mutuelleawoundjo.org/client/login?id=${mutualNumber}`;
+        const allText = `Numéro mutualiste : ${mutualNumber}\nCode d'accès provisoire : ${accessCode}\nPortail adhérent : ${portalUrl}`;
 
-          {pendingPayment?.mutualNumber && (
-            <div className="bg-slate-100 rounded-xl px-6 py-3">
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Numéro Mutuel</p>
-              <p className="text-xl font-mono font-bold text-slate-700">{pendingPayment.mutualNumber}</p>
+        const copyToClipboard = async (text, field) => {
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            const el = document.createElement("textarea");
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand("copy");
+            document.body.removeChild(el);
+          }
+          setCopiedField(field);
+          setTimeout(() => setCopiedField(null), 2000);
+        };
+
+        const CopyBtn = ({ text, field }) => (
+          <button
+            type="button"
+            onClick={() => copyToClipboard(text, field)}
+            className="flex-shrink-0 ml-2 p-1.5 rounded-md hover:bg-white/60 transition-all duration-150"
+            title="Copier"
+          >
+            {copiedField === field
+              ? <Check size={15} className="text-green-600" />
+              : <Copy size={15} className="text-gray-400 hover:text-gray-700" />}
+          </button>
+        );
+
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+
+              {/* Header vert */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-5 text-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Shield size={18} className="opacity-90" />
+                      <span className="text-sm font-medium opacity-90">Accès créé avec succès</span>
+                    </div>
+                    <h2 className="text-xl font-bold">{pendingPayment.client.name}</h2>
+                    <p className="text-green-100 text-xs mt-0.5">{pendingPayment.plan}</p>
+                  </div>
+                  <button type="button" onClick={() => setShowCode(false)}
+                    className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Corps */}
+              <div className="px-6 py-5 space-y-4">
+
+                {/* Avertissement */}
+                <div className="flex gap-2.5 items-start bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <span className="text-amber-500 text-lg leading-none mt-0.5">⚠️</span>
+                  <p className="text-amber-800 text-xs leading-relaxed">
+                    Transmettez ces informations au client maintenant.
+                    <strong> Le code d'accès ne sera plus visible</strong> après fermeture.
+                  </p>
+                </div>
+
+                {/* Numéro mutualiste */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    <User size={12} /> Numéro mutualiste
+                  </label>
+                  <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+                    <span className="flex-1 font-mono text-base font-bold tracking-widest text-gray-900">
+                      {mutualNumber}
+                    </span>
+                    <CopyBtn text={mutualNumber} field="mutual_number" />
+                  </div>
+                </div>
+
+                {/* Code d'accès */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    <Key size={12} /> Code d'accès provisoire
+                  </label>
+                  <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+                    <span className="flex-1 font-mono text-base font-bold tracking-widest text-gray-900">
+                      {accessCode}
+                    </span>
+                    <CopyBtn text={accessCode} field="access_code" />
+                  </div>
+                </div>
+
+                {/* Lien portail */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    <ExternalLink size={12} /> Lien portail adhérent
+                  </label>
+                  <div className="flex items-center bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 gap-1">
+                    <span className="flex-1 text-xs text-blue-700 font-medium truncate">{portalUrl}</span>
+                    <CopyBtn text={portalUrl} field="portal_url" />
+                    <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex-shrink-0 ml-0.5 p-1.5 rounded-md hover:bg-blue-100 transition-colors"
+                      title="Ouvrir le portail">
+                      <ExternalLink size={15} className="text-blue-500" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Tout copier */}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(allText, "all")}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 font-medium hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all duration-200"
+                >
+                  {copiedField === "all"
+                    ? <><Check size={15} className="text-green-600" /><span className="text-green-700">Copié !</span></>
+                    : <><Copy size={15} /> Tout copier (SMS / WhatsApp)</>}
+                </button>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 pb-5">
+                <button type="button" onClick={() => setShowCode(false)}
+                  className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 rounded-xl text-sm font-semibold transition-colors duration-200">
+                  J'ai transmis les informations ✓
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="bg-slate-100 rounded-xl px-6 py-5">
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Code d'accès temporaire</p>
-            <p className="text-3xl font-mono font-bold tracking-widest text-brand-600">{accessCode}</p>
           </div>
-          <p className="text-xs text-red-500 font-medium">⚠️ Ce code ne sera plus affiché après fermeture</p>
-          <button onClick={() => navigator.clipboard.writeText(accessCode)}
-            className="w-full py-2 text-sm font-semibold border border-brand-200 text-brand-600 rounded-xl hover:bg-brand-50">
-            📋 Copier le code
-          </button>
-          <button onClick={() => setShowCode(false)}
-            className="w-full py-2 text-sm font-semibold bg-brand-500 text-white rounded-xl hover:bg-brand-600">
-            J'ai noté le code ✓
-          </button>
-        </div>
-      </Modal>
+        );
+      })()}
 
       {/* ── Modal import CSV ─────────────────────────────────── */}
       <Modal open={showImport} onClose={() => setShowImport(false)} title="📂 Importer des anciens clients">
