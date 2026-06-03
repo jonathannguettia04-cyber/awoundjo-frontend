@@ -447,7 +447,7 @@ export default function HealthcareAdmin() {
       {accessData && (() => {
         const { provider, access_code, provider_code } = accessData;
         const identifier = provider_code || provider?.id || "";
-        const portalUrl  = `https://www.mutuelleawoundjo.org/etablissement/login?id=${identifier}`;
+        const portalUrl  = `https://www.mutuelleawoundjo.org/etablissement/login`;
         const t = TYPE_MAP[provider?.type] || TYPE_MAP.pharmacy;
 
         const copyToClipboard = async (text, field) => {
