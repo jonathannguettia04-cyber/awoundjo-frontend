@@ -51,6 +51,7 @@ const TABS = [
   "Demandes Commission",
   "Clients",
   "Collectes",
+  "Parrainage",
   "Sce Technique",
 ];
 
@@ -128,6 +129,16 @@ export default function AdminBusiness() {
   const [collectePage,       setCollectePage]       = useState(1);
   const [collecteModal,      setCollecteModal]      = useState(null); // { client }
   const COLLECTE_LIMIT = 30;
+
+  // Parrainage admin
+  const [parrainages,        setParrainages]        = useState([]);
+  const [parrainagesTotal,   setParrainagesTotal]   = useState(0);
+  const [parrainageSearch,   setParrainageSearch]   = useState("");
+  const [parrainageStatus,   setParrainageStatus]   = useState(""); // "" | "active" | "expired" | "disabled"
+  const [parrainagePage,     setParrainagePage]     = useState(1);
+  const [parrainageStats,    setParrainageStats]    = useState(null);
+  const [parrainageModal,    setParrainageModal]    = useState(null); // { type: "disable"|"detail", lien }
+  const PARRAINAGE_LIMIT = 30;
 
   // Sce Technique — mot de passe vérifié côté serveur
   const [sceUnlocked,     setSceUnlocked]     = useState(false);
@@ -243,6 +254,26 @@ export default function AdminBusiness() {
     setLoading(false);
   }, [get, collectePage, collecteSearch, collecteStatusFilt]);
 
+  const loadParrainages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: parrainagePage, limit: PARRAINAGE_LIMIT });
+      if (parrainageSearch) params.set("search", parrainageSearch);
+      if (parrainageStatus) params.set("status", parrainageStatus);
+      const d = await get(`/api/business/admin/parrainage-links?${params}`);
+      setParrainages(d.data?.links || d.links || []);
+      setParrainagesTotal(
+        d.data?.pagination?.total ??
+        d.pagination?.total ??
+        (d.data?.links || d.links || []).length
+      );
+      if (d.data?.stats || d.stats) {
+        setParrainageStats(d.data?.stats || d.stats);
+      }
+    } catch (e) { showToast(e.message, true); }
+    setLoading(false);
+  }, [get, parrainagePage, parrainageSearch, parrainageStatus]);
+
   // FIX : loadScePayments en useCallback (était une fonction normale)
   const loadScePayments = useCallback(async () => {
     setSceLoading(true);
@@ -271,11 +302,12 @@ export default function AdminBusiness() {
     if (tab === "Demandes Commission") loadDemandesCommission();
     if (tab === "Clients")             loadClients();
     if (tab === "Collectes")           loadCollectes();
+    if (tab === "Parrainage")          loadParrainages();
     if (tab === "Sce Technique" && sceUnlocked) loadScePayments();
   }, [
     tab, sceUnlocked,
     loadMembers, loadCommissions, loadBonusPool,
-    loadDemandesCommission, loadClients, loadCollectes, loadScePayments,
+    loadDemandesCommission, loadClients, loadCollectes, loadParrainages, loadScePayments,
   ]);
 
   // ── Actions membres ────────────────────────────────────────
@@ -349,6 +381,24 @@ export default function AdminBusiness() {
       loadDemandesCommission();
     } catch (e) { showToast(e.message, true); }
     setActionLoading(null);
+  }
+
+  // ── Actions parrainage ─────────────────────────────────────
+  async function handleDisableParrainage(linkId) {
+    try {
+      await post(`/api/business/admin/parrainage-links/${linkId}/disable`);
+      showToast("🔒 Lien de parrainage désactivé");
+      setParrainageModal(null);
+      loadParrainages();
+    } catch (e) { showToast(e.message, true); }
+  }
+
+  async function handleEnableParrainage(linkId) {
+    try {
+      await post(`/api/business/admin/parrainage-links/${linkId}/enable`);
+      showToast("✅ Lien de parrainage réactivé");
+      loadParrainages();
+    } catch (e) { showToast(e.message, true); }
   }
 
   // ── Sce Technique — auth via DB (FIX : plus de mot de passe hardcodé) ──
@@ -1152,6 +1202,289 @@ export default function AdminBusiness() {
               onUpdated={() => { setCollecteModal(null); loadCollectes(); }}
               showToast={showToast}
             />
+          )}
+        </div>
+      )}
+
+      {/* ══ ONGLET PARRAINAGE ═══════════════════════════════ */}
+      {tab === "Parrainage" && (
+        <div>
+          {/* Stats rapides */}
+          {!loading && (
+            <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ background: "#fff", border: "1.5px solid #DDD6FE", borderRadius: 12, padding: "14px 20px", minWidth: 160 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Total liens</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#7C3AED" }}>{parrainagesTotal}</div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #A7F3D0", borderRadius: 12, padding: "14px 20px", minWidth: 160 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Actifs</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#059669" }}>
+                  {parrainageStats?.active ?? parrainages.filter(l => l.status === "active" || l.active).length}
+                </div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #FDE68A", borderRadius: 12, padding: "14px 20px", minWidth: 160 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Clients créés</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#D97706" }}>
+                  {parrainageStats?.total_clients ?? parrainages.reduce((s, l) => s + (l.clients_count || 0), 0)}
+                </div>
+              </div>
+              <div style={{ background: "#fff", border: "1.5px solid #FECACA", borderRadius: 12, padding: "14px 20px", minWidth: 160 }}>
+                <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Expirés / Désactivés</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#DC2626" }}>
+                  {parrainageStats?.inactive ?? parrainages.filter(l => l.status === "expired" || l.status === "disabled" || l.disabled).length}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filtres */}
+          <div style={s.filters}>
+            <input
+              style={s.input}
+              placeholder="🔍 Nom parrain, email, token…"
+              value={parrainageSearch}
+              onChange={e => { setParrainageSearch(e.target.value); setParrainagePage(1); }}
+            />
+            <select style={s.select} value={parrainageStatus} onChange={e => { setParrainageStatus(e.target.value); setParrainagePage(1); }}>
+              <option value="">Tous les statuts</option>
+              <option value="active">Actifs</option>
+              <option value="expired">Expirés</option>
+              <option value="disabled">Désactivés</option>
+            </select>
+            <button style={s.btnSecondary} onClick={loadParrainages}>↻ Rafraîchir</button>
+          </div>
+
+          {loading ? <Spinner /> : (
+            <div style={s.table}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {["Parrain","Rôle","Token / Lien","Clients","Statut","Expiration","Actions"].map(h => (
+                      <th key={h} style={s.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parrainages.map(lien => {
+                    const isActive   = lien.status === "active"   || (!lien.status && lien.active && !lien.disabled);
+                    const isExpired  = lien.status === "expired"  || (!lien.status && lien.expires_at && new Date(lien.expires_at) < new Date());
+                    const isDisabled = lien.status === "disabled" || lien.disabled;
+                    const statusLabel = isDisabled ? "Désactivé" : isExpired ? "Expiré" : "Actif";
+                    const statusStyle = isDisabled
+                      ? { bg: "#FEF2F2", color: "#DC2626" }
+                      : isExpired
+                      ? { bg: "#FFF7ED", color: "#D97706" }
+                      : { bg: "#ECFDF5", color: "#059669" };
+                    const roleC = ROLE_COLORS[lien.parrain_role || lien.member_role] || {};
+                    const BASE  = window.location.origin;
+                    const fullUrl = `${BASE}/parrainage/${lien.token}`;
+
+                    return (
+                      <tr key={lien.id || lien.token} style={s.tr}>
+                        {/* Parrain */}
+                        <td style={s.td}>
+                          <div style={s.memberName}>{lien.parrain_name || lien.member_name || "—"}</div>
+                          <div style={s.memberSub}>{lien.parrain_email || lien.member_email || ""}</div>
+                          {(lien.parrain_phone || lien.member_phone) && (
+                            <div style={s.memberSub}>{lien.parrain_phone || lien.member_phone}</div>
+                          )}
+                        </td>
+                        {/* Rôle */}
+                        <td style={s.td}>
+                          {(lien.parrain_role || lien.member_role) ? (
+                            <span style={{ ...s.badge, background: roleC.bg, color: roleC.color, border: `1px solid ${roleC.border}` }}>
+                              {lien.parrain_role || lien.member_role}
+                            </span>
+                          ) : <span style={{ color: "#CBD5E1" }}>—</span>}
+                        </td>
+                        {/* Token / Lien */}
+                        <td style={s.td}>
+                          <div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#7C3AED", marginBottom: 4 }}>
+                            {lien.token}
+                          </div>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(fullUrl); showToast("📋 Lien copié !"); }}
+                            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid #DDD6FE", background: "#F5F3FF", color: "#7C3AED", cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            📋 Copier le lien
+                          </button>
+                        </td>
+                        {/* Clients */}
+                        <td style={{ ...s.td, textAlign: "center" }}>
+                          <span style={{ fontWeight: 800, fontSize: 16, color: "#0891B2" }}>
+                            {lien.clients_count ?? lien.total_clients ?? 0}
+                          </span>
+                          {(lien.clients_paid != null) && (
+                            <div style={{ fontSize: 11, color: "#059669", marginTop: 2 }}>
+                              {lien.clients_paid} payé{lien.clients_paid !== 1 ? "s" : ""}
+                            </div>
+                          )}
+                        </td>
+                        {/* Statut */}
+                        <td style={s.td}>
+                          <span style={{ ...s.badge, background: statusStyle.bg, color: statusStyle.color }}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                        {/* Expiration */}
+                        <td style={{ ...s.td, fontSize: 12, color: "#94A3B8", whiteSpace: "nowrap" }}>
+                          {lien.expires_at
+                            ? new Date(lien.expires_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+                            : <span style={{ color: "#CBD5E1" }}>Sans limite</span>
+                          }
+                        </td>
+                        {/* Actions */}
+                        <td style={s.td}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <button
+                              onClick={() => setParrainageModal({ type: "detail", lien })}
+                              style={{ ...s.btnSecondary, fontSize: 11, padding: "5px 10px" }}
+                            >
+                              👁️ Détail
+                            </button>
+                            {isDisabled ? (
+                              <button
+                                onClick={() => handleEnableParrainage(lien.id)}
+                                style={{ fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "none", background: "#ECFDF5", color: "#059669", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                              >
+                                ✅ Réactiver
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setParrainageModal({ type: "disable", lien })}
+                                style={{ fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "none", background: "#FEF2F2", color: "#DC2626", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                              >
+                                🔒 Désactiver
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {parrainages.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>
+                        <div style={{ fontSize: 40, marginBottom: 12 }}>🔗</div>
+                        <p style={{ fontWeight: 700 }}>Aucun lien de parrainage trouvé</p>
+                        <p style={{ fontSize: 12 }}>Les liens générés par les membres apparaîtront ici</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          <div style={s.pagination}>
+            <button style={s.btnSecondary} disabled={parrainagePage === 1} onClick={() => setParrainagePage(p => p - 1)}>← Préc.</button>
+            <span style={{ fontSize: 13, color: "#64748B" }}>
+              Page {parrainagePage} · {parrainagesTotal} lien{parrainagesTotal !== 1 ? "s" : ""}
+            </span>
+            <button
+              style={s.btnSecondary}
+              disabled={parrainagePage * PARRAINAGE_LIMIT >= parrainagesTotal}
+              onClick={() => setParrainagePage(p => p + 1)}
+            >
+              Suiv. →
+            </button>
+          </div>
+
+          {/* Modal désactiver */}
+          {parrainageModal?.type === "disable" && (
+            <div style={s.overlay}>
+              <div style={s.modalBox}>
+                <h3 style={{ ...s.modalTitle, color: "#DC2626" }}>🔒 Désactiver le lien</h3>
+                <p style={s.modalText}>
+                  Désactiver le lien de parrainage de <strong>{parrainageModal.lien.parrain_name || parrainageModal.lien.member_name}</strong> ?<br />
+                  <span style={{ fontSize: 12, color: "#94A3B8" }}>Token : <code>{parrainageModal.lien.token}</code></span><br /><br />
+                  Les clients déjà inscrits ne seront pas affectés. Le lien ne pourra plus être utilisé pour de nouvelles inscriptions.
+                </p>
+                <div style={s.modalActions}>
+                  <button style={s.btnSecondary} onClick={() => setParrainageModal(null)}>Annuler</button>
+                  <button style={s.btnDanger} onClick={() => handleDisableParrainage(parrainageModal.lien.id)}>
+                    🔒 Désactiver
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal détail lien */}
+          {parrainageModal?.type === "detail" && (
+            <div style={s.overlay}>
+              <div style={{ ...s.modalBox, maxWidth: 540 }}>
+                <h3 style={s.modalTitle}>🔗 Détail du lien de parrainage</h3>
+                {(() => {
+                  const lien = parrainageModal.lien;
+                  const BASE = window.location.origin;
+                  const fullUrl = `${BASE}/parrainage/${lien.token}`;
+                  const roleC = ROLE_COLORS[lien.parrain_role || lien.member_role] || {};
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {/* Parrain */}
+                      <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "12px 16px" }}>
+                        <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Parrain</div>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{lien.parrain_name || lien.member_name || "—"}</div>
+                        {(lien.parrain_email || lien.member_email) && <div style={{ fontSize: 12, color: "#64748B" }}>{lien.parrain_email || lien.member_email}</div>}
+                        {(lien.parrain_phone || lien.member_phone) && <div style={{ fontSize: 12, color: "#64748B" }}>{lien.parrain_phone || lien.member_phone}</div>}
+                        {(lien.parrain_role || lien.member_role) && (
+                          <span style={{ ...s.badge, background: roleC.bg, color: roleC.color, border: `1px solid ${roleC.border}`, marginTop: 6, display: "inline-block" }}>
+                            {lien.parrain_role || lien.member_role}
+                          </span>
+                        )}
+                      </div>
+                      {/* Lien */}
+                      <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 16px" }}>
+                        <div style={{ fontSize: 11, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Lien public</div>
+                        <div style={{ fontFamily: "monospace", fontSize: 12, wordBreak: "break-all", color: "#4C1D95", marginBottom: 8 }}>{fullUrl}</div>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(fullUrl); showToast("📋 Lien copié !"); }}
+                          style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #DDD6FE", background: "#fff", color: "#7C3AED", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+                        >
+                          📋 Copier
+                        </button>
+                      </div>
+                      {/* Stats */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                        <div style={{ textAlign: "center", background: "#EFF6FF", borderRadius: 10, padding: "10px 8px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#2563EB" }}>{lien.clients_count ?? lien.total_clients ?? 0}</div>
+                          <div style={{ fontSize: 11, color: "#64748B" }}>Inscrits</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#ECFDF5", borderRadius: 10, padding: "10px 8px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#059669" }}>{lien.clients_paid ?? "—"}</div>
+                          <div style={{ fontSize: 11, color: "#64748B" }}>Payés</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#FFF7ED", borderRadius: 10, padding: "10px 8px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#D97706" }}>
+                            {lien.expires_at ? new Date(lien.expires_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "∞"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748B" }}>Expiration</div>
+                        </div>
+                      </div>
+                      {/* Dates */}
+                      {lien.created_at && (
+                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                          Créé le {new Date(lien.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                <div style={{ ...s.modalActions, marginTop: 20, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
+                  <button style={s.btnSecondary} onClick={() => setParrainageModal(null)}>Fermer</button>
+                  {!parrainageModal.lien.disabled && parrainageModal.lien.status !== "disabled" && (
+                    <button
+                      style={s.btnDanger}
+                      onClick={() => setParrainageModal({ type: "disable", lien: parrainageModal.lien })}
+                    >
+                      🔒 Désactiver ce lien
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
