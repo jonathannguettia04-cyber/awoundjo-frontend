@@ -879,11 +879,29 @@ export default function AdminProviders() {
                   <span className="text-sm text-slate-600">Mot de passe temporaire</span>
                   <span className="font-mono font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-lg text-sm">{tempPass}</span>
                 </div>
+                <div className="flex justify-between items-center pt-1 border-t border-amber-200 mt-1">
+                  <span className="text-sm text-slate-600">Lien de connexion</span>
+                  <a href="http://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold text-blue-600 underline truncate max-w-[180px]">
+                    mutuelleawoundjo.org/etablissement/login
+                  </a>
+                </div>
               </div>
             </div>
-            <p className="text-xs text-slate-400 mb-4 text-center">
+            <p className="text-xs text-slate-400 mb-3 text-center">
               ⚠️ Notez ces identifiants — ils ne seront plus affichés. Le provider devra changer son mot de passe à la première connexion.
             </p>
+            <button
+              onClick={() => {
+                const text = `Login : ${modal.item.phone}\nMot de passe : ${tempPass}\nLien : http://mutuelleawoundjo.org/etablissement/login`;
+                try { navigator.clipboard.writeText(text); } catch {
+                  const ta = document.createElement("textarea");
+                  ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+                }
+              }}
+              className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 transition-colors mb-2">
+              📋 Copier tout
+            </button>
             <button onClick={() => { setModal(null); setTempPass(""); }}
               className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold text-sm">
               J'ai noté les identifiants ✓
@@ -912,9 +930,27 @@ export default function AdminProviders() {
                   <span className="text-sm text-slate-600">Mot de passe temporaire</span>
                   <span className="font-mono font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-lg text-sm">{resetPass}</span>
                 </div>
+                <div className="flex justify-between items-center pt-1 border-t border-amber-200 mt-1">
+                  <span className="text-sm text-slate-600">Lien de connexion</span>
+                  <a href="http://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold text-blue-600 underline truncate max-w-[180px]">
+                    mutuelleawoundjo.org/etablissement/login
+                  </a>
+                </div>
               </div>
             </div>
-            <p className="text-xs text-slate-400 mb-4 text-center">⚠️ Notez ces identifiants — ils ne seront plus affichés.</p>
+            <p className="text-xs text-slate-400 mb-3 text-center">⚠️ Notez ces identifiants — ils ne seront plus affichés.</p>
+            <button
+              onClick={() => {
+                const text = `Login : ${modal.item.phone}\nMot de passe : ${resetPass}\nLien : http://mutuelleawoundjo.org/etablissement/login`;
+                try { navigator.clipboard.writeText(text); } catch {
+                  const ta = document.createElement("textarea");
+                  ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+                }
+              }}
+              className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 transition-colors mb-2">
+              📋 Copier tout
+            </button>
             <button onClick={() => { setModal(null); setResetPass(""); }}
               className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold text-sm">
               J'ai noté les identifiants ✓
