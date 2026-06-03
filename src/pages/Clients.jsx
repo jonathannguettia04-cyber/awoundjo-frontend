@@ -601,7 +601,47 @@ export default function Clients() {
                   {pendingPayment.accessCode && (
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Code d'accès</span>
-                      <span className="font-mono text-sm font-bold text-brand-600 tracking-widest">{pendingPayment.accessCode}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-sm font-bold text-brand-600 tracking-widest">{pendingPayment.accessCode}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const text = pendingPayment.accessCode;
+                            try { navigator.clipboard.writeText(text); } catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); }
+                            setCopiedField("pay_code");
+                            setTimeout(() => setCopiedField(null), 2000);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 transition-colors" title="Copier le code">
+                          {copiedField === "pay_code" ? <Check size={13} className="text-green-600" /> : <Copy size={13} className="text-slate-400" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {pendingPayment.mutualNumber && (
+                    <div className="pt-2 border-t border-slate-200 mt-1">
+                      <span className="block text-xs text-slate-400 mb-1">Lien portail adhérent</span>
+                      <div className="flex items-center bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 gap-1">
+                        <span className="flex-1 text-xs text-blue-700 truncate">
+                          {`https://www.mutuelleawoundjo.org/client/login?id=${pendingPayment.mutualNumber}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = `https://www.mutuelleawoundjo.org/client/login?id=${pendingPayment.mutualNumber}`;
+                            try { navigator.clipboard.writeText(url); } catch { const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); }
+                            setCopiedField("pay_portal");
+                            setTimeout(() => setCopiedField(null), 2000);
+                          }}
+                          className="flex-shrink-0 p-1 rounded hover:bg-blue-100 transition-colors" title="Copier le lien">
+                          {copiedField === "pay_portal" ? <Check size={13} className="text-green-600" /> : <Copy size={13} className="text-blue-400" />}
+                        </button>
+                        <a
+                          href={`https://www.mutuelleawoundjo.org/client/login?id=${pendingPayment.mutualNumber}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex-shrink-0 p-1 rounded hover:bg-blue-100 transition-colors" title="Ouvrir le portail">
+                          <ExternalLink size={13} className="text-blue-500" />
+                        </a>
+                      </div>
                     </div>
                   )}
                   <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
