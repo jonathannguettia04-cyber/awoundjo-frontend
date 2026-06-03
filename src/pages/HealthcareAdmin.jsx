@@ -9,10 +9,13 @@ const TYPES = [
   { id: "clinic",   label: "Clinique",    icon: "🏥", color: "bg-blue-100 text-blue-700 border-blue-200" },
   { id: "hospital", label: "Hôpital",     icon: "🏨", color: "bg-purple-100 text-purple-700 border-purple-200" },
   { id: "lab",      label: "Laboratoire", icon: "🔬", color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  { id: "optician", label: "Opticien",    icon: "👓", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+  { id: "dentist",  label: "Dentiste",    icon: "🦷", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  { id: "midwife",  label: "Sage-femme",  icon: "🩺", color: "bg-pink-100 text-pink-700 border-pink-200" },
 ];
 
 const TYPE_MAP = Object.fromEntries(TYPES.map((t) => [t.id, t]));
-const EMPTY = { name: "", type: "pharmacy", address: "", city: "", commune: "", phone: "", phone2: "", email: "", website: "" };
+const EMPTY = { name: "", type: "pharmacy", address: "", city: "", commune: "", phone: "", email: "", manager_name: "" };
 
 export default function HealthcareAdmin() {
   const [providers,    setProviders]    = useState([]);
@@ -53,8 +56,8 @@ export default function HealthcareAdmin() {
     setForm({
       name: p.name, type: p.type,
       address: p.address || "", city: p.city || "", commune: p.commune || "",
-      phone: p.phone || "", phone2: p.phone2 || "",
-      email: p.email || "", website: p.website || "",
+      phone: p.phone || "", email: p.email || "",
+      manager_name: p.manager_name || "",
     });
     setFormError(""); setShowModal(true);
   }
@@ -109,19 +112,18 @@ export default function HealthcareAdmin() {
 
       for (const row of rows) {
         const payload = {
-          name:    String(row["Nom"]         || row["name"]    || "").trim(),
-          type:    String(row["Type"]        || row["type"]    || "pharmacy").trim().toLowerCase(),
-          city:    String(row["Ville"]       || row["city"]    || "").trim(),
-          commune: String(row["Commune"]     || row["commune"] || "").trim(),
-          address: String(row["Adresse"]     || row["address"] || "").trim(),
-          phone:   String(row["Téléphone"]   || row["phone"]   || "").trim(),
-          phone2:  String(row["Téléphone 2"] || row["phone2"]  || "").trim(),
-          email:   String(row["Email"]       || row["email"]   || "").trim(),
-          website: String(row["Site web"]    || row["website"] || "").trim(),
+          name:         String(row["Nom"]          || row["name"]         || "").trim(),
+          type:         String(row["Type"]         || row["type"]         || "pharmacy").trim().toLowerCase(),
+          city:         String(row["Ville"]        || row["city"]         || "").trim(),
+          commune:      String(row["Commune"]      || row["commune"]      || "").trim(),
+          address:      String(row["Adresse"]      || row["address"]      || "").trim(),
+          phone:        String(row["Téléphone"]    || row["phone"]        || "").trim(),
+          email:        String(row["Email"]        || row["email"]        || "").trim(),
+          manager_name: String(row["Responsable"]  || row["manager_name"] || "").trim(),
         };
 
         if (!payload.name) { errors.push("Ligne ignorée : nom manquant"); continue; }
-        if (!["pharmacy", "clinic", "hospital", "lab"].includes(payload.type)) {
+        if (!["pharmacy", "clinic", "hospital", "lab", "optician", "dentist", "midwife"].includes(payload.type)) {
           payload.type = "pharmacy";
         }
 
@@ -172,7 +174,7 @@ export default function HealthcareAdmin() {
   });
 
   const counts = TYPES.reduce((acc, t) => {
-    acc[t.id] = providers.filter((p) => p.type === t.id && p.active).length;
+    acc[t.id] = providers.filter((p) => p.type === t.id && p.status === "ACTIVE").length;
     return acc;
   }, {});
 
@@ -184,7 +186,7 @@ export default function HealthcareAdmin() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Réseau de Soins</h1>
-          <p className="text-slate-500 text-sm">{providers.filter((p) => p.active).length} établissements actifs</p>
+          <p className="text-slate-500 text-sm">{providers.filter((p) => p.status === "ACTIVE").length} établissements actifs</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {/* Bouton Import Excel */}
@@ -228,15 +230,15 @@ export default function HealthcareAdmin() {
       {/* Modèle Excel à télécharger */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 flex items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          📋 Format Excel attendu — colonnes : <span className="font-mono font-semibold">Nom, Type, Ville, Adresse, Téléphone, Téléphone 2, Email, Site web</span>
-          <br />Types valides : <span className="font-mono">pharmacy · clinic · hospital · lab</span>
+          📋 Format Excel attendu — colonnes : <span className="font-mono font-semibold">Nom, Type, Ville, Commune, Adresse, Téléphone, Email, Responsable</span>
+          <br />Types valides : <span className="font-mono">pharmacy · clinic · hospital · lab · optician · dentist · midwife</span>
         </p>
         <button
           onClick={() => {
             const ws = XLSX.utils.aoa_to_sheet([
-              ["Nom", "Type", "Ville", "Adresse", "Téléphone", "Téléphone 2", "Email", "Site web"],
-              ["Pharmacie du Plateau", "pharmacy", "Abidjan", "Plateau, Rue du Commerce", "0101020304", "", "", ""],
-              ["Clinique Sainte Marie", "clinic", "Yamoussoukro", "Centre-ville", "0505060708", "", "", ""],
+              ["Nom", "Type", "Ville", "Commune", "Adresse", "Téléphone", "Email", "Responsable"],
+              ["Pharmacie du Plateau", "pharmacy", "Abidjan", "Plateau", "Rue du Commerce", "0101020304", "", ""],
+              ["Clinique Sainte Marie", "clinic", "Yamoussoukro", "Centre-ville", "Centre-ville", "0505060708", "", "Dr Koné"],
             ]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Établissements");
@@ -322,14 +324,14 @@ export default function HealthcareAdmin() {
             return (
               <div key={p.id}
                 className={`bg-white rounded-2xl border shadow-sm p-5 transition-all hover:shadow-md
-                  ${!p.active ? "opacity-50 border-slate-200" : "border-slate-100"}`}>
+                  ${p.status !== "ACTIVE" ? "opacity-50 border-slate-200" : "border-slate-100"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className={`w-11 h-11 rounded-xl border flex items-center justify-center text-xl flex-shrink-0 ${t.color}`}>
                     {t.icon}
                   </div>
                   <div className="flex items-center gap-1 flex-wrap justify-end">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${t.color}`}>{t.label}</span>
-                    {!p.active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactif</span>}
+                    {p.status !== "ACTIVE" && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{p.status === "SUSPENDED" ? "Suspendu" : "Inactif"}</span>}
                   </div>
                 </div>
                 <p className="font-bold text-slate-800 text-sm leading-tight">{p.name}</p>
@@ -337,7 +339,7 @@ export default function HealthcareAdmin() {
                   <p className="text-xs text-slate-400 mt-1">📍 {[p.address, p.commune, p.city].filter(Boolean).join(", ")}</p>
                 )}
                 {p.phone && (
-                  <p className="text-xs text-slate-500 mt-0.5">📞 {p.phone}{p.phone2 ? ` · ${p.phone2}` : ""}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">📞 {p.phone}</p>
                 )}
 
                 <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50">
@@ -345,7 +347,7 @@ export default function HealthcareAdmin() {
                     className="flex-1 text-xs font-semibold py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
                     ✏️ Modifier
                   </button>
-                  {p.active ? (
+                  {p.status === "ACTIVE" ? (
                     <button onClick={() => setConfirm(p)}
                       className="flex-1 text-xs font-semibold py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
                       🗑️ Désactiver
@@ -412,18 +414,14 @@ export default function HealthcareAdmin() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone 2</label>
-              <input value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Site web</label>
-              <input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Responsable</label>
+              <input value={form.manager_name} onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
+                placeholder="Ex : Dr Koné"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
           </div>
