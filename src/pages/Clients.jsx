@@ -658,6 +658,30 @@ export default function Clients() {
                 </div>
               )}
 
+              {/* Tout copier */}
+              {pendingPayment?.mutualNumber && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = `https://www.mutuelleawoundjo.org/client/login?id=${pendingPayment.mutualNumber}`;
+                    const text = [
+                      `Nom : ${pendingPayment.client.name}`,
+                      `N° Mutuel : ${pendingPayment.mutualNumber}`,
+                      pendingPayment.accessCode ? `Code d'accès : ${pendingPayment.accessCode}` : "",
+                      `Portail adhérent : ${url}`,
+                    ].filter(Boolean).join("\n");
+                    try { navigator.clipboard.writeText(text); } catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); }
+                    setCopiedField("pay_all");
+                    setTimeout(() => setCopiedField(null), 2000);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-500 font-medium hover:border-brand-400 hover:text-brand-700 hover:bg-brand-50 transition-all duration-200"
+                >
+                  {copiedField === "pay_all"
+                    ? <><Check size={14} className="text-green-600" /><span className="text-green-700">Copié !</span></>
+                    : <><Copy size={14} /> Tout copier (SMS / WhatsApp)</>}
+                </button>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Réseau de paiement</label>
                 <select
