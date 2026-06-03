@@ -347,6 +347,7 @@ export default function AdminProviders() {
       setTempPass(data.temp_password);
       setModal({ type: "approved_result", item: modal.item, provider: data.provider });
       loadRequests();
+      loadProviders();
     } catch (err) {
       setError(err.response?.data?.error || "Erreur approbation");
       setModal(null);
