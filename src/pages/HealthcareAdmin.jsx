@@ -1,6 +1,3 @@
-2.34 Ko•463 lignes
-•
-Le formatage peut être différent de la source
 
 import { useEffect, useState } from "react";
 import { healthcareAPI } from "../services/api";
