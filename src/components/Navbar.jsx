@@ -1,8 +1,12 @@
 // src/components/Navbar.jsx
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRole } from "../context/RoleContext";
+
+// Nombre max de liens visibles directement dans la navbar (avant "Plus...")
+// Ajuste cette valeur selon la largeur que tu veux allouer aux liens
+const MAX_VISIBLE = 6;
 
 function getNavLinks(role) {
   const common = [
@@ -55,14 +59,67 @@ function initials(name = "") {
     .join("");
 }
 
+/** Lien de navigation desktop (réutilisable) */
+function NavLink({ to, label, icon, pathname, onClick }) {
+  const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors duration-150 no-underline"
+      style={{
+        color: isActive ? "#fff" : "rgba(255,255,255,0.6)",
+        background: isActive ? "rgba(255,255,255,0.18)" : "transparent",
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.10)";
+        if (!isActive) e.currentTarget.style.color = "#fff";
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) e.currentTarget.style.background = "transparent";
+        if (!isActive) e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+      }}
+    >
+      <i className={`ti ${icon}`} aria-hidden="true" style={{ fontSize: 15 }} />
+      <span className="hidden lg:block">{label}</span>
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { role, label: roleLabel } = useRole();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
 
-  const links = getNavLinks(role);
+  const [menuOpen, setMenuOpen]       = useState(false); // burger mobile
+  const [moreOpen, setMoreOpen]       = useState(false); // dropdown "Plus..."
+  const moreRef                       = useRef(null);
+
+  const links        = getNavLinks(role);
+  const visibleLinks = links.slice(0, MAX_VISIBLE);
+  const hiddenLinks  = links.slice(MAX_VISIBLE);
+  const hasMore      = hiddenLinks.length > 0;
+
+  // Un lien caché est-il actif ? → on le signale sur le bouton "Plus..."
+  const moreIsActive = hiddenLinks.some(({ to }) =>
+    to === "/" ? pathname === "/" : pathname.startsWith(to)
+  );
+
+  // Fermer le dropdown si clic en dehors
+  const handleClickOutside = useCallback((e) => {
+    if (moreRef.current && !moreRef.current.contains(e.target)) {
+      setMoreOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (moreOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [moreOpen, handleClickOutside]);
+
+  // Fermer le dropdown au changement de route
+  useEffect(() => { setMoreOpen(false); }, [pathname]);
 
   function handleLogout() {
     logout();
@@ -89,32 +146,97 @@ export default function Navbar() {
         <div className="hidden md:block flex-shrink-0 w-px h-5 mx-1" style={{ background: "rgba(255,255,255,0.2)" }} />
 
         {/* Nav desktop */}
-        <nav className="hidden md:flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
-          {links.map(({ to, label, icon }) => {
-            const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
-            return (
-              <Link
-                key={to}
-                to={to}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors duration-150 no-underline"
+        <nav className="hidden md:flex items-center gap-0.5 flex-1 min-w-0">
+          {visibleLinks.map(({ to, label, icon }) => (
+            <NavLink key={to} to={to} label={label} icon={icon} pathname={pathname} />
+          ))}
+
+          {/* ── Bouton "Plus..." ── */}
+          {hasMore && (
+            <div className="relative flex-shrink-0" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors duration-150"
                 style={{
-                  color: isActive ? "#fff" : "rgba(255,255,255,0.6)",
-                  background: isActive ? "rgba(255,255,255,0.18)" : "transparent",
+                  color: moreIsActive || moreOpen ? "#fff" : "rgba(255,255,255,0.6)",
+                  background: moreIsActive || moreOpen ? "rgba(255,255,255,0.18)" : "transparent",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.10)";
-                  if (!isActive) e.currentTarget.style.color = "#fff";
+                  if (!moreIsActive && !moreOpen) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.10)";
+                    e.currentTarget.style.color = "#fff";
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.background = "transparent";
-                  if (!isActive) e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+                  if (!moreIsActive && !moreOpen) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+                  }
                 }}
+                aria-haspopup="true"
+                aria-expanded={moreOpen}
               >
-                <i className={`ti ${icon}`} aria-hidden="true" style={{ fontSize: 15 }} />
-                <span className="hidden lg:block">{label}</span>
-              </Link>
-            );
-          })}
+                <i className="ti ti-dots" aria-hidden="true" style={{ fontSize: 15 }} />
+                <span className="hidden lg:block">Plus</span>
+                <i
+                  className={`ti ti-chevron-down hidden lg:block`}
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 12,
+                    transition: "transform 0.2s",
+                    transform: moreOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
+              </button>
+
+              {/* Dropdown */}
+              {moreOpen && (
+                <div
+                  className="absolute left-0 top-full mt-1.5 flex flex-col py-1 rounded-xl shadow-2xl z-50"
+                  style={{
+                    background: "#1a5fa8",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    minWidth: 200,
+                    // Petite animation d'apparition
+                    animation: "fadeSlideDown 0.15s ease",
+                  }}
+                >
+                  {hiddenLinks.map(({ to, label, icon }) => {
+                    const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
+                    return (
+                      <Link
+                        key={to}
+                        to={to}
+                        onClick={() => setMoreOpen(false)}
+                        className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium no-underline transition-colors duration-100"
+                        style={{
+                          color: isActive ? "#fff" : "rgba(255,255,255,0.7)",
+                          background: isActive ? "rgba(255,255,255,0.14)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.10)";
+                          if (!isActive) e.currentTarget.style.color = "#fff";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) e.currentTarget.style.background = "transparent";
+                          if (!isActive) e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                        }}
+                      >
+                        <i className={`ti ${icon}`} aria-hidden="true" style={{ fontSize: 15 }} />
+                        {label}
+                        {isActive && (
+                          <span
+                            className="ml-auto rounded-full"
+                            style={{ width: 6, height: 6, background: "#00c4b4" }}
+                          />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* Séparateur */}
@@ -188,7 +310,7 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* ── Drawer mobile ───────────────────────────────────────── */}
+      {/* ── Drawer mobile (tous les liens, pas de limite) ─────── */}
       {menuOpen && (
         <div
           className="md:hidden px-3 pb-3 flex flex-col gap-0.5"
@@ -255,6 +377,14 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Animation CSS pour le dropdown */}
+      <style>{`
+        @keyframes fadeSlideDown {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </header>
   );
 }
