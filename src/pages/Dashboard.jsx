@@ -18,7 +18,7 @@ const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
 
 /* ─── Sparkline SVG ───────────────────────────────────────────────── */
-function Sparkline({ data = [], color = "#10b981", height = 48 }) {
+function Sparkline({ data = [], color = "#00c4b4", height = 48 }) {
   if (data.length < 2) return null;
   const vals = data.map((d) => Number(d.revenue || 0));
   const max = Math.max(...vals, 1);
@@ -161,21 +161,21 @@ export default function Dashboard() {
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
     .awj-dash * { box-sizing: border-box; }
-    .awj-dash { font-family: 'Outfit', system-ui, sans-serif; background: #0d1117; min-height: 100vh; color: #f0f0f0; }
+    .awj-dash { font-family: 'Outfit', system-ui, sans-serif; background: #0a1628; min-height: 100vh; color: #f0f0f0; }
     .awj-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; transition: border-color 0.2s, transform 0.2s; }
     .awj-card:hover { border-color: rgba(255,255,255,0.13); }
-    .awj-card-hover:hover { transform: translateY(-2px); border-color: rgba(16,185,129,0.25) !important; }
-    .awj-btn-primary { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s, transform 0.15s; }
+    .awj-card-hover:hover { transform: translateY(-2px); border-color: rgba(0,196,180,0.3) !important; }
+    .awj-btn-primary { background: linear-gradient(135deg, #1a5fa8, #00c4b4); color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s, transform 0.15s; }
     .awj-btn-primary:hover { opacity: 0.88; }
     .awj-btn-primary:active { transform: scale(0.97); }
-    .awj-btn-ghost { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.2s; }
-    .awj-btn-ghost:hover { background: rgba(255,255,255,0.10); }
-    .awj-link { color: #10b981; text-decoration: none; font-size: 12px; font-weight: 500; }
+    .awj-btn-ghost { background: rgba(26,95,168,0.15); color: rgba(255,255,255,0.75); border: 1px solid rgba(26,95,168,0.3); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.2s; }
+    .awj-btn-ghost:hover { background: rgba(26,95,168,0.25); }
+    .awj-link { color: #00c4b4; text-decoration: none; font-size: 12px; font-weight: 500; }
     .awj-link:hover { text-decoration: underline; }
     .awj-row-item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-decoration: none; transition: background 0.15s; }
     .awj-row-item:last-child { border-bottom: none; }
-    .awj-row-item:hover { background: rgba(255,255,255,0.04); }
-    .awj-avatar { width: 38px; height: 38px; border-radius: 10px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.25); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #10b981; flex-shrink: 0; }
+    .awj-row-item:hover { background: rgba(26,95,168,0.08); }
+    .awj-avatar { width: 38px; height: 38px; border-radius: 10px; background: rgba(0,196,180,0.15); border: 1px solid rgba(0,196,180,0.25); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #00c4b4; flex-shrink: 0; }
     .awj-section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
     .awj-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px; }
     .awj-pulse { animation: awjPulse 2.5s ease-in-out infinite; }
@@ -227,7 +227,7 @@ export default function Dashboard() {
       <style>{css}</style>
       <div className="awj-dash" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ width: 44, height: 44, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+          <div style={{ width: 44, height: 44, border: "3px solid rgba(0,196,180,0.2)", borderTopColor: "#00c4b4", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Chargement du tableau de bord…</p>
         </div>
@@ -262,15 +262,15 @@ export default function Dashboard() {
   const greeting = h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
 
   const planColors = {
-    ESSENTIELLE: { color: "#10b981", bg: "rgba(16,185,129,0.12)", label: "🌱" },
-    IVOIRIENNE: { color: "#8b5cf6", bg: "rgba(139,92,246,0.12)", label: "🌿" },
-    TURQUOISE: { color: "#06b6d4", bg: "rgba(6,182,212,0.12)", label: "💎" },
+    ESSENTIELLE: { color: "#00c4b4", bg: "rgba(0,196,180,0.12)", label: "🌱" },
+    IVOIRIENNE: { color: "#1a5fa8", bg: "rgba(26,95,168,0.12)", label: "🌿" },
+    TURQUOISE: { color: "#00c4b4", bg: "rgba(0,196,180,0.12)", label: "💎" },
   };
 
   const donutSegments = [
-    { value: Number(cs.plan_essentielle ?? 0), color: "#10b981" },
-    { value: Number(cs.plan_ivoirienne ?? 0), color: "#8b5cf6" },
-    { value: Number(cs.plan_turquoise ?? 0), color: "#06b6d4" },
+    { value: Number(cs.plan_essentielle ?? 0), color: "#00c4b4" },
+    { value: Number(cs.plan_ivoirienne ?? 0), color: "#1a5fa8" },
+    { value: Number(cs.plan_turquoise ?? 0), color: "#00c4b4" },
   ];
 
   const totalClients = Number(cs.total_clients ?? 0);
@@ -285,14 +285,14 @@ export default function Dashboard() {
           <div style={{}}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} className="awj-pulse" />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c4b4" }} className="awj-pulse" />
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
                   {now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 </span>
               </div>
               <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>
                 {greeting},{" "}
-                <span style={{ background: "linear-gradient(135deg, #10b981, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                <span style={{ background: "linear-gradient(135deg, #00c4b4, #5eead4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {user?.name?.split(" ")[0]}
                 </span>{" "}👋
               </h1>
@@ -326,6 +326,98 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* ══ VUE MULTI-PORTAILS ══════════════════════════════════ */}
+          {isAdmin && (
+            <div style={{ marginBottom: 24 }}>
+              <p className="awj-section-label" style={{ marginBottom: 14 }}>🌐 Portails actifs — vue d'ensemble</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+                {[
+                  {
+                    key: "admin",
+                    icon: "🛡️",
+                    label: "Admin",
+                    desc: "Gestion centrale",
+                    color: "#1a5fa8",
+                    gradient: "linear-gradient(135deg,rgba(26,95,168,0.25),rgba(26,95,168,0.08))",
+                    border: "rgba(26,95,168,0.35)",
+                    link: "/dashboard",
+                    stat: `${data?.clients?.total_clients ?? 0} clients`,
+                  },
+                  {
+                    key: "agent",
+                    icon: "🧑‍💼",
+                    label: "Agents",
+                    desc: "Réseau terrain",
+                    color: "#00c4b4",
+                    gradient: "linear-gradient(135deg,rgba(0,196,180,0.2),rgba(0,196,180,0.06))",
+                    border: "rgba(0,196,180,0.3)",
+                    link: "/agents",
+                    stat: `${data?.top_agents?.length ?? 0} agents actifs`,
+                  },
+                  {
+                    key: "client",
+                    icon: "👤",
+                    label: "Clients",
+                    desc: "Portail mutualistes",
+                    color: "#60a5fa",
+                    gradient: "linear-gradient(135deg,rgba(96,165,250,0.18),rgba(96,165,250,0.05))",
+                    border: "rgba(96,165,250,0.28)",
+                    link: "/clients",
+                    stat: `${data?.clients?.actifs ?? 0} actifs`,
+                  },
+                  {
+                    key: "diaspora",
+                    icon: "🌍",
+                    label: "Diaspora",
+                    desc: "Réseau international",
+                    color: "#f59e0b",
+                    gradient: "linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.05))",
+                    border: "rgba(245,158,11,0.28)",
+                    link: "/diaspora",
+                    stat: "Réseau actif",
+                  },
+                  {
+                    key: "business",
+                    icon: "🏢",
+                    label: "Business",
+                    desc: "Réseau MLM",
+                    color: "#a78bfa",
+                    gradient: "linear-gradient(135deg,rgba(167,139,250,0.18),rgba(167,139,250,0.05))",
+                    border: "rgba(167,139,250,0.28)",
+                    link: "/business",
+                    stat: "CNEPECI",
+                  },
+                  {
+                    key: "parrainage",
+                    icon: "🔗",
+                    label: "Parrainage",
+                    desc: "Réseau référents",
+                    color: "#fb923c",
+                    gradient: "linear-gradient(135deg,rgba(251,146,60,0.18),rgba(251,146,60,0.05))",
+                    border: "rgba(251,146,60,0.28)",
+                    link: "/referral",
+                    stat: "10% commission",
+                  },
+                ].map((portal) => (
+                  <Link key={portal.key} to={portal.link} style={{ textDecoration: "none" }}>
+                    <div style={{ background: portal.gradient, border: `1px solid ${portal.border}`, borderRadius: 14, padding: "16px 18px", cursor: "pointer", transition: "transform 0.2s, border-color 0.2s" }}
+                      onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                      onMouseLeave={e => e.currentTarget.style.transform = "none"}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <span style={{ fontSize: 22 }}>{portal.icon}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: `rgba(255,255,255,0.08)`, padding: "2px 7px", borderRadius: 20, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Live</span>
+                      </div>
+                      <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 2px", color: "#f0f0f0" }}>{portal.label}</p>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: "0 0 10px" }}>{portal.desc}</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: portal.color, margin: 0 }}>{portal.stat}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ══ FORMULES (admin) ════════════════════════════════════ */}
           {isAdmin && showPlans && (
             <div className="awj-card awj-fade-in" style={{ marginBottom: 24, overflow: "hidden" }}>
@@ -350,7 +442,7 @@ export default function Dashboard() {
                     </div>
                     <div style={{ display: "flex", gap: 16, marginTop: 4, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-                        Adhésion : <strong style={{ color: plan.adhesion_price === 0 ? "#10b981" : "rgba(255,255,255,0.75)" }}>
+                        Adhésion : <strong style={{ color: plan.adhesion_price === 0 ? "#00c4b4" : "rgba(255,255,255,0.75)" }}>
                           {plan.adhesion_price === 0 ? "Gratuit" : `${Number(plan.adhesion_price).toLocaleString("fr-FR")} FCFA`}
                         </strong>
                       </span>
@@ -358,13 +450,13 @@ export default function Dashboard() {
                         Cotisation : <strong style={{ color: "rgba(255,255,255,0.75)" }}>{Number(plan.monthly_price).toLocaleString("fr-FR")} FCFA/mois</strong>
                       </span>
                       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-                        Couverture : <strong style={{ color: "#10b981" }}>{plan.coverage_percent}%</strong>
+                        Couverture : <strong style={{ color: "#00c4b4" }}>{plan.coverage_percent}%</strong>
                       </span>
                     </div>
                     {plan.benefits?.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                         {plan.benefits.map((b) => (
-                          <span key={b.category} style={{ fontSize: 11, background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)", padding: "2px 8px", borderRadius: 6 }}>
+                          <span key={b.category} style={{ fontSize: 11, background: "rgba(0,196,180,0.12)", color: "#00c4b4", border: "1px solid rgba(0,196,180,0.2)", padding: "2px 8px", borderRadius: 6 }}>
                             {b.category.replace(/_/g, " ")}
                             {b.coverage_percent != null && ` ${b.coverage_percent}%`}
                           </span>
@@ -373,7 +465,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => togglePlanActive(plan)} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: plan.is_active ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: plan.is_active ? "#10b981" : "rgba(255,255,255,0.4)" }}>
+                    <button onClick={() => togglePlanActive(plan)} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: plan.is_active ? "rgba(0,196,180,0.15)" : "rgba(255,255,255,0.06)", color: plan.is_active ? "#00c4b4" : "rgba(255,255,255,0.4)" }}>
                       {plan.is_active ? "✓ Actif" : "○ Inactif"}
                     </button>
                     <button onClick={() => { setEditingPlan(plan); setPlanModal(true); }} style={{ fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, background: "rgba(96,165,250,0.12)", color: "#60a5fa" }}>
@@ -401,21 +493,21 @@ export default function Dashboard() {
 
             {/* Revenu Total — carte hero */}
             <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden", gridColumn: "span 1" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #10b981, #34d399, transparent)" }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #00c4b4, #5eead4, transparent)" }} />
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>Revenu total</p>
-              <div className="awj-number" style={{ color: "#10b981", marginBottom: 4 }}>
+              <div className="awj-number" style={{ color: "#00c4b4", marginBottom: 4 }}>
                 {fmtShort(ps.total_revenue)}
                 <span style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>FCFA</span>
               </div>
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "4px 0 16px" }}>{ps.total_payments ?? 0} paiements au total</p>
-              <Sparkline data={evolution} color="#10b981" height={44} />
+              <Sparkline data={evolution} color="#00c4b4" height={44} />
             </div>
 
             {/* Aujourd'hui */}
             <div className="awj-card" style={{ padding: "24px 24px 18px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #8b5cf6, #a78bfa, transparent)" }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #1a5fa8, #60a5fa, transparent)" }} />
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>Aujourd'hui</p>
-              <div className="awj-number" style={{ color: "#a78bfa", marginBottom: 4 }}>
+              <div className="awj-number" style={{ color: "#60a5fa", marginBottom: 4 }}>
                 {fmtShort(ps.today_revenue)}
                 <span style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>FCFA</span>
               </div>
@@ -439,7 +531,7 @@ export default function Dashboard() {
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>Méthodes de paiement</p>
               {[
                 { label: "📱 Wave", value: Number(ps.wave_revenue), color: "#f59e0b" },
-                { label: "💵 Cash", value: Number(ps.cash_revenue), color: "#10b981" },
+                { label: "💵 Cash", value: Number(ps.cash_revenue), color: "#00c4b4" },
               ].map((m) => (
                 <div key={m.label} style={{ marginBottom: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -464,9 +556,9 @@ export default function Dashboard() {
               <DonutChart segments={donutSegments} />
               <div style={{ marginTop: 16, width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
-                  { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "#10b981" },
-                  { label: "Ivoirienne", value: Number(cs.plan_ivoirienne ?? 0), color: "#8b5cf6" },
-                  { label: "Turquoise", value: Number(cs.plan_turquoise ?? 0), color: "#06b6d4" },
+                  { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "#00c4b4" },
+                  { label: "Ivoirienne", value: Number(cs.plan_ivoirienne ?? 0), color: "#1a5fa8" },
+                  { label: "Turquoise", value: Number(cs.plan_turquoise ?? 0), color: "#00c4b4" },
                 ].map((s) => (
                   <div key={s.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -483,7 +575,7 @@ export default function Dashboard() {
             <div className="awj-stat-grid">
               {[
                 { label: "Total clients", value: cs.total_clients ?? 0, sub: "inscrits", color: "#f0f0f0", icon: "👥", to: "/clients" },
-                { label: "Actifs", value: cs.actifs ?? 0, sub: "membres actifs", color: "#10b981", icon: "✅", to: "/clients?status=actif" },
+                { label: "Actifs", value: cs.actifs ?? 0, sub: "membres actifs", color: "#00c4b4", icon: "✅", to: "/clients?status=actif" },
                 { label: "En attente", value: cs.attente ?? 0, sub: "à valider", color: "#f59e0b", icon: "⏳", to: "/clients?status=attente" },
               ].map((s) => (
                 <Link key={s.label} to={s.to} style={{ textDecoration: "none" }}>
@@ -498,9 +590,9 @@ export default function Dashboard() {
                 </Link>
               ))}
               {[
-                { label: "Essentielle", value: cs.plan_essentielle ?? 0, color: "#10b981", to: "/clients?plan=ESSENTIELLE" },
-                { label: "Ivoirienne", value: cs.plan_ivoirienne ?? 0, color: "#8b5cf6", to: "/clients?plan=IVOIRIENNE" },
-                { label: "Turquoise", value: cs.plan_turquoise ?? 0, color: "#06b6d4", to: "/clients?plan=TURQUOISE" },
+                { label: "Essentielle", value: cs.plan_essentielle ?? 0, color: "#00c4b4", to: "/clients?plan=ESSENTIELLE" },
+                { label: "Ivoirienne", value: cs.plan_ivoirienne ?? 0, color: "#1a5fa8", to: "/clients?plan=IVOIRIENNE" },
+                { label: "Turquoise", value: cs.plan_turquoise ?? 0, color: "#00c4b4", to: "/clients?plan=TURQUOISE" },
               ].map((s) => (
                 <Link key={s.label} to={s.to} style={{ textDecoration: "none" }}>
                   <div className="awj-card awj-card-hover" style={{ padding: "18px 20px", cursor: "pointer" }}>
@@ -536,11 +628,11 @@ export default function Dashboard() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                           <p style={{ fontWeight: 600, fontSize: 13, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</p>
-                          <p style={{ fontWeight: 800, fontSize: 13, color: "#10b981", margin: 0, flexShrink: 0, marginLeft: 12 }}>{fmtShort(a.total_revenue)} FCFA</p>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: "#00c4b4", margin: 0, flexShrink: 0, marginLeft: 12 }}>{fmtShort(a.total_revenue)} FCFA</p>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{ flex: 1, background: "rgba(255,255,255,0.07)", borderRadius: 99, height: 3 }}>
-                            <div style={{ width: `${pct}%`, height: 3, borderRadius: 99, background: i === 0 ? "#f59e0b" : "#10b981", transition: "width 0.8s ease" }} />
+                            <div style={{ width: `${pct}%`, height: 3, borderRadius: 99, background: i === 0 ? "#f59e0b" : "#00c4b4", transition: "width 0.8s ease" }} />
                           </div>
                           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", flexShrink: 0 }}>{a.nb_clients} clients</span>
                         </div>
@@ -593,7 +685,7 @@ export default function Dashboard() {
                 <p style={{ textAlign: "center", color: "rgba(255,255,255,0.25)", fontSize: 13, padding: "32px 0" }}>Aucun paiement pour l'instant</p>
               ) : last_payments.map((p) => (
                 <div key={p.id} className="awj-row-item" style={{ cursor: "default" }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18, background: p.type === "adhesion" ? "rgba(139,92,246,0.15)" : "rgba(6,182,212,0.15)", border: `1px solid ${p.type === "adhesion" ? "rgba(139,92,246,0.25)" : "rgba(6,182,212,0.25)"}` }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18, background: p.type === "adhesion" ? "rgba(26,95,168,0.15)" : "rgba(0,196,180,0.15)", border: `1px solid ${p.type === "adhesion" ? "rgba(26,95,168,0.25)" : "rgba(0,196,180,0.25)"}` }}>
                     {p.type === "adhesion" ? "📋" : "🔄"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -607,7 +699,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontWeight: 800, fontSize: 13, color: "#10b981", margin: 0 }}>{fmtShort(p.amount)} FCFA</p>
+                    <p style={{ fontWeight: 800, fontSize: 13, color: "#00c4b4", margin: 0 }}>{fmtShort(p.amount)} FCFA</p>
                     <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>{fmtDate(p.created_at)}</p>
                   </div>
                 </div>

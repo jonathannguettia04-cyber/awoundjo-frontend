@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const ROLE_LABELS = {
-  ADMIN:       { label: "Administrateur Général",  accent: "#10b981", dim: "rgba(16,185,129,0.12)"  },
-  MANAGER:     { label: "Responsable Commercial",  accent: "#38bdf8", dim: "rgba(56,189,248,0.12)"  },
+  ADMIN:       { label: "Administrateur Général",  accent: "#00c4b4", dim: "rgba(0,196,180,0.12)"  },
+  MANAGER:     { label: "Responsable Commercial",  accent: "#1a5fa8", dim: "rgba(26,95,168,0.12)"  },
   CONSEILLERE: { label: "Conseillère Clientèle",   accent: "#f472b6", dim: "rgba(244,114,182,0.12)" },
   AGENT:       { label: "Commercial",              accent: "#a78bfa", dim: "rgba(167,139,250,0.12)" },
 };
@@ -35,9 +35,9 @@ const SECTIONS = [
     title: "Commerce",
     icon: "🤝",
     roles: ["ADMIN", "MANAGER"],
-    accent: "#38bdf8",
-    dim: "rgba(56,189,248,0.07)",
-    glow: "rgba(56,189,248,0.18)",
+    accent: "#1a5fa8",
+    dim: "rgba(26,95,168,0.07)",
+    glow: "rgba(26,95,168,0.18)",
     links: [
       { icon: "📈", label: "Dashboard commercial",        path: "/",            desc: "Stats de l'équipe commerciale" },
       { icon: "👤", label: "Mes commerciaux",             path: "/agents",      desc: "Gérer et suivre les commerciaux" },
@@ -79,9 +79,9 @@ const SECTIONS = [
     title: "Réseau Ambassadeurs",
     icon: "🌐",
     roles: ["ADMIN"],
-    accent: "#10b981",
-    dim: "rgba(16,185,129,0.07)",
-    glow: "rgba(16,185,129,0.18)",
+    accent: "#00c4b4",
+    dim: "rgba(0,196,180,0.07)",
+    glow: "rgba(0,196,180,0.18)",
     links: [
       { icon: "🌍", label: "Admin Diaspora",              path: "/admin/diaspora",               desc: "Gérer ambassadeurs diaspora" },
       { icon: "⛪", label: "Admin Fédérations",           path: "/admin/federation",             desc: "Gérer ambassadeurs fédérations" },
@@ -96,9 +96,9 @@ const SECTIONS = [
     title: "Réseau CNEPECI",
     icon: "⛪",
     roles: ["ADMIN"],
-    accent: "#818cf8",
-    dim: "rgba(129,140,248,0.07)",
-    glow: "rgba(129,140,248,0.18)",
+    accent: "#60a5fa",
+    dim: "rgba(96,165,250,0.07)",
+    glow: "rgba(96,165,250,0.18)",
     links: [
       { icon: "📊", label: "Admin CNEPECI",               path: "/admin/cnepeci", desc: "Vue d'ensemble du réseau" },
       { icon: "👥", label: "Membres CNEPECI",             path: "/admin/cnepeci", desc: "Bureaux, Coordonnateurs, Pasteurs" },
@@ -143,7 +143,7 @@ export default function AdminHub() {
     .awj-hub * { box-sizing: border-box; }
     .awj-hub {
       font-family: 'Outfit', system-ui, sans-serif;
-      background: #0d1117;
+      background: #0a1628;
       min-height: 100vh;
       color: #f0f0f0;
       padding: 28px 24px 60px;
@@ -163,7 +163,7 @@ export default function AdminHub() {
     }
     .awj-avatar-lg {
       width: 52px; height: 52px; border-radius: 14px;
-      background: linear-gradient(135deg,#10b981,#059669);
+      background: linear-gradient(135deg,#1a5fa8,#00c4b4);
       display: flex; align-items: center; justify-content: center;
       font-size: 22px; font-weight: 800; color: #fff; flex-shrink: 0;
     }
@@ -209,7 +209,7 @@ export default function AdminHub() {
     .awj-link-card {
       display: flex; align-items: center; gap: 12px;
       padding: 14px 18px;
-      background: #0d1117;
+      background: #0a1628;
       cursor: pointer;
       border: none;
       font-family: inherit;
