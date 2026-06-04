@@ -2,15 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Icônes Tabler ───────────────────────────────────────────── */
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
+
+/* ── Tokens Awoundjô ─────────────────────────────────────────── */
+:root {
+  --aw-primary:      #1a5fa8;
+  --aw-primary-dark: #0a1628;
+  --aw-teal:         #00c4b4;
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body { font-family: 'Poppins', sans-serif; @apply bg-slate-50 text-slate-800; }
 }
 
 @layer utilities {
-  .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
-  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  .scrollbar-thin::-webkit-scrollbar        { width: 5px; height: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-track  { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb  { @apply bg-slate-300 rounded-full; }
   .animate-fade-in { animation: fadeIn .22s ease; }
 }
 
