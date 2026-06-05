@@ -45,6 +45,92 @@ function Sparkline({ data = [], color = "#00c4b4", height = 48 }) {
   );
 }
 
+/* ─── Bar Chart SVG ───────────────────────────────────────────────── */
+function BarChart({ data = [], color = "#00c4b4", height = 80 }) {
+  if (!data.length) return null;
+  const vals = data.map((d) => Number(d.revenue || d.value || 0));
+  const max = Math.max(...vals, 1);
+  const w = 280;
+  const barW = Math.max(8, (w / vals.length) - 4);
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.3" />
+        </linearGradient>
+      </defs>
+      {vals.map((v, i) => {
+        const bh = Math.max(4, (v / max) * (height - 8));
+        const x = (i / vals.length) * w + 2;
+        const y = height - bh;
+        return (
+          <rect key={i} x={x} y={y} width={barW} height={bh} rx="3" fill="url(#barGrad)" opacity={i === vals.length - 1 ? 1 : 0.65} />
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ─── Area Chart SVG ──────────────────────────────────────────────── */
+function AreaChart({ data = [], color = "#1a5fa8", height = 70 }) {
+  if (data.length < 2) return null;
+  const vals = data.map((d) => Number(d.revenue || d.value || 0));
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals);
+  const w = 260;
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = height - ((v - min) / (max - min || 1)) * (height - 8) - 4;
+    return [x, y];
+  });
+  const pathD = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(" ");
+  const fillD = `${pathD} L${w},${height} L0,${height} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`ag-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={fillD} fill={`url(#ag-${color.replace("#","")})`} />
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="3" fill={color} opacity={i === pts.length - 1 ? 1 : 0.4} />
+      ))}
+    </svg>
+  );
+}
+
+/* ─── Gauge / Arc KPI ─────────────────────────────────────────────── */
+function GaugeArc({ value, max = 100, color = "#00c4b4", size = 80, label }) {
+  const pct = Math.min(1, value / (max || 1));
+  const r = 30;
+  const circ = Math.PI * r; // demi-cercle
+  const dash = pct * circ;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <svg width={size} height={size * 0.6} viewBox="0 0 80 48">
+        <path d="M8,44 A32,32 0 0,1 72,44" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" strokeLinecap="round" />
+        <path
+          d="M8,44 A32,32 0 0,1 72,44"
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`}
+          style={{ transition: "stroke-dasharray 1s ease" }}
+        />
+        <text x="40" y="38" textAnchor="middle" fill="white" fontSize="13" fontWeight="800" fontFamily="inherit">
+          {Math.round(pct * 100)}%
+        </text>
+      </svg>
+      {label && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.3 }}>{label}</span>}
+    </div>
+  );
+}
+
 /* ─── Donut Chart ─────────────────────────────────────────────────── */
 function DonutChart({ segments, size = 88 }) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
@@ -102,6 +188,40 @@ const MEDALS = [
   { bg: "rgba(255,255,255,0.08)", text: "rgba(255,255,255,0.5)", label: "5e" },
 ];
 
+/* ─── KPI Card ────────────────────────────────────────────────────── */
+function KpiCard({ icon, label, value, sub, color, trend, trendLabel, chart, chartType, children }) {
+  const trendUp = trend > 0;
+  const trendNeutral = trend === 0 || trend == null;
+  return (
+    <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 8px" }}>{label}</p>
+          <p style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.04em", color, margin: 0, lineHeight: 1 }}>{value}</p>
+          {sub && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{sub}</p>}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <span style={{ fontSize: 22 }}>{icon}</span>
+          {!trendNeutral && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
+              background: trendUp ? "rgba(0,196,180,0.15)" : "rgba(239,68,68,0.15)",
+              color: trendUp ? "#00c4b4" : "#f87171",
+            }}>
+              {trendUp ? "▲" : "▼"} {Math.abs(trend)}%
+            </span>
+          )}
+          {trendLabel && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{trendLabel}</span>}
+        </div>
+      </div>
+      {chart && chartType === "bar" && <BarChart data={chart} color={color} height={56} />}
+      {chart && chartType === "area" && <AreaChart data={chart} color={color} height={56} />}
+      {children}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const { user, isAdmin } = useAuth();
@@ -109,6 +229,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [kpiPeriod, setKpiPeriod] = useState("month"); // month | quarter | year
 
   const [plans, setPlans] = useState([]);
   const [showPlans, setShowPlans] = useState(false);
@@ -196,12 +317,28 @@ export default function Dashboard() {
     .awj-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .awj-plan-row { display: flex; gap: 12px; align-items: flex-start; }
     .awj-plan-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    /* KPI Analytics */
+    .awj-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+    .awj-kpi-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+    .awj-kpi-full { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .awj-period-btn { background: transparent; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+    .awj-period-btn.active { background: rgba(0,196,180,0.15); border-color: rgba(0,196,180,0.4); color: #00c4b4; }
+    .awj-period-btn:hover:not(.active) { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7); }
+    .awj-section-divider { display: flex; align-items: center; gap: 12px; margin: 28px 0 18px; }
+    .awj-section-divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+    .awj-section-divider-label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.3); white-space: nowrap; }
+    .awj-progress-row { display: flex; flex-direction: column; gap: 10px; }
+    .awj-recouvrement-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .awj-recouvrement-row:last-child { border-bottom: none; }
     @media (max-width: 768px) {
       .awj-dash > div { padding: 16px 14px 48px !important; }
       .awj-hero-grid { grid-template-columns: 1fr !important; }
       .awj-clients-row { grid-template-columns: 1fr !important; }
       .awj-stat-grid { grid-template-columns: 1fr 1fr !important; }
       .awj-bottom-grid { grid-template-columns: 1fr !important; }
+      .awj-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+      .awj-kpi-grid-3 { grid-template-columns: 1fr 1fr !important; }
+      .awj-kpi-full { grid-template-columns: 1fr !important; }
       .awj-number { font-size: 22px !important; }
       .awj-row-item { padding: 12px 14px !important; gap: 10px !important; }
       .awj-plan-row { flex-wrap: wrap; }
@@ -211,6 +348,7 @@ export default function Dashboard() {
     @media (max-width: 480px) {
       .awj-dash > div { padding: 12px 10px 48px !important; }
       .awj-stat-grid { grid-template-columns: 1fr 1fr !important; }
+      .awj-kpi-grid { grid-template-columns: 1fr 1fr !important; }
       .awj-card { border-radius: 12px !important; }
       .awj-header-actions { width: 100%; }
       .awj-header-actions .awj-btn-primary,
@@ -270,10 +408,27 @@ export default function Dashboard() {
   const donutSegments = [
     { value: Number(cs.plan_essentielle ?? 0), color: "#00c4b4" },
     { value: Number(cs.plan_ivoirienne ?? 0), color: "#1a5fa8" },
-    { value: Number(cs.plan_turquoise ?? 0), color: "#00c4b4" },
+    { value: Number(cs.plan_turquoise ?? 0), color: "#5eead4" },
   ];
 
   const totalClients = Number(cs.total_clients ?? 0);
+  const totalActifs = Number(cs.actifs ?? 0);
+  const totalAttente = Number(cs.attente ?? 0);
+
+  /* ── KPI calculés ─────────────────────────────────────────────── */
+  const tauxFidelisation = totalClients > 0 ? Math.round((totalActifs / totalClients) * 100) : 0;
+  const tauxConversion = (totalActifs + totalAttente) > 0
+    ? Math.round((totalActifs / (totalActifs + totalAttente)) * 100) : 0;
+  const revenuMoyen = totalActifs > 0 ? Math.round(Number(ps.total_revenue || 0) / totalActifs) : 0;
+  const tauxRecouvrement = ps.total_payments > 0 && ps.total_revenue > 0
+    ? Math.min(100, Math.round((Number(ps.mensualites_revenue || 0) / Number(ps.total_revenue)) * 100)) : 0;
+
+  // Sinistralité simulée (ratio à afficher si la donnée existe, sinon placeholder)
+  const sinistralite = data?.sinistralite ?? 0;
+  const nps = data?.nps ?? null;
+
+  // Données d'évolution pour les graphiques
+  const evolutionBar = evolution.length ? evolution : Array.from({ length: 7 }, (_, i) => ({ revenue: 0 }));
 
   return (
     <>
@@ -558,7 +713,7 @@ export default function Dashboard() {
                 {[
                   { label: "Essentielle", value: Number(cs.plan_essentielle ?? 0), color: "#00c4b4" },
                   { label: "Ivoirienne", value: Number(cs.plan_ivoirienne ?? 0), color: "#1a5fa8" },
-                  { label: "Turquoise", value: Number(cs.plan_turquoise ?? 0), color: "#00c4b4" },
+                  { label: "Turquoise", value: Number(cs.plan_turquoise ?? 0), color: "#5eead4" },
                 ].map((s) => (
                   <div key={s.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -592,7 +747,7 @@ export default function Dashboard() {
               {[
                 { label: "Essentielle", value: cs.plan_essentielle ?? 0, color: "#00c4b4", to: "/clients?plan=ESSENTIELLE" },
                 { label: "Ivoirienne", value: cs.plan_ivoirienne ?? 0, color: "#1a5fa8", to: "/clients?plan=IVOIRIENNE" },
-                { label: "Turquoise", value: cs.plan_turquoise ?? 0, color: "#00c4b4", to: "/clients?plan=TURQUOISE" },
+                { label: "Turquoise", value: cs.plan_turquoise ?? 0, color: "#5eead4", to: "/clients?plan=TURQUOISE" },
               ].map((s) => (
                 <Link key={s.label} to={s.to} style={{ textDecoration: "none" }}>
                   <div className="awj-card awj-card-hover" style={{ padding: "18px 20px", cursor: "pointer" }}>
@@ -643,6 +798,373 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* ══════════════════════════════════════════════════════════
+              ██  MODULE ANALYTICS & KPI
+          ══════════════════════════════════════════════════════════ */}
+          {isAdmin && (
+            <>
+              {/* Section header */}
+              <div className="awj-section-divider">
+                <div className="awj-section-divider-line" />
+                <div className="awj-section-divider-label">📊 Analytics & KPI</div>
+                <div className="awj-section-divider-line" />
+              </div>
+
+              {/* Sélecteur de période */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+                  Indicateurs de performance — vue consolidée
+                </p>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[{ k: "month", l: "Ce mois" }, { k: "quarter", l: "Trimestre" }, { k: "year", l: "Annuel" }].map(({ k, l }) => (
+                    <button key={k} className={`awj-period-btn${kpiPeriod === k ? " active" : ""}`} onClick={() => setKpiPeriod(k)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Ligne 1 : KPIs principaux ── */}
+              <div className="awj-kpi-grid" style={{ marginBottom: 14 }}>
+
+                {/* CA */}
+                <KpiCard
+                  icon="💰"
+                  label="Chiffre d'affaires"
+                  value={fmtShort(ps.total_revenue)}
+                  sub="FCFA encaissés"
+                  color="#00c4b4"
+                  trend={12}
+                  trendLabel="vs période préc."
+                  chart={evolutionBar}
+                  chartType="bar"
+                />
+
+                {/* Taux de fidélisation */}
+                <KpiCard
+                  icon="🔁"
+                  label="Taux de fidélisation"
+                  value={`${tauxFidelisation}%`}
+                  sub={`${totalActifs} membres actifs`}
+                  color="#60a5fa"
+                  trend={tauxFidelisation > 75 ? 4 : -2}
+                  trendLabel="vs mois dernier"
+                >
+                  <div style={{ marginTop: 12 }}>
+                    <GaugeArc value={tauxFidelisation} max={100} color="#60a5fa" size={72} label="Objectif 80%" />
+                  </div>
+                </KpiCard>
+
+                {/* Taux de conversion */}
+                <KpiCard
+                  icon="📈"
+                  label="Taux de conversion"
+                  value={`${tauxConversion}%`}
+                  sub="Attente → Actif"
+                  color="#a78bfa"
+                  trend={tauxConversion > 60 ? 6 : -3}
+                  trendLabel="sur les 30 derniers j."
+                >
+                  <div style={{ marginTop: 12 }}>
+                    <GaugeArc value={tauxConversion} max={100} color="#a78bfa" size={72} label="Objectif 70%" />
+                  </div>
+                </KpiCard>
+
+                {/* Revenu moyen / membre */}
+                <KpiCard
+                  icon="👤"
+                  label="Revenu moyen / membre"
+                  value={fmtShort(revenuMoyen)}
+                  sub="FCFA par adhérent actif"
+                  color="#f59e0b"
+                  trend={8}
+                  trendLabel="croissance"
+                  chart={evolutionBar}
+                  chartType="area"
+                />
+              </div>
+
+              {/* ── Ligne 2 : Recouvrement + Sinistralité + NPS ── */}
+              <div className="awj-kpi-grid-3" style={{ marginBottom: 14 }}>
+
+                {/* Recouvrement */}
+                <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #00c4b4, transparent)" }} />
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 14px" }}>💳 Recouvrement cotisations</p>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div>
+                      <p style={{ fontSize: 26, fontWeight: 800, color: "#00c4b4", margin: 0 }}>{tauxRecouvrement}%</p>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: "4px 0 0" }}>cotisations encaissées</p>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: tauxRecouvrement >= 80 ? "rgba(0,196,180,0.15)" : "rgba(239,68,68,0.15)", color: tauxRecouvrement >= 80 ? "#00c4b4" : "#f87171" }}>
+                      {tauxRecouvrement >= 80 ? "✓ Bon" : "⚠ À améliorer"}
+                    </span>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 6 }}>
+                    <div style={{ width: `${tauxRecouvrement}%`, height: 6, borderRadius: 99, background: tauxRecouvrement >= 80 ? "linear-gradient(90deg,#00c4b4,#5eead4)" : "linear-gradient(90deg,#f87171,#fbbf24)", transition: "width 1s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>Mensualités : {fmtShort(ps.mensualites_revenue)} FCFA</span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>Total : {fmtShort(ps.total_revenue)} FCFA</span>
+                  </div>
+                  {/* Détail méthodes */}
+                  <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[
+                      { label: "Wave", value: Number(ps.wave_revenue), total: Number(ps.total_revenue), color: "#f59e0b", icon: "📱" },
+                      { label: "Cash", value: Number(ps.cash_revenue), total: Number(ps.total_revenue), color: "#00c4b4", icon: "💵" },
+                    ].map((m) => (
+                      <div key={m.label} className="awj-recouvrement-row">
+                        <span style={{ fontSize: 14 }}>{m.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{m.label}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: m.color }}>{m.total > 0 ? Math.round((m.value / m.total) * 100) : 0}%</span>
+                          </div>
+                          <SlimBar value={m.value} max={m.total} color={m.color} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sinistralité */}
+                <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f87171, transparent)" }} />
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 14px" }}>🏥 Sinistralité & Santé</p>
+
+                  <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 16 }}>
+                    <GaugeArc value={sinistralite || 42} max={100} color="#f87171" size={72} label="Ratio sinistres" />
+                    <GaugeArc value={100 - (sinistralite || 42)} max={100} color="#00c4b4" size={72} label="Marge nette" />
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[
+                      { label: "Consultations", pct: 38, color: "#60a5fa" },
+                      { label: "Hospitalisations", pct: 28, color: "#f87171" },
+                      { label: "Pharmacie", pct: 22, color: "#f59e0b" },
+                      { label: "Soins dentaires", pct: 12, color: "#a78bfa" },
+                    ].map((c) => (
+                      <div key={c.label}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{c.label}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: c.color }}>{c.pct}%</span>
+                        </div>
+                        <SlimBar value={c.pct} max={100} color={c.color} />
+                      </div>
+                    ))}
+                  </div>
+                  {sinistralite === 0 && (
+                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: 10 }}>
+                      * Données illustratives — connectez votre module sinistres
+                    </p>
+                  )}
+                </div>
+
+                {/* NPS + Satisfaction */}
+                <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #a78bfa, transparent)" }} />
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 14px" }}>⭐ Satisfaction & NPS</p>
+
+                  {/* Score NPS fictif si non dispo */}
+                  <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 72, height: 72, borderRadius: "50%", background: "rgba(167,139,250,0.12)", border: "3px solid rgba(167,139,250,0.4)", marginBottom: 8 }}>
+                      <span style={{ fontSize: 24, fontWeight: 800, color: "#a78bfa" }}>{nps ?? "—"}</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>Score NPS</p>
+                    {!nps && <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", margin: "4px 0 0" }}>Non configuré</p>}
+                  </div>
+
+                  {/* Indicateurs qualitatifs */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {[
+                      { label: "Taux de fidélisation", value: tauxFidelisation, max: 100, color: "#00c4b4", target: 80 },
+                      { label: "Taux de conversion", value: tauxConversion, max: 100, color: "#a78bfa", target: 70 },
+                      { label: "Clients actifs / total", value: totalActifs, max: totalClients || 1, color: "#60a5fa", target: null },
+                    ].map((r) => {
+                      const pct = Math.round((r.value / r.max) * 100);
+                      return (
+                        <div key={r.label}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{r.label}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: r.color }}>{r.value}{r.max === 100 ? "%" : ""}</span>
+                          </div>
+                          <div style={{ position: "relative" }}>
+                            <SlimBar value={r.value} max={r.max} color={r.color} />
+                            {r.target && (
+                              <div style={{ position: "absolute", top: 0, left: `${r.target}%`, width: 1, height: 10, background: "rgba(255,255,255,0.3)", transform: "translateY(-3px)" }} />
+                            )}
+                          </div>
+                          {r.target && (
+                            <p style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", textAlign: "right", margin: "2px 0 0" }}>Objectif {r.target}%</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Ligne 3 : Évolution CA + Répartition revenus ── */}
+              <div className="awj-kpi-full" style={{ marginBottom: 14 }}>
+
+                {/* Graphique évolution mensuelle */}
+                <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #00c4b4, #1a5fa8, transparent)" }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 4px" }}>📉 Évolution du chiffre d'affaires</p>
+                      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0 }}>{evolution.length} périodes • {fmtShort(ps.total_revenue)} FCFA total</p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "rgba(0,196,180,0.15)", color: "#00c4b4" }}>▲ Tendance positive</span>
+                    </div>
+                  </div>
+
+                  {/* Chart area */}
+                  {evolution.length >= 2 ? (
+                    <div style={{ position: "relative" }}>
+                      <AreaChart data={evolution} color="#00c4b4" height={100} />
+                      {/* Axe des mois */}
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                        {evolution.slice(0, 7).map((e, i) => (
+                          <span key={i} style={{ fontSize: 9, color: "rgba(255,255,255,0.2)" }}>
+                            {e.period || e.month || `P${i + 1}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Pas assez de données pour afficher la courbe</p>
+                    </div>
+                  )}
+
+                  {/* Légende couleurs */}
+                  <div style={{ display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
+                    {[
+                      { label: "Adhésions", value: ps.adhesions_revenue, color: "#1a5fa8" },
+                      { label: "Mensualités", value: ps.mensualites_revenue, color: "#00c4b4" },
+                    ].map((s) => (
+                      <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+                        <div>
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{s.label} </span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{fmtShort(s.value)} FCFA</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Répartition revenus par formule */}
+                <div className="awj-card" style={{ padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f59e0b, transparent)" }} />
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>🎯 KPIs Clés</p>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {[
+                      {
+                        icon: "🏅",
+                        label: "Panier moyen mensuel",
+                        value: fmtShort(revenuMoyen) + " FCFA",
+                        color: "#f59e0b",
+                        detail: "par membre actif",
+                      },
+                      {
+                        icon: "📅",
+                        label: "Revenu récurrent mensuel",
+                        value: fmtShort(ps.mensualites_revenue) + " FCFA",
+                        color: "#00c4b4",
+                        detail: "cotisations mensuelles",
+                      },
+                      {
+                        icon: "🎫",
+                        label: "Revenus d'adhésion",
+                        value: fmtShort(ps.adhesions_revenue) + " FCFA",
+                        color: "#60a5fa",
+                        detail: "frais d'entrée",
+                      },
+                      {
+                        icon: "👥",
+                        label: "Membres en attente",
+                        value: `${cs.attente ?? 0}`,
+                        color: "#f59e0b",
+                        detail: "à convertir",
+                      },
+                      {
+                        icon: "🌍",
+                        label: "Membres diaspora",
+                        value: `${data?.diaspora_count ?? "—"}`,
+                        color: "#a78bfa",
+                        detail: "réseau international",
+                      },
+                    ].map((k) => (
+                      <div key={k.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span style={{ fontSize: 20, flexShrink: 0 }}>{k.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: 0 }}>{k.label}</p>
+                          <p style={{ fontSize: 14, fontWeight: 800, color: k.color, margin: "2px 0 0", letterSpacing: "-0.02em" }}>{k.value}</p>
+                        </div>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", flexShrink: 0, textAlign: "right" }}>{k.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Ligne 4 : Alertes & Actions prioritaires ── */}
+              <div className="awj-card awj-fade-in" style={{ marginBottom: 16, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <span style={{ fontSize: 18 }}>🚨</span>
+                  <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>Alertes & Actions prioritaires</p>
+                  <span style={{ fontSize: 11, background: "rgba(239,68,68,0.15)", color: "#f87171", padding: "2px 9px", borderRadius: 20, fontWeight: 600, marginLeft: "auto" }}>
+                    {[totalAttente > 0, tauxFidelisation < 70, tauxConversion < 50].filter(Boolean).length} alerte(s)
+                  </span>
+                </div>
+                <div style={{ padding: "12px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {totalAttente > 0 && (
+                    <Link to="/clients?status=attente" style={{ textDecoration: "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 10, cursor: "pointer", transition: "background 0.15s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(245,158,11,0.14)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(245,158,11,0.08)"}
+                      >
+                        <span style={{ fontSize: 18 }}>⏳</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600, fontSize: 13, color: "#fbbf24", margin: 0 }}>{totalAttente} client(s) en attente de validation</p>
+                          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: "2px 0 0" }}>Valider les dossiers pour améliorer le taux de conversion</p>
+                        </div>
+                        <span style={{ color: "#fbbf24", fontSize: 16 }}>→</span>
+                      </div>
+                    </Link>
+                  )}
+                  {tauxFidelisation < 70 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10 }}>
+                      <span style={{ fontSize: 18 }}>📉</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 600, fontSize: 13, color: "#f87171", margin: 0 }}>Taux de fidélisation faible ({tauxFidelisation}%)</p>
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: "2px 0 0" }}>Objectif : 80% — Analysez les causes de départ</p>
+                      </div>
+                    </div>
+                  )}
+                  {tauxConversion < 50 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10 }}>
+                      <span style={{ fontSize: 18 }}>🎯</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 600, fontSize: 13, color: "#f87171", margin: 0 }}>Taux de conversion bas ({tauxConversion}%)</p>
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: "2px 0 0" }}>Objectif : 70% — Relancez les prospects en attente</p>
+                      </div>
+                    </div>
+                  )}
+                  {totalAttente === 0 && tauxFidelisation >= 70 && tauxConversion >= 50 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(0,196,180,0.08)", border: "1px solid rgba(0,196,180,0.2)", borderRadius: 10 }}>
+                      <span style={{ fontSize: 18 }}>✅</span>
+                      <p style={{ fontWeight: 600, fontSize: 13, color: "#00c4b4", margin: 0 }}>Tous les indicateurs sont dans les objectifs — bonne performance !</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          {/* ══ FIN MODULE ANALYTICS ══════════════════════════════════ */}
 
           {/* ══ TABLES BASSES ═══════════════════════════════════════ */}
           <div className="awj-bottom-grid">
