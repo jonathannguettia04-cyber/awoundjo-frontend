@@ -685,7 +685,7 @@ export default function Dashboard() {
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f59e0b, #fbbf24, transparent)" }} />
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>Méthodes de paiement</p>
               {[
-                { label: "📱 Wave", value: Number(ps.wave_revenue), color: "#f59e0b" },
+                { label: "📱 Jeko", value: Number(ps.wave_revenue), color: "#f59e0b" },
                 { label: "💵 Cash", value: Number(ps.cash_revenue), color: "#00c4b4" },
               ].map((m) => (
                 <div key={m.label} style={{ marginBottom: 14 }}>
