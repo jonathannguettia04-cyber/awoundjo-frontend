@@ -16,13 +16,20 @@ export default function ClientLogin() {
   const [new_pwd, setNewPwd]    = useState("");
   const [confirm, setConfirm]   = useState("");
 
+  // Après connexion : si d'autres portails sont déjà ouverts → hub de sélection
+  const redirectAfterLogin = () => {
+    const autres = ["business_token", "diaspora_token", "affilie_token", "cnepeci_token"]
+      .some(k => { try { return !!localStorage.getItem(k); } catch { return false; } });
+    navigate(autres ? "/portail" : "/client/dashboard");
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault(); setError(""); setLoading(true);
     try {
       const res = await clientAuthAPI.login({ mutual_number: mutual_number.toUpperCase(), password });
       localStorage.setItem("client_token", res.data.token);
       localStorage.setItem("client_data",  JSON.stringify(res.data.client));
-      navigate("/client/dashboard");
+      redirectAfterLogin();
     } catch (err) {
       if (err.response?.data?.requiresSetup) setStep("setup");
       else setError(err.response?.data?.error || "Identifiants incorrects");
@@ -38,7 +45,7 @@ export default function ClientLogin() {
       const res = await clientAuthAPI.setupPassword({ mutual_number: mutual_number.toUpperCase(), access_code, new_password: new_pwd });
       localStorage.setItem("client_token", res.data.token);
       localStorage.setItem("client_data",  JSON.stringify(res.data.client));
-      navigate("/client/dashboard");
+      redirectAfterLogin();
     } catch (err) {
       setError(err.response?.data?.error || "Erreur d'activation");
     } finally { setLoading(false); }

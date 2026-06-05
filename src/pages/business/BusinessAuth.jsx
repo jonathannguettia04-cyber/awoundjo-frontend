@@ -111,8 +111,10 @@ export default function BusinessAuth() {
       safeLS("setItem", "business_data",  JSON.stringify(data.member));
       safeLS("removeItem", "token");
       safeLS("removeItem", "user");
-      // must_change_password géré depuis le dashboard (route change-password non définie)
-      navigate("/business/dashboard");
+      // Si d'autres portails déjà ouverts → hub de sélection
+      const autresActifs = ["client_token", "diaspora_token", "affilie_token", "cnepeci_token"]
+        .some(k => { try { return !!localStorage.getItem(k); } catch { return false; } });
+      navigate(autresActifs ? "/portail" : "/business/dashboard");
     } catch {
       setError("Erreur réseau. Vérifiez votre connexion.");
     } finally {

@@ -146,7 +146,7 @@ export default function DiasporaAuth() {
       }
       localStorage.setItem("business_token", data.token);
       localStorage.setItem("business_data", JSON.stringify(data.member));
-      navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
+      redirectAfterLogin(data.must_change_password ? "/business/change-password" : "/business/dashboard");
       return;
     }
 
@@ -160,12 +160,12 @@ export default function DiasporaAuth() {
     if (data.network === "BUSINESS") {
       localStorage.setItem("business_token", data.token);
       localStorage.setItem("business_data", JSON.stringify(data.member));
-      navigate(data.must_change_password ? "/business/change-password" : "/business/dashboard");
+      redirectAfterLogin(data.must_change_password ? "/business/change-password" : "/business/dashboard");
       return;
     }
 
     diasporaLogin(data.token, data.ambassador || data.member);
-    navigate(getDashPath(data.ambassador || data.member));
+    redirectAfterLogin(getDashPath(data.ambassador || data.member));
 
   } catch (err) {
     const response = err?.response;
@@ -256,6 +256,14 @@ export default function DiasporaAuth() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // ── Hub multi-accès ───────────────────────────────────────
+  function redirectAfterLogin(defaultPath) {
+    const autresTokens = ["client_token", "business_token", "diaspora_token", "affilie_token", "cnepeci_token"]
+      .filter(k => k !== "diaspora_token")
+      .some(k => localStorage.getItem(k));
+    navigate(autresTokens ? "/portail" : defaultPath);
   }
 
   const net = NETWORK_CONFIG[regForm.network_type];

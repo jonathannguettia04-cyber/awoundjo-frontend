@@ -183,6 +183,9 @@ const CommissionWithdrawal = lazy(() => import("./pages/shared/CommissionWithdra
 // généré par l'agent depuis businessController.js
 const CollectePage = lazy(() => import("./pages/collecte/CollectePage"));
 
+// ── Hub de sélection de portail ──────────────────────────────
+const PortailHub = lazy(() => import("./pages/PortailHub"));
+
 // ── [PARRAINAGE] Page publique Business ──────────────────────
 // Accessible sans authentification via lien de parrainage
 // généré par un membre Business depuis /business/parrainage
@@ -305,7 +308,8 @@ export default function App() {
             <Route path="/login" element={
               user ? <Navigate to="/" replace /> : <Login />
             } />
-            <Route path="/hub"   element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
+            <Route path="/hub"      element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
+            <Route path="/portail"  element={<PortailHub />} />
 
             {/* ── AGENT ───────────────────────────────────── */}
             <Route path="/" element={
