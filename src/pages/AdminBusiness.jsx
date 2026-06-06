@@ -1411,80 +1411,16 @@ export default function AdminBusiness() {
             </div>
           )}
 
-          {/* Modal détail lien */}
+          {/* Modal détail lien — données enrichies via API */}
           {parrainageModal?.type === "detail" && (
-            <div style={s.overlay}>
-              <div style={{ ...s.modalBox, maxWidth: 540 }}>
-                <h3 style={s.modalTitle}>🔗 Détail du lien de parrainage</h3>
-                {(() => {
-                  const lien = parrainageModal.lien;
-                  const BASE = window.location.origin;
-                  const fullUrl = `${BASE}/parrainage/${lien.token}`;
-                  const roleC = ROLE_COLORS[lien.parrain_role || lien.member_role] || {};
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {/* Parrain */}
-                      <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "12px 16px" }}>
-                        <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Parrain</div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{lien.parrain_name || lien.member_name || "—"}</div>
-                        {(lien.parrain_email || lien.member_email) && <div style={{ fontSize: 12, color: "#64748B" }}>{lien.parrain_email || lien.member_email}</div>}
-                        {(lien.parrain_phone || lien.member_phone) && <div style={{ fontSize: 12, color: "#64748B" }}>{lien.parrain_phone || lien.member_phone}</div>}
-                        {(lien.parrain_role || lien.member_role) && (
-                          <span style={{ ...s.badge, background: roleC.bg, color: roleC.color, border: `1px solid ${roleC.border}`, marginTop: 6, display: "inline-block" }}>
-                            {lien.parrain_role || lien.member_role}
-                          </span>
-                        )}
-                      </div>
-                      {/* Lien */}
-                      <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 16px" }}>
-                        <div style={{ fontSize: 11, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Lien public</div>
-                        <div style={{ fontFamily: "monospace", fontSize: 12, wordBreak: "break-all", color: "#4C1D95", marginBottom: 8 }}>{fullUrl}</div>
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(fullUrl); showToast("📋 Lien copié !"); }}
-                          style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #DDD6FE", background: "#fff", color: "#7C3AED", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
-                        >
-                          📋 Copier
-                        </button>
-                      </div>
-                      {/* Stats */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                        <div style={{ textAlign: "center", background: "#EFF6FF", borderRadius: 10, padding: "10px 8px" }}>
-                          <div style={{ fontSize: 20, fontWeight: 800, color: "#2563EB" }}>{lien.clients_count ?? lien.total_clients ?? 0}</div>
-                          <div style={{ fontSize: 11, color: "#64748B" }}>Inscrits</div>
-                        </div>
-                        <div style={{ textAlign: "center", background: "#ECFDF5", borderRadius: 10, padding: "10px 8px" }}>
-                          <div style={{ fontSize: 20, fontWeight: 800, color: "#059669" }}>{lien.clients_paid ?? "—"}</div>
-                          <div style={{ fontSize: 11, color: "#64748B" }}>Payés</div>
-                        </div>
-                        <div style={{ textAlign: "center", background: "#FFF7ED", borderRadius: 10, padding: "10px 8px" }}>
-                          <div style={{ fontSize: 20, fontWeight: 800, color: "#D97706" }}>
-                            {lien.expires_at ? new Date(lien.expires_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "∞"}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#64748B" }}>Expiration</div>
-                        </div>
-                      </div>
-                      {/* Dates */}
-                      {lien.created_at && (
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
-                          Créé le {new Date(lien.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <div style={{ ...s.modalActions, marginTop: 20, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
-                  <button style={s.btnSecondary} onClick={() => setParrainageModal(null)}>Fermer</button>
-                  {!parrainageModal.lien.disabled && parrainageModal.lien.status !== "disabled" && (
-                    <button
-                      style={s.btnDanger}
-                      onClick={() => setParrainageModal({ type: "disable", lien: parrainageModal.lien })}
-                    >
-                      🔒 Désactiver ce lien
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ParrainageLinkDetailModal
+              lien={parrainageModal.lien}
+              token={token}
+              showToast={showToast}
+              onClose={() => setParrainageModal(null)}
+              onDisable={() => setParrainageModal({ type: "disable", lien: parrainageModal.lien })}
+              onRefresh={() => { setParrainageModal(null); loadParrainages(); }}
+            />
           )}
         </div>
       )}
@@ -1719,6 +1655,245 @@ export default function AdminBusiness() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MODAL — DÉTAIL LIEN DE PARRAINAGE (avec liste clients enrichie)
+//  GET /api/business/admin/parrainage-links/:id/clients
+// ══════════════════════════════════════════════════════════════
+function ParrainageLinkDetailModal({ lien: lienInit, token, showToast, onClose, onDisable, onRefresh }) {
+  const [data,    setData]    = useState(null);  // { lien, stats, clients[] }
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/api/business/admin/parrainage-links/${lienInit.id}/clients`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || r.statusText);
+        setData(d.data || d);
+      } catch (e) {
+        showToast(e.message, true);
+      }
+      setLoading(false);
+    })();
+  }, [lienInit.id, token]);
+
+  const lien    = data?.lien    || lienInit;
+  const stats   = data?.stats   || null;
+  const clients = data?.clients || [];
+
+  const BASE    = window.location.origin;
+  const fullUrl = `${BASE}/parrainage/${lien.token}`;
+  const roleC   = ROLE_COLORS[lien.parrain?.role || lien.parrain_role || lien.member_role] || {};
+  const fmt     = n => Number(n || 0).toLocaleString("fr-FR");
+
+  const isDisabled = lien.disabled || lien.status === "disabled";
+
+  const STATUT_STYLE = {
+    paye:       { bg: "#ECFDF5", color: "#059669", label: "✅ Payé"       },
+    echelonne:  { bg: "#EFF6FF", color: "#2563EB", label: "📊 Échelonné"  },
+    en_attente: { bg: "#FFF7ED", color: "#D97706", label: "⏳ En attente" },
+  };
+
+  return (
+    <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        ...s.modalBox,
+        maxWidth: 680,
+        width: "95%",
+        maxHeight: "90vh",
+        display: "flex",
+        flexDirection: "column",
+        padding: "24px 28px",
+      }}>
+
+        {/* ── En-tête ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div>
+            <h3 style={{ ...s.modalTitle, marginBottom: 2 }}>🔗 Lien de parrainage</h3>
+            <p style={{ margin: 0, fontSize: 12, color: "#94A3B8" }}>
+              {lien.parrain?.name || lien.parrain_name || lien.member_name || "—"}
+              {(lien.parrain?.role || lien.parrain_role || lien.member_role) && (
+                <span style={{ marginLeft: 8, ...s.badge,
+                  background: roleC.bg, color: roleC.color,
+                  border: `1px solid ${roleC.border || roleC.color + "30"}`,
+                }}>
+                  {lien.parrain?.role || lien.parrain_role || lien.member_role}
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94A3B8", lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* ── Infos parrain + lien ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Parrain</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A", marginBottom: 2 }}>
+                {lien.parrain?.name || lien.parrain_name || lien.member_name || "—"}
+              </div>
+              {(lien.parrain?.email || lien.parrain_email || lien.member_email) && (
+                <div style={{ fontSize: 12, color: "#64748B" }}>
+                  {lien.parrain?.email || lien.parrain_email || lien.member_email}
+                </div>
+              )}
+              {(lien.parrain?.phone || lien.parrain_phone || lien.member_phone) && (
+                <div style={{ fontSize: 12, color: "#64748B" }}>
+                  {lien.parrain?.phone || lien.parrain_phone || lien.member_phone}
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, color: "#7C3AED", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Token</div>
+              <div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#4C1D95", marginBottom: 8, wordBreak: "break-all" }}>
+                {lien.token}
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(fullUrl); showToast("📋 Lien copié !"); }}
+                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #DDD6FE", background: "#fff", color: "#7C3AED", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+              >
+                📋 Copier le lien
+              </button>
+            </div>
+          </div>
+
+          {/* ── Stats (depuis API) ── */}
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "20px 0", color: "#94A3B8", fontSize: 13 }}>
+              Chargement des clients…
+            </div>
+          ) : (
+            <>
+              {stats && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                  {[
+                    { label: "Inscrits",    val: stats.total,      bg: "#EFF6FF", color: "#2563EB" },
+                    { label: "Payés",       val: stats.payes,      bg: "#ECFDF5", color: "#059669" },
+                    { label: "Échelonnés",  val: stats.echelonnes, bg: "#EFF6FF", color: "#0891B2" },
+                    { label: "En attente",  val: stats.en_attente, bg: "#FFF7ED", color: "#D97706" },
+                  ].map(({ label, val, bg, color }) => (
+                    <div key={label} style={{ textAlign: "center", background: bg, borderRadius: 10, padding: "10px 8px" }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color }}>{val}</div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Liste des clients ── */}
+              {clients.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+                  <p style={{ margin: 0, fontWeight: 700 }}>Aucun client inscrit via ce lien</p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+                    Clients inscrits ({clients.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                    {clients.map(c => {
+                      const st = STATUT_STYLE[c.statut_paiement] || STATUT_STYLE.en_attente;
+                      return (
+                        <div key={c.id} style={{
+                          background: "#fff",
+                          border: "1px solid #E2E8F0",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: 12,
+                        }}>
+                          {/* Infos client */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{c.name}</div>
+                            <div style={{ fontSize: 12, color: "#64748B" }}>
+                              {c.phone}
+                              {c.city && <span style={{ marginLeft: 6 }}>· {c.city}</span>}
+                            </div>
+                            {c.created_at && (
+                              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                                Inscrit le {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Paiement */}
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <span style={{ ...s.badge, background: st.bg, color: st.color, fontSize: 11 }}>
+                              {st.label}
+                            </span>
+                            <div style={{ fontSize: 12, color: "#0F172A", fontWeight: 700, marginTop: 4 }}>
+                              {fmt(c.adhesion_price)} F
+                            </div>
+                            {c.collecte && c.statut_paiement === "echelonne" && (
+                              <>
+                                {/* Barre de progression */}
+                                <div style={{ height: 5, width: 100, background: "#E2E8F0", borderRadius: 4, overflow: "hidden", marginTop: 4, marginLeft: "auto" }}>
+                                  <div style={{ height: "100%", width: `${c.collecte.pourcentage}%`, background: "#7C3AED", borderRadius: 4 }} />
+                                </div>
+                                <div style={{ fontSize: 10, color: "#7C3AED", fontWeight: 700, marginTop: 2 }}>
+                                  {c.collecte.pourcentage}% · {fmt(c.collecte.total_verse)} F versés
+                                </div>
+                                {c.collecte.reste > 0 && (
+                                  <div style={{ fontSize: 10, color: "#D97706" }}>
+                                    Reste : {fmt(c.collecte.reste)} F
+                                  </div>
+                                )}
+                                {c.collecte.nb_versements > 0 && (
+                                  <div style={{ fontSize: 10, color: "#94A3B8" }}>
+                                    {c.collecte.nb_versements} versement{c.collecte.nb_versements > 1 ? "s" : ""}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Expiration / date création */}
+          <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#94A3B8" }}>
+            {lien.created_at && (
+              <span>Créé le {new Date(lien.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</span>
+            )}
+            {lien.expires_at && (
+              <span>· Expire le {new Date(lien.expires_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</span>
+            )}
+            {!lien.expires_at && <span>· Sans limite d'expiration</span>}
+          </div>
+        </div>
+
+        {/* ── Pied ── */}
+        <div style={{ ...s.modalActions, marginTop: 16, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
+          <button style={s.btnSecondary} onClick={onClose}>Fermer</button>
+          {!isDisabled && (
+            <button style={s.btnDanger} onClick={onDisable}>
+              🔒 Désactiver ce lien
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
