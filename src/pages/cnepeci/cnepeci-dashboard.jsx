@@ -979,7 +979,7 @@ function HistoryPage() {
 // PAGE CRÉER MEMBRE
 // ══════════════════════════════════════════════════════════════════════════════
 function CreerMembrePage({ membre }) {
-  const [form, setForm] = useState({ nom: "", email: "", phone: "", role: "" });
+  const [form, setForm] = useState({ nom: "", email: "", phone: "", role: "", jeko_method: "orange" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
@@ -1010,12 +1010,12 @@ function CreerMembrePage({ membre }) {
     if (!form.role) { setError("Veuillez sélectionner un rôle."); return; }
     setLoading(true);
     try {
-      const body = { nom: form.nom, email: form.email, phone: form.phone, role_a_creer: form.role };
+      const body = { nom: form.nom, email: form.email, phone: form.phone, role_a_creer: form.role, jeko_method: form.jeko_method };
       const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(body) });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur création"); return; }
       setSuccess(data.credentials || data);
-      setForm(f => ({ nom: "", email: "", phone: "", role: f.role }));
+      setForm(f => ({ nom: "", email: "", phone: "", role: f.role, jeko_method: "orange" }));
       apiFetch("/reseau/membres-crees").then(d => { if (d?.success) setMembresCreés(d.membres || []); });
     } catch { setError("Erreur réseau."); }
     finally { setLoading(false); }
@@ -1048,11 +1048,35 @@ function CreerMembrePage({ membre }) {
                 <div style={{ background: G.greenLight, border: `1px solid ${G.green}44`, borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: G.green, marginBottom: 10 }}>✅ Membre créé avec succès !</div>
                   <div style={{ background: "#fff", borderRadius: 8, padding: 12, fontFamily: "monospace", fontSize: 12, color: G.text, lineHeight: 1.8 }}>
+                    {success.mutual_number && <div>🪪 N° Mutualiste : <strong style={{ color: G.blue }}>{success.mutual_number}</strong></div>}
                     <div>📧 Email : <strong>{success.email}</strong></div>
                     <div>🔑 Mot de passe : <strong style={{ color: G.purple }}>{success.mot_de_passe}</strong></div>
                     {success.lien_connexion && <div style={{ wordBreak: "break-all" }}>🔗 Lien : <strong style={{ color: G.blue }}>{success.lien_connexion}</strong></div>}
                     {success.role && <div>👤 Rôle : <strong>{ROLES[success.role]?.label||success.role}</strong></div>}
+                    {success.adhesion_fee != null && <div>💰 Frais d'adhésion : <strong style={{ color: G.gold }}>23 500 F</strong></div>}
                   </div>
+
+                  {success.redirect_url && (
+                    <div style={{ marginTop: 14 }}>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 7, textTransform: "uppercase", letterSpacing: ".5px" }}>Réseau de paiement — 23 500 F</label>
+                      <select value={form.jeko_method} onChange={e => set("jeko_method", e.target.value)}
+                        style={{ width: "100%", padding: "9px 12px", border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff", color: G.text, marginBottom: 8 }}>
+                        <option value="orange">🟠 Orange Money</option>
+                        <option value="wave">🔵 Wave</option>
+                        <option value="mtn">🟡 MTN Mobile Money</option>
+                        <option value="moov">🟢 Moov Money</option>
+                        <option value="djamo">💜 Djamo / Carte bancaire</option>
+                      </select>
+                      <button onClick={() => { window.location.href = success.redirect_url; }}
+                        style={{ width: "100%", padding: "11px 16px", background: `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        💳 Procéder au paiement JEKO → 23 500 F
+                      </button>
+                      <div style={{ fontSize: 11, color: G.muted, marginTop: 6, textAlign: "center" }}>
+                        ⏳ Le compte sera activé après confirmation du paiement
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                     <button onClick={() => { navigator.clipboard?.writeText(fullText).catch(() => { const el=document.createElement("textarea"); el.value=fullText; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }); }}
                       style={{ flex: 1, padding: "9px 14px", background: G.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
@@ -1118,10 +1142,14 @@ function CreerMembrePage({ membre }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{m.nom}</div>
                       <div style={{ fontSize: 11, color: G.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</div>
+                      {m.mutual_number && <div style={{ fontSize: 10, fontWeight: 700, color: G.blue, marginTop: 2, fontFamily: "monospace" }}>{m.mutual_number}</div>}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                       {ri && <Badge color={ri.color} bg={ri.color+"18"}>{ri.abbr}</Badge>}
                       <ActiveBadge statut={m.statut} />
+                      {m.statut_paiement === "paid"
+                        ? <Badge color={G.green} bg={G.greenLight}>✓ Payé</Badge>
+                        : <Badge color={G.gold} bg={G.goldLight}>⏳ En attente</Badge>}
                     </div>
                   </div>
                 );
@@ -1829,7 +1857,6 @@ const NAV_ITEMS = [
   { id: "commissions", label: "Commissions",         icon: "◎" },
   { id: "bonus",       label: "Bonus mensuel",       icon: "◆" },
   { id: "clients",     label: "Clients finaux",      icon: "🫂" },
-  { id: "paiement",    label: "Payer",               icon: "◑" },
   { id: "retrait",     label: "Retrait commission",  icon: "💸" },
   { id: "invite",      label: "Lien d'invitation",   icon: "◇" },
   { id: "history",     label: "Historique",          icon: "○" },
