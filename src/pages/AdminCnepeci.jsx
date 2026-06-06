@@ -321,6 +321,7 @@ function MembresTable({ membres, onRefresh }) {
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterPaiement, setFilterPaiement] = useState("ALL");
   const [alert, setAlert] = useState(null);
   const [selected, setSelected] = useState(null);
 
@@ -328,11 +329,14 @@ function MembresTable({ membres, onRefresh }) {
     const matchSearch = !search ||
       m.nom?.toLowerCase().includes(search.toLowerCase()) ||
       m.email?.toLowerCase().includes(search.toLowerCase()) ||
-      m.phone?.includes(search);
+      m.phone?.includes(search) ||
+      m.mutual_number?.toLowerCase().includes(search.toLowerCase());
     const matchRole = filterRole === "ALL" || m.role === filterRole;
     const status = (m.statut || m.status || "").toLowerCase();
     const matchStatus = filterStatus === "ALL" || status === filterStatus;
-    return matchSearch && matchRole && matchStatus;
+    const ps = (m.statut_paiement || "").toLowerCase();
+    const matchPaiement = filterPaiement === "ALL" || ps === filterPaiement;
+    return matchSearch && matchRole && matchStatus && matchPaiement;
   });
 
   return (
@@ -341,7 +345,7 @@ function MembresTable({ membres, onRefresh }) {
 
       {/* Filtres */}
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <input placeholder="🔍 Rechercher nom, email, téléphone…" value={search} onChange={e => setSearch(e.target.value)}
+        <input placeholder="🔍 Nom, email, téléphone, N° mutualiste…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: 220, padding: "9px 14px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", background: C.bg }} />
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
           style={{ padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}>
@@ -354,6 +358,13 @@ function MembresTable({ membres, onRefresh }) {
           <option value="actif">● Actifs</option>
           <option value="suspendu">● Suspendus</option>
           <option value="pending">● En attente</option>
+        </select>
+        <select value={filterPaiement} onChange={e => setFilterPaiement(e.target.value)}
+          style={{ padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}>
+          <option value="ALL">Tous paiements</option>
+          <option value="paid">✓ Payés</option>
+          <option value="unpaid">✕ Impayés</option>
+          <option value="pending">⏳ En attente</option>
         </select>
       </div>
 
@@ -386,6 +397,7 @@ function MembresTable({ membres, onRefresh }) {
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, color: C.dark }}>{m.nom || "—"}</div>
+                        {m.mutual_number && <div style={{ fontSize: 10, color: C.blue, fontFamily: "monospace", marginTop: 1 }}>{m.mutual_number}</div>}
                         {m.code_invitation && <div style={{ fontSize: 10, color: C.purple, fontFamily: "monospace", marginTop: 1 }}>#{m.code_invitation}</div>}
                       </div>
                     </div>
@@ -395,7 +407,19 @@ function MembresTable({ membres, onRefresh }) {
                     <div style={{ color: C.dark, fontSize: 12 }}>{m.email}</div>
                     <div style={{ color: C.slate, fontSize: 11, marginTop: 2 }}>{m.phone || "—"}</div>
                   </td>
-                  <td style={{ padding: "12px 14px" }}><StatusBadge status={m.statut || m.status} /></td>
+                  <td style={{ padding: "12px 14px" }}>
+                    <StatusBadge status={m.statut || m.status} />
+                    {m.statut_paiement && (
+                      <div style={{ marginTop: 4 }}>
+                        <Badge
+                          color={m.statut_paiement === "paid" ? C.green : C.gold}
+                          bg={m.statut_paiement === "paid" ? C.greenL : C.goldL}
+                          size={10}>
+                          {m.statut_paiement === "paid" ? "✓ Cotis. payé" : "⏳ Non payé"}
+                        </Badge>
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: "12px 14px", color: C.slate, fontSize: 12 }}>{m.parrain_nom || "—"}</td>
                   <td style={{ padding: "12px 14px", color: C.slate, fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(m.created_at)}</td>
                   <td style={{ padding: "12px 14px" }} onClick={e => e.stopPropagation()}>
@@ -414,7 +438,14 @@ function MembresTable({ membres, onRefresh }) {
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Détails — {selected.nom}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[["ID", selected.id], ["Code", selected.code_invitation || "—"], ["Rôle", ROLE_CONFIG[selected.role]?.label], ["Inscrit le", fmtDate(selected.created_at)]].map(([k, v]) => (
+              {[
+                ["ID", selected.id],
+                ["N° Mutualiste", selected.mutual_number || "—"],
+                ["Code invitation", selected.code_invitation || "—"],
+                ["Rôle", ROLE_CONFIG[selected.role]?.label],
+                ["Statut paiement", selected.statut_paiement === "paid" ? "✓ Payé" : selected.statut_paiement === "unpaid" ? "✕ Impayé" : "⏳ En attente"],
+                ["Inscrit le", fmtDate(selected.created_at)],
+              ].map(([k, v]) => (
                 <div key={k}><div style={{ fontSize: 10, color: C.slate, marginBottom: 2 }}>{k}</div><div style={{ fontSize: 12, fontWeight: 600, color: C.dark }}>{v}</div></div>
               ))}
             </div>
@@ -625,6 +656,7 @@ function ClientsFinauxTable({ clients, onRefresh, onAlert }) {
       c.nom?.toLowerCase().includes(q) ||
       c.email?.toLowerCase().includes(q) ||
       c.phone?.includes(search) ||
+      c.mutual_number?.toLowerCase().includes(q) ||
       c.code_invitation?.toLowerCase().includes(q) ||
       c.parrain_nom?.toLowerCase().includes(q);
     const st = (c.statut || c.status || "").toLowerCase();
@@ -644,9 +676,9 @@ function ClientsFinauxTable({ clients, onRefresh, onAlert }) {
   // Export CSV simple
   const handleExport = () => {
     setExportLoading(true);
-    const rows = [["Nom", "Email", "Téléphone", "Parrain", "Statut", "Paiement", "Cotisation", "Inscription"]];
+    const rows = [["Nom", "N° Mutualiste", "Email", "Téléphone", "Parrain", "Statut", "Paiement", "Cotisation", "Inscription"]];
     filtered.forEach(c => rows.push([
-      c.nom || "", c.email || "", c.phone || "", c.parrain_nom || "",
+      c.nom || "", c.mutual_number || "", c.email || "", c.phone || "", c.parrain_nom || "",
       c.statut || c.status || "", c.paiement_statut || c.payment_status || "",
       c.montant_cotisation ? `${c.montant_cotisation} F` : "—",
       c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : ""
@@ -763,6 +795,7 @@ function ClientsFinauxTable({ clients, onRefresh, onAlert }) {
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: C.dark, fontSize: 13 }}>{c.nom || "—"}</div>
+                          {c.mutual_number && <div style={{ fontSize: 10, color: C.blue, fontFamily: "monospace", marginTop: 1 }}>{c.mutual_number}</div>}
                           {c.code_invitation && <div style={{ fontSize: 10, color: C.purple, fontFamily: "monospace", marginTop: 1 }}>#{c.code_invitation}</div>}
                         </div>
                       </div>

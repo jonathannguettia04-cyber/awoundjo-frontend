@@ -1448,7 +1448,7 @@ function WithdrawalPage() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PAGE CLIENTS FINAUX (MUTUALISTES)
-// Endpoints : POST /clients · GET /clients · POST /clients/:id/pay/jeko · POST /clients/:id/pay/cash
+// Endpoints : POST /clients · GET /clients · POST /clients/:id/pay/jeko
 // Plans chargés dynamiquement depuis GET /api/plans
 // Paiement Jeko inline sur la liste (pattern DiasporaPages)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1490,7 +1490,6 @@ function ClientsPage() {
   // Paiement inline (par client id)
   const [payingId, setPayingId]     = useState(null);   // id du client dont le panel est ouvert
   const [paidId, setPaidId]         = useState(null);   // id du client venant d'être payé
-  const [payMode, setPayMode]       = useState(null);   // null | "jeko" | "cash"
   const [jekoMethod, setJekoMethod] = useState("orange");
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError]     = useState("");
@@ -1534,13 +1533,11 @@ function ClientsPage() {
   // ── Paiement inline ──────────────────────────────────────────
   function openPay(clientId) {
     setPayingId(clientId);
-    setPayMode(null);
     setJekoMethod("orange");
     setPayError("");
   }
   function closePay() {
     setPayingId(null);
-    setPayMode(null);
     setPayError("");
   }
 
@@ -1559,19 +1556,6 @@ function ClientsPage() {
     } else {
       setPayError("URL de paiement non reçue. Réessayez.");
     }
-  }
-
-  async function payCash(clientId) {
-    const c = clients.find(x => x.id === clientId);
-    if (!window.confirm(`Confirmer le paiement CASH pour ${c?.name} ?`)) return;
-    setPayError(""); setPayLoading(true);
-    const data = await apiFetch(`/clients/${clientId}/pay/cash`, { method: "POST" });
-    setPayLoading(false);
-    if (!data || data.success === false) { setPayError(data?.message || "Erreur paiement"); return; }
-    setPaidId(clientId);
-    closePay();
-    loadClients(1);
-    setTimeout(() => setPaidId(null), 3000);
   }
 
   // ── Helpers UI ───────────────────────────────────────────────
@@ -1685,59 +1669,29 @@ function ClientsPage() {
                           </div>
                         )}
 
-                        {/* Choix du mode */}
-                        {!payMode && (
+                        {/* Panel paiement JEKO */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)}
+                            style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${G.border}`, fontSize: 13, fontFamily: "inherit", background: "#fff", color: G.text }}>
+                            <option value="orange">🟠 Orange Money</option>
+                            <option value="wave">🔵 Wave</option>
+                            <option value="mtn">🟡 MTN Mobile Money</option>
+                            <option value="moov">🟢 Moov Money</option>
+                            <option value="djamo">💜 Djamo / Carte bancaire</option>
+                          </select>
                           <div style={{ display: "flex", gap: 10 }}>
-                            <button disabled
-                              style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#e2e8f0", color: "#94a3b8", border: "none", fontWeight: 700, fontSize: 13, cursor: "not-allowed", fontFamily: "inherit" }}>
-                              💵 Cash (indisponible)
-                            </button>
-                            <button onClick={() => setPayMode("jeko")}
-                              style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                              📱 JEKO
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Mode JEKO */}
-                        {payMode === "jeko" && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            <select value={jekoMethod} onChange={e => setJekoMethod(e.target.value)}
-                              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${G.border}`, fontSize: 13, fontFamily: "inherit", background: "#fff", color: G.text }}>
-                              <option value="orange">🟠 Orange Money</option>
-                              <option value="wave">🔵 Wave</option>
-                              <option value="mtn">🟡 MTN Mobile Money</option>
-                              <option value="moov">🟢 Moov Money</option>
-                              <option value="djamo">💜 Djamo / Carte bancaire</option>
-                            </select>
-                            <div style={{ display: "flex", gap: 10 }}>
-                              <button onClick={() => setPayMode(null)}
-                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#fff", color: G.muted, border: `1.5px solid ${G.border}`, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                                ← Retour
-                              </button>
-                              <button onClick={() => payJeko(c.id)} disabled={payLoading}
-                                style={{ flex: 2, padding: "10px 0", borderRadius: 8, background: payLoading ? "#94a3b8" : `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                                {payLoading
-                                  ? <><div style={{ width: 13, height: 13, border: "2px solid rgba(255,255,255,.4)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Redirection…</>
-                                  : "💳 Payer via JEKO"}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Mode Cash */}
-                        {payMode === "cash" && (
-                          <div style={{ display: "flex", gap: 10 }}>
-                            <button onClick={() => setPayMode(null)}
+                            <button onClick={() => closePay()}
                               style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: "#fff", color: G.muted, border: `1.5px solid ${G.border}`, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                              ← Retour
+                              ✕ Annuler
                             </button>
-                            <button onClick={() => payCash(c.id)} disabled={payLoading}
-                              style={{ flex: 2, padding: "10px 0", borderRadius: 8, background: payLoading ? "#94a3b8" : G.blue, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                              {payLoading ? "Enregistrement…" : "✅ Confirmer paiement cash"}
+                            <button onClick={() => payJeko(c.id)} disabled={payLoading}
+                              style={{ flex: 2, padding: "10px 0", borderRadius: 8, background: payLoading ? "#94a3b8" : `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                              {payLoading
+                                ? <><div style={{ width: 13, height: 13, border: "2px solid rgba(255,255,255,.4)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Redirection…</>
+                                : "💳 Payer via JEKO"}
                             </button>
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>
