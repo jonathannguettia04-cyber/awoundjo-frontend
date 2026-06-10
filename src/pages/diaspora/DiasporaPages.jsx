@@ -134,7 +134,7 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
   const [jekoMethod, setJekoMethod] = useState("orange");
 
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : ${BASE.replace("/api", "")}/diaspora/login`;
-  const fee  = Number(adhesionFee) || 0;
+  const fee  = Number(adhesionFee) > 0 ? Number(adhesionFee) : 15000;
 
   async function handlePay() {
     setPayLoading(true);
@@ -286,7 +286,7 @@ function PaymentModal({ member, roleLabel, onClose }) {
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
   const [jekoMethod, setJekoMethod] = useState("orange");
-  const fee = Number(member.membership_fee) || 0;
+  const fee = Number(member.membership_fee) > 0 ? Number(member.membership_fee) : 15000;
 
   async function handlePay() {
     setPayLoading(true);
@@ -1560,7 +1560,7 @@ export function DiasporaNewClient() {
   // ── Succès création — affichage credentials + paiement ──
   if (success) {
     const client = success.client;
-    const fee    = success.adhesion_fee || 0;
+    const fee    = Number(success.adhesion_fee) > 0 ? Number(success.adhesion_fee) : 15000;
     const infoTxt = `Client Awoundjô\nNuméro mutualiste : ${success.mutual_number}\nCode d'accès : ${success.access_code}\nPortail : ${success.portal_url}`;
 
     if (cashDone) {
