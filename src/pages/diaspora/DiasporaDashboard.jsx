@@ -136,9 +136,11 @@ function CreateClientInline({ onSuccess, onCancel }) {
 
 // ── Bannière succès après création client ─────────────────────
 function ClientCreatedBanner({ result, onClose }) {
-  const creds = result?.credentials;
+  const mutualNumber = result?.mutual_number;
+  const accessCode   = result?.access_code;
+  const portalLink   = result?.portal_url || result?.portal_link || `${window.location.origin}/portail-client`;
   const [copied, setCopied] = useState(false);
-  const text = `Client Awoundjô\nNuméro mutualiste : ${creds?.mutual_number}\nMot de passe temporaire : ${creds?.temp_password}`;
+  const text = `Client Awoundjô\nNuméro mutualiste : ${mutualNumber}\nCode d'accès : ${accessCode}\nPortail : ${portalLink}`;
   return (
     <div style={{ background:C.greenL, border:`1.5px solid #05966944`, borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
@@ -147,14 +149,21 @@ function ClientCreatedBanner({ result, onClose }) {
       </div>
       <div style={{ background:"#fff", borderRadius:10, padding:"12px 16px", marginBottom:12 }}>
         {[
-          { label:"Numéro mutualiste", value: creds?.mutual_number },
-          { label:"Mot de passe temp.", value: creds?.temp_password },
+          { label:"Numéro mutualiste", value: mutualNumber },
+          { label:"Code d'accès",      value: accessCode   },
         ].map(r => (
           <div key={r.label} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
             <span style={{ fontSize:12, color:C.slate }}>{r.label}</span>
             <span style={{ fontFamily:"monospace", fontWeight:800, fontSize:13 }}>{r.value}</span>
           </div>
         ))}
+        <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #D1FAE5" }}>
+          <span style={{ fontSize:11, color:C.slate }}>Lien portail client</span>
+          <a href={portalLink} target="_blank" rel="noreferrer"
+            style={{ display:"block", fontSize:12, fontWeight:700, color:C.green, wordBreak:"break-all", marginTop:2 }}>
+            🔗 {portalLink}
+          </a>
+        </div>
       </div>
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
         <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); }}

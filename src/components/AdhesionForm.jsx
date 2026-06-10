@@ -330,7 +330,7 @@ export default function AdhesionForm({ targetRole, onSuccess }) {
       setCredentials(data.credentials);
       setAmbassadorId(newId);
       setStep("done");
-      onSuccess?.(data.credentials, rc.art, newId, adhesionFee);
+      onSuccess?.(data.credentials, rc.art, newId, adhesionFee, data.client_credentials);
     } catch (err) {
       setError(err?.response?.data?.error || err?.response?.data?.message || "Erreur lors de la création du compte.");
       setStep("form");

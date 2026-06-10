@@ -127,13 +127,17 @@ function Btn({ children, onClick, variant = "primary", style = {}, disabled = fa
 // MODAL CREDENTIALS — affiché après création d'un rôle
 // Paiement via JEKO
 // ─────────────────────────────────────────────────────────────
-function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee, onClose }) {
+function CredentialsModal({ credentials, clientCredentials, ambassadorId, targetLabel, adhesionFee, onClose }) {
   const [copied,     setCopied]     = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payError,   setPayError]   = useState("");
   const [jekoMethod, setJekoMethod] = useState("orange");
 
   const text = `Identifiants ${targetLabel} Awoundjô\nNom d'utilisateur : ${credentials.username}\nMot de passe : ${credentials.temp_password}\nURL : ${BASE.replace("/api", "")}/diaspora/login`;
+  const clientText = clientCredentials
+    ? `Compte Mutualiste Awoundjô\nN° Mutualiste : ${clientCredentials.mutual_number}\nCode d'accès : ${clientCredentials.access_code}\nPortail : ${clientCredentials.portal_link}`
+    : "";
+  const fullText = clientCredentials ? `${text}\n\n${clientText}` : text;
   const fee  = Number(adhesionFee) > 0 ? Number(adhesionFee) : 15000;
 
   async function handlePay() {
@@ -210,13 +214,35 @@ function CredentialsModal({ credentials, ambassadorId, targetLabel, adhesionFee,
           <p style={{ margin: "4px 0 0", fontSize: 11, color: C.red }}>⚠️ Le mot de passe doit être changé à la première connexion</p>
         </div>
 
+        {/* Compte client mutualiste */}
+        {clientCredentials && (
+          <div style={{ background: "#F0FDF4", borderRadius: 12, padding: "16px 18px", marginBottom: 14, border: "1.5px solid #86EFAC" }}>
+            <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#16A34A", textTransform: "uppercase", letterSpacing: .8 }}>
+              🏥 Compte Mutualiste — Accès Portail Client
+            </p>
+            {[
+              { label: "N° Mutualiste",  value: clientCredentials.mutual_number },
+              { label: "Code d'accès",   value: clientCredentials.access_code   },
+            ].map(f => (
+              <div key={f.label} style={{ marginBottom: 10 }}>
+                <p style={{ margin: "0 0 3px", fontSize: 11, fontWeight: 700, color: C.slate, textTransform: "uppercase", letterSpacing: .8 }}>{f.label}</p>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.dark, fontFamily: "monospace", background: "#fff", padding: "6px 10px", borderRadius: 6, border: "1px solid #86EFAC" }}>{f.value}</p>
+              </div>
+            ))}
+            <a href={clientCredentials.portal_link} target="_blank" rel="noreferrer"
+              style={{ display: "inline-block", marginTop: 4, fontSize: 12, color: "#16A34A", fontWeight: 700, wordBreak: "break-all" }}>
+              🔗 {clientCredentials.portal_link}
+            </a>
+          </div>
+        )}
+
         {/* Partage */}
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-          <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+          <button onClick={() => { navigator.clipboard.writeText(fullText); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
             style={{ flex: 1, padding: "9px 0", background: C.blueL, color: C.blue, border: `1.5px solid ${C.blue}`, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             {copied ? "✅ Copié !" : "📋 Copier les identifiants"}
           </button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
+          <a href={`https://wa.me/?text=${encodeURIComponent(fullText)}`} target="_blank" rel="noreferrer"
             style={{ flex: 1, padding: "9px 0", background: "#25D366", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             📲 WhatsApp
           </a>
@@ -404,6 +430,7 @@ export function DiasporaRegisterPays() {
   const [credsLabel, setCredsLabel]         = useState("");
   const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
+  const [clientCreds, setClientCreds]       = useState(null);
   const [payMember, setPayMember]           = useState(null);
   const [payFailed, setPayFailed]           = useState(false);
 
@@ -418,8 +445,9 @@ export function DiasporaRegisterPays() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id, fee) {
+  function handleSuccess(credentials, label, id, fee, clientCredentials) {
     setCreds(credentials);
+    setClientCreds(clientCredentials || null);
     setCredsLabel(label);
     setCredsId(id || null);
     setCredsAdhesionFee(fee || 0);
@@ -430,7 +458,7 @@ export function DiasporaRegisterPays() {
 
   return (
     <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} clientCredentials={clientCreds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); setClientCreds(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Ambassadeur Pays" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
@@ -504,6 +532,7 @@ export function DiasporaRegisterRecruiter() {
   const [credsLabel, setCredsLabel]         = useState("");
   const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
+  const [clientCreds, setClientCreds]       = useState(null);
   const [payMember, setPayMember]           = useState(null);
   const [payFailed, setPayFailed]           = useState(false);
 
@@ -518,8 +547,9 @@ export function DiasporaRegisterRecruiter() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id, fee) {
+  function handleSuccess(credentials, label, id, fee, clientCredentials) {
     setCreds(credentials);
+    setClientCreds(clientCredentials || null);
     setCredsLabel(label);
     setCredsId(id || null);
     setCredsAdhesionFee(fee || 0);
@@ -530,7 +560,7 @@ export function DiasporaRegisterRecruiter() {
 
   return (
     <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} clientCredentials={clientCreds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); setClientCreds(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="Recruteur" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
@@ -604,6 +634,7 @@ export function DiasporaRegisterRUM() {
   const [credsLabel, setCredsLabel]         = useState("");
   const [credsId, setCredsId]               = useState(null);
   const [credsAdhesionFee, setCredsAdhesionFee] = useState(0);
+  const [clientCreds, setClientCreds]       = useState(null);
   const [payMember, setPayMember]           = useState(null);
   const [payFailed, setPayFailed]           = useState(false);
 
@@ -618,8 +649,9 @@ export function DiasporaRegisterRUM() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSuccess(credentials, label, id, fee) {
+  function handleSuccess(credentials, label, id, fee, clientCredentials) {
     setCreds(credentials);
+    setClientCreds(clientCredentials || null);
     setCredsLabel(label);
     setCredsId(id || null);
     setCredsAdhesionFee(fee || 0);
@@ -630,7 +662,7 @@ export function DiasporaRegisterRUM() {
 
   return (
     <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      {creds && <CredentialsModal credentials={creds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); }} />}
+      {creds && <CredentialsModal credentials={creds} clientCredentials={clientCreds} ambassadorId={credsId} targetLabel={credsLabel} adhesionFee={credsAdhesionFee} onClose={() => { setCreds(null); setCredsId(null); setClientCreds(null); }} />}
       {payMember && <PaymentModal member={payMember} roleLabel="RUM" onClose={() => setPayMember(null)} />}
 
       {payFailed && (
