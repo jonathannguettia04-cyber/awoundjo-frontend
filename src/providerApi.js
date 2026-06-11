@@ -1,4 +1,4 @@
-// src/providerApi.js — v2
+// src/providerApi.js — v3
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -82,13 +82,14 @@ export const providerPharmacyAPI = {
   // Créer une ordonnance directe (pharmacie sans prescription préalable)
   createDirectPrescription: (data) =>
     providerApi.post("/prescriptions/direct", data),
-    // data = { client_id, items: [...], notes? }
+    // data = { client_id, content, total_amount, practitioner_name }
 };
 
 // ── Examens avec accord préalable ────────────────────────────
 export const providerExamAPI = {
-  create: (data)   => providerApi.post("/exam-requests", data),
-  getAll: (params) => providerApi.get("/exam-requests", { params }),
+  create:  (data)   => providerApi.post("/exam-requests", data),
+  getAll:  (params) => providerApi.get("/exam-requests", { params }),
+  getById: (id)     => providerApi.get(`/exam-requests/${id}`),
 };
 
 // ── Dossier médical ───────────────────────────────────────────

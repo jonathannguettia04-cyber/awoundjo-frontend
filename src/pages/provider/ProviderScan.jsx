@@ -107,12 +107,15 @@ export default function ProviderScan() {
 
   // Examens
   const [examRequired,    setExamRequired]    = useState(false);
-  const [examCatalog,     setExamCatalog]     = useState([]); // actes biologie + imagerie du catalogue
-  const [examSelected,    setExamSelected]    = useState([]); // catalog_codes sélectionnés
+  const [examCatalog,     setExamCatalog]     = useState([]);
+  const [examSelected,    setExamSelected]    = useState([]);
+  const [examPrices,      setExamPrices]      = useState({}); // { catalog_code: montant_string }
+  const [examAutre,       setExamAutre]       = useState({ active: false, nom: "", prix: "" }); // examen "Autre"
   const [examSaving,      setExamSaving]      = useState(false);
   const [examDone,        setExamDone]        = useState(false);
-  const [examResults,     setExamResults]     = useState([]); // résultats soumis
-  const [examSoldes,      setExamSoldes]      = useState({}); // { analyses_biologiques: eligData, radiologie_imagerie: eligData }
+  const [examResults,     setExamResults]     = useState([]);
+  const [examSoldes,      setExamSoldes]      = useState({});
+  const [examTotals,      setExamTotals]      = useState({ consultation_amount: 0, estimated_exams_total: 0, estimated_grand_total: 0 });
 
   // ── Chargement catalogue quand client connu ───────────────
   useEffect(() => {
@@ -236,22 +239,58 @@ export default function ProviderScan() {
   // ── Soumettre les examens (un appel par examen) ───────────
   async function handleExams(e) {
     e.preventDefault();
-    if (!examSelected.length) {
+    const hasAutre = examAutre.active && examAutre.nom.trim();
+    if (!examSelected.length && !hasAutre) {
       setStep(prescriptionRequired ? 5 : 6);
       return;
     }
     setExamSaving(true); setError("");
     try {
       const results = [];
+      let lastTotals = null;
+
+      // Examens du catalogue — on envoie estimated_amount structuré
       for (const catalog_code of examSelected) {
-        const entry = examCatalog.find(e => e.code === catalog_code);
+        const entry            = examCatalog.find(e => e.code === catalog_code);
+        const estimated_amount = Number(examPrices[catalog_code]) || null;
         const { data } = await providerExamAPI.create({
-          service_id:   service.id,
+          service_id:       service.id,
           catalog_code,
-          description:  entry?.label || catalog_code,
+          description:      entry?.label || catalog_code,
+          estimated_amount,
+          is_autre:         false,
         });
         results.push(data.exam_request);
+        lastTotals = {
+          consultation_amount:   data.consultation_amount   ?? Number(service.total_amount),
+          estimated_exams_total: data.estimated_exams_total ?? 0,
+          estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
+        };
       }
+
+      // Examen "Autre" — catalog_code proxy + is_autre=true + autre_label
+      if (hasAutre) {
+        const proxyCode = examCatalog.find(e => e.category === "analyses_biologiques")?.code
+          || examCatalog[0]?.code;
+        if (proxyCode) {
+          const estimated_amount = Number(examAutre.prix) || null;
+          const { data } = await providerExamAPI.create({
+            service_id:       service.id,
+            catalog_code:     proxyCode,
+            is_autre:         true,
+            autre_label:      examAutre.nom.trim(),
+            estimated_amount,
+          });
+          results.push(data.exam_request);
+          lastTotals = {
+            consultation_amount:   data.consultation_amount   ?? Number(service.total_amount),
+            estimated_exams_total: data.estimated_exams_total ?? 0,
+            estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
+          };
+        }
+      }
+
+      if (lastTotals) setExamTotals(lastTotals);
       setExamResults(results);
       setExamDone(true);
       setStep(prescriptionRequired ? 5 : 6);
@@ -276,8 +315,10 @@ export default function ProviderScan() {
     setCatalog([]); setSelectedCat(null); setError("");
     setDescription(""); setDoctorName(""); setTotalAmount(""); setService(null);
     setPrescription(""); setPrescDone(false); setPrescriptionRequired(false);
-    setExamRequired(false); setExamCatalog([]); setExamSelected([]);
+    setExamRequired(false); setExamCatalog([]); setExamSelected([]); setExamPrices({});
+    setExamAutre({ active: false, nom: "", prix: "" });
     setExamDone(false); setExamResults([]); setExamSoldes({});
+    setExamTotals({ consultation_amount: 0, estimated_exams_total: 0, estimated_grand_total: 0 });
   }
 
   // ── Calculs financiers ────────────────────────────────────
@@ -316,9 +357,8 @@ export default function ProviderScan() {
       {/* ── Progress bar ── */}
       <div style={{ display: "flex", gap: 6, marginBottom: 28, alignItems: "center" }}>
         {visibleSteps.map((s, i) => {
-          const realStep = s.n === 4 && !prescriptionRequired ? step : s.n;
-          const active   = step === s.n;
-          const done     = step > s.n;
+          const active = step === s.n;
+          const done   = step > s.n;
           return (
             <div key={s.n} style={{ display: "flex", alignItems: "center", gap: 6, flex: i < visibleSteps.length - 1 ? 1 : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -328,7 +368,7 @@ export default function ProviderScan() {
                   background: done ? "#22C55E" : active ? "#2563EB" : "#E2E8F0",
                   color: done || active ? "#fff" : "#94A3B8",
                 }}>
-                  {done ? "✓" : s.n}
+                  {done ? "✓" : i + 1}
                 </div>
                 <div style={{ display: window.innerWidth < 480 ? "none" : "block" }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: active ? "#2563EB" : done ? "#22C55E" : "#94A3B8", margin: 0 }}>{s.label}</p>
@@ -691,37 +731,72 @@ export default function ProviderScan() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {entries.map(entry => {
                             const checked = examSelected.includes(entry.code);
+                            const soldeData = examSoldes[entry.category];
+                            const plafond = entry.cap_per_person_annual || entry.cap_annual || null;
                             return (
-                              <button key={entry.code} type="button" onClick={() => toggleExam(entry.code)}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 12,
-                                  padding: "12px 14px", borderRadius: 12, border: "2px solid",
-                                  borderColor: checked ? "#2563EB" : "#E2E8F0",
-                                  background: checked ? "#EFF6FF" : "#fff",
-                                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                                  transition: "all .15s",
-                                }}>
-                                <div style={{
-                                  width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                                  border: `2px solid ${checked ? "#2563EB" : "#CBD5E1"}`,
-                                  background: checked ? "#2563EB" : "#fff",
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  fontSize: 12, color: "#fff",
-                                }}>
-                                  {checked && "✓"}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#1E40AF" : "#1E293B" }}>{entry.label}</p>
-                                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
-                                    {entry.code} · ⏳ Accord préalable mutuelle
-                                  </p>
-                                </div>
-                                {entry.cap_per_act && (
-                                  <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
-                                    max {fmt(entry.cap_per_act)}
-                                  </span>
+                              <div key={entry.code}>
+                                <button type="button" onClick={() => toggleExam(entry.code)}
+                                  style={{
+                                    width: "100%", display: "flex", alignItems: "center", gap: 12,
+                                    padding: "12px 14px", borderRadius: checked ? "12px 12px 0 0" : 12,
+                                    border: "2px solid",
+                                    borderColor: checked ? "#2563EB" : "#E2E8F0",
+                                    borderBottom: checked ? "1px solid #BFDBFE" : "2px solid #E2E8F0",
+                                    background: checked ? "#EFF6FF" : "#fff",
+                                    cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                                    transition: "all .15s",
+                                  }}>
+                                  <div style={{
+                                    width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                                    border: `2px solid ${checked ? "#2563EB" : "#CBD5E1"}`,
+                                    background: checked ? "#2563EB" : "#fff",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 12, color: "#fff",
+                                  }}>
+                                    {checked && "✓"}
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#1E40AF" : "#1E293B" }}>{entry.label}</p>
+                                    <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
+                                      {entry.code} · ⏳ Accord préalable mutuelle
+                                    </p>
+                                  </div>
+                                  {plafond && (
+                                    <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
+                                      plafond {fmt(plafond)}
+                                    </span>
+                                  )}
+                                </button>
+                                {/* Champ prix — visible si sélectionné */}
+                                {checked && (
+                                  <div style={{
+                                    padding: "10px 14px", background: "#EFF6FF",
+                                    border: "2px solid #2563EB", borderTop: "none",
+                                    borderRadius: "0 0 12px 12px",
+                                  }}>
+                                    <label style={{ ...s.label, color: "#2563EB" }}>Montant estimé (FCFA)</label>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <input
+                                        type="number" min="0"
+                                        value={examPrices[entry.code] || ""}
+                                        onChange={ev => setExamPrices(prev => ({ ...prev, [entry.code]: ev.target.value }))}
+                                        placeholder="Ex : 8 000"
+                                        style={{ ...s.input, fontSize: 15, fontWeight: 700, flex: 1 }}
+                                      />
+                                      {plafond && examPrices[entry.code] && Number(examPrices[entry.code]) > plafond && (
+                                        <span style={{ fontSize: 11, color: "#DC2626", whiteSpace: "nowrap" }}>
+                                          ⚠️ Dépasse le plafond
+                                        </span>
+                                      )}
+                                    </div>
+                                    {plafond && (
+                                      <p style={{ fontSize: 11, color: "#3B82F6", margin: "4px 0 0" }}>
+                                        Plafond prise en charge : {fmt(plafond)} · {soldeData?.coverage_pct ?? "—"}% couvert
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -730,10 +805,82 @@ export default function ProviderScan() {
                   })}
 
                   {examSelected.length > 0 && (
-                    <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 10, fontSize: 12, color: "#1E40AF", marginBottom: 12 }}>
+                    <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 10, fontSize: 12, color: "#1E40ED", marginBottom: 12 }}>
                       ✅ {examSelected.length} examen(s) sélectionné(s) — soumis en accord préalable à la mutuelle
                     </div>
                   )}
+
+                  {/* Carte "Autre examen" */}
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
+                      📝 Autre examen
+                    </p>
+                    <button type="button" onClick={() => setExamAutre(prev => ({ ...prev, active: !prev.active }))}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 12,
+                        padding: "12px 14px",
+                        borderRadius: examAutre.active ? "12px 12px 0 0" : 12,
+                        border: "2px solid", borderColor: examAutre.active ? "#7C3AED" : "#E2E8F0",
+                        borderBottom: examAutre.active ? "1px solid #DDD6FE" : "2px solid #E2E8F0",
+                        background: examAutre.active ? "#F5F3FF" : "#fff",
+                        cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                        transition: "all .15s",
+                      }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${examAutre.active ? "#7C3AED" : "#CBD5E1"}`,
+                        background: examAutre.active ? "#7C3AED" : "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, color: "#fff",
+                      }}>
+                        {examAutre.active && "✓"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: examAutre.active ? "#5B21B6" : "#1E293B" }}>
+                          Autre examen (hors catalogue)
+                        </p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#94A3B8" }}>
+                          ⏳ Accord préalable · Plafond 35 000 FCFA
+                        </p>
+                      </div>
+                    </button>
+                    {examAutre.active && (
+                      <div style={{
+                        padding: "12px 14px", background: "#F5F3FF",
+                        border: "2px solid #7C3AED", borderTop: "none",
+                        borderRadius: "0 0 12px 12px",
+                        display: "flex", flexDirection: "column", gap: 10,
+                      }}>
+                        <div>
+                          <label style={{ ...s.label, color: "#7C3AED" }}>Nom de l'examen *</label>
+                          <input
+                            value={examAutre.nom}
+                            onChange={e => setExamAutre(prev => ({ ...prev, nom: e.target.value }))}
+                            placeholder="Ex : PCR COVID, Biopsie, IRM cérébrale…"
+                            style={{ ...s.input, borderColor: "#DDD6FE" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ ...s.label, color: "#7C3AED" }}>Montant estimé (FCFA)</label>
+                          <input
+                            type="number" min="0"
+                            value={examAutre.prix}
+                            onChange={e => setExamAutre(prev => ({ ...prev, prix: e.target.value }))}
+                            placeholder="Ex : 25 000"
+                            style={{ ...s.input, fontSize: 15, fontWeight: 700, borderColor: "#DDD6FE" }}
+                          />
+                          {examAutre.prix && Number(examAutre.prix) > 35000 && (
+                            <p style={{ fontSize: 11, color: "#DC2626", margin: "4px 0 0" }}>
+                              ⚠️ Dépasse le plafond de 35 000 FCFA pour les examens hors catalogue
+                            </p>
+                          )}
+                          <p style={{ fontSize: 11, color: "#7C3AED", margin: "4px 0 0" }}>
+                            Plafond prise en charge : 35 000 FCFA
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -751,9 +898,10 @@ export default function ProviderScan() {
                   style={{ ...s.btnPrimary, flex: 1 }}>
                   {examSaving
                     ? <><Spinner /> Soumission…</>
-                    : examSelected.length
-                      ? `🔬 Soumettre ${examSelected.length} examen(s)`
-                      : "Continuer sans examen →"
+                    : (() => {
+                        const total = examSelected.length + (examAutre.active && examAutre.nom.trim() ? 1 : 0);
+                        return total ? `🔬 Soumettre ${total} examen(s)` : "Continuer sans examen →";
+                      })()
                   }
                 </button>
               </div>
@@ -816,11 +964,11 @@ export default function ProviderScan() {
               { label: "N° mutualiste",   value: client?.mutual_number },
               { label: "Acte",            value: selectedCat?.label },
               { label: "Code",            value: selectedCat?.code },
-              { label: "Montant total",   value: fmt(service.total_amount) },
+              { label: "Consultation",    value: fmt(service.total_amount) },
               { label: "Part mutuelle",   value: fmt(service.mutual_part),  color: "#0097A7" },
               { label: "Reste patient",   value: fmt(service.client_part),  color: "#DC2626" },
               { label: "Couverture",      value: `${service.coverage_pct}%` },
-              ...(examDone ? [{ label: "Examens", value: `🔬 ${examResults.length} demande(s) en accord préalable` }] : []),
+              ...(examDone ? [{ label: "Examens soumis", value: `🔬 ${examResults.length} demande(s) en accord préalable` }] : []),
               ...(prescDone ? [{ label: "Ordonnance", value: "✅ Saisie dans le système" }] : []),
             ].map((row, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F1F5F9" }}>
@@ -828,6 +976,27 @@ export default function ProviderScan() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: row.color || "#1E293B" }}>{row.value}</span>
               </div>
             ))}
+            {/* Bloc total estimé — affiché uniquement si des examens ont été soumis avec un montant */}
+            {examDone && examTotals.estimated_exams_total > 0 && (
+              <div style={{ marginTop: 12, padding: "12px 14px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 10 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
+                  💰 Estimation financière
+                </p>
+                {[
+                  { label: "Consultation (validé)",             value: fmt(examTotals.consultation_amount),   color: "#1E293B" },
+                  { label: "Examens complémentaires (estimé)",  value: fmt(examTotals.estimated_exams_total), color: "#D97706" },
+                  { label: "Total estimé",                      value: fmt(examTotals.estimated_grand_total), color: "#0F172A", bold: true },
+                ].map((row, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.06)" : "none" }}>
+                    <span style={{ fontSize: 12, color: "#92400E" }}>{row.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: row.bold ? 800 : 700, color: row.color }}>{row.value}</span>
+                  </div>
+                ))}
+                <p style={{ fontSize: 10, color: "#B45309", margin: "6px 0 0" }}>
+                  ⚠️ Le montant des examens est une estimation — la prise en charge définitive est soumise à l'accord préalable de la mutuelle.
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto" }}>
