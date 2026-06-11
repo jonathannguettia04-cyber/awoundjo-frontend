@@ -1,16 +1,18 @@
 // src/pages/provider/ProviderScan.jsx
-// Flux principal de prise en charge — 4 étapes :
+// Flux principal de prise en charge — 6 étapes :
 //   1. Identifier le patient
 //   2. Vérifier l'éligibilité + choisir l'acte du catalogue
 //   3. Saisir le montant + valider
-//   4. (Clinique uniquement) Saisir l'ordonnance
-//   5. Confirmation finale
+//   4. (Consultation uniquement) Soumettre les examens complémentaires
+//   5. (Clinique uniquement) Saisir l'ordonnance
+//   6. Confirmation finale
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   providerClientAPI, providerServiceAPI,
   providerCatalogAPI, providerPrescriptionAPI,
+  providerExamAPI,
   getProviderData,
 } from "../../providerApi";
 
@@ -59,8 +61,16 @@ const STEPS = [
   { n: 1, label: "Identification",  sub: "Trouver l'assuré" },
   { n: 2, label: "Acte",           sub: "Choisir dans le catalogue" },
   { n: 3, label: "Validation",     sub: "Montant & confirmation" },
-  { n: 4, label: "Ordonnance",     sub: "Saisie obligatoire" },
-  { n: 5, label: "Confirmation",   sub: "Prise en charge validée" },
+  { n: 4, label: "Examens",        sub: "Accord préalable" },
+  { n: 5, label: "Ordonnance",     sub: "Saisie obligatoire" },
+  { n: 6, label: "Confirmation",   sub: "Prise en charge validée" },
+];
+
+// Catégories qui déclenchent l'étape examens
+const EXAM_REQUIRED_CATEGORIES = [
+  "consultation_generaliste",
+  "consultation_specialiste",
+  "consultation_urgence",
 ];
 
 // ─── Composant principal ─────────────────────────────────────
@@ -95,6 +105,15 @@ export default function ProviderScan() {
   const [prescDone,       setPrescDone]       = useState(false);
   const [prescriptionRequired, setPrescriptionRequired] = useState(false);
 
+  // Examens
+  const [examRequired,    setExamRequired]    = useState(false);
+  const [examCatalog,     setExamCatalog]     = useState([]); // actes biologie + imagerie du catalogue
+  const [examSelected,    setExamSelected]    = useState([]); // catalog_codes sélectionnés
+  const [examSaving,      setExamSaving]      = useState(false);
+  const [examDone,        setExamDone]        = useState(false);
+  const [examResults,     setExamResults]     = useState([]); // résultats soumis
+  const [examSoldes,      setExamSoldes]      = useState({}); // { analyses_biologiques: eligData, radiologie_imagerie: eligData }
+
   // ── Chargement catalogue quand client connu ───────────────
   useEffect(() => {
     if (!client) return;
@@ -105,7 +124,27 @@ export default function ProviderScan() {
       .finally(() => setCatLoading(false));
   }, [client]);
 
-  // ── Vérification éligibilité quand acte sélectionné ──────
+  // ── Chargement catalogue examens quand service créé ─────
+  useEffect(() => {
+    if (!service || !examRequired) return;
+    const examEntries = catalog.filter(e =>
+      ["analyses_biologiques", "radiologie_imagerie"].includes(e.category)
+    );
+    setExamCatalog(examEntries);
+  }, [service, examRequired, catalog]);
+
+  // ── Chargement des soldes examens à l'entrée de l'étape 4 ─
+  useEffect(() => {
+    if (!client || examCatalog.length === 0) return;
+    const cats = ["analyses_biologiques", "radiologie_imagerie"];
+    cats.forEach(cat => {
+      const firstEntry = examCatalog.find(e => e.category === cat);
+      if (!firstEntry) return;
+      providerClientAPI.eligibility(client.id, firstEntry.code)
+        .then(r => setExamSoldes(prev => ({ ...prev, [cat]: r.data })))
+        .catch(() => {});
+    });
+  }, [examCatalog, client]);
   useEffect(() => {
     if (!client || !selectedCat) return;
     providerClientAPI.eligibility(client.id, selectedCat.code)
@@ -157,9 +196,13 @@ export default function ProviderScan() {
       });
       setService(data.service);
       const needsPresc = PRESCRIPTION_REQUIRED_CATEGORIES.includes(selectedCat.category);
+      const needsExam  = EXAM_REQUIRED_CATEGORIES.includes(selectedCat.category);
       setPrescriptionRequired(needsPresc);
-      // Si ordonnance requise → étape 4, sinon → confirmation directe
-      setStep(needsPresc ? 4 : 5);
+      setExamRequired(needsExam);
+      // Après validation : examens d'abord (si consultation), puis ordonnance, puis confirmation
+      if (needsExam) setStep(4);
+      else if (needsPresc) setStep(5);
+      else setStep(6);
     } catch (err) {
       setError(err.response?.data?.error || "Erreur lors de l'enregistrement");
     } finally { setSaving(false); }
@@ -177,15 +220,54 @@ export default function ProviderScan() {
         catalog_codes: [],
       });
       setPrescDone(true);
-      setStep(5);
+      setStep(6);
     } catch (err) {
       setError(err.response?.data?.error || "Erreur lors de la sauvegarde de l'ordonnance");
     } finally { setPrescSaving(false); }
   }
 
-  // ── Passer l'ordonnance (non bloquant pour l'instant, à configurer) ──
+  // ── Toggle sélection d'un examen du catalogue ────────────
+  function toggleExam(code) {
+    setExamSelected(prev =>
+      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+    );
+  }
+
+  // ── Soumettre les examens (un appel par examen) ───────────
+  async function handleExams(e) {
+    e.preventDefault();
+    if (!examSelected.length) {
+      setStep(prescriptionRequired ? 5 : 6);
+      return;
+    }
+    setExamSaving(true); setError("");
+    try {
+      const results = [];
+      for (const catalog_code of examSelected) {
+        const entry = examCatalog.find(e => e.code === catalog_code);
+        const { data } = await providerExamAPI.create({
+          service_id:   service.id,
+          catalog_code,
+          description:  entry?.label || catalog_code,
+        });
+        results.push(data.exam_request);
+      }
+      setExamResults(results);
+      setExamDone(true);
+      setStep(prescriptionRequired ? 5 : 6);
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de la soumission des examens");
+    } finally { setExamSaving(false); }
+  }
+
+  // ── Passer les examens ────────────────────────────────────
+  function skipExams() {
+    setStep(prescriptionRequired ? 5 : 6);
+  }
+
+  // ── Passer l'ordonnance (non bloquant) ───────────────────
   function skipPrescription() {
-    setStep(5);
+    setStep(6);
   }
 
   // ── Reset complet ─────────────────────────────────────────
@@ -194,6 +276,8 @@ export default function ProviderScan() {
     setCatalog([]); setSelectedCat(null); setError("");
     setDescription(""); setDoctorName(""); setTotalAmount(""); setService(null);
     setPrescription(""); setPrescDone(false); setPrescriptionRequired(false);
+    setExamRequired(false); setExamCatalog([]); setExamSelected([]);
+    setExamDone(false); setExamResults([]); setExamSoldes({});
   }
 
   // ── Calculs financiers ────────────────────────────────────
@@ -210,8 +294,12 @@ export default function ProviderScan() {
     return acc;
   }, {});
 
-  // ── Étapes visibles (pas ordonnance si pas clinique) ────
-  const visibleSteps = STEPS.filter(s => s.n !== 4 || prescriptionRequired);
+  // ── Étapes visibles selon le type d'acte ────────────────
+  const visibleSteps = STEPS.filter(s => {
+    if (s.n === 4) return examRequired;
+    if (s.n === 5) return prescriptionRequired;
+    return true;
+  });
 
   return (
     <div style={{ fontFamily: "'DM Sans',system-ui,sans-serif", paddingBottom: 32 }}>
@@ -376,16 +464,61 @@ export default function ProviderScan() {
               border: `1px solid ${eligibility.eligible ? "#BBF7D0" : "#FECACA"}`,
             }}>
               {eligibility.eligible ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>✅</span>
-                  <div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 20 }}>✅</span>
                     <p style={{ fontWeight: 700, color: "#15803D", margin: 0, fontSize: 13 }}>
                       Éligible — Couverture {eligibility.coverage_pct}%
                     </p>
-                    {eligibility?.cap_monthly_acts && (
-                    <p style={{ color: "#16A34A", fontSize: 11, margin: 0 }}>
-                     Max {eligibility.cap_monthly_acts} bons/mois
-                     </p>
+                  </div>
+                  {/* Plafonds et soldes */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {eligibility.cap_per_act && (
+                      <div style={s.capRow}>
+                        <span>Plafond par acte</span>
+                        <span style={{ fontWeight: 700 }}>{fmt(eligibility.cap_per_act)}</span>
+                      </div>
+                    )}
+                    {eligibility.consults_remaining !== null && eligibility.cap_monthly_acts && (
+                      <div style={s.capRow}>
+                        <span>Consultations ce mois</span>
+                        <span style={{ fontWeight: 700, color: eligibility.consults_remaining === 0 ? "#DC2626" : "#15803D" }}>
+                          {eligibility.consults_remaining} restante(s) / {eligibility.cap_monthly_acts}
+                        </span>
+                      </div>
+                    )}
+                    {eligibility.cap_monthly_acts && eligibility.consults_remaining === null && (
+                      <div style={s.capRow}>
+                        <span>Max / mois</span>
+                        <span style={{ fontWeight: 700 }}>{eligibility.cap_monthly_acts} acte(s)</span>
+                      </div>
+                    )}
+                    {eligibility.solde_person !== null && (
+                      <div style={s.capRow}>
+                        <span>Solde annuel (personne)</span>
+                        <span style={{ fontWeight: 700, color: eligibility.solde_person < 10000 ? "#DC2626" : "#15803D" }}>
+                          {fmt(eligibility.solde_person)} / {fmt(eligibility.cap_per_person)}
+                        </span>
+                      </div>
+                    )}
+                    {eligibility.solde_family !== null && (
+                      <div style={s.capRow}>
+                        <span>Solde annuel (famille)</span>
+                        <span style={{ fontWeight: 700, color: eligibility.solde_family < 10000 ? "#DC2626" : "#15803D" }}>
+                          {fmt(eligibility.solde_family)} / {fmt(eligibility.cap_annual)}
+                        </span>
+                      </div>
+                    )}
+                    {eligibility.solde_global !== null && (
+                      <div style={s.capRow}>
+                        <span>Solde global / an</span>
+                        <span style={{ fontWeight: 700, color: eligibility.solde_global < 20000 ? "#DC2626" : "#15803D" }}>
+                          {fmt(eligibility.solde_global)} / {fmt(eligibility.cap_global_person)}
+                        </span>
+                      </div>
+                    )}
+                    {eligibility.warning && (
+                      <p style={{ fontSize: 11, color: "#D97706", margin: "6px 0 0" }}>{eligibility.warning}</p>
                     )}
                   </div>
                 </div>
@@ -471,6 +604,13 @@ export default function ProviderScan() {
             </div>
           )}
 
+          {/* Avertissement examens */}
+          {EXAM_REQUIRED_CATEGORIES.includes(selectedCat.category) && (
+            <div style={{ marginTop: 14, padding: "12px 16px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, fontSize: 13, color: "#1E40AF" }}>
+              🔬 Vous pourrez prescrire des examens complémentaires après validation de cet acte.
+            </div>
+          )}
+
           {/* Avertissement ordonnance */}
           {PRESCRIPTION_REQUIRED_CATEGORIES.includes(selectedCat.category) && (
             <div style={{ marginTop: 14, padding: "12px 16px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 12, fontSize: 13, color: "#92400E" }}>
@@ -488,8 +628,142 @@ export default function ProviderScan() {
         </form>
       )}
 
-      {/* ══ ÉTAPE 4 — Ordonnance ══ */}
+      {/* ══ ÉTAPE 4 — Examens complémentaires ══ */}
       {step === 4 && service && (
+        <div>
+          <div style={{ ...s.card, background: "#EFF6FF", border: "1px solid #BFDBFE", marginBottom: 16 }}>
+            <p style={{ fontWeight: 800, color: "#1E40AF", margin: "0 0 4px" }}>🔬 Examens complémentaires</p>
+            <p style={{ color: "#3B82F6", fontSize: 13, margin: 0 }}>
+              Sélectionnez les examens à prescrire. Chaque examen sera soumis comme demande d'accord préalable à la mutuelle.
+            </p>
+          </div>
+
+          <div style={s.card}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 6px" }}>Patient</p>
+            <p style={{ fontWeight: 700, color: "#0F172A", margin: "0 0 16px" }}>{client?.name} — {client?.mutual_number}</p>
+
+            <form onSubmit={handleExams}>
+              {examCatalog.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8", fontSize: 13 }}>
+                  Aucun examen disponible dans le catalogue pour ce profil.
+                </div>
+              ) : (
+                <>
+                  {/* Grouper par catégorie */}
+                  {["analyses_biologiques", "radiologie_imagerie"].map(cat => {
+                    const entries = examCatalog.filter(e => e.category === cat);
+                    if (!entries.length) return null;
+                    const catInfo = { analyses_biologiques: { icon: "🔬", label: "Analyses biologiques" }, radiologie_imagerie: { icon: "🩻", label: "Radiologie / Imagerie" } }[cat];
+                    const solde = examSoldes[cat];
+                    return (
+                      <div key={cat} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
+                            {catInfo.icon} {catInfo.label}
+                          </p>
+                          {solde && solde.eligible && (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              {solde.solde_person !== null && (
+                                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                                  background: solde.solde_person < 10000 ? "#FEF2F2" : "#F0FDF4",
+                                  color: solde.solde_person < 10000 ? "#DC2626" : "#15803D" }}>
+                                  Solde : {fmt(solde.solde_person)}
+                                </span>
+                              )}
+                              {solde.solde_family !== null && solde.solde_person === null && (
+                                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                                  background: solde.solde_family < 10000 ? "#FEF2F2" : "#F0FDF4",
+                                  color: solde.solde_family < 10000 ? "#DC2626" : "#15803D" }}>
+                                  Solde : {fmt(solde.solde_family)}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 11, color: "#64748B", padding: "2px 8px", background: "#F1F5F9", borderRadius: 6 }}>
+                                {solde.coverage_pct}% pris en charge
+                              </span>
+                            </div>
+                          )}
+                          {solde && !solde.eligible && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", padding: "2px 8px", background: "#FEF2F2", borderRadius: 6 }}>
+                              ❌ Plafond atteint
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {entries.map(entry => {
+                            const checked = examSelected.includes(entry.code);
+                            return (
+                              <button key={entry.code} type="button" onClick={() => toggleExam(entry.code)}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 12,
+                                  padding: "12px 14px", borderRadius: 12, border: "2px solid",
+                                  borderColor: checked ? "#2563EB" : "#E2E8F0",
+                                  background: checked ? "#EFF6FF" : "#fff",
+                                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                                  transition: "all .15s",
+                                }}>
+                                <div style={{
+                                  width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                                  border: `2px solid ${checked ? "#2563EB" : "#CBD5E1"}`,
+                                  background: checked ? "#2563EB" : "#fff",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: 12, color: "#fff",
+                                }}>
+                                  {checked && "✓"}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#1E40AF" : "#1E293B" }}>{entry.label}</p>
+                                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
+                                    {entry.code} · ⏳ Accord préalable mutuelle
+                                  </p>
+                                </div>
+                                {entry.cap_per_act && (
+                                  <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
+                                    max {fmt(entry.cap_per_act)}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {examSelected.length > 0 && (
+                    <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 10, fontSize: 12, color: "#1E40AF", marginBottom: 12 }}>
+                      ✅ {examSelected.length} examen(s) sélectionné(s) — soumis en accord préalable à la mutuelle
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div style={{ padding: "10px 14px", background: "#FFFBEB", borderRadius: 10, fontSize: 12, color: "#92400E", marginBottom: 16 }}>
+                ⏳ Les examens sélectionnés seront soumis à validation par la mutuelle avant toute prise en charge.
+              </div>
+
+              {error && <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 10 }}>⚠️ {error}</div>}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={skipExams} style={s.btnSecondary}>
+                  Passer →
+                </button>
+                <button type="submit" disabled={examSaving}
+                  style={{ ...s.btnPrimary, flex: 1 }}>
+                  {examSaving
+                    ? <><Spinner /> Soumission…</>
+                    : examSelected.length
+                      ? `🔬 Soumettre ${examSelected.length} examen(s)`
+                      : "Continuer sans examen →"
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══ ÉTAPE 5 — Ordonnance ══ */}
+      {step === 5 && service && (
         <div>
           <div style={{ ...s.card, background: "#FFFBEB", border: "1px solid #FCD34D", marginBottom: 16 }}>
             <p style={{ fontWeight: 800, color: "#92400E", margin: "0 0 4px" }}>📋 Ordonnance obligatoire</p>
@@ -527,8 +801,8 @@ export default function ProviderScan() {
         </div>
       )}
 
-      {/* ══ ÉTAPE 5 — Confirmation ══ */}
-      {step === 5 && service && (
+      {/* ══ ÉTAPE 6 — Confirmation ══ */}
+      {step === 6 && service && (
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <div style={{ fontSize: 64, marginBottom: 12 }}>✅</div>
           <h2 style={{ color: "#0f2942", fontWeight: 800, margin: "0 0 6px" }}>Prise en charge validée</h2>
@@ -546,6 +820,7 @@ export default function ProviderScan() {
               { label: "Part mutuelle",   value: fmt(service.mutual_part),  color: "#0097A7" },
               { label: "Reste patient",   value: fmt(service.client_part),  color: "#DC2626" },
               { label: "Couverture",      value: `${service.coverage_pct}%` },
+              ...(examDone ? [{ label: "Examens", value: `🔬 ${examResults.length} demande(s) en accord préalable` }] : []),
               ...(prescDone ? [{ label: "Ordonnance", value: "✅ Saisie dans le système" }] : []),
             ].map((row, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F1F5F9" }}>
@@ -585,4 +860,5 @@ const s = {
   input:      { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box", color: "#1E293B" },
   btnPrimary: { background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
   btnSecondary:{ background: "#fff", color: "#475569", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "13px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  capRow:      { display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", padding: "4px 0", borderBottom: "1px solid rgba(0,0,0,.04)" },
 };

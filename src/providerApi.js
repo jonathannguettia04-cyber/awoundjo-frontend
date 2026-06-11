@@ -85,6 +85,12 @@ export const providerPharmacyAPI = {
     // data = { client_id, items: [...], notes? }
 };
 
+// ── Examens avec accord préalable ────────────────────────────
+export const providerExamAPI = {
+  create: (data)   => providerApi.post("/exam-requests", data),
+  getAll: (params) => providerApi.get("/exam-requests", { params }),
+};
+
 // ── Dossier médical ───────────────────────────────────────────
 export const providerMedicalAPI = {
   getRecords: (clientId)       => providerApi.get(`/medical/${clientId}`),
