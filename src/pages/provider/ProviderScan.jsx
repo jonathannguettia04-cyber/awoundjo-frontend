@@ -236,7 +236,7 @@ export default function ProviderScan() {
     );
   }
 
-  // ── Soumettre les examens (un appel par examen) ───────────
+  // ── Soumettre les examens (appel batch unique) ────────────
   async function handleExams(e) {
     e.preventDefault();
     const hasAutre = examAutre.active && examAutre.nom.trim();
@@ -246,52 +246,43 @@ export default function ProviderScan() {
     }
     setExamSaving(true); setError("");
     try {
-      const results = [];
-      let lastTotals = null;
+      // Construire le tableau batch
+      const exams = [];
 
-      // Examens du catalogue — on envoie estimated_amount structuré
       for (const catalog_code of examSelected) {
-        const entry            = examCatalog.find(e => e.code === catalog_code);
-        const estimated_amount = Number(examPrices[catalog_code]) || null;
-        const { data } = await providerExamAPI.create({
-          service_id:       service.id,
+        const entry = examCatalog.find(e => e.code === catalog_code);
+        exams.push({
           catalog_code,
           description:      entry?.label || catalog_code,
-          estimated_amount,
+          estimated_amount: Number(examPrices[catalog_code]) || null,
           is_autre:         false,
         });
-        results.push(data.exam_request);
-        lastTotals = {
-          consultation_amount:   data.consultation_amount   ?? Number(service.total_amount),
-          estimated_exams_total: data.estimated_exams_total ?? 0,
-          estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
-        };
       }
 
-      // Examen "Autre" — catalog_code proxy + is_autre=true + autre_label
       if (hasAutre) {
         const proxyCode = examCatalog.find(e => e.category === "analyses_biologiques")?.code
           || examCatalog[0]?.code;
         if (proxyCode) {
-          const estimated_amount = Number(examAutre.prix) || null;
-          const { data } = await providerExamAPI.create({
-            service_id:       service.id,
+          exams.push({
             catalog_code:     proxyCode,
             is_autre:         true,
             autre_label:      examAutre.nom.trim(),
-            estimated_amount,
+            estimated_amount: Number(examAutre.prix) || null,
           });
-          results.push(data.exam_request);
-          lastTotals = {
-            consultation_amount:   data.consultation_amount   ?? Number(service.total_amount),
-            estimated_exams_total: data.estimated_exams_total ?? 0,
-            estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
-          };
         }
       }
 
-      if (lastTotals) setExamTotals(lastTotals);
-      setExamResults(results);
+      const { data } = await providerExamAPI.create({
+        service_id: service.id,
+        exams,
+      });
+
+      setExamTotals({
+        consultation_amount:   data.consultation_amount   ?? Number(service.total_amount),
+        estimated_exams_total: data.estimated_exams_total ?? 0,
+        estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
+      });
+      setExamResults(data.exam_requests || []);
       setExamDone(true);
       setStep(prescriptionRequired ? 5 : 6);
     } catch (err) {
