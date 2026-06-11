@@ -350,6 +350,7 @@ export default function AdminProviders() {
   const [providers,   setProviders]  = useState([]);
   const [invoices,    setInvoices]   = useState([]);
   const [examRequests,setExamReqs]   = useState([]);
+  const [examPendingCount, setExamPendingCount] = useState(0);
   const [loading,     setLoading]    = useState(false);
   const [selected,    setSelected]   = useState(null);
   const [rejectNote,  setRejectNote] = useState("");
@@ -398,6 +399,13 @@ export default function AdminProviders() {
     try {
       const { data } = await adminProviderAPI.getExamRequests(examStatus);
       setExamReqs(data.exam_requests || []);
+      // Badge header : toujours recharger le count des pending_approval
+      if (examStatus !== "PENDING_APPROVAL") {
+        const { data: pd } = await adminProviderAPI.getExamRequests("PENDING_APPROVAL");
+        setExamPendingCount((pd.exam_requests || []).length);
+      } else {
+        setExamPendingCount((data.exam_requests || []).length);
+      }
     } catch { setError("Erreur chargement accords préalables"); }
     finally { setLoading(false); }
   }
@@ -415,9 +423,9 @@ export default function AdminProviders() {
     const actesMonth  = providers.reduce((s, p) => s + Number(p.actes_month  || 0), 0);
     const montantMonth= providers.reduce((s, p) => s + Number(p.montant_month|| 0), 0);
     const pendingReq  = requests.filter(r => r.status === "PENDING").length;
-    const pendingExams= examRequests.filter(e => e.status === "PENDING_APPROVAL").length;
+    const pendingExams= examPendingCount;
     return { active, total: providers.length, actesMonth, montantMonth, pendingReq, pendingExams };
-  }, [providers, requests, examRequests]);
+  }, [providers, requests, examRequests, examPendingCount]);
 
   const maxActes = useMemo(() =>
     Math.max(1, ...providers.map(p => Number(p.actes_month || 0))), [providers]);
@@ -800,10 +808,10 @@ export default function AdminProviders() {
 
           {/* KPI mini row */}
           {(() => {
-            const pending  = examRequests.filter(e => e.status === "PENDING_APPROVAL").length;
-            const approved = examRequests.filter(e => e.status === "APPROVED").length;
-            const done     = examRequests.filter(e => e.status === "DONE").length;
-            const rejected = examRequests.filter(e => e.status === "REJECTED").length;
+            const pending  = examPendingCount;
+            const approved = examStatus === "APPROVED" ? examRequests.length : "—";
+            const done     = examStatus === "DONE"     ? examRequests.length : "—";
+            const rejected = examStatus === "REJECTED" ? examRequests.length : "—";
             return (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                 <KpiCard icon="⏳" label="En attente"  value={pending}  accent="#F59E0B" />
