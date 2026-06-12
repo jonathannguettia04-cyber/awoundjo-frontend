@@ -1,10 +1,24 @@
 // src/pages/AdminProviders.jsx  — v2
 // Ajout : onglet "🔬 Accords préalables" pour gérer les demandes d'examens
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import api from "../services/api";
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+// Regroupe les actes liés (consultation + examen via linked_service_id)
+// pour afficher deux lignes distinctes + un sous-total combiné.
+// Cohérent avec ProviderBilling.jsx — le backend (adminGetProviderActes)
+// trie déjà les lignes pour que parent et enfants soient adjacents.
+function groupServices(services = []) {
+  const groups = new Map();
+  for (const svc of services) {
+    const key = svc.linked_service_id || svc.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(svc);
+  }
+  return Array.from(groups.values());
+}
 
 const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬" };
 const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire" };
@@ -137,22 +151,47 @@ function ProviderDetailModal({ provider, onClose }) {
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Montant</span>
               </div>
-              {actes.map((a, i) => (
-                <div key={a.id || i}
-                  className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center px-3 py-2.5 rounded-xl border border-slate-50 hover:bg-slate-50 transition-colors">
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm truncate">{a.beneficiary_name || "—"}</p>
-                    {a.member_id && <p className="text-xs text-slate-400">#{a.member_id}</p>}
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700">
-                      {a.act_type || a.type || "—"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">{fmtDate(a.created_at || a.date)}</p>
-                  <p className="font-bold text-slate-800 text-sm text-right whitespace-nowrap">{fmt(a.montant)}</p>
-                </div>
-              ))}
+              {groupServices(actes).map((group) => {
+                const isGroup = group.length > 1;
+                const groupKey = group[0].linked_service_id || group[0].id;
+                const subtotalMontant = group.reduce((s, x) => s + Number(x.montant), 0);
+                return (
+                  <React.Fragment key={groupKey}>
+                    {group.map((a, i) => (
+                      <div key={a.id || i}
+                        className={`grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center px-3 py-2.5 rounded-xl border transition-colors ${
+                          isGroup ? "border-sky-100 bg-sky-50 hover:bg-sky-100" : "border-slate-50 hover:bg-slate-50"
+                        }`}>
+                        <div>
+                          <p className="font-semibold text-slate-800 text-sm truncate">{a.beneficiary_name || "—"}</p>
+                          {a.member_id && <p className="text-xs text-slate-400">#{a.member_id}</p>}
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700">
+                            {a.linked_service_id && <span className="text-sky-500 mr-1">↳</span>}
+                            {a.catalog_label || a.act_type || a.type || "—"}
+                          </span>
+                          {isGroup && !a.linked_service_id && (
+                            <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-sky-100 text-sky-600">
+                              + examen lié
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">{fmtDate(a.created_at || a.date)}</p>
+                        <p className="font-bold text-slate-800 text-sm text-right whitespace-nowrap">{fmt(a.montant)}</p>
+                      </div>
+                    ))}
+                    {isGroup && (
+                      <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center px-3 py-2 rounded-xl bg-sky-100 border border-sky-200">
+                        <p className="col-span-3 text-xs font-extrabold text-sky-700 text-right">
+                          Sous-total combiné (consultation + examen)
+                        </p>
+                        <p className="font-extrabold text-slate-800 text-sm text-right whitespace-nowrap">{fmt(subtotalMontant)}</p>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           )}
         </div>
