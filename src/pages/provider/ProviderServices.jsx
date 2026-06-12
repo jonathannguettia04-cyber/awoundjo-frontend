@@ -9,6 +9,14 @@ import { providerServiceAPI } from "../../providerApi";
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
+// Statuts d'accord préalable — cohérent avec AdminProviders.jsx
+const EXAM_STATUS = {
+  PENDING_APPROVAL: { label: "En attente d'accord", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D" },
+  APPROVED:         { label: "Accordé",             color: "#059669", bg: "#ECFDF5", border: "#6EE7B7" },
+  REJECTED:         { label: "Rejeté",              color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+  DONE:             { label: "Examen réalisé",      color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
+};
+
 const CATEGORY_CONFIG = {
   consultation_generaliste:    { icon: "🩺",  label: "Consultation générale",    color: "#2563EB", bg: "#EFF6FF" },
   consultation_specialiste:    { icon: "👨‍⚕️", label: "Consultation spécialiste", color: "#7C3AED", bg: "#F5F3FF" },
@@ -170,6 +178,11 @@ export default function ProviderServices() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontWeight: 700, color: "#0f2942", margin: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {svc.catalog_label || svc.catalog_code}
+                      {svc.exam_requests?.length > 0 && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#0891B2", background: "#ECFEFF", borderRadius: 8, padding: "2px 6px" }}>
+                          🔬 + examen
+                        </span>
+                      )}
                     </p>
                     <p style={{ color: "#64748B", fontSize: 12, margin: 0 }}>
                       {svc.client_name} · {svc.mutual_number}
@@ -202,6 +215,52 @@ export default function ProviderServices() {
                     {svc.description && (
                       <div style={{ background: "#F8FAFC", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#475569" }}>
                         {svc.description}
+                      </div>
+                    )}
+
+                    {/* Examen(s) lié(s) — accord préalable */}
+                    {svc.exam_requests?.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: "#0891B2", textTransform: "uppercase", letterSpacing: .6, margin: "0 0 6px" }}>
+                          🔬 Examen{svc.exam_requests.length > 1 ? "s" : ""} lié{svc.exam_requests.length > 1 ? "s" : ""}
+                        </p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {svc.exam_requests.map(ex => {
+                            const st = EXAM_STATUS[ex.status] || EXAM_STATUS.PENDING_APPROVAL;
+                            return (
+                              <div key={ex.id} style={{ background: "#ECFEFF", border: "1px solid #BAE6FD", borderRadius: 8, padding: "8px 12px" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#0f2942", margin: 0 }}>
+                                    {ex.is_autre ? ex.autre_label : (ex.exam_label || ex.catalog_code)}
+                                  </p>
+                                  <span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>
+                                    {st.label}
+                                  </span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                                  <p style={{ fontSize: 11, color: "#0369A1", margin: 0 }}>
+                                    {ex.preauth_code ? `Accord : ${ex.preauth_code}` : "—"}
+                                  </p>
+                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#0f2942", margin: 0 }}>
+                                    {ex.estimated_amount != null ? fmt(ex.estimated_amount) : "—"}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Sous-total combiné (consultation + examen) */}
+                        {Number(svc.exams_total) > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, background: "#E0F2FE", border: "1px solid #BAE6FD", borderRadius: 8, padding: "8px 12px" }}>
+                            <p style={{ fontSize: 12, fontWeight: 800, color: "#0369A1", margin: 0 }}>
+                              Sous-total combiné (consultation + examen)
+                            </p>
+                            <p style={{ fontSize: 13, fontWeight: 800, color: "#0f2942", margin: 0 }}>
+                              {fmt(svc.grand_total)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                     {svc.prescription_content && (
