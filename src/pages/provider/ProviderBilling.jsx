@@ -4,11 +4,25 @@
 //   - Demander le paiement (PENDING → SUBMITTED)
 //   - Suivre le statut (SUBMITTED → PAID)
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { providerBillingAPI } from "../../providerApi";
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+// Regroupe les actes liés (consultation + examen via linked_service_id)
+// pour afficher deux lignes distinctes + un sous-total combiné.
+// Les services sont déjà triés côté backend pour que parent et enfants
+// soient adjacents (parent en premier).
+function groupServices(services = []) {
+  const groups = new Map();
+  for (const svc of services) {
+    const key = svc.linked_service_id || svc.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(svc);
+  }
+  return Array.from(groups.values());
+}
 
 const STATUS_CONFIG = {
   PENDING:   { label: "Brouillon",      icon: "📝", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D" },
@@ -222,15 +236,50 @@ export default function ProviderBilling() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {detail.services.map((svc, i) => (
-                                  <tr key={svc.id} style={{ borderBottom: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                                    <td style={{ padding: "7px 8px", color: "#475569", whiteSpace: "nowrap" }}>{fmtDate(svc.created_at)}</td>
-                                    <td style={{ padding: "7px 8px", color: "#1E293B", fontWeight: 600 }}>{svc.client_name || "—"}</td>
-                                    <td style={{ padding: "7px 8px", color: "#475569" }}>{svc.catalog_label || svc.catalog_code}</td>
-                                    <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.total_amount)}</td>
-                                    <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.mutual_part)}</td>
-                                  </tr>
-                                ))}
+                                {groupServices(detail.services).map((group) => {
+                                  const isGroup = group.length > 1;
+                                  const groupKey = group[0].linked_service_id || group[0].id;
+                                  const subtotalAmount = group.reduce((s, x) => s + Number(x.total_amount), 0);
+                                  const subtotalMutual = group.reduce((s, x) => s + Number(x.mutual_part), 0);
+                                  return (
+                                    <React.Fragment key={groupKey}>
+                                      {group.map((svc, i) => (
+                                        <tr key={svc.id} style={{
+                                          borderBottom: "1px solid #F1F5F9",
+                                          background: isGroup ? "#F0F9FF" : (i % 2 === 0 ? "#fff" : "#FAFAFA"),
+                                        }}>
+                                          <td style={{ padding: "7px 8px", color: "#475569", whiteSpace: "nowrap" }}>{fmtDate(svc.created_at)}</td>
+                                          <td style={{ padding: "7px 8px", color: "#1E293B", fontWeight: 600 }}>{svc.client_name || "—"}</td>
+                                          <td style={{ padding: "7px 8px", color: "#475569" }}>
+                                            {svc.linked_service_id && (
+                                              <span style={{ color: "#0284C7", marginRight: 4 }}>↳</span>
+                                            )}
+                                            {svc.catalog_label || svc.catalog_code}
+                                            {isGroup && !svc.linked_service_id && (
+                                              <span style={{
+                                                marginLeft: 8, fontSize: 10, fontWeight: 700, color: "#0284C7",
+                                                background: "#E0F2FE", borderRadius: 8, padding: "2px 6px",
+                                              }}>
+                                                + examen lié
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.total_amount)}</td>
+                                          <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.mutual_part)}</td>
+                                        </tr>
+                                      ))}
+                                      {isGroup && (
+                                        <tr style={{ borderBottom: "2px solid #E2E8F0", background: "#E0F2FE" }}>
+                                          <td colSpan={3} style={{ padding: "7px 8px", color: "#0369A1", fontWeight: 800, textAlign: "right" }}>
+                                            Sous-total combiné (consultation + examen)
+                                          </td>
+                                          <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 800, whiteSpace: "nowrap" }}>{fmt(subtotalAmount)}</td>
+                                          <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 800, whiteSpace: "nowrap" }}>{fmt(subtotalMutual)}</td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
