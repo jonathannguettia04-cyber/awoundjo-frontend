@@ -105,6 +105,9 @@ export default function ProviderScan() {
   const [prescDone,       setPrescDone]       = useState(false);
   const [prescriptionRequired, setPrescriptionRequired] = useState(false);
 
+  // Solde annuel global (retourné après chaque acte enregistré)
+  const [soldeAnnuel,     setSoldeAnnuel]     = useState(null);
+
   // Examens
   const [examRequired,    setExamRequired]    = useState(false);
   const [examCatalog,     setExamCatalog]     = useState([]);
@@ -198,6 +201,7 @@ export default function ProviderScan() {
         total_amount: Number(totalAmount),
       });
       setService(data.service);
+      if (data.solde_annuel) setSoldeAnnuel(data.solde_annuel);
       const needsPresc = PRESCRIPTION_REQUIRED_CATEGORIES.includes(selectedCat.category);
       const needsExam  = EXAM_REQUIRED_CATEGORIES.includes(selectedCat.category);
       setPrescriptionRequired(needsPresc);
@@ -282,6 +286,7 @@ export default function ProviderScan() {
         estimated_exams_total: data.estimated_exams_total ?? 0,
         estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
       });
+      if (data.solde_annuel) setSoldeAnnuel(data.solde_annuel);
       setExamResults(data.exam_requests || []);
       setExamDone(true);
       setStep(prescriptionRequired ? 5 : 6);
@@ -310,6 +315,7 @@ export default function ProviderScan() {
     setExamAutre({ active: false, nom: "", prix: "" });
     setExamDone(false); setExamResults([]); setExamSoldes({});
     setExamTotals({ consultation_amount: 0, estimated_exams_total: 0, estimated_grand_total: 0 });
+    setSoldeAnnuel(null);
   }
 
   // ── Calculs financiers ────────────────────────────────────
@@ -512,9 +518,9 @@ export default function ProviderScan() {
                     )}
                     {eligibility.consults_remaining !== null && eligibility.cap_monthly_acts && (
                       <div style={s.capRow}>
-                        <span>Consultations ce mois</span>
+                        <span>Actes ce mois</span>
                         <span style={{ fontWeight: 700, color: eligibility.consults_remaining === 0 ? "#DC2626" : "#15803D" }}>
-                          {eligibility.consults_remaining} restante(s) / {eligibility.cap_monthly_acts}
+                          {eligibility.consults_remaining} restant(s) / {eligibility.cap_monthly_acts}
                         </span>
                       </div>
                     )}
@@ -967,6 +973,45 @@ export default function ProviderScan() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: row.color || "#1E293B" }}>{row.value}</span>
               </div>
             ))}
+
+            {/* ── Notification solde annuel global ── */}
+            {soldeAnnuel && (() => {
+              const pct   = soldeAnnuel.cap_global_person > 0
+                ? Math.round((soldeAnnuel.solde_global / soldeAnnuel.cap_global_person) * 100)
+                : 0;
+              const isLow  = pct <= 20;
+              const isMid  = pct > 20 && pct <= 50;
+              const color  = isLow ? "#DC2626" : isMid ? "#D97706" : "#15803D";
+              const bg     = isLow ? "#FEF2F2" : isMid ? "#FFFBEB" : "#F0FDF4";
+              const border = isLow ? "#FECACA" : isMid ? "#FCD34D" : "#BBF7D0";
+              const icon   = isLow ? "🔴" : isMid ? "🟡" : "🟢";
+              return (
+                <div style={{ marginTop: 14, padding: "14px 16px", background: bg, border: `1px solid ${border}`, borderRadius: 12 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: .8, margin: "0 0 10px" }}>
+                    {icon} Solde annuel — information mutualiste
+                  </p>
+                  {/* Barre de progression */}
+                  <div style={{ height: 6, background: "rgba(0,0,0,.08)", borderRadius: 99, overflow: "hidden", marginBottom: 10 }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .4s" }} />
+                  </div>
+                  {[
+                    { label: "Plafond annuel",      value: fmt(soldeAnnuel.cap_global_person) },
+                    { label: "Consommé cette année", value: fmt(soldeAnnuel.consumed_global),   color: "#64748B" },
+                    { label: "Solde restant",        value: fmt(soldeAnnuel.solde_global),       color, bold: true },
+                  ].map((row, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                      <span style={{ fontSize: 12, color: "#64748B" }}>{row.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: row.bold ? 800 : 600, color: row.color || "#1E293B" }}>{row.value}</span>
+                    </div>
+                  ))}
+                  {isLow && (
+                    <p style={{ fontSize: 11, color: "#B91C1C", margin: "8px 0 0", fontWeight: 600 }}>
+                      ⚠️ Plafond annuel presque épuisé — informer le mutualiste de contacter Awoundjô.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             {/* Bloc total estimé — affiché uniquement si des examens ont été soumis avec un montant */}
             {examDone && examTotals.estimated_exams_total > 0 && (
               <div style={{ marginTop: 12, padding: "12px 14px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 10 }}>
