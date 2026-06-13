@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { clientTeleAPI } from "../../clientApi";
 
 // ⚠️ Numéro WhatsApp central de la mutuelle (format international, sans +)
-const WHATSAPP_NUMBER = "2250700000000";
+const WHATSAPP_NUMBER = "2250759595213";
 
 const STATUS = {
   pending:     { label: "En attente",  color: "#D97706", bg: "#FFFBEB", icon: "⏳" },
