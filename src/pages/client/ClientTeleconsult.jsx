@@ -24,6 +24,7 @@ export default function ClientTeleconsult() {
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState("");
   const [lastRef, setLastRef] = useState(null);
+  const [lastSubject, setLastSubject] = useState("");
   const [visible, setVis]     = useState(false);
   const [active,  setActive]  = useState(null); // consultation ouverte (chat)
 
@@ -43,6 +44,7 @@ export default function ClientTeleconsult() {
       const res = await clientTeleAPI.send({ subject, message });
       setSuccess("Consultation envoyée ! Un médecin vous répondra bientôt.");
       setLastRef(res.data.data?.id);
+      setLastSubject(subject?.trim() || "Téléconsultation (motif non précisé)");
       setModal(false); setSubject(""); setMessage("");
       load();
       setTimeout(() => setSuccess(""), 8000);
@@ -54,10 +56,20 @@ export default function ClientTeleconsult() {
     return <ChatView consultation={active} onBack={() => { setActive(null); load(); }} />;
   }
 
+  // Récupère les infos du client stockées localement après connexion (cf. ClientLogin.jsx)
+  const getClientInfo = () => {
+    try {
+      const raw = localStorage.getItem("client_data");
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+    return {};
+  };
+  const clientInfo = getClientInfo();
+
   const waText = encodeURIComponent(
     lastRef
-      ? `Bonjour, je viens d'envoyer une demande de téléconsultation (Réf: ${lastRef.slice(0, 8)}), merci de me prendre en charge rapidement.`
-      : `Bonjour, j'ai une question concernant ma téléconsultation.`
+      ? `Bonjour, je viens d'envoyer une nouvelle demande de téléconsultation sur l'application Awoundjô.\n\n👤 Nom : ${clientInfo.name || "Non renseigné"}\n🔢 N° Mutualiste : ${clientInfo.mutual_number || "Non renseigné"}\n📋 Motif : ${lastSubject}\n\nMerci de me mettre en relation avec un médecin dans les plus brefs délais. 🙏`
+      : `Bonjour, j'ai une question concernant ma téléconsultation sur l'application Awoundjô.`
   );
 
   return (
