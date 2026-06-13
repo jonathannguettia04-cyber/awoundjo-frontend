@@ -123,6 +123,7 @@ const SECTIONS = [
       { icon: "⛪", label: "Portail Fédération",          path: "/diaspora/login", desc: "Espace ambassadeurs fédération",  external: true },
       { icon: "💼", label: "Portail Business",            path: "/business/login", desc: "Espace membres réseau business",  external: true },
       { icon: "🔐", label: "Portail CNEPECI",             path: "/cnepeci/login",  desc: "Espace membres CNEPECI",          external: true },
+      { icon: "👨‍⚕️", label: "Portail Médecin",           path: "/medecin",        desc: "Espace téléconsultation médecins", external: true },
     ],
   },
 ];

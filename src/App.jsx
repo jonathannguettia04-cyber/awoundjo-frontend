@@ -70,6 +70,9 @@ const ClientTeleconsult   = lazy(() => import("./pages/client/ClientTeleconsult"
 const ClientReseau        = lazy(() => import("./pages/client/ClientReseau"));
 const ClientProfil        = lazy(() => import("./pages/client/ClientProfil"));
 
+// ── Espace MÉDECIN (téléconsultation) ────────────────────────
+const MedecinDashboard    = lazy(() => import("./pages/medecin/MedecinDashboard"));
+
 // ── Pages ÉTABLISSEMENT ──────────────────────────────────────
 const EtablissementLogin  = lazy(() => import("./pages/provider/EtablissementLogin"));
 const ProviderLayout      = lazy(() => import("./pages/provider/ProviderLayout"));
@@ -546,6 +549,12 @@ export default function App() {
             <Route path="/rejoindre/:code"       element={<ClientParrainagePage />} />
             <Route path="/rejoindre/:code/merci" element={<ClientParrainagePage />} />
             <Route path="/rejoindre/:code/echec" element={<ClientParrainagePage />} />
+            {/* ═══════════════════════════════════════════════
+                ESPACE MÉDECIN (téléconsultation)
+                Gère sa propre auth (medecin_token) en interne
+            ══════════════════════════════════════════════════*/}
+            <Route path="/medecin" element={<MedecinDashboard />} />
+
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
             <Route path="*" element={

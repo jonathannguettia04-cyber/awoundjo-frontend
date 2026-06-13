@@ -20,8 +20,8 @@ function groupServices(services = []) {
   return Array.from(groups.values());
 }
 
-const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬" };
-const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire" };
+const TYPE_ICONS  = { pharmacy: "💊", clinic: "🏥", hospital: "🏨", lab: "🔬", optician: "👓", dentist: "🦷", midwife: "🤰", medecin_teleconsult: "👨‍⚕️" };
+const TYPE_LABELS = { pharmacy: "Pharmacie", clinic: "Clinique", hospital: "Hôpital", lab: "Laboratoire", optician: "Opticien", dentist: "Dentiste", midwife: "Sage-femme", medecin_teleconsult: "Médecin téléconsultation" };
 
 const REQ_STATUS = {
   PENDING:  { label: "En attente", color: "#F59E0B", bg: "#FFFBEB" },
