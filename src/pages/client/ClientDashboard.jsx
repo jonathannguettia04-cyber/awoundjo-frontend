@@ -164,7 +164,156 @@ function NotifModal({ notif, onClose, onShare, shareLink, shareLoading, copied, 
   );
 }
 
-// ─── Widget Parrainage ─────────────────────────────────────────────────────
+// ─── Widget Plafonds annuels ───────────────────────────────────────────────
+function PlafondWidget({ profile, visible }) {
+  const [open, setOpen] = useState(false);
+  const fmtF = (n) => Number(n || 0).toLocaleString("fr-FR") + " F";
+
+  const cs = profile?.caps_soldes;
+  if (!cs) return null;
+
+  const pct = cs.cap_global_person && cs.solde_global !== null
+    ? Math.round((cs.solde_global / cs.cap_global_person) * 100)
+    : null;
+  const isLow  = pct !== null && pct <= 20;
+  const isMid  = pct !== null && pct > 20 && pct <= 50;
+  const barColor = isLow ? "#DC2626" : isMid ? "#D97706" : "#2563EB";
+
+  const acteRows = [
+    { icon: "🩺",  label: "Consultation généraliste", cat: cs.consultation_generaliste },
+    { icon: "👨‍⚕️", label: "Consultation spécialiste",  cat: cs.consultation_specialiste },
+    { icon: "🔬",  label: "Examens (biologie/imagerie)", cat: cs.analyses_biologiques },
+    { icon: "💊",  label: "Pharmacie",                   cat: cs.pharmacie },
+  ].filter(r => r.cat);
+
+  return (
+    <div style={{
+      background: "#fff",
+      border: "1.5px solid #E2E8F0",
+      borderRadius: 20,
+      padding: "16px",
+      marginBottom: 20,
+      boxShadow: "0 2px 12px rgba(0,0,0,.06)",
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(10px)",
+      transition: "all .5s .08s cubic-bezier(.34,1.56,.64,1)",
+    }}>
+      {/* Header cliquable */}
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+          background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20,
+        }}>🛡️</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0 }}>Mes plafonds de prise en charge</p>
+          {cs.cap_global_person ? (
+            <p style={{ fontSize: 11, color: isLow ? "#DC2626" : isMid ? "#D97706" : "#64748B", margin: "2px 0 0", fontWeight: isLow || isMid ? 700 : 400 }}>
+              {isLow ? "⚠️ " : ""}{fmtF(cs.solde_global)} restants sur {fmtF(cs.cap_global_person)}/an
+            </p>
+          ) : (
+            <p style={{ fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Plafonds par acte actifs</p>
+          )}
+        </div>
+        <span style={{ color: "#94A3B8", fontSize: 18, transition: "transform .2s", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>›</span>
+      </div>
+
+      {/* Barre de progression solde global */}
+      {cs.cap_global_person && pct !== null && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 99, transition: "width .6s" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+            <span style={{ fontSize: 10, color: "#94A3B8" }}>{pct}% restant</span>
+            {isLow && <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>Plafond bientôt atteint</span>}
+          </div>
+        </div>
+      )}
+
+      {/* Détail dépliable */}
+      {open && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+
+          {/* Solde global */}
+          {cs.cap_global_person && (
+            <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "12px 14px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
+                Plafond annuel global (toutes prestations)
+              </p>
+              {[
+                { label: "Plafond total",         value: fmtF(cs.cap_global_person),  color: "#1E293B" },
+                { label: "Consommé cette année",  value: fmtF(cs.consumed_global),    color: "#64748B" },
+                { label: "Solde restant",         value: fmtF(cs.solde_global),       color: barColor, bold: true },
+              ].map((row, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                  <span style={{ fontSize: 12, color: "#64748B" }}>{row.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: row.bold ? 800 : 600, color: row.color }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Plafonds par acte + quota mensuel + solde annuel par catégorie */}
+          <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "12px 14px" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
+              Plafonds par catégorie
+            </p>
+            {acteRows.map((row, i) => {
+              const c = row.cat;
+              const actesRestants = c.acts_remaining;
+              const soldeAnnuel   = c.solde_annual;
+              const alerteActes   = actesRestants !== null && actesRestants === 0;
+              const alerteSolde   = soldeAnnuel   !== null && soldeAnnuel < 5000;
+              return (
+                <div key={i} style={{ padding: "8px 0", borderBottom: i < acteRows.length - 1 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 15, flexShrink: 0 }}>{row.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", flex: 1 }}>{row.label}</span>
+                    {c.cap_per_act && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", whiteSpace: "nowrap" }}>
+                        max {fmtF(c.cap_per_act)}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 24 }}>
+                    {c.cap_monthly_acts !== null && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+                        background: alerteActes ? "#FEF2F2" : "#F1F5F9",
+                        color: alerteActes ? "#DC2626" : "#64748B",
+                      }}>
+                        {alerteActes ? "⚠️ " : ""}{c.acts_remaining ?? "—"}/{c.cap_monthly_acts} actes restants ce mois
+                      </span>
+                    )}
+                    {soldeAnnuel !== null && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+                        background: alerteSolde ? "#FEF2F2" : "#F0FDF4",
+                        color: alerteSolde ? "#DC2626" : "#15803D",
+                      }}>
+                        {alerteSolde ? "⚠️ " : ""}{fmtF(soldeAnnuel)} restants/an
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {isLow && (
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", fontSize: 12, color: "#B91C1C", fontWeight: 600 }}>
+              ⚠️ Votre plafond annuel est presque épuisé. Contactez Awoundjô pour plus d'informations.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function ParrainageWidget({ visible }) {
   const [link,    setLink]    = useState(null);
   const [stats,   setStats]   = useState(null);
@@ -511,6 +660,9 @@ export default function ClientDashboard() {
           ))}
         </div>
       </div>
+
+      {/* ── Plafonds de prise en charge ────────────────────────────── */}
+      <PlafondWidget profile={profile} visible={visible} />
 
       {/* ── Alerte suspension ──────────────────────────────────────── */}
       {profile.status === "suspendu" && (
