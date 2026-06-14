@@ -48,6 +48,9 @@ function Login({ onLogin }) {
         <button onClick={submit} disabled={loading} style={{ ...ls.btnPrimary, width: "100%", opacity: loading ? .7 : 1 }}>
           {loading ? "Connexion..." : "Se connecter"}
         </button>
+        <a href="/etablissement?type=medecin_teleconsult&tab=request" style={{ display: "block", textAlign: "center", marginTop: 16, fontSize: 12, color: "#0891B2", fontWeight: 600, textDecoration: "none" }}>
+          Pas encore inscrit ? Rejoindre le réseau →
+        </a>
       </div>
     </div>
   );
