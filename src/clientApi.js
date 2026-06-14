@@ -73,6 +73,9 @@ export const clientMedicalAPI = {
 export const clientTeleAPI = {
   get:  ()     => clientApi.get("/teleconsultation"),
   send: (data) => clientApi.post("/teleconsultation", data),
+  getMessages:     (id)      => clientApi.get(`/teleconsult/${id}/messages`),
+  sendMessage:     (id, message) => clientApi.post(`/teleconsult/${id}/messages`, { message }),
+  getPrescription: (id)      => clientApi.get(`/teleconsult/${id}/prescription`),
 };
 
 // ── HELPERS ──────────────────────────────────────────────────────
