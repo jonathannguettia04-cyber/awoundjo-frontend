@@ -145,8 +145,8 @@ export default function EtablissementLogin() {
             <div style={S.sub}>Remplissez ce formulaire — nous validerons votre demande sous 48h</div>
             <form onSubmit={handleRequest}>
               <div style={S.field}>
-                <label style={S.label}>Nom de l'établissement *</label>
-                <input style={S.input} required placeholder="Ex : Pharmacie du Plateau"
+                <label style={S.label}>{reqForm.type === "medecin_teleconsult" ? "Nom du médecin *" : "Nom de l'établissement *"}</label>
+                <input style={S.input} required placeholder={reqForm.type === "medecin_teleconsult" ? "Ex : Dr. Koné Issouf" : "Ex : Pharmacie du Plateau"}
                   value={reqForm.name}
                   onChange={e => setReqForm({ ...reqForm, name: e.target.value })} />
               </div>
@@ -199,17 +199,21 @@ export default function EtablissementLogin() {
                     onChange={e => setReqForm({ ...reqForm, address: e.target.value })} />
                 </div>
               </div>
-              <div style={S.field}>
-                <label style={S.label}>Nom du responsable *</label>
-                <input style={S.input} required placeholder="Nom complet du gérant"
-                  value={reqForm.manager_name}
-                  onChange={e => setReqForm({ ...reqForm, manager_name: e.target.value })} />
-              </div>
+              {reqForm.type !== "medecin_teleconsult" && (
+                <div style={S.field}>
+                  <label style={S.label}>Nom du responsable *</label>
+                  <input style={S.input} required placeholder="Nom complet du gérant"
+                    value={reqForm.manager_name}
+                    onChange={e => setReqForm({ ...reqForm, manager_name: e.target.value })} />
+                </div>
+              )}
 
               {/* Info partenaire */}
-              <div style={{ background: "rgba(0,188,212,.08)", border: "1px solid rgba(0,188,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "rgba(255,255,255,.6)" }}>
-                ℹ️ Le statut <strong style={{ color: "#00BCD4" }}>clinique partenaire</strong> (donnant accès à la formule BASIQUE) sera défini par l'équipe Awoundjô lors de la validation.
-              </div>
+              {reqForm.type !== "medecin_teleconsult" && (
+                <div style={{ background: "rgba(0,188,212,.08)", border: "1px solid rgba(0,188,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "rgba(255,255,255,.6)" }}>
+                  ℹ️ Le statut <strong style={{ color: "#00BCD4" }}>clinique partenaire</strong> (donnant accès à la formule BASIQUE) sera défini par l'équipe Awoundjô lors de la validation.
+                </div>
+              )}
 
               <button style={S.btn} type="submit" disabled={loading}
                 onMouseEnter={e => { e.target.style.transform = "translateY(-2px)"; }}
