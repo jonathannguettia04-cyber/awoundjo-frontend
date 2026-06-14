@@ -1,16 +1,17 @@
 // src/pages/provider/EtablissementLogin.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { providerAuthAPI, providerLogin } from "../../providerApi";
 
 const TYPES = [
-  { id: "pharmacy", label: "Pharmacie",    icon: "💊" },
-  { id: "clinic",   label: "Clinique",     icon: "🏥" },
-  { id: "hospital", label: "Hôpital",      icon: "🏨" },
-  { id: "lab",      label: "Laboratoire",  icon: "🔬" },
-  { id: "optician", label: "Opticien",     icon: "👓" },
-  { id: "dentist",  label: "Dentiste",     icon: "🦷" },
-  { id: "midwife",  label: "Sage-femme",   icon: "🤱" },
+  { id: "pharmacy",            label: "Pharmacie",                icon: "💊" },
+  { id: "clinic",               label: "Clinique",                 icon: "🏥" },
+  { id: "hospital",             label: "Hôpital",                  icon: "🏨" },
+  { id: "lab",                  label: "Laboratoire",              icon: "🔬" },
+  { id: "optician",             label: "Opticien",                 icon: "👓" },
+  { id: "dentist",               label: "Dentiste",                 icon: "🦷" },
+  { id: "midwife",               label: "Sage-femme",               icon: "🤱" },
+  { id: "medecin_teleconsult",  label: "Médecin téléconsultation",  icon: "👨‍⚕️" },
 ];
 
 const S = {
@@ -42,14 +43,18 @@ const S = {
 
 export default function EtablissementLogin() {
   const navigate = useNavigate();
-  const [tab,     setTab]     = useState("login");
+  const [searchParams] = useSearchParams();
+  const initialType = TYPES.some(t => t.id === searchParams.get("type")) ? searchParams.get("type") : "pharmacy";
+  const initialTab  = searchParams.get("tab") === "request" ? "request" : (searchParams.get("type") ? "request" : "login");
+
+  const [tab,     setTab]     = useState(initialTab);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState("");
 
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
   const [reqForm,   setReqForm]   = useState({
-    name: "", type: "pharmacy", phone: "", email: "",
+    name: "", type: initialType, phone: "", email: "",
     address: "", city: "", manager_name: "",
   });
 
