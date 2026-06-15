@@ -38,6 +38,8 @@ export const medecinTeleAPI = {
   close:       (id) => api.post(`/provider/teleconsult/${id}/close`),
   getPrescription:    (id) => api.get(`/provider/teleconsult/${id}/prescription`),
   createPrescription: (id, data) => api.post(`/provider/teleconsult/${id}/prescription`, data),
+  getBalance:  () => api.get("/provider/teleconsult/balance"),
+  requestPayment: () => api.post("/provider/teleconsult/request-payment"),
 };
 
 export default api;

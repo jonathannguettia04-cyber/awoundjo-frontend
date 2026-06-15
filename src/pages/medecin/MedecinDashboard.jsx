@@ -48,9 +48,6 @@ function Login({ onLogin }) {
         <button onClick={submit} disabled={loading} style={{ ...ls.btnPrimary, width: "100%", opacity: loading ? .7 : 1 }}>
           {loading ? "Connexion..." : "Se connecter"}
         </button>
-        <a href="/etablissement?type=medecin_teleconsult&tab=request" style={{ display: "block", textAlign: "center", marginTop: 16, fontSize: 12, color: "#0891B2", fontWeight: 600, textDecoration: "none" }}>
-          Pas encore inscrit ? Rejoindre le réseau →
-        </a>
       </div>
     </div>
   );
@@ -62,6 +59,16 @@ function Dashboard({ medecin, onLogout }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null); // consultation ouverte (chat)
+  const [balance, setBalance] = useState(null);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payMsg, setPayMsg] = useState("");
+
+  const loadBalance = async () => {
+    try {
+      const res = await medecinTeleAPI.getBalance();
+      setBalance(res.data);
+    } catch (e) { console.error(e); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -75,7 +82,18 @@ function Dashboard({ medecin, onLogout }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [tab]);
+  useEffect(() => { load(); loadBalance(); }, [tab]);
+
+  const requestPayment = async () => {
+    setPayLoading(true); setPayMsg("");
+    try {
+      const res = await medecinTeleAPI.requestPayment();
+      setPayMsg(`✅ Demande envoyée : ${res.data.count} consultation(s) × 2000 FCFA = ${res.data.amount.toLocaleString("fr-FR")} FCFA`);
+      await loadBalance();
+      if (tab === "closed") load();
+    } catch (e) { setPayMsg(`⚠️ ${e.response?.data?.error || "Erreur"}`); }
+    finally { setPayLoading(false); }
+  };
 
   const claim = async (id) => {
     try {
@@ -85,7 +103,7 @@ function Dashboard({ medecin, onLogout }) {
   };
 
   if (active) {
-    return <ChatView consultation={active} onBack={() => { setActive(null); load(); }} />;
+    return <ChatView consultation={active} onBack={() => { setActive(null); load(); loadBalance(); }} />;
   }
 
   return (
@@ -102,6 +120,27 @@ function Dashboard({ medecin, onLogout }) {
           </button>
         </div>
       </div>
+
+      {/* Solde / Reversement */}
+      {balance && balance.count > 0 && (
+        <div style={{ margin: "14px 16px 0", background: "#fff", borderRadius: 16, padding: "14px 16px", boxShadow: "0 2px 10px rgba(0,0,0,.06)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>À reverser ({balance.count} consultation{balance.count > 1 ? "s" : ""} × 2000 FCFA)</p>
+              <p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#0F172A" }}>{balance.amount.toLocaleString("fr-FR")} FCFA</p>
+            </div>
+            <button onClick={requestPayment} disabled={payLoading} style={{
+              background: "linear-gradient(135deg,#0891B2,#164e63)", color: "#fff", border: "none",
+              borderRadius: 12, padding: "12px 18px", fontSize: 13, fontWeight: 700,
+              cursor: payLoading ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif",
+              opacity: payLoading ? .7 : 1,
+            }}>
+              {payLoading ? "Envoi..." : "💰 Demander reversement"}
+            </button>
+          </div>
+          {payMsg && <p style={{ margin: "10px 0 0", fontSize: 12, color: payMsg.startsWith("✅") ? "#059669" : "#DC2626" }}>{payMsg}</p>}
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, padding: "16px 16px 0", overflowX: "auto" }}>
@@ -134,7 +173,14 @@ function Dashboard({ medecin, onLogout }) {
             <div key={c.id} style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{c.client_name || "Patient"}</p>
-                <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: st.bg, borderRadius: 8, padding: "3px 8px" }}>{st.label}</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {tab === "closed" && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: c.invoice_id ? "#94A3B8" : "#059669", background: c.invoice_id ? "#F1F5F9" : "#ECFDF5", borderRadius: 8, padding: "3px 8px" }}>
+                      {c.amount?.toLocaleString("fr-FR") || "2 000"} FCFA{c.invoice_id ? " · reversé" : ""}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: st.bg, borderRadius: 8, padding: "3px 8px" }}>{st.label}</span>
+                </div>
               </div>
               {c.mutual_number && <p style={{ margin: "0 0 4px", fontSize: 11, color: "#94A3B8" }}>N° mutuelle : {c.mutual_number} {c.client_plan ? `· ${c.client_plan}` : ""}</p>}
               <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{c.subject || "Consultation"}</p>
