@@ -179,6 +179,9 @@ function PlafondWidget({ profile, visible }) {
   const isMid  = pct !== null && pct > 20 && pct <= 50;
   const barColor = isLow ? "#DC2626" : isMid ? "#D97706" : "#2563EB";
 
+  const cg     = cs.consultation_groupe;
+  const cgLow  = cg && cg.solde_annual !== null && cg.solde_annual < 5000;
+
   const acteRows = [
     { icon: "🩺",  label: "Consultation généraliste", cat: cs.consultation_generaliste },
     { icon: "👨‍⚕️", label: "Consultation spécialiste",  cat: cs.consultation_specialiste },
@@ -246,6 +249,25 @@ function PlafondWidget({ profile, visible }) {
                 { label: "Plafond total",         value: fmtF(cs.cap_global_person),  color: "#1E293B" },
                 { label: "Consommé cette année",  value: fmtF(cs.consumed_global),    color: "#64748B" },
                 { label: "Solde restant",         value: fmtF(cs.solde_global),       color: barColor, bold: true },
+              ].map((row, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
+                  <span style={{ fontSize: 12, color: "#64748B" }}>{row.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: row.bold ? 800 : 600, color: row.color }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Plafond annuel groupé consultations (généraliste + spécialiste + urgence) */}
+          {cg && (
+            <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "12px 14px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
+                Plafond annuel consultations {cg.scope === "family" ? "(famille)" : "(par bénéficiaire)"}
+              </p>
+              {[
+                { label: "Plafond total",        value: fmtF(cg.cap_annual),      color: "#1E293B" },
+                { label: "Consommé cette année", value: fmtF(cg.consumed_annual), color: "#64748B" },
+                { label: "Solde restant",        value: fmtF(cg.solde_annual),    color: cgLow ? "#DC2626" : "#15803D", bold: true },
               ].map((row, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.05)" : "none" }}>
                   <span style={{ fontSize: 12, color: "#64748B" }}>{row.label}</span>
