@@ -305,15 +305,7 @@ function PlafondWidget({ profile, visible }) {
                         {alerteActes ? "⚠️ " : ""}{c.acts_remaining ?? "—"}/{c.cap_monthly_acts} actes restants ce mois
                       </span>
                     )}
-                    {soldeAnnuel !== null && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
-                        background: alerteSolde ? "#FEF2F2" : "#F0FDF4",
-                        color: alerteSolde ? "#DC2626" : "#15803D",
-                      }}>
-                        {alerteSolde ? "⚠️ " : ""}{fmtF(soldeAnnuel)} restants/an
-                      </span>
-                    )}
+
                   </div>
                 </div>
               );
