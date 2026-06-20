@@ -546,6 +546,14 @@ export default function ProviderScan() {
                         </span>
                       </div>
                     )}
+                    {eligibility.solde_group !== null && (
+                      <div style={s.capRow}>
+                        <span>Solde annuel consultations ({eligibility.group_scope === "family" ? "famille" : "personne"})</span>
+                        <span style={{ fontWeight: 700, color: eligibility.solde_group < 10000 ? "#DC2626" : "#15803D" }}>
+                          {fmt(eligibility.solde_group)} / {fmt(eligibility.cap_group)}
+                        </span>
+                      </div>
+                    )}
                     {eligibility.solde_global !== null && (
                       <div style={s.capRow}>
                         <span>Solde global / an</span>
