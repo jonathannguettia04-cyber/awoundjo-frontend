@@ -293,11 +293,7 @@ function PlafondWidget({ profile, visible }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 15, flexShrink: 0 }}>{row.icon}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", flex: 1 }}>{row.label}</span>
-                    {c.cap_per_act && (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", whiteSpace: "nowrap" }}>
-                        max {fmtF(c.cap_per_act)}
-                      </span>
-                    )}
+
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 24 }}>
                     {c.cap_monthly_acts !== null && (
