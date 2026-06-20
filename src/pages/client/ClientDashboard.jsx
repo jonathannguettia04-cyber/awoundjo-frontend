@@ -172,8 +172,8 @@ function PlafondWidget({ profile, visible }) {
   const cs = profile?.caps_soldes;
   if (!cs) return null;
 
-  const pct = cs.cap_global_person && cs.solde_global !== null
-    ? Math.round((cs.solde_global / cs.cap_global_person) * 100)
+  const pct = cs.cap_global_family && cs.solde_global !== null
+    ? Math.round((cs.solde_global / cs.cap_global_family) * 100)
     : null;
   const isLow  = pct !== null && pct <= 20;
   const isMid  = pct !== null && pct > 20 && pct <= 50;
@@ -211,9 +211,9 @@ function PlafondWidget({ profile, visible }) {
         }}>🛡️</div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0 }}>Mes plafonds de prise en charge</p>
-          {cs.cap_global_person ? (
+          {cs.cap_global_family ? (
             <p style={{ fontSize: 11, color: isLow ? "#DC2626" : isMid ? "#D97706" : "#64748B", margin: "2px 0 0", fontWeight: isLow || isMid ? 700 : 400 }}>
-              {isLow ? "⚠️ " : ""}{fmtF(cs.solde_global)} restants sur {fmtF(cs.cap_global_person)}/an
+              {isLow ? "⚠️ " : ""}{fmtF(cs.solde_global)} restants sur {fmtF(cs.cap_global_family)}/an (famille)
             </p>
           ) : (
             <p style={{ fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Plafonds par acte actifs</p>
@@ -223,7 +223,7 @@ function PlafondWidget({ profile, visible }) {
       </div>
 
       {/* Barre de progression solde global */}
-      {cs.cap_global_person && pct !== null && (
+      {cs.cap_global_family && pct !== null && (
         <div style={{ marginTop: 12 }}>
           <div style={{ height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 99, transition: "width .6s" }} />
@@ -240,13 +240,13 @@ function PlafondWidget({ profile, visible }) {
         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
 
           {/* Solde global */}
-          {cs.cap_global_person && (
+          {cs.cap_global_family && (
             <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "12px 14px" }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
-                Plafond annuel global (toutes prestations)
+                Plafond annuel global (toutes prestations) — famille
               </p>
               {[
-                { label: "Plafond total",         value: fmtF(cs.cap_global_person),  color: "#1E293B" },
+                { label: "Plafond total",         value: fmtF(cs.cap_global_family),  color: "#1E293B" },
                 { label: "Consommé cette année",  value: fmtF(cs.consumed_global),    color: "#64748B" },
                 { label: "Solde restant",         value: fmtF(cs.solde_global),       color: barColor, bold: true },
               ].map((row, i) => (
