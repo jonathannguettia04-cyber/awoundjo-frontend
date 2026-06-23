@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { healthcareAPI } from "../services/api";
 import Modal from "../components/Modal";
-import * as XLSX from "xlsx";
 
 const TYPES = [
   { id: "pharmacy", label: "Pharmacie",   icon: "💊", color: "bg-green-100 text-green-700 border-green-200" },
@@ -234,15 +233,19 @@ export default function HealthcareAdmin() {
           <br />Types valides : <span className="font-mono">pharmacy · clinic · hospital · lab · optician · dentist · midwife</span>
         </p>
         <button
-          onClick={() => {
-            const ws = XLSX.utils.aoa_to_sheet([
-              ["Nom", "Type", "Ville", "Commune", "Adresse", "Téléphone", "Email", "Responsable"],
-              ["Pharmacie du Plateau", "pharmacy", "Abidjan", "Plateau", "Rue du Commerce", "0101020304", "", ""],
-              ["Clinique Sainte Marie", "clinic", "Yamoussoukro", "Centre-ville", "Centre-ville", "0505060708", "", "Dr Koné"],
-            ]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Établissements");
-            XLSX.writeFile(wb, "modele_etablissements.xlsx");
+          onClick={async () => {
+            const ExcelJS = (await import("exceljs")).default;
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet("Établissements");
+            ws.addRow(["Nom", "Type", "Ville", "Commune", "Adresse", "Téléphone", "Email", "Responsable"]);
+            ws.addRow(["Pharmacie du Plateau", "pharmacy", "Abidjan", "Plateau", "Rue du Commerce", "0101020304", "", ""]);
+            ws.addRow(["Clinique Sainte Marie", "clinic", "Yamoussoukro", "Centre-ville", "Centre-ville", "0505060708", "", "Dr Koné"]);
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = "modele_etablissements.xlsx"; a.click();
+            URL.revokeObjectURL(url);
           }}
           className="flex-shrink-0 text-xs font-semibold text-brand-600 border border-brand-200 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
           ⬇️ Modèle
