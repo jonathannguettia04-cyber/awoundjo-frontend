@@ -199,6 +199,9 @@ const BusinessParrainagePage = lazy(() => import("./pages/parrainage/BusinessPar
 // généré par un client final depuis son dashboard
 const ClientParrainagePage = lazy(() => import("./pages/parrainage/ClientParrainagePage"));
 
+// ── Landing page publique ─────────────────────────────────
+const LandingPage = lazy(() => import("./pages/public/LandingPage"));
+
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
   return (
@@ -292,10 +295,12 @@ export default function App() {
   const isCollectePage  = pathname.startsWith("/collecte");
   // [PARRAINAGE CLIENT] La page publique de parrainage client — pas de navbar
   const isRejoindrePage = pathname.startsWith("/rejoindre");
+  // [LANDING] Page publique d'accueil — pas de navbar
+  const isLandingPage   = pathname === "/";
 
   const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage
     && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
-    && !isCollectePage && !isRejoindrePage;
+    && !isCollectePage && !isRejoindrePage && !isLandingPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -314,9 +319,12 @@ export default function App() {
             <Route path="/hub"      element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
             <Route path="/portail"  element={<PortailHub />} />
 
-            {/* ── AGENT ───────────────────────────────────── */}
+            {/* ── LANDING / AGENT ─────────────────────────── */}
+            {/* Si connecté (agent) → Dashboard ; sinon → Landing page publique */}
             <Route path="/" element={
-              <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
+              user
+                ? <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
+                : <LandingPage />
             } />
             <Route path="/clients" element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
@@ -557,6 +565,7 @@ export default function App() {
 
             {/* ── Fallback ─────────────────────────────────── */}
             {/* FIX : un provider connecté ne doit pas atterrir sur /login agent */}
+            {/* Route inconnue → landing page (ou dashboard provider si connecté) */}
             <Route path="*" element={
               safeLocalStorage("getItem", "provider_token")
                 ? <Navigate to="/etablissement/dashboard" replace />

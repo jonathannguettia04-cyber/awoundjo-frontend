@@ -78,6 +78,12 @@ export const clientTeleAPI = {
   getPrescription: (id)      => clientApi.get(`/teleconsult/${id}/prescription`),
 };
 
+// ── VÉRIFICATION PUBLIQUE (sans auth) ───────────────────────────
+// Utilisée par la LandingPage pour vérifier un numéro mutualiste
+export const clientPublicAPI = {
+  verifyNumber: (num) => axios.get(`${API_URL}/api/client/auth/verify/${encodeURIComponent(num)}`),
+};
+
 // ── HELPERS ──────────────────────────────────────────────────────
 export const clientLogout = () => {
   localStorage.removeItem("client_token");
