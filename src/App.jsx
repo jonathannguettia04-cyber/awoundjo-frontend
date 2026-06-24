@@ -201,6 +201,18 @@ const ClientParrainagePage = lazy(() => import("./pages/parrainage/ClientParrain
 
 // ── Landing page publique ─────────────────────────────────
 const LandingPage = lazy(() => import("./pages/public/LandingPage"));
+const AboutPage         = lazy(() => import("./pages/public/About"));
+const FormulesPage       = lazy(() => import("./pages/public/Formules"));
+const FonctionnementPage = lazy(() => import("./pages/public/Fonctionnement"));
+const ReseauPage         = lazy(() => import("./pages/public/Reseau"));
+const SimulateurPage     = lazy(() => import("./pages/public/Simulateur"));
+const AvisPage           = lazy(() => import("./pages/public/Avis"));
+const FaqPage            = lazy(() => import("./pages/public/Faq"));
+const VerificationPage   = lazy(() => import("./pages/public/Verification"));
+const ContactPage        = lazy(() => import("./pages/public/Contact"));
+const AdhesionPage       = lazy(() => import("./pages/public/Adhesion"));
+const BlogPage           = lazy(() => import("./pages/public/Blog"));
+const BlogPostPage       = lazy(() => import("./pages/public/BlogPost"));
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
@@ -217,6 +229,9 @@ function PageLoader() {
 // ── Guards ───────────────────────────────────────────────────
 const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
 
+// [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
+const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog"];
+
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user, initializing } = useAuth();
   const { pathname } = useLocation();
@@ -226,7 +241,8 @@ function ProtectedRoute({ children, allowedRoles = null }) {
     pathname.startsWith("/diaspora") || pathname.startsWith("/referral") ||
     pathname.startsWith("/affilie") || pathname.startsWith("/client") ||
     pathname.startsWith("/etablissement") || pathname.startsWith("/cnepeci") ||
-    pathname.startsWith("/collecte"); // [COLLECTE] route publique exclue
+    pathname.startsWith("/collecte") || // [COLLECTE] route publique exclue
+    PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/blog/"); // [LANDING] pages vitrine publiques exclues
   if (isIndependentPortal) return children;
 
   // Attend que le localStorage soit lu avant de décider
@@ -297,10 +313,12 @@ export default function App() {
   const isRejoindrePage = pathname.startsWith("/rejoindre");
   // [LANDING] Page publique d'accueil — pas de navbar
   const isLandingPage   = pathname === "/";
+  // [LANDING] Pages vitrine publiques (about, formules, etc.) — pas de navbar agent
+  const isPublicPage    = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/blog/");
 
   const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage
     && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
-    && !isCollectePage && !isRejoindrePage && !isLandingPage;
+    && !isCollectePage && !isRejoindrePage && !isLandingPage && !isPublicPage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -326,6 +344,18 @@ export default function App() {
                 ? <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
                 : <LandingPage />
             } />
+            <Route path="/about"          element={<AboutPage />} />
+            <Route path="/formules"       element={<FormulesPage />} />
+            <Route path="/fonctionnement" element={<FonctionnementPage />} />
+            <Route path="/reseau"         element={<ReseauPage />} />
+            <Route path="/simulateur"     element={<SimulateurPage />} />
+            <Route path="/avis"           element={<AvisPage />} />
+            <Route path="/faq"            element={<FaqPage />} />
+            <Route path="/verification"   element={<VerificationPage />} />
+            <Route path="/contact"        element={<ContactPage />} />
+            <Route path="/adhesion"       element={<AdhesionPage />} />
+            <Route path="/blog"           element={<BlogPage />} />
+            <Route path="/blog/:slug"     element={<BlogPostPage />} />
             <Route path="/clients" element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
             } />
