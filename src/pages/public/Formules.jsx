@@ -219,7 +219,7 @@ export default function Formules() {
             {[
               { q: "Puis-je changer de formule ?", r: "Oui, à chaque date anniversaire de votre adhésion. Contactez notre équipe pour effectuer la modification." },
               { q: "Y a-t-il un délai de carence ?", r: "Oui, 30 jours pour les soins courants, 6 mois pour la maternité et la chirurgie programmée. Les urgences sont couvertes immédiatement." },
-              { q: "Combien de personnes puis-je couvrir ?", r: "Votre conjoint et tous vos enfants à charge sans limite d'âge inférieure à 21 ans. Pour les parents, une extension est possible." },
+              { q: "Combien de personnes puis-je couvrir ?", r: "Votre conjoint et vos 3 (trois) enfants, limite d'âge inférieure à 21 ans. Pour les parents, une extension est possible." },
               { q: "Que couvre le bilan de santé offert ?", r: "Consultation générale, glycémie, cholestérol, tension artérielle et bilan rénal. À effectuer dans les 3 mois suivant l'adhésion." },
             ].map(f => (
               <div key={f.q} style={{ background: C.cream, borderRadius: 14, padding: "20px 22px", border: "1.5px solid #EBF5F0" }}>
