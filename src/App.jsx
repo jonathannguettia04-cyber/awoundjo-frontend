@@ -311,8 +311,8 @@ export default function App() {
   const isCollectePage  = pathname.startsWith("/collecte");
   // [PARRAINAGE CLIENT] La page publique de parrainage client — pas de navbar
   const isRejoindrePage = pathname.startsWith("/rejoindre");
-  // [LANDING] Page publique d'accueil — pas de navbar
-  const isLandingPage   = pathname === "/";
+  // [LANDING] Page publique d'accueil — pas de navbar SAUF si connecté (admin)
+  const isLandingPage   = pathname === "/" && !user;
   // [LANDING] Pages vitrine publiques (about, formules, etc.) — pas de navbar agent
   const isPublicPage    = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/blog/");
 
