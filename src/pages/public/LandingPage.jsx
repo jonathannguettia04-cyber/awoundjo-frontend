@@ -7,9 +7,9 @@ import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
 import { C, STATS, PLANS, TESTIMONIALS, STEPS } from "../../data/constants";
 
-const FAMILY_PHOTO = "https://images.unsplash.com/photo-1656502439223-46667fff43c7?w=1200&q=85";
-const DOCTOR_PHOTO = "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=800&q=80";
-const CITY_PHOTO   = "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?w=1200&q=80";
+const FAMILY_PHOTO = "https://images.pexels.com/photos/3820178/pexels-photo-3820178.jpeg?auto=compress&cs=tinysrgb&w=1200";
+const DOCTOR_PHOTO = "https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=800";
+const CITY_PHOTO   = "https://images.pexels.com/photos/3483098/pexels-photo-3483098.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
 const PARTENAIRES = ["Cliniques privées", "Hôpitaux publics", "Pharmacies", "Laboratoires", "Dentistes", "Opticiens"];
 

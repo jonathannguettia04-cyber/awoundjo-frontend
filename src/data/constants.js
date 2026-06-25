@@ -96,7 +96,7 @@ export const BLOG_POSTS = [
     excerpt: "Budget, taille de famille, besoins médicaux : les critères essentiels pour choisir la formule Awoundjô adaptée à votre situation.",
     date: "2026-05-12",
     category: "Conseils",
-    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80",
+    image: "https://images.pexels.com/photos/4386467/pexels-photo-4386467.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     slug: "mobile-money-cotisations",
@@ -104,7 +104,7 @@ export const BLOG_POSTS = [
     excerpt: "Wave, Orange Money, MTN MoMo : découvrez comment régler vos cotisations mensuelles en quelques clics, sans vous déplacer.",
     date: "2026-04-28",
     category: "Pratique",
-    image: "https://images.unsplash.com/photo-1556742049-0a6cd6c8d27e?w=800&q=80",
+    image: "https://images.pexels.com/photos/6347919/pexels-photo-6347919.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     slug: "reseau-soins-extension-2026",
@@ -112,7 +112,7 @@ export const BLOG_POSTS = [
     excerpt: "12 nouvelles villes couvertes, 30 établissements partenaires supplémentaires : le point sur l'extension de notre réseau cette année.",
     date: "2026-03-15",
     category: "Actualités",
-    image: "https://images.unsplash.com/photo-1551076805-e1869033e561?w=800&q=80",
+    image: "https://images.pexels.com/photos/263402/pexels-photo-263402.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     slug: "prevention-sante-famille",
@@ -120,6 +120,6 @@ export const BLOG_POSTS = [
     excerpt: "La prévention reste le meilleur moyen de rester en bonne santé. Voici nos conseils pratiques applicables au quotidien.",
     date: "2026-02-20",
     category: "Conseils",
-    image: "https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=800&q=80",
+    image: "https://images.pexels.com/photos/4047186/pexels-photo-4047186.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
 ];
