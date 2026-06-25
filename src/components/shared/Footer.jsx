@@ -2,70 +2,209 @@
 import { Link } from "react-router-dom";
 import { C, CONTACT } from "../../data/constants";
 
+const PORTAILS = [
+  { label: "Espace Adhérent",       href: "/client/login",        desc: "Gérez votre couverture" },
+  { label: "Espace Établissement",  href: "/etablissement/login", desc: "Portail prestataires" },
+  { label: "Espace Ambassadeur",    href: "/diaspora/login",      desc: "Réseau Diaspora" },
+  { label: "Espace Parrainage",     href: "/referral",            desc: "Réseau Référral" },
+  { label: "Espace Affilié",        href: "/affilie",             desc: "Réseau Affilié" },
+  { label: "Espace Commercial",     href: "/business/login",      desc: "Réseau Business" },
+];
+
+const SOCIAL = [
+  { label: "Facebook",  href: "https://facebook.com",  icon: "f" },
+  { label: "Instagram", href: "https://instagram.com", icon: "in" },
+  { label: "LinkedIn",  href: "https://linkedin.com",  icon: "li" },
+  { label: "WhatsApp",  href: `https://wa.me/${CONTACT.whatsapp}`, icon: "wa" },
+];
+
 export default function Footer() {
   return (
-    <footer style={{ background: "#0F2D1A", padding: "60px 20px 32px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <div className="awj-footer-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
+    <footer style={{ background: "#0A1F12", borderTop: `3px solid ${C.gold}` }}>
+      {/* Bandeau CTA */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.green}, #0A2E18)`,
+        padding: "48px 24px",
+        textAlign: "center",
+        borderBottom: "1px solid #1B3D26",
+      }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, color: C.gold, fontWeight: 700, marginBottom: 12 }}>
+          PRÊT À PROTÉGER VOTRE FAMILLE ?
+        </p>
+        <h3 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.3rem, 2.5vw, 2rem)", color: "#FFFFFF", margin: "0 0 20px" }}>
+          Rejoignez 2 400 familles ivoiriennes déjà protégées
+        </h3>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link to="/adhesion" style={{
+            background: C.gold, color: "#0A1F12", fontFamily: "Inter, sans-serif", fontWeight: 800,
+            fontSize: 14, padding: "13px 28px", borderRadius: 10, textDecoration: "none",
+            letterSpacing: 0.3,
+          }}>Adhérer maintenant</Link>
+          <Link to="/simulateur" style={{
+            background: "transparent", color: "#FFFFFF", fontFamily: "Inter, sans-serif", fontWeight: 600,
+            fontSize: 14, padding: "13px 28px", borderRadius: 10, textDecoration: "none",
+            border: "1.5px solid rgba(255,255,255,0.3)",
+          }}>Tester mon budget →</Link>
+        </div>
+      </div>
+
+      {/* Corps du footer */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px 32px" }}>
+        <div className="awj-footer-grid" style={{
+          display: "grid",
+          gridTemplateColumns: "2.2fr 1fr 1.4fr 1fr",
+          gap: 48,
+          marginBottom: 48,
+        }}>
+          {/* Colonne marque */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${C.green}, ${C.gold})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ color: C.white, fontWeight: 900, fontSize: 16, fontFamily: "Playfair Display, serif" }}>A</span>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: `linear-gradient(135deg, ${C.green}, ${C.gold})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ color: "#FFFFFF", fontWeight: 900, fontSize: 18, fontFamily: "Playfair Display, serif" }}>A</span>
               </div>
-              <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 20, color: C.white }}>Awoundjô</span>
+              <div>
+                <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 18, color: "#FFFFFF", lineHeight: 1 }}>Awoundjô</div>
+                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 9, color: C.gold, letterSpacing: 1.5, marginTop: 2 }}>MUTUELLE DE SANTÉ</div>
+              </div>
             </div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", lineHeight: 1.7, maxWidth: 280 }}>
-              La première mutuelle de santé digitale de Côte d'Ivoire. Solidarité, accessibilité, innovation.
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#6B9E80", lineHeight: 1.75, maxWidth: 290, margin: "0 0 20px" }}>
+              La première mutuelle de santé digitale de Côte d'Ivoire. Solidarité, accessibilité et innovation pour chaque famille ivoirienne.
             </p>
-            <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-              {["Facebook", "Instagram", "LinkedIn", "WhatsApp"].map(s => (
-                <div key={s} style={{ width: 36, height: 36, borderRadius: 8, background: "#1B3D26", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  <span style={{ color: C.gold, fontSize: 14 }}>{s[0]}</span>
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {SOCIAL.map(s => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" title={s.label} style={{
+                  width: 34, height: 34, borderRadius: 8,
+                  background: "#152B1C",
+                  border: "1px solid #1B3D26",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  textDecoration: "none",
+                  transition: "background 0.15s",
+                }}>
+                  <span style={{ color: C.gold, fontSize: 11, fontWeight: 700, fontFamily: "Inter, sans-serif", textTransform: "uppercase" }}>{s.icon}</span>
+                </a>
+              ))}
+            </div>
+            {/* Certifications / badges */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["CIMA agréé", "Paiement sécurisé", "RGPD conforme"].map(b => (
+                <span key={b} style={{
+                  fontFamily: "Inter, sans-serif", fontSize: 10, color: "#4A7A5A",
+                  border: "1px solid #1B3D26", borderRadius: 4,
+                  padding: "3px 8px", letterSpacing: 0.3,
+                }}>{b}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div>
+            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.gold, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Navigation</div>
+            <nav style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+              {[
+                { to: "/",             label: "Accueil" },
+                { to: "/about",        label: "À propos" },
+                { to: "/formules",     label: "Nos formules" },
+                { to: "/fonctionnement", label: "Comment ça marche" },
+                { to: "/reseau",       label: "Réseau de soins" },
+                { to: "/avis",         label: "Témoignages" },
+                { to: "/blog",         label: "Blog santé" },
+                { to: "/faq",          label: "FAQ" },
+                { to: "/contact",      label: "Contact" },
+              ].map(l => (
+                <Link key={l.to} to={l.to} style={{
+                  fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#6B9E80",
+                  textDecoration: "none", transition: "color 0.15s",
+                }}>{l.label}</Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Portails */}
+          <div>
+            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.gold, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Espaces connectés</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {PORTAILS.map(p => (
+                <Link key={p.href} to={p.href} style={{
+                  textDecoration: "none",
+                  display: "flex", flexDirection: "column", gap: 1,
+                  padding: "9px 12px", borderRadius: 8,
+                  background: "#0F2318",
+                  border: "1px solid #1B3D26",
+                  transition: "border-color 0.15s",
+                }}>
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#C8E6D4" }}>{p.label}</span>
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#4A7A5A" }}>{p.desc}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.gold, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Contact</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                { icon: "📞", val: CONTACT.phone, href: `tel:${CONTACT.phone.replace(/\s/g,"")}` },
+                { icon: "✉️", val: CONTACT.email, href: `mailto:${CONTACT.email}` },
+                { icon: "📍", val: CONTACT.address, href: null },
+              ].map((c, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 14, lineHeight: 1.6, flexShrink: 0 }}>{c.icon}</span>
+                  {c.href ? (
+                    <a href={c.href} style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#6B9E80", textDecoration: "none", lineHeight: 1.55, wordBreak: "break-word" }}>{c.val}</a>
+                  ) : (
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#6B9E80", lineHeight: 1.55 }}>{c.val}</span>
+                  )}
                 </div>
               ))}
             </div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13, color: C.gold, letterSpacing: 1, marginBottom: 16 }}>NAVIGATION</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Link to="/" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>Accueil</Link>
-              <Link to="/about" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>À propos</Link>
-              <Link to="/formules" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>Formules</Link>
-              <Link to="/reseau" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>Réseau de soins</Link>
-              <Link to="/blog" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>Blog</Link>
-              <Link to="/contact" style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", textDecoration: "none" }}>Contact</Link>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13, color: C.gold, letterSpacing: 1, marginBottom: 16 }}>PORTAILS</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {["Espace Adhérent","Espace Commercial","Espace Établissement","Espace Ambassadeur"].map(l => (
-                <span key={l} style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", cursor: "pointer" }}>{l}</span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13, color: C.gold, letterSpacing: 1, marginBottom: 16 }}>INFORMATIONS</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80" }}>{CONTACT.phone}</span>
-              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80", wordBreak: "break-word" }}>{CONTACT.email}</span>
-              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#6B9E80" }}>{CONTACT.address}</span>
+
+            <div style={{ marginTop: 24, padding: "14px 16px", background: "#0F2318", borderRadius: 10, border: "1px solid #1B3D26" }}>
+              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gold, fontWeight: 700, marginBottom: 6 }}>HORAIRES D'OUVERTURE</div>
+              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#6B9E80", lineHeight: 1.6 }}>
+                Lun – Ven : 8h00 – 17h00<br />
+                Sam : 8h00 – 13h00
+              </div>
             </div>
           </div>
         </div>
-        <div className="awj-footer-bottom" style={{ borderTop: "1px solid #1B3D26", paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#4A7A5A" }}>© 2026 Awoundjô — Tous droits réservés</span>
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#4A7A5A" }}>Mutuelle de Santé — Côte d'Ivoire</span>
+
+        {/* Bas de page */}
+        <div className="awj-footer-bottom" style={{
+          borderTop: "1px solid #1B3D26",
+          paddingTop: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}>
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#3A5E48" }}>
+            © 2026 Awoundjô — Tous droits réservés. Mutuelle de Santé, Côte d'Ivoire.
+          </span>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {[
+              { label: "Mentions légales", to: "/mentions" },
+              { label: "Politique de confidentialité", to: "/confidentialite" },
+              { label: "CGU", to: "/cgu" },
+            ].map(l => (
+              <Link key={l.to} to={l.to} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#3A5E48", textDecoration: "none" }}>{l.label}</Link>
+            ))}
+          </div>
         </div>
       </div>
 
       <style>{`
-        @media (max-width: 760px) {
+        @media (max-width: 900px) {
           .awj-footer-grid { grid-template-columns: 1fr 1fr !important; gap: 32px !important; }
-          .awj-footer-bottom { flex-direction: column; align-items: flex-start !important; text-align: left; }
         }
-        @media (max-width: 480px) {
-          .awj-footer-grid { grid-template-columns: 1fr !important; }
+        @media (max-width: 560px) {
+          .awj-footer-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+          .awj-footer-bottom { flex-direction: column; align-items: flex-start !important; }
         }
       `}</style>
     </footer>
