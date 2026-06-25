@@ -7,8 +7,8 @@ import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
 import { C, STATS } from "../../data/constants";
 
-const TEAM_PHOTO = "https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=900";
-const OFFICE_PHOTO = "https://images.pexels.com/photos/1170412/pexels-photo-1170412.jpeg?auto=compress&cs=tinysrgb&w=900";
+const TEAM_PHOTO = "/images/equipe-awoundjo.jpg";
+const OFFICE_PHOTO = "/images/bureaux-awoundjo.jpg";
 
 const VALEURS = [
   { icon: "🤝", label: "Solidarité", desc: "Chaque cotisation aide une famille dans le besoin. La force du collectif au service de chacun." },
