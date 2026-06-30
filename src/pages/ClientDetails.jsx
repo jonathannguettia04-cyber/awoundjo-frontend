@@ -14,6 +14,45 @@ import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 const STATUSES = ["actif", "attente", "suspendu"];
 const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
+// Calcule les infos de retard de cotisation à partir de l'historique des paiements
+function getCotisationInfo(client, payments) {
+  const mensualites = (payments || [])
+    .filter((p) => p.type === "mensualite")
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const lastPayment = mensualites[0] || null;
+  // Si aucune mensualité, on se base sur la date d'adhésion (ou de création) du client
+  const refDate = lastPayment
+    ? new Date(lastPayment.created_at)
+    : (client?.created_at ? new Date(client.created_at) : null);
+
+  if (!refDate) {
+    return { lastDate: null, daysSince: null, label: "Aucune donnée", level: "neutral" };
+  }
+
+  const now = new Date();
+  const diffMs = now - refDate;
+  const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const months = Math.floor(daysSince / 30);
+  const days = daysSince % 30;
+
+  let label;
+  if (daysSince <= 0) {
+    label = "À jour";
+  } else if (months > 0) {
+    label = `${months} mois${days > 0 ? ` et ${days} jour${days > 1 ? "s" : ""}` : ""}`;
+  } else {
+    label = `${daysSince} jour${daysSince > 1 ? "s" : ""}`;
+  }
+
+  // Niveaux d'alerte : <30j = ok, 30-60j = attention, >60j = critique
+  let level = "ok";
+  if (daysSince > 60) level = "critical";
+  else if (daysSince > 30) level = "warning";
+
+  return { lastDate: refDate, daysSince, label, level, hasPayment: !!lastPayment };
+}
+
 export default function ClientDetails() {
   const { id } = useParams();
   const { isAdmin } = useAuth();
@@ -269,6 +308,15 @@ export default function ClientDetails() {
   );
 
   const { client: c, payments } = client;
+  const cotisInfo = getCotisationInfo(c, payments);
+
+  const cotisStyles = {
+    ok:       { bg: "bg-green-50",  border: "border-green-200",  text: "text-green-700",  icon: "✅" },
+    warning:  { bg: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-700",  icon: "⚠️" },
+    critical: { bg: "bg-red-50",    border: "border-red-200",    text: "text-red-700",    icon: "🚨" },
+    neutral:  { bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-600",  icon: "ℹ️" },
+  };
+  const cs = cotisStyles[cotisInfo.level] || cotisStyles.neutral;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in space-y-6">
@@ -380,6 +428,39 @@ export default function ClientDetails() {
             <p className="text-sm font-medium text-slate-700">🧑‍💼 {c.agent_name}</p>
           </div>
         )}
+      </div>
+
+      {/* Détails de cotisation */}
+      <div className={`rounded-xl border ${cs.border} ${cs.bg} px-5 py-4`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className={`text-sm font-semibold ${cs.text} flex items-center gap-2`}>
+              <span>{cs.icon}</span>
+              Détails de cotisation
+            </p>
+            {cotisInfo.lastDate ? (
+              <>
+                <p className="text-xs text-slate-500 mt-1">
+                  {cotisInfo.hasPayment ? "Dernière mensualité payée le " : "Adhésion le "}
+                  <span className="font-medium text-slate-700">
+                    {cotisInfo.lastDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                  </span>
+                </p>
+                <p className={`text-sm font-bold mt-1 ${cs.text}`}>
+                  {cotisInfo.daysSince <= 0
+                    ? "Cotisation à jour"
+                    : `Impayée depuis ${cotisInfo.label}`}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-slate-500 mt-1">Aucune information de paiement disponible</p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Statut actuel</p>
+            <StatusBadge status={c.status} />
+          </div>
+        </div>
       </div>
 
       {/* Historique paiements */}
