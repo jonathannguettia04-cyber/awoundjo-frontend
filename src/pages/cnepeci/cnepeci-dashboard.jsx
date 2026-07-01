@@ -979,7 +979,7 @@ function HistoryPage() {
 // PAGE CRÉER MEMBRE
 // ══════════════════════════════════════════════════════════════════════════════
 function CreerMembrePage({ membre }) {
-  const [form, setForm] = useState({ nom: "", email: "", phone: "", role: "", jeko_method: "orange" });
+  const [form, setForm] = useState({ nom: "", email: "", phone: "", role: "", plan_slug: "", jeko_method: "orange" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
@@ -987,19 +987,28 @@ function CreerMembrePage({ membre }) {
   const [listLoading, setListLoading] = useState(true);
   // Rôles créables chargés dynamiquement depuis le backend
   const [rolesCreables, setRolesCreables] = useState(null); // null = chargement en cours
+  // Formules d'adhésion chargées dynamiquement depuis /plans
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    // Charger en parallèle les rôles créables et la liste des membres déjà créés
+    // Charger en parallèle les rôles créables, la liste des membres déjà créés, et les formules
     Promise.all([
       apiFetch("/reseau/roles-creables"),
       apiFetch("/reseau/membres-crees"),
-    ]).then(([rolesRes, membresRes]) => {
+      fetchPlans(),
+    ]).then(([rolesRes, membresRes, plansData]) => {
       const roles = rolesRes?.roles || rolesRes?.data?.roles || [];
       setRolesCreables(roles);
       // Présélectionner le premier rôle disponible
       if (roles.length > 0) setForm(f => ({ ...f, role: roles[0] }));
       if (membresRes?.success) setMembresCreés(membresRes.membres || []);
+      setPlans(plansData);
+      // Présélectionner la première formule active
+      const firstPlan = plansData.find(p => p.active !== false);
+      if (firstPlan) setForm(f => ({ ...f, plan_slug: firstPlan.slug?.toUpperCase() || firstPlan.slug }));
+      setPlansLoading(false);
       setListLoading(false);
     });
   }, []);
@@ -1008,14 +1017,16 @@ function CreerMembrePage({ membre }) {
     setError(""); setSuccess(null);
     if (!form.nom || !form.email) { setError("Nom et email requis."); return; }
     if (!form.role) { setError("Veuillez sélectionner un rôle."); return; }
+    if (!form.plan_slug) { setError("Veuillez sélectionner une formule d'adhésion."); return; }
     setLoading(true);
     try {
-      const body = { nom: form.nom, email: form.email, phone: form.phone, role_a_creer: form.role, jeko_method: form.jeko_method };
+      const body = { nom: form.nom, email: form.email, phone: form.phone, role_a_creer: form.role, plan_slug: form.plan_slug, jeko_method: form.jeko_method };
       const data = await apiFetch("/reseau/creer-membre", { method: "POST", body: JSON.stringify(body) });
       if (!data) { setError("Erreur réseau."); return; }
       if (!data.success) { setError(data.message || "Erreur création"); return; }
-      setSuccess(data.credentials || data);
-      setForm(f => ({ nom: "", email: "", phone: "", role: f.role, jeko_method: "orange" }));
+      // FIX : fusionner credentials + payment pour disposer du redirect_url et du montant réel
+      setSuccess({ ...(data.credentials || {}), ...(data.payment || {}) });
+      setForm(f => ({ nom: "", email: "", phone: "", role: f.role, plan_slug: f.plan_slug, jeko_method: "orange" }));
       apiFetch("/reseau/membres-crees").then(d => { if (d?.success) setMembresCreés(d.membres || []); });
     } catch { setError("Erreur réseau."); }
     finally { setLoading(false); }
@@ -1053,12 +1064,13 @@ function CreerMembrePage({ membre }) {
                     <div>🔑 Mot de passe : <strong style={{ color: G.purple }}>{success.mot_de_passe}</strong></div>
                     {success.lien_connexion && <div style={{ wordBreak: "break-all" }}>🔗 Lien : <strong style={{ color: G.blue }}>{success.lien_connexion}</strong></div>}
                     {success.role && <div>👤 Rôle : <strong>{ROLES[success.role]?.label||success.role}</strong></div>}
-                    {success.adhesion_fee != null && <div>💰 Frais d'adhésion : <strong style={{ color: G.gold }}>23 500 F</strong></div>}
+                    {success.plan && <div>📋 Formule : <strong>{success.plan}</strong></div>}
+                    {success.montant != null && <div>💰 Frais d'adhésion : <strong style={{ color: G.gold }}>{Number(success.montant).toLocaleString("fr-FR")} F</strong></div>}
                   </div>
 
                   {success.redirect_url && (
                     <div style={{ marginTop: 14 }}>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 7, textTransform: "uppercase", letterSpacing: ".5px" }}>Réseau de paiement — 23 500 F</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 7, textTransform: "uppercase", letterSpacing: ".5px" }}>Réseau de paiement — {Number(success.montant||0).toLocaleString("fr-FR")} F</label>
                       <select value={form.jeko_method} onChange={e => set("jeko_method", e.target.value)}
                         style={{ width: "100%", padding: "9px 12px", border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff", color: G.text, marginBottom: 8 }}>
                         <option value="orange">🟠 Orange Money</option>
@@ -1069,7 +1081,7 @@ function CreerMembrePage({ membre }) {
                       </select>
                       <button onClick={() => { window.location.href = success.redirect_url; }}
                         style={{ width: "100%", padding: "11px 16px", background: `linear-gradient(135deg,${G.green},#047857)`, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                        💳 Procéder au paiement JEKO → 23 500 F
+                        💳 Procéder au paiement JEKO → {Number(success.montant||0).toLocaleString("fr-FR")} F
                       </button>
                       <div style={{ fontSize: 11, color: G.muted, marginTop: 6, textAlign: "center" }}>
                         ⏳ Le compte sera activé après confirmation du paiement
@@ -1111,6 +1123,29 @@ function CreerMembrePage({ membre }) {
               </div>
             )}
 
+            {/* Sélecteur de formule d'adhésion */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>Formule d'adhésion *</label>
+              {plansLoading ? (
+                <div style={{ fontSize: 12, color: G.muted }}>Chargement des formules…</div>
+              ) : plans.length === 0 ? (
+                <div style={{ fontSize: 12, color: G.muted }}>Aucune formule disponible</div>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {plans.map(p => {
+                    const slug = p.slug?.toUpperCase() || p.slug;
+                    const isSelected = form.plan_slug === slug;
+                    return (
+                      <button key={slug} onClick={() => set("plan_slug", slug)}
+                        style={{ padding: "8px 16px", borderRadius: 20, border: `2px solid ${isSelected ? G.blue : G.border}`, background: isSelected ? G.blue : "#fff", color: isSelected ? "#fff" : G.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+                        {p.name || slug}{p.adhesion_price != null && ` — ${Number(p.adhesion_price).toLocaleString("fr-FR")} F`}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {[{label:"Nom complet *",key:"nom",type:"text"},{label:"Email *",key:"email",type:"email"},{label:"Téléphone",key:"phone",type:"tel"}].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>{f.label}</label>
@@ -1119,8 +1154,8 @@ function CreerMembrePage({ membre }) {
                   onFocus={e=>e.target.style.borderColor=G.blue} onBlur={e=>e.target.style.borderColor=G.border} />
               </div>
             ))}
-            <button onClick={handleCreer} disabled={loading || !form.role}
-              style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg,${G.blue},#1D4ED8)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: (loading||!form.role)?"not-allowed":"pointer", fontFamily: "inherit", opacity: (loading||!form.role)?0.7:1 }}>
+            <button onClick={handleCreer} disabled={loading || !form.role || !form.plan_slug}
+              style={{ width: "100%", padding: "13px 20px", background: `linear-gradient(135deg,${G.blue},#1D4ED8)`, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: (loading||!form.role||!form.plan_slug)?"not-allowed":"pointer", fontFamily: "inherit", opacity: (loading||!form.role||!form.plan_slug)?0.7:1 }}>
               {loading ? "Création…" : `Créer le ${ROLES[form.role]?.label || form.role}`}
             </button>
           </div>
