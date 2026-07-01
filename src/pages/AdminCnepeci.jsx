@@ -398,6 +398,7 @@ function MembresTable({ membres, onRefresh }) {
                       <div>
                         <div style={{ fontWeight: 700, color: C.dark }}>{m.nom || "—"}</div>
                         {m.mutual_number && <div style={{ fontSize: 10, color: C.blue, fontFamily: "monospace", marginTop: 1 }}>{m.mutual_number}</div>}
+                        {m.plan_slug && <div style={{ fontSize: 10, color: C.slate, marginTop: 1 }}>{m.plan_slug}</div>}
                         {m.code_invitation && <div style={{ fontSize: 10, color: C.purple, fontFamily: "monospace", marginTop: 1 }}>#{m.code_invitation}</div>}
                       </div>
                     </div>
@@ -441,6 +442,7 @@ function MembresTable({ membres, onRefresh }) {
               {[
                 ["ID", selected.id],
                 ["N° Mutualiste", selected.mutual_number || "—"],
+                ["Formule", selected.plan_slug || "—"],
                 ["Code invitation", selected.code_invitation || "—"],
                 ["Rôle", ROLE_CONFIG[selected.role]?.label],
                 ["Statut paiement", selected.statut_paiement === "paid" ? "✓ Payé" : selected.statut_paiement === "unpaid" ? "✕ Impayé" : "⏳ En attente"],
