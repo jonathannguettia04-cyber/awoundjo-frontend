@@ -21,29 +21,36 @@ function getCotisationInfo(client, payments) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const lastPayment = mensualites[0] || null;
-  // Référence de retard, dans l'ordre de priorité :
-  // 1. expiration_date du client (fixée à la migration ou après un paiement) — source de vérité métier
-  // 2. date de la dernière mensualité réellement payée
-  // 3. date de création du client (nouveau client sans historique)
-  let refDate = null;
-  let source  = null;
+  // Date affichée (informative) vs date utilisée pour calculer le retard.
+  // Un paiement couvre 1 mois : le retard ne doit se calculer qu'à partir
+  // de la FIN de la période couverte, pas de la date du paiement elle-même.
+  let displayDate = null;   // ce qu'on montre à l'agent ("payé le...", "valable jusqu'au...")
+  let calcDate    = null;   // ce qui sert au calcul du retard
+  let source      = null;
+
   if (client?.expiration_date) {
-    refDate = new Date(client.expiration_date);
-    source  = "expiration";
+    // expiration_date est déjà la fin de période couverte (mise à jour à chaque paiement/migration)
+    displayDate = new Date(client.expiration_date);
+    calcDate    = displayDate;
+    source      = "expiration";
   } else if (lastPayment) {
-    refDate = new Date(lastPayment.created_at);
-    source  = "payment";
+    displayDate = new Date(lastPayment.created_at);
+    calcDate    = new Date(displayDate);
+    calcDate.setMonth(calcDate.getMonth() + 1); // fin de la période couverte par ce paiement
+    source      = "payment";
   } else if (client?.created_at) {
-    refDate = new Date(client.created_at);
-    source  = "creation";
+    // Aucun paiement jamais effectué : pas de période de grâce, le compteur part de l'adhésion
+    displayDate = new Date(client.created_at);
+    calcDate    = displayDate;
+    source      = "creation";
   }
 
-  if (!refDate) {
+  if (!calcDate) {
     return { lastDate: null, daysSince: null, label: "Aucune donnée", level: "neutral" };
   }
 
   const now = new Date();
-  const diffMs = now - refDate;
+  const diffMs = now - calcDate;
   const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const months = Math.floor(daysSince / 30);
   const days = daysSince % 30;
@@ -62,7 +69,7 @@ function getCotisationInfo(client, payments) {
   if (daysSince > 60) level = "critical";
   else if (daysSince > 0) level = "warning";
 
-  return { lastDate: refDate, daysSince, label, level, hasPayment: !!lastPayment, source };
+  return { lastDate: displayDate, daysSince, label, level, hasPayment: !!lastPayment, source };
 }
 
 export default function ClientDetails() {
