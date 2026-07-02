@@ -17,7 +17,7 @@ const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 // Calcule les infos de retard de cotisation à partir de l'historique des paiements
 function getCotisationInfo(client, payments) {
   const mensualites = (payments || [])
-    .filter((p) => p.type === "mensualite")
+    .filter((p) => p.type === "mensualite" && p.status === "paid")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const lastPayment = mensualites[0] || null;
@@ -481,20 +481,37 @@ export default function ClientDetails() {
                   <th className="text-left px-4 py-3">Date</th>
                   <th className="text-left px-4 py-3">Type</th>
                   <th className="text-left px-4 py-3">Méthode</th>
+                  <th className="text-left px-4 py-3">Statut</th>
                   <th className="text-right px-4 py-3">Montant</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-slate-500 text-xs">
-                      {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-3"><TypeBadge type={p.type} /></td>
-                    <td className="px-4 py-3"><MethodBadge method={p.payment_method} /></td>
-                    <td className="px-4 py-3 text-right font-semibold text-brand-600">{fmt(p.amount)}</td>
-                  </tr>
-                ))}
+                {payments.map((p) => {
+                  const isPaid = p.status === "paid";
+                  return (
+                    <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${!isPaid ? "bg-amber-50/40" : ""}`}>
+                      <td className="px-4 py-3 text-slate-500 text-xs">
+                        {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-4 py-3"><TypeBadge type={p.type} /></td>
+                      <td className="px-4 py-3"><MethodBadge method={p.payment_method} /></td>
+                      <td className="px-4 py-3">
+                        {isPaid ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                            Payé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                            Dû
+                          </span>
+                        )}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${isPaid ? "text-brand-600" : "text-amber-600"}`}>
+                        {fmt(p.amount)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
