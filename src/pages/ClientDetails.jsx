@@ -23,7 +23,7 @@ function getCotisationInfo(client, payments) {
   const paidMensualites = mensualites
     .filter((p) => p.status === "paid")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const unpaidMensualites = mensualites.filter((p) => p.status !== "paid");
+  const unpaidMensualites = mensualites.filter((p) => p.status === "overdue");
 
   const lastPayment  = paidMensualites[0] || null;
   const monthsUnpaid = unpaidMensualites.length;
@@ -450,9 +450,11 @@ export default function ClientDetails() {
               )}
             </p>
             <p className={`text-sm font-bold mt-1 ${cs.text}`}>
-              {cotisInfo.monthsUnpaid === 0
-                ? "Cotisation à jour"
-                : `Impayé depuis ${cotisInfo.label}`}
+              {cotisInfo.level === "neutral"
+                ? cotisInfo.label
+                : cotisInfo.level === "ok"
+                  ? "Cotisation à jour"
+                  : `Impayé depuis ${cotisInfo.label}`}
             </p>
           </div>
           <div className="text-right">
