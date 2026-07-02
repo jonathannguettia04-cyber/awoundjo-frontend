@@ -14,62 +14,44 @@ import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 const STATUSES = ["actif", "attente", "suspendu"];
 const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
-// Calcule les infos de retard de cotisation à partir de l'historique des paiements
+// Calcule les infos de retard de cotisation à partir de l'historique des paiements.
+// Le backend insère une ligne "mensualite" par mois dû (status='overdue' tant que
+// non réglé, 'paid' une fois encaissé) — donc le nombre de mois impayés se COMPTE
+// directement, sans approximation en jours/30.
 function getCotisationInfo(client, payments) {
-  const mensualites = (payments || [])
-    .filter((p) => p.type === "mensualite" && p.status === "paid")
+  const mensualites = (payments || []).filter((p) => p.type === "mensualite");
+  const paidMensualites = mensualites
+    .filter((p) => p.status === "paid")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const unpaidMensualites = mensualites.filter((p) => p.status !== "paid");
 
-  const lastPayment = mensualites[0] || null;
-  // Date affichée (informative) vs date utilisée pour calculer le retard.
-  // Un paiement couvre 1 mois : le retard ne doit se calculer qu'à partir
-  // de la FIN de la période couverte, pas de la date du paiement elle-même.
-  let displayDate = null;   // ce qu'on montre à l'agent ("payé le...", "valable jusqu'au...")
-  let calcDate    = null;   // ce qui sert au calcul du retard
-  let source      = null;
+  const lastPayment  = paidMensualites[0] || null;
+  const monthsUnpaid = unpaidMensualites.length;
 
-  if (client?.expiration_date) {
-    // expiration_date est déjà la fin de période couverte (mise à jour à chaque paiement/migration)
-    displayDate = new Date(client.expiration_date);
-    calcDate    = displayDate;
-    source      = "expiration";
-  } else if (lastPayment) {
-    displayDate = new Date(lastPayment.created_at);
-    calcDate    = new Date(displayDate);
-    calcDate.setMonth(calcDate.getMonth() + 1); // fin de la période couverte par ce paiement
-    source      = "payment";
-  } else if (client?.created_at) {
-    // Aucun paiement jamais effectué : pas de période de grâce, le compteur part de l'adhésion
-    displayDate = new Date(client.created_at);
-    calcDate    = displayDate;
-    source      = "creation";
+  // Aucune mensualité du tout (client tout juste créé, pas encore de cycle démarré)
+  if (mensualites.length === 0) {
+    return {
+      lastDate: null, hasPayment: false, monthsUnpaid: 0,
+      label: "Aucune mensualité enregistrée", level: "neutral",
+    };
   }
 
-  if (!calcDate) {
-    return { lastDate: null, daysSince: null, label: "Aucune donnée", level: "neutral" };
-  }
+  const label = monthsUnpaid === 0
+    ? "À jour"
+    : `${monthsUnpaid} mois`;
 
-  const now = new Date();
-  const diffMs = now - calcDate;
-  const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const months = Math.floor(daysSince / 30);
-  const days = daysSince % 30;
-
-  let label;
-  if (daysSince <= 0) {
-    label = "À jour";
-  } else if (months > 0) {
-    label = `${months} mois${days > 0 ? ` et ${days} jour${days > 1 ? "s" : ""}` : ""}`;
-  } else {
-    label = `${daysSince} jour${daysSince > 1 ? "s" : ""}`;
-  }
-
-  // Niveaux d'alerte : à jour = ok, 1-30j = attention, >60j = critique
+  // Niveaux d'alerte : à jour = ok, 1-2 mois = attention, 3 mois et + = critique
   let level = "ok";
-  if (daysSince > 60) level = "critical";
-  else if (daysSince > 0) level = "warning";
+  if (monthsUnpaid >= 3) level = "critical";
+  else if (monthsUnpaid > 0) level = "warning";
 
-  return { lastDate: displayDate, daysSince, label, level, hasPayment: !!lastPayment, source };
+  return {
+    lastDate:    lastPayment ? new Date(lastPayment.created_at) : null,
+    hasPayment:  !!lastPayment,
+    monthsUnpaid,
+    label,
+    level,
+  };
 }
 
 export default function ClientDetails() {
@@ -457,27 +439,21 @@ export default function ClientDetails() {
               <span>{cs.icon}</span>
               Détails de cotisation
             </p>
-            {cotisInfo.lastDate ? (
-              <>
-                <p className="text-xs text-slate-500 mt-1">
-                  {cotisInfo.source === "expiration"
-                    ? "Cotisation valable jusqu'au "
-                    : cotisInfo.source === "payment"
-                      ? "Dernière mensualité payée le "
-                      : "Adhésion le "}
-                  <span className="font-medium text-slate-700">
-                    {cotisInfo.lastDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-                  </span>
-                </p>
-                <p className={`text-sm font-bold mt-1 ${cs.text}`}>
-                  {cotisInfo.daysSince <= 0
-                    ? "Cotisation à jour"
-                    : `Impayée depuis ${cotisInfo.label}`}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-slate-500 mt-1">Aucune information de paiement disponible</p>
-            )}
+            <p className="text-xs text-slate-500 mt-1">
+              {cotisInfo.hasPayment
+                ? "Dernier paiement le "
+                : "Aucun paiement enregistré"}
+              {cotisInfo.hasPayment && (
+                <span className="font-medium text-slate-700">
+                  {cotisInfo.lastDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                </span>
+              )}
+            </p>
+            <p className={`text-sm font-bold mt-1 ${cs.text}`}>
+              {cotisInfo.monthsUnpaid === 0
+                ? "Cotisation à jour"
+                : `Impayé depuis ${cotisInfo.label}`}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-400 uppercase tracking-wider">Statut actuel</p>
