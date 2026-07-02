@@ -21,10 +21,22 @@ function getCotisationInfo(client, payments) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const lastPayment = mensualites[0] || null;
-  // Si aucune mensualité, on se base sur la date d'adhésion (ou de création) du client
-  const refDate = lastPayment
-    ? new Date(lastPayment.created_at)
-    : (client?.created_at ? new Date(client.created_at) : null);
+  // Référence de retard, dans l'ordre de priorité :
+  // 1. expiration_date du client (fixée à la migration ou après un paiement) — source de vérité métier
+  // 2. date de la dernière mensualité réellement payée
+  // 3. date de création du client (nouveau client sans historique)
+  let refDate = null;
+  let source  = null;
+  if (client?.expiration_date) {
+    refDate = new Date(client.expiration_date);
+    source  = "expiration";
+  } else if (lastPayment) {
+    refDate = new Date(lastPayment.created_at);
+    source  = "payment";
+  } else if (client?.created_at) {
+    refDate = new Date(client.created_at);
+    source  = "creation";
+  }
 
   if (!refDate) {
     return { lastDate: null, daysSince: null, label: "Aucune donnée", level: "neutral" };
@@ -50,7 +62,7 @@ function getCotisationInfo(client, payments) {
   if (daysSince > 60) level = "critical";
   else if (daysSince > 0) level = "warning";
 
-  return { lastDate: refDate, daysSince, label, level, hasPayment: !!lastPayment };
+  return { lastDate: refDate, daysSince, label, level, hasPayment: !!lastPayment, source };
 }
 
 export default function ClientDetails() {
@@ -441,7 +453,11 @@ export default function ClientDetails() {
             {cotisInfo.lastDate ? (
               <>
                 <p className="text-xs text-slate-500 mt-1">
-                  {cotisInfo.hasPayment ? "Dernière mensualité payée le " : "Adhésion le "}
+                  {cotisInfo.source === "expiration"
+                    ? "Cotisation valable jusqu'au "
+                    : cotisInfo.source === "payment"
+                      ? "Dernière mensualité payée le "
+                      : "Adhésion le "}
                   <span className="font-medium text-slate-700">
                     {cotisInfo.lastDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
                   </span>
