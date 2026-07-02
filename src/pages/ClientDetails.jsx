@@ -45,10 +45,10 @@ function getCotisationInfo(client, payments) {
     label = `${daysSince} jour${daysSince > 1 ? "s" : ""}`;
   }
 
-  // Niveaux d'alerte : <30j = ok, 30-60j = attention, >60j = critique
+  // Niveaux d'alerte : à jour = ok, 1-30j = attention, >60j = critique
   let level = "ok";
   if (daysSince > 60) level = "critical";
-  else if (daysSince > 30) level = "warning";
+  else if (daysSince > 0) level = "warning";
 
   return { lastDate: refDate, daysSince, label, level, hasPayment: !!lastPayment };
 }
