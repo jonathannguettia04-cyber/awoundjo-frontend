@@ -24,32 +24,43 @@ function getCotisationInfo(client, payments) {
   const paidMensualites = mensualites
     .filter((p) => p.status === "paid")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const unpaidMensualites = mensualites.filter((p) => p.status === "overdue");
+  const unpaidMensualites  = mensualites.filter((p) => p.status === "overdue");
+  const pendingMensualites = mensualites.filter((p) => p.status === "pending");
 
-  const lastPayment  = paidMensualites[0] || null;
-  const monthsUnpaid = unpaidMensualites.length;
+  const lastPayment   = paidMensualites[0] || null;
+  const monthsUnpaid  = unpaidMensualites.length;
+  const monthsPending = pendingMensualites.length;
 
   // Aucune mensualité du tout (client tout juste créé, pas encore de cycle démarré)
   if (mensualites.length === 0) {
     return {
-      lastDate: null, hasPayment: false, monthsUnpaid: 0,
+      lastDate: null, hasPayment: false, monthsUnpaid: 0, monthsPending: 0,
       label: "Aucune mensualité enregistrée", level: "neutral",
     };
   }
 
-  const label = monthsUnpaid === 0
-    ? "À jour"
-    : `${monthsUnpaid} mois`;
-
-  // Niveaux d'alerte : à jour = ok, 1-2 mois = attention, 3 mois et + = critique
+  // Niveaux d'alerte : à jour = ok, 1-2 mois impayés = attention, 3 mois et + = critique.
+  // Un paiement "pending" (ex: Jeko non confirmé) n'est PAS un mois payé — tant qu'il
+  // n'y a aucun mois overdue, on ne peut pas dire "à jour", on affiche "en attente".
   let level = "ok";
-  if (monthsUnpaid >= 3) level = "critical";
-  else if (monthsUnpaid > 0) level = "warning";
+  let label = "À jour";
+
+  if (monthsUnpaid >= 3) {
+    level = "critical";
+    label = `${monthsUnpaid} mois`;
+  } else if (monthsUnpaid > 0) {
+    level = "warning";
+    label = `${monthsUnpaid} mois`;
+  } else if (monthsPending > 0) {
+    level = "pending";
+    label = `${monthsPending} mois`;
+  }
 
   return {
     lastDate:    lastPayment ? new Date(lastPayment.created_at) : null,
     hasPayment:  !!lastPayment,
     monthsUnpaid,
+    monthsPending,
     label,
     level,
   };
@@ -316,6 +327,7 @@ export default function ClientDetails() {
     ok:       { bg: "bg-green-50",  border: "border-green-200",  text: "text-green-700",  icon: "✅" },
     warning:  { bg: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-700",  icon: "⚠️" },
     critical: { bg: "bg-red-50",    border: "border-red-200",    text: "text-red-700",    icon: "🚨" },
+    pending:  { bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700",   icon: "⏳" },
     neutral:  { bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-600",  icon: "ℹ️" },
   };
   const cs = cotisStyles[cotisInfo.level] || cotisStyles.neutral;
@@ -465,7 +477,9 @@ export default function ClientDetails() {
                 ? cotisInfo.label
                 : cotisInfo.level === "ok"
                   ? "Cotisation à jour"
-                  : `Impayé depuis ${cotisInfo.label}`}
+                  : cotisInfo.level === "pending"
+                    ? `En attente de confirmation depuis ${cotisInfo.label}`
+                    : `Impayé depuis ${cotisInfo.label}`}
             </p>
           </div>
           <div className="text-right">
