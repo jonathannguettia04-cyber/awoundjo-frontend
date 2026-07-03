@@ -13,6 +13,7 @@ import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 // Les formules sont chargées dynamiquement depuis /api/plans
 const STATUSES = ["actif", "attente", "suspendu"];
 const fmt      = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : "—";
 
 // Calcule les infos de retard de cotisation à partir de l'historique des paiements.
 // Le backend insère une ligne "mensualite" par mois dû (status='overdue' tant que
@@ -404,7 +405,7 @@ export default function ClientDetails() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-50">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-slate-50">
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Téléphone</p>
             <p className="text-sm font-medium text-slate-700">{c.phone}</p>
@@ -420,6 +421,16 @@ export default function ClientDetails() {
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total payé</p>
             <p className="text-sm font-bold text-brand-600">{fmt(c.total_paid)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Date d'adhésion</p>
+            <p className="text-sm font-medium text-slate-700">{fmtDate(c.registration_date)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Dernier paiement</p>
+            <p className="text-sm font-medium text-slate-700">
+              {cotisInfo.hasPayment ? fmtDate(cotisInfo.lastDate) : "—"}
+            </p>
           </div>
         </div>
 
@@ -489,6 +500,18 @@ export default function ClientDetails() {
               <tbody className="divide-y divide-slate-50">
                 {payments.map((p) => {
                   const isPaid = p.status === "paid";
+                  // Chaque statut réel a son propre badge — avant, tout ce qui
+                  // n'était pas "paid" (pending/overdue/failed/cancelled) était
+                  // affiché comme "Dû", ce qui mélangeait "paiement en cours de
+                  // traitement chez Jeko" et "mois jamais réglé".
+                  const STATUS_STYLES = {
+                    paid:      { label: "Payé",      cls: "bg-emerald-100 text-emerald-700" },
+                    overdue:   { label: "Dû",         cls: "bg-amber-100 text-amber-700" },
+                    pending:   { label: "En attente", cls: "bg-sky-100 text-sky-700" },
+                    failed:    { label: "Échoué",     cls: "bg-red-100 text-red-700" },
+                    cancelled: { label: "Annulé",     cls: "bg-slate-200 text-slate-600" },
+                  };
+                  const st = STATUS_STYLES[p.status] || { label: p.status, cls: "bg-slate-100 text-slate-600" };
                   return (
                     <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${!isPaid ? "bg-amber-50/40" : ""}`}>
                       <td className="px-4 py-3 text-slate-500 text-xs">
@@ -497,15 +520,9 @@ export default function ClientDetails() {
                       <td className="px-4 py-3"><TypeBadge type={p.type} /></td>
                       <td className="px-4 py-3"><MethodBadge method={p.payment_method} /></td>
                       <td className="px-4 py-3">
-                        {isPaid ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                            Payé
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                            Dû
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}`}>
+                          {st.label}
+                        </span>
                       </td>
                       <td className={`px-4 py-3 text-right font-semibold ${isPaid ? "text-brand-600" : "text-amber-600"}`}>
                         {fmt(p.amount)}
