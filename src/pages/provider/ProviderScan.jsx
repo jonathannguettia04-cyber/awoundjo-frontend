@@ -146,14 +146,14 @@ export default function ProviderScan() {
     cats.forEach(cat => {
       const firstEntry = examCatalog.find(e => e.category === cat);
       if (!firstEntry) return;
-      providerClientAPI.eligibility(client.id, firstEntry.code)
+      providerClientAPI.eligibility(client.id, firstEntry.code, client.dependent_id)
         .then(r => setExamSoldes(prev => ({ ...prev, [cat]: r.data })))
         .catch(() => {});
     });
   }, [examCatalog, client]);
   useEffect(() => {
     if (!client || !selectedCat) return;
-    providerClientAPI.eligibility(client.id, selectedCat.code)
+    providerClientAPI.eligibility(client.id, selectedCat.code, client.dependent_id)
       .then(r => setEligibility(r.data))
       .catch(() => {});
   }, [selectedCat, client]);
@@ -195,6 +195,7 @@ export default function ProviderScan() {
     try {
       const { data } = await providerServiceAPI.create({
         client_id:    client.id,
+        dependent_id: client.dependent_id,
         catalog_code: selectedCat.code,
         description,
         doctor_name:  doctorName.trim(),

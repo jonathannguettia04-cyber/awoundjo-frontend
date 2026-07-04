@@ -49,7 +49,8 @@ export const providerCatalogAPI = {
 export const providerClientAPI = {
   scan:        (mutual_number) => providerApi.get(`/client/scan/${mutual_number}`),
   search:      (q)             => providerApi.get("/client/search", { params: { q } }),
-  eligibility: (id, catalog_code) => providerApi.get(`/client/${id}/eligibility`, { params: { catalog_code } }),
+  eligibility: (id, catalog_code, dependent_id) =>
+    providerApi.get(`/client/${id}/eligibility`, { params: { catalog_code, dependent_id } }),
 };
 
 // ── Services (actes) ─────────────────────────────────────────
