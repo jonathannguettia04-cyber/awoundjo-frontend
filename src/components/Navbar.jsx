@@ -24,6 +24,7 @@ function getNavLinks(role) {
       { to: "/admin/providers", label: "Établissements",  icon: "ti-building-hospital" },
       { to: "/agents",          label: "Agents",          icon: "ti-id-badge" },
       { to: "/admin/diaspora",  label: "Diaspora",        icon: "ti-world" },
+      { to: "/admin/blog",      label: "Blog",            icon: "ti-notes" },
       { to: "/hub",             label: "Hub Admin",       icon: "ti-key" },
     ],
     AGENT: [
