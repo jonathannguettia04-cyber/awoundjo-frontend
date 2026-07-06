@@ -154,6 +154,7 @@ export default function AdminBlog() {
   }
 
   return (
+    <div style={{ background: "#0a1628", minHeight: "100vh" }}>
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
@@ -316,6 +317,7 @@ export default function AdminBlog() {
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
