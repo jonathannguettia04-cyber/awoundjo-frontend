@@ -1,11 +1,14 @@
 // src/pages/public/BlogPost.jsx
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
-import { C, BLOG_POSTS, CONTACT } from "../../data/constants";
+import { C, CONTACT } from "../../data/constants";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -17,41 +20,50 @@ const CATEGORY_COLOR = {
   Actualités: { bg: "#0E749014",     color: "#0E7490" },
 };
 
-// Contenu enrichi par slug
-const POST_CONTENT = {
-  "bien-choisir-sa-formule-sante": {
-    intro: "Choisir une mutuelle santé n'est pas une décision anodine. C'est un engagement financier mensuel qui doit correspondre à votre situation familiale, votre état de santé et votre budget. Voici les critères essentiels pour faire le bon choix.",
-    sections: [
-      {
-        title: "1. Évaluez vos besoins réels",
-        body: "Avant de choisir une formule, listez vos besoins médicaux habituels. Consultez-vous souvent un médecin généraliste ? Avez-vous des maladies chroniques nécessitant un suivi régulier ? Portez-vous des lunettes ou des lentilles ? Prévoyez-vous une grossesse ? Pour une famille jeune et en bonne santé, la formule Essentielle peut suffire. Pour une famille avec des enfants ou des besoins en optique et maternité, la formule Ivoirienne est plus adaptée.",
-      },
-      {
-        title: "2. Calculez votre budget réel",
-        body: "Ne regardez pas seulement la mensualité, mais le coût total annuel : mensualité × 12 + frais d'adhésion. Pour la formule Essentielle : 10 000 × 12 + 15 000 = 135 000 F/an, soit 375 F par jour. Rapporté à une hospitalisation qui peut coûter 200 000 à 500 000 F, la mutuelle est rapidement rentabilisée.",
-      },
-      {
-        title: "3. Tenez compte de toute la famille",
-        body: "Chez Awoundjô, votre cotisation couvre votre foyer entier (conjoint + enfants à charge). Le nombre de personnes couvertes ne change pas le tarif mensuel. Plus votre famille est grande, plus le rapport qualité/prix de la mutuelle est avantageux.",
-      },
-      {
-        title: "4. Utilisez le simulateur",
-        body: "En cas de doute, notre simulateur en ligne vous pose 4 questions ciblées et vous recommande la formule idéale en moins d'une minute. C'est gratuit et sans engagement.",
-      },
-    ],
-    conclusion: "Le meilleur choix est celui qui correspond à vos besoins actuels, avec une marge pour les imprévus. Vous pouvez toujours changer de formule à votre date anniversaire d'adhésion.",
-    cta_text: "Faire le simulateur →",
-    cta_link: "/simulateur",
-  },
-};
-
 export default function BlogPost() {
   const { slug } = useParams();
-  const post = BLOG_POSTS.find(p => p.slug === slug);
-  const content = POST_CONTENT[slug];
-  const related = BLOG_POSTS.filter(p => p.slug !== slug).slice(0, 2);
+  const [post, setPost] = useState(null);
+  const [related, setRelated] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  if (!post) {
+  useEffect(() => {
+    setLoading(true);
+    setNotFound(false);
+
+    fetch(`${API}/api/blog/${slug}`)
+      .then((r) => {
+        if (r.status === 404) { setNotFound(true); return null; }
+        return r.json();
+      })
+      .then((data) => {
+        if (data) setPost(data.data || data);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+
+    fetch(`${API}/api/blog`)
+      .then((r) => r.json())
+      .then((data) => {
+        const all = data.data || data || [];
+        setRelated(all.filter((p) => p.slug !== slug).slice(0, 2));
+      })
+      .catch(() => setRelated([]));
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <>
+        <FontLoader /><Nav /><ResponsiveStyles />
+        <section style={{ background: C.white, padding: "140px 24px 96px", textAlign: "center" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", color: C.gray }}>Chargement…</p>
+        </section>
+        <Footer /><WhatsAppFloat />
+      </>
+    );
+  }
+
+  if (notFound || !post) {
     return (
       <>
         <FontLoader /><Nav /><ResponsiveStyles />
@@ -65,6 +77,16 @@ export default function BlogPost() {
       </>
     );
   }
+
+  // Paragraphes du contenu (séparés par ligne vide), ou texte par défaut si vide
+  const paragraphs = (post.content || "").trim()
+    ? post.content.trim().split(/\n\s*\n/).filter(Boolean)
+    : [
+        "Chez Awoundjô, nous croyons que l'accès à l'information est la première étape vers une meilleure santé. Notre équipe travaille chaque jour à rendre nos services plus accessibles, plus transparents et plus adaptés aux réalités des familles ivoiriennes.",
+        "La mutualisation est un principe simple mais puissant : chacun cotise selon ses moyens et bénéficie selon ses besoins. En Côte d'Ivoire, où l'accès aux soins reste un défi pour de nombreuses familles, ce modèle peut transformer des vies.",
+      ];
+
+  const gallery = Array.isArray(post.gallery) ? post.gallery : [];
 
   return (
     <>
@@ -89,8 +111,8 @@ export default function BlogPost() {
               color: CATEGORY_COLOR[post.category]?.color || C.gold,
               background: "rgba(255,255,255,0.12)",
               padding: "5px 12px", borderRadius: 20, letterSpacing: 0.5,
-            }}>{post.category.toUpperCase()}</span>
-            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{formatDate(post.date)}</span>
+            }}>{post.category?.toUpperCase()}</span>
+            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{formatDate(post.created_at)}</span>
           </div>
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.2 }}>
             {post.title}
@@ -109,45 +131,43 @@ export default function BlogPost() {
             {/* Article */}
             <article>
               {/* Image principale */}
-              <div style={{ borderRadius: "0 0 20px 20px", overflow: "hidden", marginBottom: 48, boxShadow: "0 8px 32px rgba(0,0,0,0.10)" }}>
-                <img src={post.image} alt={post.title} style={{ width: "100%", display: "block", aspectRatio: "16/9", objectFit: "cover" }} />
-              </div>
-
-              {/* Contenu */}
-              {content ? (
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, color: C.slate, lineHeight: 1.85, marginBottom: 36, fontWeight: 500 }}>
-                    {content.intro}
-                  </p>
-                  {content.sections.map((s, i) => (
-                    <div key={i} style={{ marginBottom: 36 }}>
-                      <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.2rem, 2vw, 1.5rem)", color: C.slate, margin: "0 0 14px", lineHeight: 1.3 }}>
-                        {s.title}
-                      </h2>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: C.gray, lineHeight: 1.85, margin: 0 }}>
-                        {s.body}
-                      </p>
-                    </div>
-                  ))}
-                  <div style={{ background: C.cream, borderRadius: 16, padding: "24px 28px", borderLeft: `4px solid ${C.green}`, margin: "36px 0" }}>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: C.slate, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
-                      {content.conclusion}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, color: C.slate, lineHeight: 1.85, marginBottom: 28 }}>
-                    {post.excerpt}
-                  </p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: C.gray, lineHeight: 1.85, marginBottom: 28 }}>
-                    Chez Awoundjô, nous croyons que l'accès à l'information est la première étape vers une meilleure santé. Notre équipe travaille chaque jour à rendre nos services plus accessibles, plus transparents et plus adaptés aux réalités des familles ivoiriennes.
-                  </p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: C.gray, lineHeight: 1.85 }}>
-                    La mutualisation est un principe simple mais puissant : chacun cotise selon ses moyens et bénéficie selon ses besoins. En Côte d'Ivoire, où l'accès aux soins reste un défi pour de nombreuses familles, ce modèle peut transformer des vies.
-                  </p>
+              {post.image && (
+                <div style={{ borderRadius: "0 0 20px 20px", overflow: "hidden", marginBottom: gallery.length ? 20 : 48, boxShadow: "0 8px 32px rgba(0,0,0,0.10)" }}>
+                  <img src={post.image} alt={post.title} style={{ width: "100%", display: "block", aspectRatio: "16/9", objectFit: "cover" }} />
                 </div>
               )}
+
+              {/* Galerie photo */}
+              {gallery.length > 0 && (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${Math.min(gallery.length, 3)}, 1fr)`,
+                  gap: 10,
+                  marginBottom: 48,
+                }}>
+                  {gallery.map((url, i) => (
+                    <div key={i} style={{ borderRadius: 12, overflow: "hidden", aspectRatio: "1/1" }}>
+                      <img src={url} alt={`${post.title} — photo ${i + 2}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Contenu */}
+              <div>
+                {paragraphs.map((p, i) => (
+                  <p key={i} style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: i === 0 ? 17 : 16,
+                    fontWeight: i === 0 ? 500 : 400,
+                    color: i === 0 ? C.slate : C.gray,
+                    lineHeight: 1.85,
+                    marginBottom: 28,
+                  }}>
+                    {p}
+                  </p>
+                ))}
+              </div>
 
               {/* CTA article */}
               <div style={{
@@ -165,11 +185,11 @@ export default function BlogPost() {
                     Adhésion en ligne en 5 minutes. Couverture activée sous 24h.
                   </p>
                 </div>
-                <Link to={content?.cta_link || "/adhesion"} style={{
+                <Link to="/adhesion" style={{
                   background: C.green, color: "#FFFFFF",
                   fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14,
                   padding: "13px 24px", borderRadius: 10, textDecoration: "none", whiteSpace: "nowrap",
-                }}>{content?.cta_text || "Adhérer maintenant →"}</Link>
+                }}>Adhérer maintenant →</Link>
               </div>
 
               {/* Partager */}
@@ -231,12 +251,12 @@ export default function BlogPost() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                       {related.map(r => (
                         <Link key={r.slug} to={`/blog/${r.slug}`} style={{ textDecoration: "none", display: "flex", gap: 12, alignItems: "flex-start" }}>
-                          <div style={{ width: 56, height: 56, borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
-                            <img src={r.image} alt={r.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          <div style={{ width: 56, height: 56, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: C.greenPale }}>
+                            {r.image && <img src={r.image} alt={r.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                           </div>
                           <div>
                             <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 13, color: C.slate, lineHeight: 1.35, marginBottom: 4 }}>{r.title}</div>
-                            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gray }}>{formatDate(r.date)}</div>
+                            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gray }}>{formatDate(r.created_at)}</div>
                           </div>
                         </Link>
                       ))}
