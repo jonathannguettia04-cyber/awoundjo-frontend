@@ -52,6 +52,9 @@ const AdminBusiness             = lazy(() => import("./pages/AdminBusiness"));
 // ── Pages ADMIN — CNEPECI ────────────────────────────────────
 const AdminCnepeci              = lazy(() => import("./pages/AdminCnepeci"));
 
+// ── Pages ADMIN — Blog ───────────────────────────────────────
+const AdminBlog                 = lazy(() => import("./pages/AdminBlog"));
+
 // ── Pages ADMIN — Broadcast ──────────────────────────────────
 const AdminBroadcasts           = lazy(() => import("./pages/admin/AdminBroadcasts"));
 
@@ -416,6 +419,11 @@ export default function App() {
             {/* ── ADMIN — CNEPECI ──────────────────────── */}
             <Route path="/admin/cnepeci" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminCnepeci /></ProtectedRoute>
+            } />
+
+            {/* ── ADMIN — Blog ─────────────────────────── */}
+            <Route path="/admin/blog" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminBlog /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Broadcast ────────────────────── */}
