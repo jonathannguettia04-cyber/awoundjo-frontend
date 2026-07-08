@@ -59,9 +59,10 @@ export const clientContribAPI = {
 
 // ── DÉPENDANTS ───────────────────────────────────────────────────
 export const clientDepsAPI = {
-  get:    ()     => clientApi.get("/dependents"),
-  add:    (data) => clientApi.post("/dependents", data),
-  remove: (id)   => clientApi.delete(`/dependents/${id}`),
+  get:               ()     => clientApi.get("/dependents"),
+  add:               (data) => clientApi.post("/dependents", data),
+  remove:            (id)   => clientApi.delete(`/dependents/${id}`),
+  requestExtraChild: (data) => clientApi.post("/dependents/extra-request", data),
 };
 
 // ── DOSSIER MÉDICAL ──────────────────────────────────────────────

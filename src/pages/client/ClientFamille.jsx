@@ -7,6 +7,9 @@ import { uploadFile } from "../../supabaseClient";
 const EMPTY_SPOUSE = { type: "spouse", name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 const EMPTY_CHILD  = { type: "child",  name: "", firstname: "", birth_date: "", birth_place: "", identity_document: "", photo: null, piece: null };
 
+// Surprime mensuelle par formule (appliquée après validation admin)
+const SURPRIME_ENFANT = { ESSENTIELLE: 2000, IVOIRIENNE: 3000, TURQUOISE: 5000 };
+
 const DEP_GRADIENTS = {
   spouse: "linear-gradient(135deg, #DB2777 0%, #9D174D 100%)",
   child:  "linear-gradient(135deg, #059669 0%, #064e3b 100%)",
@@ -32,6 +35,7 @@ export default function ClientFamille() {
   const navigate = useNavigate();
   const [deps, setDeps]         = useState([]);
   const [titular, setTitular]   = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState(null);
   const [form, setForm]         = useState(EMPTY_SPOUSE);
@@ -53,6 +57,7 @@ export default function ClientFamille() {
       .then(res => {
         setDeps(res.data.data);
         setTitular(res.data.titular || null);
+        setPendingRequests(res.data.pendingRequests || []);
       })
       .catch(() => navigate("/client/login"))
       .finally(() => setLoading(false));
@@ -63,11 +68,16 @@ export default function ClientFamille() {
   const spouse   = deps.filter(d => d.type === "spouse");
   const children = deps.filter(d => d.type === "child");
 
+  const baseCap        = 3;
+  const effectiveMax   = baseCap + (titular?.extra_children_approved || 0);
+  const canAddDirectly = children.length < effectiveMax;
+  const surprimeAmount = SURPRIME_ENFANT[titular?.plan] || 2000;
+
   const openModal = (type) => {
     setForm(type === "spouse" ? { ...EMPTY_SPOUSE } : { ...EMPTY_CHILD });
     setPhotoFile(null); setPieceFile(null);
     setPhotoPreview(null); setPieceReady(false);
-    setError(""); setModal(type);
+    setError(""); setModal(type); // type: "spouse" | "child" | "child_request"
   };
 
   const handlePhotoChange = (file) => {
@@ -84,6 +94,7 @@ export default function ClientFamille() {
   const handleAdd = async () => {
     if (!form.name || !form.firstname) return setError("Nom et prénom requis");
     setError(""); setSaving(true); setUploading(true);
+    const isExtraRequest = modal === "child_request";
     try {
       const [photoUrl, pieceUrl] = await Promise.all([
         photoFile ? uploadFile(photoFile, "photos") : Promise.resolve(null),
@@ -93,14 +104,23 @@ export default function ClientFamille() {
       if (photoFile && !photoUrl) return setError("Échec de l'upload de la photo. Réessayez.");
       if (pieceFile && !pieceUrl) return setError("Échec de l'upload du document. Réessayez.");
 
-      await clientDepsAPI.add({
+      const payload = {
         type: form.type, name: form.name, firstname: form.firstname,
         birth_date: form.birth_date, birth_place: form.birth_place,
         identity_document: form.identity_document,
         photo: photoUrl, piece: pieceUrl,
-      });
+      };
 
-      setSuccess(`${form.type === "spouse" ? "Conjoint(e)" : "Enfant"} ajouté(e) !`);
+      if (isExtraRequest) {
+        await clientDepsAPI.requestExtraChild(payload);
+        setSuccess("Demande envoyée à l'admin. Surprime appliquée après validation.");
+      } else {
+        // Le backend doit re-vérifier le cap (3 + extra_children_approved) côté serveur,
+        // même si canAddDirectly a déjà filtré côté client.
+        await clientDepsAPI.add(payload);
+        setSuccess(`${form.type === "spouse" ? "Conjoint(e)" : "Enfant"} ajouté(e) !`);
+      }
+
       setModal(null); load();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
@@ -173,8 +193,9 @@ export default function ClientFamille() {
           ))}
 
       {/* ── Section Enfants ── */}
-      <SectionHeader title={`Enfants (${children.length}/3)`} icon="👶" color="#059669"
-        canAdd={children.length < 3} onAdd={() => openModal("child")} />
+      <SectionHeader title={`Enfants (${children.length}/${effectiveMax})`} icon="👶" color="#059669"
+        canAdd={true}
+        onAdd={() => openModal(canAddDirectly ? "child" : "child_request")} />
       {children.length === 0
         ? <EmptyCard icon="👶" text="Aucun enfant enregistré" color="#059669" onAdd={() => openModal("child")} />
         : children.map((d, i) => (
@@ -182,6 +203,27 @@ export default function ClientFamille() {
               depNumber={buildDepNumber(titular?.mutual_number, "child", i + 1)}
               titular={titular} />
           ))}
+
+      {!canAddDirectly && (
+        <p style={{ fontSize: 11, color: "#94A3B8", margin: "4px 2px 0" }}>
+          Cap atteint · un enfant de plus = +{surprimeAmount} FCFA/mois (soumis à validation)
+        </p>
+      )}
+
+      {/* ── Demandes en attente ── */}
+      {pendingRequests.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {pendingRequests.map(r => (
+            <div key={r.id} style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 14, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18 }}>⏳</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#92400E" }}>{r.firstname} {r.name}</p>
+                <p style={{ margin: 0, fontSize: 11, color: "#B45309" }}>En attente de validation admin</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Modal ajout ── */}
       {modal && (
@@ -193,14 +235,20 @@ export default function ClientFamille() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
-                  {modal === "spouse" ? "💑 Ajouter conjoint(e)" : "👶 Ajouter un enfant"}
+                  {modal === "spouse" ? "💑 Ajouter conjoint(e)" : modal === "child_request" ? "👶 Demande enfant supplémentaire" : "👶 Ajouter un enfant"}
                 </h3>
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                  {modal === "spouse" ? "1 conjoint maximum" : `${children.length}/3 enfants`}
+                  {modal === "spouse" ? "1 conjoint maximum" : modal === "child_request" ? "Soumis à validation admin" : `${children.length}/${effectiveMax} enfants`}
                 </p>
               </div>
               <button onClick={() => !isBusy && setModal(null)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
+
+            {modal === "child_request" && (
+              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 16px", color: "#92400E", fontSize: 13, marginBottom: 16 }}>
+                💰 Surprime de <strong>+{surprimeAmount} FCFA/mois</strong> appliquée dès validation par l'admin.
+              </div>
+            )}
 
             {error && (
               <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16 }}>
@@ -251,8 +299,8 @@ export default function ClientFamille() {
                 onChange={e => handlePieceChange(e.target.files[0])} />
             </div>
 
-            <button onClick={handleAdd} disabled={isBusy} style={{ width: "100%", background: isBusy ? "#94A3B8" : modal === "spouse" ? "linear-gradient(135deg,#DB2777,#9D174D)" : "linear-gradient(135deg,#059669,#065F46)", color: "#fff", border: "none", borderRadius: 14, padding: 16, fontSize: 15, fontWeight: 700, cursor: isBusy ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.2)", transition: "background .2s" }}>
-              {uploading ? "⬆️ Upload en cours..." : saving ? "⏳ Enregistrement..." : `✅ Enregistrer ${modal === "spouse" ? "le conjoint" : "l'enfant"}`}
+            <button onClick={handleAdd} disabled={isBusy} style={{ width: "100%", background: isBusy ? "#94A3B8" : modal === "spouse" ? "linear-gradient(135deg,#DB2777,#9D174D)" : modal === "child_request" ? "linear-gradient(135deg,#D97706,#92400E)" : "linear-gradient(135deg,#059669,#065F46)", color: "#fff", border: "none", borderRadius: 14, padding: 16, fontSize: 15, fontWeight: 700, cursor: isBusy ? "not-allowed" : "pointer", fontFamily: "'Poppins',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.2)", transition: "background .2s" }}>
+              {uploading ? "⬆️ Upload en cours..." : saving ? "⏳ Envoi..." : modal === "spouse" ? "✅ Enregistrer le conjoint" : modal === "child_request" ? `📨 Envoyer la demande (+${surprimeAmount} FCFA/mois)` : "✅ Enregistrer l'enfant"}
             </button>
           </div>
         </div>
