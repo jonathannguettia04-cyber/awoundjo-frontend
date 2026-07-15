@@ -42,6 +42,7 @@ const AdminCredentials          = lazy(() => import("./pages/AdminCredentials"))
 const AdminExports              = lazy(() => import("./pages/AdminExports"));
 const AdminValidationClients    = lazy(() => import("./pages/AdminValidationClients"));
 const AdminResetPassword        = lazy(() => import("./pages/AdminResetPassword"));
+const AdminSmsDelivery          = lazy(() => import("./pages/AdminSmsDelivery"));
 
 // ── Pages ADMIN — Affilié ────────────────────────────────────
 const AdminAffilie              = lazy(() => import("./pages/admin/AdminAffilie"));
@@ -404,6 +405,9 @@ export default function App() {
             } />
             <Route path="/admin/clients/reset-password" element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminResetPassword /></ProtectedRoute>
+            } />
+            <Route path="/admin/sms" element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminSmsDelivery /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Affilié ──────────────────────────── */}
