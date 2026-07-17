@@ -23,6 +23,7 @@ const NAV_BY_TYPE = {
     { path: "/etablissement/medical",      icon: "📋", label: "Dossiers médicaux" },
     { path: "/etablissement/exam-requests",icon: "🔬", label: "Accords préalables" },
     { path: "/etablissement/prior-auth",   icon: "🏨", label: "Actes lourds" },
+    { path: "/etablissement/doctors",      icon: "🩺", label: "Praticiens" },
     { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
   ],
   hospital: [
@@ -33,6 +34,7 @@ const NAV_BY_TYPE = {
     { path: "/etablissement/prescriptions",icon: "💊", label: "Ordonnances émises" },
     { path: "/etablissement/exam-requests",icon: "🔬", label: "Accords préalables" },
     { path: "/etablissement/prior-auth",   icon: "🏨", label: "Actes lourds" },
+    { path: "/etablissement/doctors",      icon: "🩺", label: "Praticiens" },
     { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
   ],
   // Labo / Opticien / Dentiste / Sage-femme : prise en charge simple, pas de dossier médical
@@ -61,6 +63,7 @@ const NAV_BY_TYPE = {
     { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
     { path: "/etablissement/medical",      icon: "📋", label: "Dossiers médicaux" },
     { path: "/etablissement/prior-auth",   icon: "🏨", label: "Actes lourds" },
+    { path: "/etablissement/doctors",      icon: "🩺", label: "Praticiens" },
     { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
   ],
 };
