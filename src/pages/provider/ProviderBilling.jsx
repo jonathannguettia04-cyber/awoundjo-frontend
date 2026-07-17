@@ -26,7 +26,7 @@ function groupServices(services = []) {
 
 const STATUS_CONFIG = {
   PENDING:   { label: "Brouillon",      icon: "📝", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D" },
-  SUBMITTED: { label: "Soumise",        icon: "📤", color: "#2563EB", bg: "#EFF6FF", border: "#93C5FD" },
+  SUBMITTED: { label: "Soumise",        icon: "📤", color: "#185FA5", bg: "#EFF6FF", border: "#93C5FD" },
   PAID:      { label: "Payée ✅",       icon: "💳", color: "#059669", bg: "#ECFDF5", border: "#6EE7B7" },
   REJECTED:  { label: "Rejetée",        icon: "❌", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
 };
@@ -95,7 +95,7 @@ export default function ProviderBilling() {
 
   // KPIs
   const kpis = [
-    { label: "Total facturé",   value: fmt(invoices.reduce((s, i) => s + Number(i.mutual_amount), 0)), icon: "💰", color: "#2563EB" },
+    { label: "Total facturé",   value: fmt(invoices.reduce((s, i) => s + Number(i.mutual_amount), 0)), icon: "💰", color: "#185FA5" },
     { label: "En attente",      value: invoices.filter(i => i.status === "PENDING").length,             icon: "📝", color: "#D97706" },
     { label: "Soumises",        value: invoices.filter(i => i.status === "SUBMITTED").length,           icon: "📤", color: "#7C3AED" },
     { label: "Payées",          value: invoices.filter(i => i.status === "PAID").length,                icon: "✅", color: "#059669" },
@@ -107,7 +107,7 @@ export default function ProviderBilling() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: 0 }}>Facturation</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#042C53", margin: 0 }}>Facturation</h2>
           <p style={{ color: "#64748B", fontSize: 13, margin: "2px 0 0" }}>{invoices.length} facture{invoices.length > 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => { setShowGen(true); setError(""); setSuccess(""); }}
@@ -131,7 +131,7 @@ export default function ProviderBilling() {
       </div>
 
       {/* Explication du flux */}
-      <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 14, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0369A1" }}>
+      <div style={{ background: "#E6F1FB", border: "1px solid #B5D4F4", borderRadius: 14, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0C447C" }}>
         <strong>Comment ça marche :</strong> Générez une facture regroupant vos actes non facturés →
         Cliquez <strong>"Demander le paiement"</strong> pour la soumettre à Awoundjô →
         L'équipe valide et procède au virement.
@@ -155,7 +155,7 @@ export default function ProviderBilling() {
             const st   = STATUS_CONFIG[inv.status] || STATUS_CONFIG.PENDING;
             const open = selected?.id === inv.id;
             return (
-              <div key={inv.id} style={{ background: "#fff", borderRadius: 16, border: `1.5px solid ${open ? "#2563EB" : "#E2E8F0"}`, overflow: "hidden", transition: "border-color .15s" }}>
+              <div key={inv.id} style={{ background: "#fff", borderRadius: 16, border: `1.5px solid ${open ? "#185FA5" : "#E2E8F0"}`, overflow: "hidden", transition: "border-color .15s" }}>
 
                 {/* Ligne principale */}
                 <div onClick={() => handleViewDetail(inv)}
@@ -168,7 +168,7 @@ export default function ProviderBilling() {
 
                   {/* Infos */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 14, margin: 0 }}>
+                    <p style={{ fontWeight: 700, color: "#042C53", fontSize: 14, margin: 0 }}>
                       Période du {fmtDate(inv.period_start)} au {fmtDate(inv.period_end)}
                     </p>
                     <p style={{ color: "#64748B", fontSize: 12, margin: "2px 0 0" }}>
@@ -180,7 +180,7 @@ export default function ProviderBilling() {
 
                   {/* Montants */}
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontWeight: 800, color: "#0f2942", fontSize: 15, margin: 0 }}>{fmt(inv.mutual_amount)}</p>
+                    <p style={{ fontWeight: 800, color: "#042C53", fontSize: 15, margin: 0 }}>{fmt(inv.mutual_amount)}</p>
                     <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>part mutuelle</p>
                   </div>
 
@@ -213,7 +213,7 @@ export default function ProviderBilling() {
                         {/* Récap financier */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
                           {[
-                            { label: "Total actes",    value: fmt(inv.total_amount),  color: "#0f2942" },
+                            { label: "Total actes",    value: fmt(inv.total_amount),  color: "#042C53" },
                             { label: "Part mutuelle",  value: fmt(inv.mutual_amount), color: "#059669" },
                             { label: "Part patient",   value: fmt(inv.client_amount), color: "#DC2626" },
                           ].map((r, i) => (
@@ -246,7 +246,7 @@ export default function ProviderBilling() {
                                       {group.map((svc, i) => (
                                         <tr key={svc.id} style={{
                                           borderBottom: "1px solid #F1F5F9",
-                                          background: isGroup ? "#F0F9FF" : (i % 2 === 0 ? "#fff" : "#FAFAFA"),
+                                          background: isGroup ? "#E6F1FB" : (i % 2 === 0 ? "#fff" : "#FAFAFA"),
                                         }}>
                                           <td style={{ padding: "7px 8px", color: "#475569", whiteSpace: "nowrap" }}>{fmtDate(svc.created_at)}</td>
                                           <td style={{ padding: "7px 8px", color: "#1E293B", fontWeight: 600 }}>{svc.client_name || "—"}</td>
@@ -264,16 +264,16 @@ export default function ProviderBilling() {
                                               </span>
                                             )}
                                           </td>
-                                          <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.total_amount)}</td>
+                                          <td style={{ padding: "7px 8px", color: "#042C53", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.total_amount)}</td>
                                           <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(svc.mutual_part)}</td>
                                         </tr>
                                       ))}
                                       {isGroup && (
                                         <tr style={{ borderBottom: "2px solid #E2E8F0", background: "#E0F2FE" }}>
-                                          <td colSpan={3} style={{ padding: "7px 8px", color: "#0369A1", fontWeight: 800, textAlign: "right" }}>
+                                          <td colSpan={3} style={{ padding: "7px 8px", color: "#0C447C", fontWeight: 800, textAlign: "right" }}>
                                             Sous-total combiné (consultation + examen)
                                           </td>
-                                          <td style={{ padding: "7px 8px", color: "#0f2942", fontWeight: 800, whiteSpace: "nowrap" }}>{fmt(subtotalAmount)}</td>
+                                          <td style={{ padding: "7px 8px", color: "#042C53", fontWeight: 800, whiteSpace: "nowrap" }}>{fmt(subtotalAmount)}</td>
                                           <td style={{ padding: "7px 8px", color: "#059669", fontWeight: 800, whiteSpace: "nowrap" }}>{fmt(subtotalMutual)}</td>
                                         </tr>
                                       )}
@@ -301,7 +301,7 @@ export default function ProviderBilling() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontWeight: 800, color: "#0f2942", margin: 0 }}>Générer une facture</h3>
+              <h3 style={{ fontWeight: 800, color: "#042C53", margin: 0 }}>Générer une facture</h3>
               <button onClick={() => setShowGen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94A3B8" }}>✕</button>
             </div>
 
@@ -342,7 +342,7 @@ export default function ProviderBilling() {
 }
 
 const s = {
-  btnPrimary:   { background: "linear-gradient(135deg,#0f2942,#1a4a7a)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  btnPrimary:   { background: "linear-gradient(135deg,#042C53,#0C447C)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   btnSecondary: { background: "#fff", color: "#64748B", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   alertError:   { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 },
   alertSuccess: { background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: "10px 14px", color: "#059669", fontSize: 13, marginBottom: 14 },

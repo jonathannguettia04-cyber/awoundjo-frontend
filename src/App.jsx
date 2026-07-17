@@ -86,6 +86,8 @@ const ProviderServices    = lazy(() => import("./pages/provider/ProviderServices
 const ProviderMedical     = lazy(() => import("./pages/provider/ProviderMedical"));
 const ProviderBilling              = lazy(() => import("./pages/provider/ProviderBilling"));
 const ProviderPharmacyPrescriptions = lazy(() => import("./pages/provider/ProviderPharmacyPrescriptions"));
+const ProviderExamRequests         = lazy(() => import("./pages/provider/ProviderExamRequests"));
+const ProviderPriorAuth            = lazy(() => import("./pages/provider/ProviderPriorAuth"));
 // ── Redirect scan selon type de prestataire ──────────────────
 // Pharmacie → ordonnances patients | Autres → prise en charge classique
 function ScanRoute() {
@@ -469,6 +471,8 @@ export default function App() {
               <Route path="history"           element={<ProviderServices />} />
               <Route path="profile"           element={<ProviderDashboard />} />
               <Route path="prescriptions"     element={<ProviderPharmacyPrescriptions />} />
+              <Route path="exam-requests"     element={<ProviderExamRequests />} />
+              <Route path="prior-auth"        element={<ProviderPriorAuth />} />
               <Route path="billing" element={<ProviderBilling />} />
             </Route>
 

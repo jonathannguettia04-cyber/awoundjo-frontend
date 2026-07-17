@@ -32,7 +32,7 @@ function SpinDark() {
   return (
     <span style={{
       display: "inline-block", width: 14, height: 14,
-      border: "2px solid #CBD5E1", borderTopColor: "#2563EB",
+      border: "2px solid #CBD5E1", borderTopColor: "#185FA5",
       borderRadius: "50%", animation: "spin 0.7s linear infinite",
     }} />
   );
@@ -130,7 +130,7 @@ function TabExisting() {
           <p style={{ fontWeight: 800, color: "#15803D", fontSize: 15, margin: "0 0 12px" }}>✅ Bon enregistré avec succès</p>
           {[
             { label: "Montant total",  value: fmt(bonResult.bon.amount) },
-            { label: "Part mutuelle",  value: fmt(bonResult.mutual_part), color: "#0097A7" },
+            { label: "Part mutuelle",  value: fmt(bonResult.mutual_part), color: "#0C447C" },
             { label: "Reste patient",  value: fmt(bonResult.client_part), color: "#DC2626" },
             { label: "Couverture",     value: `${bonResult.coverage_pct}%` },
             ...(bonResult.bons_remaining != null
@@ -164,7 +164,7 @@ function TabExisting() {
         <div>
           {/* Fiche patient */}
           <div style={{ ...s.card, display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 20, color: "#2563EB", flexShrink: 0 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 20, color: "#185FA5", flexShrink: 0 }}>
               {result.client.name?.charAt(0)}
             </div>
             <div style={{ flex: 1 }}>
@@ -220,10 +220,10 @@ function TabExisting() {
                 const isSelected = selected?.id === presc.id;
                 const canDispense = elig?.eligible && elig?.bons_remaining_this_month !== 0;
                 return (
-                  <div key={presc.id} style={{ ...s.card, marginBottom: 12, border: `2px solid ${isSelected ? "#2563EB" : "#E2E8F0"}` }}>
+                  <div key={presc.id} style={{ ...s.card, marginBottom: 12, border: `2px solid ${isSelected ? "#185FA5" : "#E2E8F0"}` }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
                       <div>
-                        <p style={{ fontWeight: 700, color: "#0f2942", margin: "0 0 4px", fontSize: 14 }}>
+                        <p style={{ fontWeight: 700, color: "#042C53", margin: "0 0 4px", fontSize: 14 }}>
                           📋 {presc.service_label || "Ordonnance médicale"}
                         </p>
                         <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
@@ -269,7 +269,7 @@ function TabExisting() {
 
                     {isSelected && (
                       <form onSubmit={handleDispense} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
-                        <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 13, margin: "0 0 12px" }}>💊 Saisir le bon pharmacie</p>
+                        <p style={{ fontWeight: 700, color: "#042C53", fontSize: 13, margin: "0 0 12px" }}>💊 Saisir le bon pharmacie</p>
                         <div style={{ marginBottom: 12 }}>
                           <label style={s.label}>Médicaments dispensés (un par ligne)</label>
                           <textarea
@@ -293,8 +293,8 @@ function TabExisting() {
                             style={{ ...s.input, fontSize: 20, fontWeight: 800 }}
                           />
                           {bonAmount && elig && (
-                            <div style={{ marginTop: 8, padding: "8px 12px", background: "#E0F7FA", borderRadius: 8 }}>
-                              <p style={{ fontSize: 12, color: "#0097A7", margin: 0 }}>
+                            <div style={{ marginTop: 8, padding: "8px 12px", background: "#E6F1FB", borderRadius: 8 }}>
+                              <p style={{ fontSize: 12, color: "#0C447C", margin: 0 }}>
                                 Part mutuelle ({elig.coverage_pct}%) : <strong>{fmt(Math.round(Number(bonAmount) * elig.coverage_pct / 100))}</strong>
                                 {" · "}Reste patient : <strong>{fmt(Number(bonAmount) - Math.round(Number(bonAmount) * elig.coverage_pct / 100))}</strong>
                               </p>
@@ -417,7 +417,7 @@ function TabDirect() {
           { label: "Montant total",  value: fmt(bon.amount || amount) },
           ...(bon.mutual_part != null
             ? [
-                { label: "Part mutuelle", value: fmt(bon.mutual_part), color: "#0097A7" },
+                { label: "Part mutuelle", value: fmt(bon.mutual_part), color: "#0C447C" },
                 { label: "Reste patient", value: fmt(bon.client_part), color: "#DC2626" },
                 { label: "Couverture",    value: `${bon.coverage_pct}%` },
               ]
@@ -436,7 +436,7 @@ function TabDirect() {
     <div>
       {/* Step 1 — Recherche patient */}
       <div style={{ ...s.card, marginBottom: 16 }}>
-        <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 13, margin: "0 0 12px" }}>
+        <p style={{ fontWeight: 700, color: "#042C53", fontSize: 13, margin: "0 0 12px" }}>
           <span style={s.stepBadge}>1</span> Identifier le patient
         </p>
         <form onSubmit={handleSearch} style={{ display: "flex", gap: 10 }}>
@@ -506,7 +506,7 @@ function TabDirect() {
       {patient && (
         <form onSubmit={handleSubmit}>
           <div style={{ ...s.card, marginBottom: 16 }}>
-            <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 13, margin: "0 0 12px" }}>
+            <p style={{ fontWeight: 700, color: "#042C53", fontSize: 13, margin: "0 0 12px" }}>
               <span style={s.stepBadge}>2</span> Rédiger l'ordonnance
             </p>
 
@@ -541,9 +541,9 @@ function TabDirect() {
                       onClick={() => setValidDays(opt.days)}
                       style={{
                         padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                        border: `1.5px solid ${validDays === opt.days ? "#2563EB" : "#E2E8F0"}`,
+                        border: `1.5px solid ${validDays === opt.days ? "#185FA5" : "#E2E8F0"}`,
                         background: validDays === opt.days ? "#EFF6FF" : "#fff",
-                        color: validDays === opt.days ? "#2563EB" : "#64748B",
+                        color: validDays === opt.days ? "#185FA5" : "#64748B",
                         cursor: "pointer", fontFamily: "inherit",
                       }}
                     >
@@ -560,7 +560,7 @@ function TabDirect() {
                     type="button"
                     onClick={() => setTotalBons(v => Math.max(1, v - 1))}
                     style={{ ...s.stepper }}>−</button>
-                  <span style={{ fontWeight: 800, fontSize: 18, color: "#0f2942", width: 28, textAlign: "center" }}>{totalBons}</span>
+                  <span style={{ fontWeight: 800, fontSize: 18, color: "#042C53", width: 28, textAlign: "center" }}>{totalBons}</span>
                   <button
                     type="button"
                     onClick={() => setTotalBons(v => Math.min(12, v + 1))}
@@ -572,7 +572,7 @@ function TabDirect() {
 
           {/* Step 3 — Saisir la vente */}
           <div style={{ ...s.card, marginBottom: 16 }}>
-            <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 13, margin: "0 0 12px" }}>
+            <p style={{ fontWeight: 700, color: "#042C53", fontSize: 13, margin: "0 0 12px" }}>
               <span style={s.stepBadge}>3</span> Enregistrer la vente
             </p>
 
@@ -592,10 +592,10 @@ function TabDirect() {
                 style={{ ...s.input, fontSize: 22, fontWeight: 800 }}
               />
               {amount && elig?.eligible && (
-                <div style={{ marginTop: 8, padding: "10px 14px", background: "#E0F7FA", borderRadius: 10 }}>
+                <div style={{ marginTop: 8, padding: "10px 14px", background: "#E6F1FB", borderRadius: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, color: "#0097A7" }}>Part mutuelle ({elig.coverage_pct}%)</span>
-                    <strong style={{ fontSize: 13, color: "#0097A7" }}>{fmt(Math.round(Number(amount) * elig.coverage_pct / 100))}</strong>
+                    <span style={{ fontSize: 13, color: "#0C447C" }}>Part mutuelle ({elig.coverage_pct}%)</span>
+                    <strong style={{ fontSize: 13, color: "#0C447C" }}>{fmt(Math.round(Number(amount) * elig.coverage_pct / 100))}</strong>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
                     <span style={{ fontSize: 13, color: "#DC2626" }}>Reste à payer (patient)</span>
@@ -643,7 +643,7 @@ export default function ProviderPharmacyPrescriptions() {
       `}</style>
 
       {/* En-tête */}
-      <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: "0 0 4px" }}>
+      <h2 style={{ fontSize: 18, fontWeight: 800, color: "#042C53", margin: "0 0 4px" }}>
         💊 Pharmacie — Gestion des ventes
       </h2>
       <p style={{ color: "#64748B", fontSize: 13, margin: "0 0 20px" }}>
@@ -665,7 +665,7 @@ export default function ProviderPharmacyPrescriptions() {
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
               background: tab === t.key ? "#fff" : "transparent",
-              color:      tab === t.key ? "#2563EB" : "#64748B",
+              color:      tab === t.key ? "#185FA5" : "#64748B",
               boxShadow:  tab === t.key ? "0 1px 4px rgba(0,0,0,.08)" : "none",
             }}
           >
@@ -685,9 +685,9 @@ const s = {
   card:       { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: "16px 18px" },
   input:      { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box", color: "#1E293B" },
   label:      { display: "block", fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 },
-  btnPrimary: { background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" },
+  btnPrimary: { background: "linear-gradient(135deg,#185FA5,#0C447C)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" },
   btnSecondary:{ background: "#fff", color: "#475569", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "12px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   errorBox:   { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14 },
-  stepBadge:  { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 7, background: "#2563EB", color: "#fff", fontSize: 12, fontWeight: 800, marginRight: 8 },
+  stepBadge:  { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 7, background: "#185FA5", color: "#fff", fontSize: 12, fontWeight: 800, marginRight: 8 },
   stepper:    { width: 34, height: 34, borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#F8FAFC", fontSize: 18, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" },
 };

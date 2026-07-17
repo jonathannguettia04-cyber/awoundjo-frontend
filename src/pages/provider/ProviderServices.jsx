@@ -98,11 +98,11 @@ export default function ProviderServices() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2942", margin: 0 }}>Historique des actes</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#042C53", margin: 0 }}>Historique des actes</h2>
           <p style={{ color: "#64748B", fontSize: 13, margin: "2px 0 0" }}>{total} acte{total > 1 ? "s" : ""} enregistré{total > 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => navigate("/etablissement/scan")}
-          style={{ background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          style={{ background: "linear-gradient(135deg,#185FA5,#0C447C)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
           + Nouvel acte
         </button>
       </div>
@@ -110,7 +110,7 @@ export default function ProviderServices() {
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
         {[
-          { label: "Actes (page)",       value: services.length,    icon: "📝", color: "#2563EB", bg: "#EFF6FF" },
+          { label: "Actes (page)",       value: services.length,    icon: "📝", color: "#185FA5", bg: "#EFF6FF" },
           { label: "Total facturé",      value: fmt(totalAmount),   icon: "💰", color: "#D97706", bg: "#FFFBEB" },
           { label: "Part mutuelle",      value: fmt(totalMutual),   icon: "🏥", color: "#059669", bg: "#ECFDF5" },
         ].map((k, i) => (
@@ -156,7 +156,7 @@ export default function ProviderServices() {
           <p style={{ fontSize: 36 }}>📋</p>
           <p>Aucun acte enregistré sur cette période</p>
           <button onClick={() => navigate("/etablissement/scan")}
-            style={{ background: "#2563EB", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginTop: 8 }}>
+            style={{ background: "#185FA5", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginTop: 8 }}>
             + Enregistrer un acte
           </button>
         </div>
@@ -168,7 +168,7 @@ export default function ProviderServices() {
             return (
               <div key={svc.id}
                 onClick={() => setSelected(isOpen ? null : svc)}
-                style={{ background: "#fff", borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,.04)", cursor: "pointer", border: `1.5px solid ${isOpen ? "#2563EB" : "#F1F5F9"}`, transition: "border-color .15s" }}>
+                style={{ background: "#fff", borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,.04)", cursor: "pointer", border: `1.5px solid ${isOpen ? "#185FA5" : "#F1F5F9"}`, transition: "border-color .15s" }}>
 
                 {/* Ligne principale */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -176,7 +176,7 @@ export default function ProviderServices() {
                     {cat.icon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 700, color: "#0f2942", margin: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ fontWeight: 700, color: "#042C53", margin: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {svc.catalog_label || svc.catalog_code}
                       {svc.exam_requests?.length > 0 && (
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#0891B2", background: "#ECFEFF", borderRadius: 8, padding: "2px 6px" }}>
@@ -189,7 +189,7 @@ export default function ProviderServices() {
                     </p>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontWeight: 800, color: "#0f2942", margin: 0, fontSize: 13 }}>{fmt(svc.total_amount)}</p>
+                    <p style={{ fontWeight: 800, color: "#042C53", margin: 0, fontSize: 13 }}>{fmt(svc.total_amount)}</p>
                     <p style={{ color: "#94A3B8", fontSize: 11, margin: 0 }}>{fmtDate(svc.created_at)}</p>
                   </div>
                 </div>
@@ -201,7 +201,7 @@ export default function ProviderServices() {
                       {[
                         { label: "Code acte",     value: svc.catalog_code },
                         { label: "Catégorie",     value: cat.label },
-                        { label: "Part mutuelle", value: fmt(svc.mutual_part),  color: "#0097A7" },
+                        { label: "Part mutuelle", value: fmt(svc.mutual_part),  color: "#0C447C" },
                         { label: "Reste patient", value: fmt(svc.client_part),  color: "#DC2626" },
                         { label: "Couverture",    value: `${svc.coverage_pct}%` },
                         { label: "Statut facture",value: svc.invoice_id ? "✅ Facturé" : "⏳ En attente" },
@@ -230,7 +230,7 @@ export default function ProviderServices() {
                             return (
                               <div key={ex.id} style={{ background: "#ECFEFF", border: "1px solid #BAE6FD", borderRadius: 8, padding: "8px 12px" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#0f2942", margin: 0 }}>
+                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#042C53", margin: 0 }}>
                                     {ex.is_autre ? ex.autre_label : (ex.exam_label || ex.catalog_code)}
                                   </p>
                                   <span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>
@@ -238,10 +238,10 @@ export default function ProviderServices() {
                                   </span>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-                                  <p style={{ fontSize: 11, color: "#0369A1", margin: 0 }}>
+                                  <p style={{ fontSize: 11, color: "#0C447C", margin: 0 }}>
                                     {ex.preauth_code ? `Accord : ${ex.preauth_code}` : "—"}
                                   </p>
-                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#0f2942", margin: 0 }}>
+                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#042C53", margin: 0 }}>
                                     {ex.estimated_amount != null ? fmt(ex.estimated_amount) : "—"}
                                   </p>
                                 </div>
@@ -253,10 +253,10 @@ export default function ProviderServices() {
                         {/* Sous-total combiné (consultation + examen) */}
                         {Number(svc.exams_total) > 0 && (
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, background: "#E0F2FE", border: "1px solid #BAE6FD", borderRadius: 8, padding: "8px 12px" }}>
-                            <p style={{ fontSize: 12, fontWeight: 800, color: "#0369A1", margin: 0 }}>
+                            <p style={{ fontSize: 12, fontWeight: 800, color: "#0C447C", margin: 0 }}>
                               Sous-total combiné (consultation + examen)
                             </p>
-                            <p style={{ fontSize: 13, fontWeight: 800, color: "#0f2942", margin: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 800, color: "#042C53", margin: 0 }}>
                               {fmt(svc.grand_total)}
                             </p>
                           </div>
@@ -271,7 +271,7 @@ export default function ProviderServices() {
                     )}
                     <button
                       onClick={e => { e.stopPropagation(); navigate(`/etablissement/medical/${svc.client_id}`); }}
-                      style={{ marginTop: 10, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#2563EB", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                      style={{ marginTop: 10, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#185FA5", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
                       📂 Voir dossier médical
                     </button>
                   </div>
@@ -302,5 +302,5 @@ const sty = {
   label:  { display: "block", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .6, marginBottom: 4 },
   input:  { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
   select: { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", background: "#fff" },
-  btn:    { background: "#0f2942", color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  btn:    { background: "#042C53", color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
 };

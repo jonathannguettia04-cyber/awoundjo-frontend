@@ -73,6 +73,21 @@ const EXAM_REQUIRED_CATEGORIES = [
   "consultation_urgence",
 ];
 
+// Catégories d'actes lourds : ne passent PAS par la validation directe (étape 3).
+// Elles sont déviées vers l'écran séparé "Accord préalable" (table prior_authorization_requests).
+// Doit rester synchronisé avec REQUIRES_PREAUTH_CATEGORIES côté providerController.js
+// (moins analyses_biologiques/radiologie_imagerie, déjà gérées par le circuit exam_requests existant).
+const PRIOR_AUTH_REQUIRED_CATEGORIES = [
+  "hospitalisation_hebergement",
+  "hospitalisation_chirurgie",
+  "maternite_chirurgicale",
+];
+
+function needsPriorAuth(entry) {
+  if (!entry) return false;
+  return entry.requires_preauth || PRIOR_AUTH_REQUIRED_CATEGORIES.includes(entry.category);
+}
+
 // ─── Composant principal ─────────────────────────────────────
 export default function ProviderScan() {
   const navigate  = useNavigate();
@@ -363,13 +378,13 @@ export default function ProviderScan() {
                 <div style={{
                   width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: 700,
-                  background: done ? "#22C55E" : active ? "#2563EB" : "#E2E8F0",
+                  background: done ? "#22C55E" : active ? "#185FA5" : "#E2E8F0",
                   color: done || active ? "#fff" : "#94A3B8",
                 }}>
                   {done ? "✓" : i + 1}
                 </div>
                 <div style={{ display: window.innerWidth < 480 ? "none" : "block" }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: active ? "#2563EB" : done ? "#22C55E" : "#94A3B8", margin: 0 }}>{s.label}</p>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: active ? "#185FA5" : done ? "#22C55E" : "#94A3B8", margin: 0 }}>{s.label}</p>
                   <p style={{ fontSize: 10, color: "#CBD5E1", margin: 0 }}>{s.sub}</p>
                 </div>
               </div>
@@ -406,7 +421,7 @@ export default function ProviderScan() {
           </form>
           <div style={{ marginTop: 16, padding: "12px 14px", background: "#F8FAFC", borderRadius: 10, fontSize: 12, color: "#64748B" }}>
             💡 Vous pouvez aussi scanner la carte de l'assuré via{" "}
-            <span style={{ color: "#2563EB", fontWeight: 700, cursor: "pointer" }} onClick={() => navigate("/etablissement/scan")}>
+            <span style={{ color: "#185FA5", fontWeight: 700, cursor: "pointer" }} onClick={() => navigate("/etablissement/scan")}>
               le lecteur QR
             </span>
           </div>
@@ -465,19 +480,19 @@ export default function ProviderScan() {
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             padding: "12px 16px", borderRadius: 12, border: "2px solid",
-                            borderColor: isSelected ? "#2563EB" : "#E2E8F0",
-                            background: isSelected ? "#EFF6FF" : "#fff",
+                            borderColor: isSelected ? (needsPriorAuth(entry) ? "#B45309" : "#185FA5") : "#E2E8F0",
+                            background: isSelected ? (needsPriorAuth(entry) ? "#FFF7ED" : "#EFF6FF") : "#fff",
                             cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                             transition: "all .15s",
                           }}>
                           <div>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: isSelected ? "#2563EB" : "#1E293B" }}>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: isSelected ? (needsPriorAuth(entry) ? "#B45309" : "#185FA5") : "#1E293B" }}>
                               {entry.label}
                             </p>
                             <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
                               {entry.code}
                               {entry.requires_prescription && " · 📄 Ordonnance requise"}
-                              {entry.requires_preauth && " · ⏳ Accord préalable"}
+                              {needsPriorAuth(entry) && " · ⏳ Accord préalable"}
                             </p>
                           </div>
                           {entry.cap_per_act && (
@@ -577,14 +592,38 @@ export default function ProviderScan() {
             </div>
           )}
 
+          {/* Acte lourd — accord préalable requis, pas de validation directe */}
+          {selectedCat && needsPriorAuth(selectedCat) && (
+            <div style={{ marginTop: 12, padding: "14px 16px", borderRadius: 14, background: "#FFF7ED", border: "1px solid #FDE1C1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 20 }}>⏳</span>
+                <p style={{ fontWeight: 700, color: "#B45309", margin: 0, fontSize: 13 }}>Accord préalable requis</p>
+              </div>
+              <p style={{ color: "#92400E", fontSize: 12, margin: 0 }}>
+                Cet acte (hospitalisation, césarienne, chirurgie…) ne peut pas être enregistré directement. Il doit d'abord faire l'objet d'une demande d'accord préalable validée par la mutuelle.
+              </p>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button onClick={() => setStep(1)} style={s.btnSecondary}>← Retour</button>
-            <button
-              onClick={() => setStep(3)}
-              disabled={!selectedCat || !eligibility?.eligible}
-              style={{ ...s.btnPrimary, flex: 1, opacity: (!selectedCat || !eligibility?.eligible) ? 0.5 : 1 }}>
-              Continuer →
-            </button>
+            {selectedCat && needsPriorAuth(selectedCat) ? (
+              <button
+                onClick={() => navigate("/etablissement/accord-prealable", {
+                  state: { client, dependent_id: client.dependent_id, catalog_code: selectedCat.code, act_label: selectedCat.label },
+                })}
+                disabled={!eligibility?.eligible}
+                style={{ ...s.btnPrimary, flex: 1, background: "linear-gradient(135deg,#B45309,#92400E)", opacity: !eligibility?.eligible ? 0.5 : 1 }}>
+                ⏳ Faire une demande d'accord préalable →
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep(3)}
+                disabled={!selectedCat || !eligibility?.eligible}
+                style={{ ...s.btnPrimary, flex: 1, opacity: (!selectedCat || !eligibility?.eligible) ? 0.5 : 1 }}>
+                Continuer →
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -595,8 +634,8 @@ export default function ProviderScan() {
           {/* Résumé acte */}
           <div style={{ ...s.card, marginBottom: 14, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 6px" }}>Acte sélectionné</p>
-            <p style={{ fontWeight: 800, color: "#1E40AF", margin: 0, fontSize: 14 }}>{selectedCat.label}</p>
-            <p style={{ color: "#3B82F6", fontSize: 11, margin: "2px 0 0", fontFamily: "monospace" }}>{selectedCat.code}</p>
+            <p style={{ fontWeight: 800, color: "#0C447C", margin: 0, fontSize: 14 }}>{selectedCat.label}</p>
+            <p style={{ color: "#185FA5", fontSize: 11, margin: "2px 0 0", fontFamily: "monospace" }}>{selectedCat.code}</p>
           </div>
 
           <div style={s.card}>
@@ -636,10 +675,10 @@ export default function ProviderScan() {
           {/* Répartition */}
           {amount > 0 && (
             <div style={{ ...s.card, marginTop: 14, background: "#E0F7FA", border: "none" }}>
-              <p style={{ fontWeight: 700, color: "#0f2942", fontSize: 13, margin: "0 0 10px" }}>Répartition</p>
+              <p style={{ fontWeight: 700, color: "#042C53", fontSize: 13, margin: "0 0 10px" }}>Répartition</p>
               {[
-                { label: "Coût total",                                   value: fmt(amount),      color: "#0f2942" },
-                { label: `Prise en charge mutuelle (${coveragePct}%)`,   value: fmt(mutualPart),  color: "#0097A7" },
+                { label: "Coût total",                                   value: fmt(amount),      color: "#042C53" },
+                { label: `Prise en charge mutuelle (${coveragePct}%)`,   value: fmt(mutualPart),  color: "#185FA5" },
                 { label: "Reste à charge patient",                       value: fmt(clientPart),  color: "#DC2626" },
               ].map((row, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < 2 ? "1px solid rgba(0,0,0,.06)" : "none" }}>
@@ -652,7 +691,7 @@ export default function ProviderScan() {
 
           {/* Avertissement examens */}
           {EXAM_REQUIRED_CATEGORIES.includes(selectedCat.category) && (
-            <div style={{ marginTop: 14, padding: "12px 16px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, fontSize: 13, color: "#1E40AF" }}>
+            <div style={{ marginTop: 14, padding: "12px 16px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, fontSize: 13, color: "#0C447C" }}>
               🔬 Vous pourrez prescrire des examens complémentaires après validation de cet acte.
             </div>
           )}
@@ -678,8 +717,8 @@ export default function ProviderScan() {
       {step === 4 && service && (
         <div>
           <div style={{ ...s.card, background: "#EFF6FF", border: "1px solid #BFDBFE", marginBottom: 16 }}>
-            <p style={{ fontWeight: 800, color: "#1E40AF", margin: "0 0 4px" }}>🔬 Examens complémentaires</p>
-            <p style={{ color: "#3B82F6", fontSize: 13, margin: 0 }}>
+            <p style={{ fontWeight: 800, color: "#0C447C", margin: "0 0 4px" }}>🔬 Examens complémentaires</p>
+            <p style={{ color: "#185FA5", fontSize: 13, margin: 0 }}>
               Sélectionnez les examens à prescrire. Chaque examen sera soumis comme demande d'accord préalable à la mutuelle.
             </p>
           </div>
@@ -746,7 +785,7 @@ export default function ProviderScan() {
                                     width: "100%", display: "flex", alignItems: "center", gap: 12,
                                     padding: "12px 14px", borderRadius: checked ? "12px 12px 0 0" : 12,
                                     border: "2px solid",
-                                    borderColor: checked ? "#2563EB" : "#E2E8F0",
+                                    borderColor: checked ? "#185FA5" : "#E2E8F0",
                                     borderBottom: checked ? "1px solid #BFDBFE" : "2px solid #E2E8F0",
                                     background: checked ? "#EFF6FF" : "#fff",
                                     cursor: "pointer", fontFamily: "inherit", textAlign: "left",
@@ -754,15 +793,15 @@ export default function ProviderScan() {
                                   }}>
                                   <div style={{
                                     width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                                    border: `2px solid ${checked ? "#2563EB" : "#CBD5E1"}`,
-                                    background: checked ? "#2563EB" : "#fff",
+                                    border: `2px solid ${checked ? "#185FA5" : "#CBD5E1"}`,
+                                    background: checked ? "#185FA5" : "#fff",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     fontSize: 12, color: "#fff",
                                   }}>
                                     {checked && "✓"}
                                   </div>
                                   <div style={{ flex: 1 }}>
-                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#1E40AF" : "#1E293B" }}>{entry.label}</p>
+                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#0C447C" : "#1E293B" }}>{entry.label}</p>
                                     <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
                                       {entry.code} · ⏳ Accord préalable mutuelle
                                     </p>
@@ -777,10 +816,10 @@ export default function ProviderScan() {
                                 {checked && (
                                   <div style={{
                                     padding: "10px 14px", background: "#EFF6FF",
-                                    border: "2px solid #2563EB", borderTop: "none",
+                                    border: "2px solid #185FA5", borderTop: "none",
                                     borderRadius: "0 0 12px 12px",
                                   }}>
-                                    <label style={{ ...s.label, color: "#2563EB" }}>Montant estimé (FCFA)</label>
+                                    <label style={{ ...s.label, color: "#185FA5" }}>Montant estimé (FCFA)</label>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                       <input
                                         type="number" min="0"
@@ -796,7 +835,7 @@ export default function ProviderScan() {
                                       )}
                                     </div>
                                     {plafond && (
-                                      <p style={{ fontSize: 11, color: "#3B82F6", margin: "4px 0 0" }}>
+                                      <p style={{ fontSize: 11, color: "#185FA5", margin: "4px 0 0" }}>
                                         Plafond prise en charge : {fmt(plafond)} · {soldeData?.coverage_pct ?? "—"}% couvert
                                       </p>
                                     )}
@@ -959,7 +998,7 @@ export default function ProviderScan() {
       {step === 6 && service && (
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <div style={{ fontSize: 64, marginBottom: 12 }}>✅</div>
-          <h2 style={{ color: "#0f2942", fontWeight: 800, margin: "0 0 6px" }}>Prise en charge validée</h2>
+          <h2 style={{ color: "#042C53", fontWeight: 800, margin: "0 0 6px" }}>Prise en charge validée</h2>
           <p style={{ color: "#64748B", fontSize: 14, margin: "0 0 24px" }}>
             L'acte a été enregistré avec succès dans le système Awoundjô.
           </p>
@@ -971,7 +1010,7 @@ export default function ProviderScan() {
               { label: "Acte",            value: selectedCat?.label },
               { label: "Code",            value: selectedCat?.code },
               { label: "Consultation",    value: fmt(service.total_amount) },
-              { label: "Part mutuelle",   value: fmt(service.mutual_part),  color: "#0097A7" },
+              { label: "Part mutuelle",   value: fmt(service.mutual_part),  color: "#185FA5" },
               { label: "Reste patient",   value: fmt(service.client_part),  color: "#DC2626" },
               { label: "Couverture",      value: `${service.coverage_pct}%` },
               ...(examDone ? [{ label: "Examens soumis", value: `🔬 ${examResults.length} demande(s) en accord préalable` }] : []),
@@ -1072,7 +1111,7 @@ const s = {
   stepDesc:   { fontSize: 14, color: "#64748B", margin: 0 },
   label:      { display: "block", fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 },
   input:      { width: "100%", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: "12px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box", color: "#1E293B" },
-  btnPrimary: { background: "linear-gradient(135deg,#2563EB,#1D4ED8)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  btnPrimary: { background: "linear-gradient(135deg,#185FA5,#0C447C)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
   btnSecondary:{ background: "#fff", color: "#475569", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "13px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   capRow:      { display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", padding: "4px 0", borderBottom: "1px solid rgba(0,0,0,.04)" },
 };

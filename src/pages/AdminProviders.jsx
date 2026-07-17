@@ -39,6 +39,13 @@ const EXAM_STATUS = {
   REJECTED:         { label: "Rejeté",      color: "#EF4444", bg: "#FEF2F2" },
   DONE:             { label: "Exécuté",     color: "#6366F1", bg: "#EEF2FF" },
 };
+// Accords préalables — actes lourds (hospitalisation, chirurgie, césarienne…)
+const PRIOR_STATUS = {
+  PENDING:  { label: "En attente",  color: "#F59E0B", bg: "#FFFBEB" },
+  APPROVED: { label: "Accordé",     color: "#22C55E", bg: "#F0FDF4" },
+  REJECTED: { label: "Rejeté",      color: "#EF4444", bg: "#FEF2F2" },
+  DONE:     { label: "Exécuté",     color: "#6366F1", bg: "#EEF2FF" },
+};
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 const adminProviderAPI = {
@@ -52,10 +59,14 @@ const adminProviderAPI = {
   getActes:         (id)            => api.get(`/provider/admin/providers/${id}/actes`),
   getInvoices:      ()              => api.get("/provider/admin/invoices"),
   payInvoice:       (id)            => api.post(`/provider/admin/invoices/${id}/pay`),
-  // ── Accords préalables ──────────────────────────────────────
+  // ── Accords préalables (examens) ────────────────────────────
   getExamRequests:  (status)        => api.get("/provider/admin/exam-requests", { params: { status } }),
   approveExam:      (id, notes)     => api.put(`/provider/admin/exam-requests/${id}/approve`, { approved_by: notes }),
   rejectExam:       (id, notes)     => api.put(`/provider/admin/exam-requests/${id}/reject`, { notes }),
+  // ── Accords préalables (actes lourds) ───────────────────────
+  getPriorAuth:     (status)        => api.get("/provider/admin/prior-auth", { params: { status } }),
+  approvePrior:     (id, notes)     => api.put(`/provider/admin/prior-auth/${id}/approve`, { approved_by: notes }),
+  rejectPrior:      (id, notes)     => api.put(`/provider/admin/prior-auth/${id}/reject`, { notes }),
 };
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -380,6 +391,122 @@ function ExamRequestRow({ exam, onApprove, onReject, processing }) {
   );
 }
 
+// ── PriorAuthRequestRow (actes lourds : hospitalisation, chirurgie, césarienne…) ──
+// NOTE : champs alignés sur le pattern exam-requests + le body documenté dans
+// providerRoutes.js (client_id, dependent_id, catalog_code, description,
+// estimated_amount, attachments). À ajuster si le controller renvoie des noms
+// différents pour adminGetPriorAuthRequests.
+function PriorAuthRequestRow({ req, onApprove, onReject, processing }) {
+  const [open, setOpen] = useState(false);
+  const s = PRIOR_STATUS[req.status] || PRIOR_STATUS.PENDING;
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors text-left">
+        <div className="w-11 h-11 rounded-xl bg-rose-50 flex items-center justify-center text-xl flex-shrink-0">
+          🏨
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-slate-800 truncate text-sm">{req.catalog_label || req.catalog_code}</p>
+          <p className="text-xs text-slate-400 truncate">
+            {req.client_name} · {req.mutual_number} · Établissement <span className="font-semibold">{req.provider_name}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs text-slate-400 hidden sm:block">{fmtDate(req.created_at)}</span>
+          <span style={{ background: s.bg, color: s.color }}
+            className="text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+            {s.label}
+          </span>
+          <span className="text-slate-300 text-xs">{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 border-t border-slate-50">
+          {/* Détail */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 mb-4">
+            {[
+              { label: "Patient",         value: `${req.client_name} (${req.mutual_number})` },
+              { label: "Formule",         value: req.client_plan || "—" },
+              { label: "Établissement",   value: `${req.provider_name} (${TYPE_LABELS[req.provider_type] || req.provider_type})` },
+              { label: "Date demande",    value: fmtDate(req.created_at) },
+              { label: "Acte",            value: req.catalog_label || req.catalog_code },
+              { label: "Montant estimé",  value: req.estimated_amount ? fmt(req.estimated_amount) : "—" },
+              { label: "Description",     value: req.description || "—" },
+              { label: "Expiration",      value: fmtDate(req.expires_at) },
+            ].map((f, i) => (
+              <div key={i}>
+                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-0.5">{f.label}</p>
+                <p className="text-sm font-semibold text-slate-700">{f.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Pièces jointes */}
+          {Array.isArray(req.attachments) && req.attachments.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Pièces jointes</p>
+              <div className="flex flex-wrap gap-2">
+                {req.attachments.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                    📎 Document {i + 1}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Code accord si approuvé */}
+          {req.status === "APPROVED" && req.preauth_code && (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+              <span className="text-xs font-bold text-green-700 uppercase tracking-wider">Code accord préalable</span>
+              <span className="font-mono font-bold text-green-800 bg-green-100 px-3 py-1 rounded-lg text-sm">
+                {req.preauth_code}
+              </span>
+            </div>
+          )}
+
+          {/* Notes rejet */}
+          {req.status === "REJECTED" && req.result_notes && (
+            <div className="bg-red-50 rounded-xl p-3 text-sm text-red-700 mb-4">
+              <span className="font-semibold">Motif : </span>{req.result_notes}
+            </div>
+          )}
+
+          {/* Résultat exécution */}
+          {req.status === "DONE" && (
+            <div className="bg-indigo-50 rounded-xl p-3 text-sm text-indigo-700 mb-4">
+              <p className="font-semibold mb-1">✅ Acte réalisé le {fmtDate(req.performed_at)}</p>
+              <p className="text-xs text-indigo-500 mb-1">Le montant réel facturé est visible dans l'onglet Facturation (associé à l'acte créé dans provider_services).</p>
+              {req.result_notes && <p className="text-xs">{req.result_notes}</p>}
+            </div>
+          )}
+
+          {/* Actions — seulement si en attente */}
+          {req.status === "PENDING" && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => onApprove(req)}
+                disabled={processing}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60">
+                {processing ? "Traitement…" : "✅ Accorder l'accord préalable"}
+              </button>
+              <button
+                onClick={() => onReject(req)}
+                disabled={processing}
+                className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 rounded-xl text-sm transition-colors border border-red-200 disabled:opacity-60">
+                ❌ Refuser
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function AdminProviders() {
   const [tab,         setTab]        = useState("requests");
@@ -390,12 +517,16 @@ export default function AdminProviders() {
   const [invoices,    setInvoices]   = useState([]);
   const [examRequests,setExamReqs]   = useState([]);
   const [examPendingCount, setExamPendingCount] = useState(0);
+  const [priorStatus,  setPriorStatus]  = useState("PENDING");
+  const [priorRequests,setPriorReqs]    = useState([]);
+  const [priorPendingCount, setPriorPendingCount] = useState(0);
   const [loading,     setLoading]    = useState(false);
   const [selected,    setSelected]   = useState(null);
   const [rejectNote,  setRejectNote] = useState("");
   const [modal,       setModal]      = useState(null);
   const [detailModal, setDetailModal]= useState(null);
   const [examRejectModal, setExamRejectModal] = useState(null); // { exam }
+  const [priorRejectModal, setPriorRejectModal] = useState(null); // { req }
   const [processing,  setProcessing] = useState(false);
   const [error,       setError]      = useState("");
   const [success,     setSuccess]    = useState("");
@@ -449,12 +580,29 @@ export default function AdminProviders() {
     finally { setLoading(false); }
   }
 
+  async function loadPriorAuthRequests() {
+    setLoading(true);
+    try {
+      const { data } = await adminProviderAPI.getPriorAuth(priorStatus);
+      setPriorReqs(data.prior_auth_requests || []);
+      // Badge header : toujours recharger le count des PENDING
+      if (priorStatus !== "PENDING") {
+        const { data: pd } = await adminProviderAPI.getPriorAuth("PENDING");
+        setPriorPendingCount((pd.prior_auth_requests || []).length);
+      } else {
+        setPriorPendingCount((data.prior_auth_requests || []).length);
+      }
+    } catch { setError("Erreur chargement accords préalables (actes lourds)"); }
+    finally { setLoading(false); }
+  }
+
   useEffect(() => {
     loadProviders();
     if (tab === "requests")  loadRequests();
     if (tab === "invoices")  loadInvoices();
     if (tab === "exams")     loadExamRequests();
-  }, [tab, reqStatus, examStatus]);
+    if (tab === "priorauth") loadPriorAuthRequests();
+  }, [tab, reqStatus, examStatus, priorStatus]);
 
   // ── KPIs ──────────────────────────────────────────────────
   const kpis = useMemo(() => {
@@ -463,8 +611,9 @@ export default function AdminProviders() {
     const montantMonth= providers.reduce((s, p) => s + Number(p.montant_month|| 0), 0);
     const pendingReq  = requests.filter(r => r.status === "PENDING").length;
     const pendingExams= examPendingCount;
-    return { active, total: providers.length, actesMonth, montantMonth, pendingReq, pendingExams };
-  }, [providers, requests, examRequests, examPendingCount]);
+    const pendingPrior= priorPendingCount;
+    return { active, total: providers.length, actesMonth, montantMonth, pendingReq, pendingExams, pendingPrior };
+  }, [providers, requests, examRequests, examPendingCount, priorRequests, priorPendingCount]);
 
   const maxActes = useMemo(() =>
     Math.max(1, ...providers.map(p => Number(p.actes_month || 0))), [providers]);
@@ -563,6 +712,30 @@ export default function AdminProviders() {
     } finally { setProcessing(false); }
   }
 
+  async function handleApprovePrior(req) {
+    setProcessing(true); setError("");
+    try {
+      const { data } = await adminProviderAPI.approvePrior(req.id, "admin");
+      setSuccess(`Accord préalable (acte lourd) accordé — code : ${data.preauth_code}`);
+      loadPriorAuthRequests();
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur accord préalable");
+    } finally { setProcessing(false); }
+  }
+
+  async function handleRejectPrior() {
+    if (!priorRejectModal) return;
+    setProcessing(true); setError("");
+    try {
+      await adminProviderAPI.rejectPrior(priorRejectModal.req.id, rejectNote);
+      setSuccess("Demande d'accord préalable (acte lourd) rejetée");
+      setPriorRejectModal(null); setRejectNote("");
+      loadPriorAuthRequests();
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur rejet accord préalable");
+    } finally { setProcessing(false); }
+  }
+
   // ── Render ─────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
@@ -588,15 +761,23 @@ export default function AdminProviders() {
               <span className="text-indigo-700 text-sm font-medium">accord(s) à valider</span>
             </button>
           )}
+          {kpis.pendingPrior > 0 && (
+            <button onClick={() => { setTab("priorauth"); setPriorStatus("PENDING"); }}
+              className="bg-rose-100 border border-rose-200 rounded-xl px-4 py-2 flex items-center gap-2 hover:bg-rose-200 transition-colors">
+              <span className="text-rose-600 font-bold text-lg">{kpis.pendingPrior}</span>
+              <span className="text-rose-700 text-sm font-medium">acte(s) lourd(s) à valider</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         <KpiCard icon="🏥" label="Établissements actifs" value={`${kpis.active} / ${kpis.total}`} accent="#6366F1" />
         <KpiCard icon="📋" label="Actes ce mois"         value={kpis.actesMonth.toLocaleString("fr-FR")} accent="#22C55E" />
         <KpiCard icon="💰" label="Montant engagé"        value={fmt(kpis.montantMonth)} sub="mois en cours" accent="#F59E0B" />
         <KpiCard icon="🔬" label="Accords à valider"     value={kpis.pendingExams} accent="#6366F1" />
+        <KpiCard icon="🏨" label="Actes lourds à valider" value={kpis.pendingPrior} accent="#F43F5E" />
       </div>
 
       {/* Alerts */}
@@ -609,6 +790,7 @@ export default function AdminProviders() {
           { id: "requests",  label: "📋 Demandes d'accès" },
           { id: "providers", label: "🏥 Établissements" },
           { id: "exams",     label: "🔬 Accords préalables", badge: kpis.pendingExams },
+          { id: "priorauth", label: "🏨 Actes lourds",       badge: kpis.pendingPrior },
           { id: "invoices",  label: "💳 Factures" },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -884,6 +1066,65 @@ export default function AdminProviders() {
           {examRequests.length > 0 && (
             <p className="text-xs text-slate-400 mt-3 text-right">
               {examRequests.length} demande{examRequests.length > 1 ? "s" : ""}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          TAB : ACTES LOURDS (accord préalable hospitalisation/chirurgie)
+      ══════════════════════════════════════════════════════════ */}
+      {tab === "priorauth" && (
+        <>
+          {/* Filtres statut */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {Object.entries(PRIOR_STATUS).map(([key, val]) => (
+              <button key={key} onClick={() => setPriorStatus(key)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${priorStatus === key ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200"}`}>
+                {val.label}
+              </button>
+            ))}
+          </div>
+
+          {/* KPI mini row */}
+          {(() => {
+            const pending  = priorPendingCount;
+            const approved = priorStatus === "APPROVED" ? priorRequests.length : "—";
+            const done     = priorStatus === "DONE"     ? priorRequests.length : "—";
+            const rejected = priorStatus === "REJECTED" ? priorRequests.length : "—";
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <KpiCard icon="⏳" label="En attente"  value={pending}  accent="#F59E0B" />
+                <KpiCard icon="✅" label="Accordés"    value={approved} accent="#22C55E" />
+                <KpiCard icon="🏨" label="Exécutés"    value={done}     accent="#6366F1" />
+                <KpiCard icon="❌" label="Refusés"     value={rejected} accent="#EF4444" />
+              </div>
+            );
+          })()}
+
+          {loading ? (
+            <div className="text-center py-16 text-slate-400">Chargement…</div>
+          ) : priorRequests.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 text-slate-400">
+              <p className="text-4xl mb-3">🏨</p>
+              <p>Aucune demande d'acte lourd {PRIOR_STATUS[priorStatus]?.label.toLowerCase()}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {priorRequests.map(req => (
+                <PriorAuthRequestRow
+                  key={req.id}
+                  req={req}
+                  onApprove={handleApprovePrior}
+                  onReject={(r) => { setPriorRejectModal({ req: r }); setRejectNote(""); }}
+                  processing={processing}
+                />
+              ))}
+            </div>
+          )}
+          {priorRequests.length > 0 && (
+            <p className="text-xs text-slate-400 mt-3 text-right">
+              {priorRequests.length} demande{priorRequests.length > 1 ? "s" : ""}
             </p>
           )}
         </>
@@ -1188,6 +1429,37 @@ export default function AdminProviders() {
                 Annuler
               </button>
               <button onClick={handleRejectExam} disabled={processing}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors disabled:opacity-60">
+                {processing ? "Rejet…" : "❌ Confirmer le refus"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject accord préalable — actes lourds */}
+      {priorRejectModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-bold text-slate-800 text-lg mb-2">Refuser l'accord préalable (acte lourd)</h3>
+            <div className="bg-red-50 rounded-xl p-4 mb-4">
+              <p className="font-semibold text-slate-800">{priorRejectModal.req.catalog_label || priorRejectModal.req.catalog_code}</p>
+              <p className="text-sm text-slate-500">{priorRejectModal.req.client_name} · {priorRejectModal.req.provider_name}</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Motif du refus (optionnel)
+              </label>
+              <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                placeholder="Ex : Non couvert par la formule, quota atteint…"
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none" rows={3} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setPriorRejectModal(null); setRejectNote(""); }}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm">
+                Annuler
+              </button>
+              <button onClick={handleRejectPrior} disabled={processing}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors disabled:opacity-60">
                 {processing ? "Rejet…" : "❌ Confirmer le refus"}
               </button>

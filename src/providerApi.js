@@ -91,6 +91,24 @@ export const providerExamAPI = {
   create:  (data)   => providerApi.post("/exam-requests", data),
   getAll:  (params) => providerApi.get("/exam-requests", { params }),
   getById: (id)     => providerApi.get(`/exam-requests/${id}`),
+  // Exécution : analyses_biologiques → { nb_b, doctor_id?, result_notes? } (montant imposé serveur)
+  //             autres catégories     → { total_amount, doctor_id?, result_notes? }
+  perform: (id, data) => providerApi.post(`/exam-requests/${id}/perform`, data),
+};
+
+// ── Accords préalables — actes lourds (hospitalisation, chirurgie, césarienne) ──
+export const providerPriorAuthAPI = {
+  create:  (data)   => providerApi.post("/prior-auth", data),
+  getAll:  (params) => providerApi.get("/prior-auth", { params }),
+  // data = { total_amount, doctor_id?, result_notes? }
+  perform: (id, data) => providerApi.post(`/prior-auth/${id}/execute`, data),
+};
+
+// ── Médecins / prescripteurs enregistrés par l'établissement ────
+export const providerDoctorsAPI = {
+  getAll: (active) => providerApi.get("/doctors", { params: active !== undefined ? { active } : {} }),
+  create: (data)   => providerApi.post("/doctors", data),
+  update: (id, data) => providerApi.patch(`/doctors/${id}`, data),
 };
 
 // ── Dossier médical ───────────────────────────────────────────
