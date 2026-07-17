@@ -1,0 +1,71 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#0A3A66"/>
+      <stop offset="45%" stop-color="#0C447C"/>
+      <stop offset="100%" stop-color="#042C53"/>
+    </linearGradient>
+
+    <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#3B8FD6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#3B8FD6" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#185FA5" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#185FA5" stop-opacity="0"/>
+    </radialGradient>
+
+    <pattern id="dots" width="46" height="46" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#FFFFFF" opacity="0.06"/>
+    </pattern>
+
+    <linearGradient id="lineFade" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond de base -->
+  <rect width="1920" height="1080" fill="url(#base)"/>
+  <rect width="1920" height="1080" fill="url(#dots)"/>
+
+  <!-- Halos lumineux -->
+  <circle cx="1550" cy="180" r="480" fill="url(#glow1)"/>
+  <circle cx="280" cy="900" r="520" fill="url(#glow2)"/>
+  <circle cx="960" cy="1080" r="380" fill="url(#glow1)"/>
+
+  <!-- Ligne de battement cardiaque, discrète, en haut -->
+  <path d="M -50 220 L 300 220 L 340 140 L 400 300 L 460 40 L 520 220 L 1970 220"
+        stroke="url(#lineFade)" stroke-width="2.5" fill="none" opacity="0.5"/>
+
+  <!-- Ligne de battement cardiaque, bas -->
+  <path d="M -50 900 L 1400 900 L 1440 800 L 1500 990 L 1560 700 L 1620 900 L 1970 900"
+        stroke="url(#lineFade)" stroke-width="2.5" fill="none" opacity="0.4"/>
+
+  <!-- Croix médicales flottantes, très subtiles -->
+  <g opacity="0.07" fill="#FFFFFF">
+    <path d="M180 300 h26 v26 h26 v26 h-26 v26 h-26 v-26 h-26 v-26 h26 z"/>
+    <path d="M1700 560 h34 v34 h34 v34 h-34 v34 h-34 v-34 h-34 v-34 h34 z"/>
+    <path d="M1080 900 h20 v20 h20 v20 h-20 v20 h-20 v-20 h-20 v-20 h20 z"/>
+    <path d="M420 760 h22 v22 h22 v22 h-22 v22 h-22 v-22 h-22 v-22 h22 z"/>
+  </g>
+
+  <!-- Cercles concentriques, motif molécule / réseau de soin -->
+  <g opacity="0.10" stroke="#FFFFFF" fill="none" stroke-width="1.5">
+    <circle cx="1620" cy="820" r="60"/>
+    <circle cx="1620" cy="820" r="110"/>
+    <circle cx="1620" cy="820" r="160"/>
+    <line x1="1620" y1="660" x2="1620" y2="980" stroke-opacity="0.5"/>
+    <line x1="1460" y1="820" x2="1780" y2="820" stroke-opacity="0.5"/>
+  </g>
+
+  <g opacity="0.09" stroke="#FFFFFF" fill="none" stroke-width="1.5">
+    <circle cx="230" cy="160" r="50"/>
+    <circle cx="230" cy="160" r="92"/>
+  </g>
+
+  <!-- Vignette pour assombrir légèrement les bords -->
+  <rect width="1920" height="1080" fill="url(#base)" opacity="0" />
+</svg>

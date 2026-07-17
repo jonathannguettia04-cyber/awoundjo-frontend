@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import {
   providerClientAPI, providerServiceAPI,
   providerCatalogAPI, providerPrescriptionAPI,
-  providerExamAPI,
+  providerExamAPI, providerDoctorsAPI,
   getProviderData,
 } from "../../providerApi";
 
@@ -56,6 +56,24 @@ const PRESCRIPTION_REQUIRED_CATEGORIES = [
   "maternite_multiple",
   "maternite_chirurgicale",
 ];
+
+const BENEFICIARY_LABELS = {
+  principal: { label: "Titulaire principal", icon: "👤" },
+  spouse:    { label: "Conjoint(e)",         icon: "💍" },
+  child:     { label: "Enfant à charge",     icon: "🧒" },
+  other:     { label: "Ayant droit",         icon: "👥" },
+};
+
+const STATUS_LABELS = {
+  actif:    { label: "Actif",    color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0" },
+  active:   { label: "Actif",    color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0" },
+  ACTIVE:   { label: "Actif",    color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0" },
+  suspendu: { label: "Suspendu", color: "#B45309", bg: "#FFFBEB", border: "#FCD34D" },
+  inactif:  { label: "Inactif",  color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+};
+function statusMeta(status) {
+  return STATUS_LABELS[status] || { label: status || "—", color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" };
+}
 
 const STEPS = [
   { n: 1, label: "Identification",  sub: "Trouver l'assuré" },
@@ -109,7 +127,8 @@ export default function ProviderScan() {
 
   // Acte
   const [description, setDescription]= useState("");
-  const [doctorName,  setDoctorName]  = useState("");
+  const [doctors,     setDoctors]     = useState([]);
+  const [doctorId,    setDoctorId]    = useState("");
   const [totalAmount, setTotalAmount]= useState("");
   const [saving,      setSaving]     = useState(false);
   const [service,     setService]    = useState(null);
@@ -144,6 +163,13 @@ export default function ProviderScan() {
       .catch(() => setError("Impossible de charger le catalogue des actes"))
       .finally(() => setCatLoading(false));
   }, [client]);
+
+  // ── Chargement de la liste des médecins/prescripteurs de l'établissement ──
+  useEffect(() => {
+    providerDoctorsAPI.getAll(true)
+      .then(r => setDoctors(r.data.doctors || []))
+      .catch(() => {});
+  }, []);
 
   // ── Chargement catalogue examens quand service créé ─────
   useEffect(() => {
@@ -205,7 +231,7 @@ export default function ProviderScan() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!client || !selectedCat || !totalAmount) return;
-    if (!doctorName.trim()) { setError("Le nom du praticien est obligatoire"); return; }
+    if (!doctorId) { setError("Le médecin / praticien est obligatoire"); return; }
     setSaving(true); setError("");
     try {
       const { data } = await providerServiceAPI.create({
@@ -213,7 +239,7 @@ export default function ProviderScan() {
         dependent_id: client.dependent_id,
         catalog_code: selectedCat.code,
         description,
-        doctor_name:  doctorName.trim(),
+        doctor_id:    doctorId,
         total_amount: Number(totalAmount),
       });
       setService(data.service);
@@ -325,7 +351,7 @@ export default function ProviderScan() {
   function reset() {
     setStep(1); setQuery(""); setClient(null); setEligibility(null);
     setCatalog([]); setSelectedCat(null); setError("");
-    setDescription(""); setDoctorName(""); setTotalAmount(""); setService(null);
+    setDescription(""); setDoctorId(""); setTotalAmount(""); setService(null);
     setPrescription(""); setPrescDone(false); setPrescriptionRequired(false);
     setExamRequired(false); setExamCatalog([]); setExamSelected([]); setExamPrices({});
     setExamAutre({ active: false, nom: "", prix: "" });
@@ -432,22 +458,11 @@ export default function ProviderScan() {
       {step === 2 && client && (
         <div>
           {/* Fiche assuré */}
-          <div style={{ ...s.card, display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 13, background: planConfig?.bg, border: `2px solid ${planConfig?.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 20, color: planConfig?.color, flexShrink: 0 }}>
-              {client.name?.charAt(0)}
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 800, color: "#0F172A", margin: "0 0 4px", fontSize: 15 }}>{client.name}</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, fontFamily: "monospace", background: "#F1F5F9", color: "#475569", padding: "2px 8px", borderRadius: 6 }}>{client.mutual_number}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: planConfig?.bg, color: planConfig?.color }}>
-                  {PLAN_CONFIG[client.plan]?.label || client.plan}
-                </span>
-              </div>
-            </div>
-            <button onClick={() => { setClient(null); setStep(1); setSelectedCat(null); setEligibility(null); }}
-              style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 18 }}>✕</button>
-          </div>
+          <ClientCard
+            client={client}
+            planConfig={planConfig}
+            onClear={() => { setClient(null); setStep(1); setSelectedCat(null); setEligibility(null); }}
+          />
 
           {/* Message restriction BASIQUE */}
           {client.plan === "BASIQUE" && (
@@ -465,48 +480,48 @@ export default function ProviderScan() {
               <p>Aucun acte disponible pour ce profil</p>
             </div>
           ) : (
-            Object.entries(catalogByCategory).map(([category, entries]) => {
-              const catInfo = CATEGORY_LABELS[category] || { icon: "📋", label: category };
-              return (
-                <div key={category} style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
-                    {catInfo.icon} {catInfo.label}
+            <div style={s.card}>
+              <label style={s.label}>Acte à réaliser *</label>
+              <select
+                value={selectedCat?.code || ""}
+                onChange={e => {
+                  const entry = catalog.find(c => c.code === e.target.value);
+                  if (entry) handleSelectAct(entry);
+                }}
+                style={{ ...s.input, background: "#fff" }}>
+                <option value="">— Sélectionner un acte —</option>
+                {Object.entries(catalogByCategory).map(([category, entries]) => {
+                  const catInfo = CATEGORY_LABELS[category] || { icon: "📋", label: category };
+                  return (
+                    <optgroup key={category} label={`${catInfo.icon} ${catInfo.label}`}>
+                      {entries.map(entry => (
+                        <option key={entry.code} value={entry.code}>
+                          {entry.label} ({entry.code}){entry.cap_per_act ? ` — max ${fmt(entry.cap_per_act)}` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+
+              {/* Détail de l'acte sélectionné */}
+              {selectedCat && (
+                <div style={{
+                  marginTop: 14, padding: "12px 14px", borderRadius: 12,
+                  background: needsPriorAuth(selectedCat) ? "#FFF7ED" : "#EFF6FF",
+                  border: `1px solid ${needsPriorAuth(selectedCat) ? "#FDE1C1" : "#BFDBFE"}`,
+                }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: needsPriorAuth(selectedCat) ? "#B45309" : "#0C447C" }}>
+                    {selectedCat.label}
                   </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {entries.map(entry => {
-                      const isSelected = selectedCat?.code === entry.code;
-                      return (
-                        <button key={entry.code} onClick={() => handleSelectAct(entry)}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px 16px", borderRadius: 12, border: "2px solid",
-                            borderColor: isSelected ? (needsPriorAuth(entry) ? "#B45309" : "#185FA5") : "#E2E8F0",
-                            background: isSelected ? (needsPriorAuth(entry) ? "#FFF7ED" : "#EFF6FF") : "#fff",
-                            cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                            transition: "all .15s",
-                          }}>
-                          <div>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: isSelected ? (needsPriorAuth(entry) ? "#B45309" : "#185FA5") : "#1E293B" }}>
-                              {entry.label}
-                            </p>
-                            <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
-                              {entry.code}
-                              {entry.requires_prescription && " · 📄 Ordonnance requise"}
-                              {needsPriorAuth(entry) && " · ⏳ Accord préalable"}
-                            </p>
-                          </div>
-                          {entry.cap_per_act && (
-                            <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap", marginLeft: 8 }}>
-                              max {fmt(entry.cap_per_act)}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: needsPriorAuth(selectedCat) ? "#92400E" : "#185FA5", fontFamily: "monospace" }}>
+                    {selectedCat.code}
+                    {selectedCat.requires_prescription && " · 📄 Ordonnance requise"}
+                    {needsPriorAuth(selectedCat) && " · ⏳ Accord préalable"}
+                  </p>
                 </div>
-              );
-            })
+              )}
+            </div>
           )}
 
           {/* Éligibilité pour l'acte sélectionné */}
@@ -640,13 +655,23 @@ export default function ProviderScan() {
 
           <div style={s.card}>
             <div style={{ marginBottom: 16 }}>
-              <label style={s.label}>Nom du praticien *</label>
-              <input
+              <label style={s.label}>Médecin / praticien *</label>
+              <select
                 required
-                value={doctorName} onChange={e => setDoctorName(e.target.value)}
-                placeholder="Dr. Konan Aya, Infirmier Bamba…"
-                style={{ ...s.input }}
-              />
+                value={doctorId} onChange={e => setDoctorId(e.target.value)}
+                style={{ ...s.input, background: "#fff" }}>
+                <option value="">— Sélectionner —</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name}{d.specialty ? ` · ${d.specialty}` : ""}
+                  </option>
+                ))}
+              </select>
+              {doctors.length === 0 && (
+                <p style={{ fontSize: 11, color: "#94A3B8", margin: "6px 0 0" }}>
+                  Aucun médecin enregistré — ajoutez-en un dans "Mon équipe médicale"
+                </p>
+              )}
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={s.label}>Description / détail de l'acte</label>
@@ -705,8 +730,8 @@ export default function ProviderScan() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button type="button" onClick={() => setStep(2)} style={s.btnSecondary}>← Retour</button>
-            <button type="submit" disabled={saving || !totalAmount}
-              style={{ ...s.btnPrimary, flex: 1, opacity: !totalAmount ? 0.5 : 1 }}>
+            <button type="submit" disabled={saving || !totalAmount || !doctorId}
+              style={{ ...s.btnPrimary, flex: 1, opacity: (!totalAmount || !doctorId) ? 0.5 : 1 }}>
               {saving ? <><Spinner /> Enregistrement…</> : "✅ Valider l'acte"}
             </button>
           </div>
@@ -723,10 +748,9 @@ export default function ProviderScan() {
             </p>
           </div>
 
-          <div style={s.card}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 6px" }}>Patient</p>
-            <p style={{ fontWeight: 700, color: "#0F172A", margin: "0 0 16px" }}>{client?.name} — {client?.mutual_number}</p>
+          {client && <ClientCard client={client} planConfig={planConfig} />}
 
+          <div style={s.card}>
             <form onSubmit={handleExams}>
               {examCatalog.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8", fontSize: 13 }}>
@@ -740,6 +764,8 @@ export default function ProviderScan() {
                     if (!entries.length) return null;
                     const catInfo = { analyses_biologiques: { icon: "🔬", label: "Analyses biologiques" }, radiologie_imagerie: { icon: "🩻", label: "Radiologie / Imagerie" } }[cat];
                     const solde = examSoldes[cat];
+                    const availableEntries = entries.filter(e => !examSelected.includes(e.code));
+                    const selectedEntries  = entries.filter(e => examSelected.includes(e.code));
                     return (
                       <div key={cat} style={{ marginBottom: 16 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -773,74 +799,66 @@ export default function ProviderScan() {
                             </span>
                           )}
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {entries.map(entry => {
-                            const checked = examSelected.includes(entry.code);
+
+                        {/* Select pour ajouter un examen de cette catégorie */}
+                        {availableEntries.length > 0 && (
+                          <select
+                            value=""
+                            onChange={e => { if (e.target.value) toggleExam(e.target.value); }}
+                            style={{ ...s.input, background: "#fff", marginBottom: 10 }}>
+                            <option value="">+ Ajouter un examen…</option>
+                            {availableEntries.map(entry => (
+                              <option key={entry.code} value={entry.code}>
+                                {entry.label} ({entry.code})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {/* Examens ajoutés dans cette catégorie */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {selectedEntries.map(entry => {
                             const soldeData = examSoldes[entry.category];
                             const plafond = entry.cap_per_person_annual || entry.cap_annual || null;
                             return (
-                              <div key={entry.code}>
-                                <button type="button" onClick={() => toggleExam(entry.code)}
-                                  style={{
-                                    width: "100%", display: "flex", alignItems: "center", gap: 12,
-                                    padding: "12px 14px", borderRadius: checked ? "12px 12px 0 0" : 12,
-                                    border: "2px solid",
-                                    borderColor: checked ? "#185FA5" : "#E2E8F0",
-                                    borderBottom: checked ? "1px solid #BFDBFE" : "2px solid #E2E8F0",
-                                    background: checked ? "#EFF6FF" : "#fff",
-                                    cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                                    transition: "all .15s",
-                                  }}>
-                                  <div style={{
-                                    width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                                    border: `2px solid ${checked ? "#185FA5" : "#CBD5E1"}`,
-                                    background: checked ? "#185FA5" : "#fff",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontSize: 12, color: "#fff",
-                                  }}>
-                                    {checked && "✓"}
-                                  </div>
+                              <div key={entry.code} style={{
+                                padding: "12px 14px", borderRadius: 12,
+                                border: "2px solid #185FA5", background: "#EFF6FF",
+                              }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                                   <div style={{ flex: 1 }}>
-                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: checked ? "#0C447C" : "#1E293B" }}>{entry.label}</p>
+                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0C447C" }}>{entry.label}</p>
                                     <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
                                       {entry.code} · ⏳ Accord préalable mutuelle
                                     </p>
                                   </div>
-                                  {plafond && (
-                                    <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
-                                      plafond {fmt(plafond)}
-                                    </span>
-                                  )}
-                                </button>
-                                {/* Champ prix — visible si sélectionné */}
-                                {checked && (
-                                  <div style={{
-                                    padding: "10px 14px", background: "#EFF6FF",
-                                    border: "2px solid #185FA5", borderTop: "none",
-                                    borderRadius: "0 0 12px 12px",
-                                  }}>
-                                    <label style={{ ...s.label, color: "#185FA5" }}>Montant estimé (FCFA)</label>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <input
-                                        type="number" min="0"
-                                        value={examPrices[entry.code] || ""}
-                                        onChange={ev => setExamPrices(prev => ({ ...prev, [entry.code]: ev.target.value }))}
-                                        placeholder="Ex : 8 000"
-                                        style={{ ...s.input, fontSize: 15, fontWeight: 700, flex: 1 }}
-                                      />
-                                      {plafond && examPrices[entry.code] && Number(examPrices[entry.code]) > plafond && (
-                                        <span style={{ fontSize: 11, color: "#DC2626", whiteSpace: "nowrap" }}>
-                                          ⚠️ Dépasse le plafond
-                                        </span>
-                                      )}
-                                    </div>
-                                    {plafond && (
-                                      <p style={{ fontSize: 11, color: "#185FA5", margin: "4px 0 0" }}>
-                                        Plafond prise en charge : {fmt(plafond)} · {soldeData?.coverage_pct ?? "—"}% couvert
-                                      </p>
+                                  <button type="button" onClick={() => toggleExam(entry.code)}
+                                    style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>
+                                    ✕
+                                  </button>
+                                </div>
+                                <div style={{ marginTop: 10 }}>
+                                  <label style={{ ...s.label, color: "#185FA5" }}>Montant estimé (FCFA)</label>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <input
+                                      type="number" min="0"
+                                      value={examPrices[entry.code] || ""}
+                                      onChange={ev => setExamPrices(prev => ({ ...prev, [entry.code]: ev.target.value }))}
+                                      placeholder="Ex : 8 000"
+                                      style={{ ...s.input, fontSize: 15, fontWeight: 700, flex: 1 }}
+                                    />
+                                    {plafond && examPrices[entry.code] && Number(examPrices[entry.code]) > plafond && (
+                                      <span style={{ fontSize: 11, color: "#DC2626", whiteSpace: "nowrap" }}>
+                                        ⚠️ Dépasse le plafond
+                                      </span>
                                     )}
                                   </div>
-                                )}
+                                  {plafond && (
+                                    <p style={{ fontSize: 11, color: "#185FA5", margin: "4px 0 0" }}>
+                                      Plafond prise en charge : {fmt(plafond)} · {soldeData?.coverage_pct ?? "—"}% couvert
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
@@ -965,10 +983,9 @@ export default function ProviderScan() {
             </p>
           </div>
 
-          <div style={s.card}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 6px" }}>Patient</p>
-            <p style={{ fontWeight: 700, color: "#0F172A", margin: "0 0 16px" }}>{client?.name} — {client?.mutual_number}</p>
+          {client && <ClientCard client={client} planConfig={planConfig} />}
 
+          <div style={s.card}>
             <form onSubmit={handlePrescription}>
               <label style={s.label}>Contenu de l'ordonnance *</label>
               <textarea
@@ -1098,6 +1115,63 @@ export default function ProviderScan() {
 }
 
 // ─── Sous-composants ─────────────────────────────────────────
+function ClientCard({ client, planConfig, onClear }) {
+  const bMeta = BENEFICIARY_LABELS[client.beneficiary_type] || BENEFICIARY_LABELS.other;
+  const sMeta = statusMeta(client.status);
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg,#FFFFFF,#F8FAFC)",
+      border: `1.5px solid ${planConfig?.border || "#E2E8F0"}`,
+      borderRadius: 18, padding: "20px 22px", marginBottom: 16,
+      boxShadow: "0 1px 3px rgba(15,23,42,.04)",
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 16, flexShrink: 0,
+          background: planConfig?.bg, border: `2px solid ${planConfig?.border}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontWeight: 900, fontSize: 22, color: planConfig?.color,
+        }}>
+          {client.name?.charAt(0)?.toUpperCase()}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+            <p style={{ fontWeight: 800, color: "#0F172A", margin: 0, fontSize: 17 }}>{client.name}</p>
+            <span style={{ fontSize: 11, fontWeight: 700, color: sMeta.color, background: sMeta.bg, border: `1px solid ${sMeta.border}`, padding: "2px 9px", borderRadius: 999 }}>
+              {sMeta.label}
+            </span>
+          </div>
+
+          <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>
+            {bMeta.icon} {bMeta.label}
+          </p>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, background: "#F1F5F9", color: "#475569", padding: "4px 10px", borderRadius: 8 }}>
+              🪪 {client.mutual_number}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8, background: planConfig?.bg, color: planConfig?.color, border: `1px solid ${planConfig?.border}` }}>
+              ⭐ Formule {planConfig?.label}
+            </span>
+            {client.phone && (
+              <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, background: "#F8FAFC", color: "#475569", border: "1px solid #E2E8F0" }}>
+                📞 {client.phone}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {onClear && (
+          <button onClick={onClear}
+            style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 18, flexShrink: 0 }}>✕</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Spinner() {
   return (
     <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,.4)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
