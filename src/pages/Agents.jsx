@@ -19,6 +19,7 @@ function getCreatableRoles(userRole) {
       { value: "RESPONSABLE_COMMERCIAL", label: "Responsable Commercial" },
       { value: "CONSEILLERE_CLIENTELE",  label: "Conseillère Clientèle" },
       { value: "APPORTEUR_AFFAIRES",     label: "Apporteur d'Affaires" },
+      { value: "COMMUNITY_MANAGER",      label: "Community Manager" },
     ];
   }
   if (userRole === "RESPONSABLE_COMMERCIAL") {
@@ -306,7 +307,7 @@ export default function Agents() {
                       className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer text-center
                         ${form.role === r.value ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-slate-300"}`}>
                       <span className="text-xl">
-                        {r.value === "AGENT" ? "🧑‍💼" : r.value === "RESPONSABLE_COMMERCIAL" ? "💼" : r.value === "APPORTEUR_AFFAIRES" ? "🤝" : "💁‍♀️"}
+                        {r.value === "AGENT" ? "🧑‍💼" : r.value === "RESPONSABLE_COMMERCIAL" ? "💼" : r.value === "APPORTEUR_AFFAIRES" ? "🤝" : r.value === "COMMUNITY_MANAGER" ? "📣" : "💁‍♀️"}
                       </span>
                       <span className={`text-xs font-semibold ${form.role === r.value ? "text-brand-700" : "text-slate-600"}`}>
                         {r.label}
@@ -321,6 +322,7 @@ export default function Agents() {
                   {form.role === "RESPONSABLE_COMMERCIAL" && "Crée et suit des agents commerciaux, voit les commissions de son équipe, vue restreinte du tableau de bord."}
                   {form.role === "CONSEILLERE_CLIENTELE" && "Gère les établissements, importe/exporte des clients, fait des adhésions. Pas de création d'agents."}
                   {form.role === "APPORTEUR_AFFAIRES" && "Enregistre uniquement des clients finaux. Commission de 5% sur les adhésions uniquement (pas de commission sur mensualités)."}
+                  {form.role === "COMMUNITY_MANAGER" && "Gère les clients, le broadcast, la galerie du site vitrine, les établissements et le blog. Pas de création d'agents ni de suivi de commissions."}
                 </div>
               </div>
             )}

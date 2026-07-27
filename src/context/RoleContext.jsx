@@ -12,6 +12,7 @@ const PERMISSIONS = {
     viewCommissions: true, viewAllCommissions: true,
     manageProviders: true, importExport: true,
     dashboardFull: true, viewGroups: true,
+    manageBroadcast: true, manageGallery: true, manageBlog: true,
   },
   AGENT: {
     createAgents: false, viewAgents: false, createOnlyBasicAgents: false,
@@ -20,6 +21,7 @@ const PERMISSIONS = {
     viewCommissions: true, viewAllCommissions: false,
     manageProviders: false, importExport: false,
     dashboardFull: true, viewGroups: true,
+    manageBroadcast: false, manageGallery: false, manageBlog: false,
   },
   RESPONSABLE_COMMERCIAL: {
     createAgents: true,  viewAgents: true, createOnlyBasicAgents: true, // seulement AGENT
@@ -28,6 +30,7 @@ const PERMISSIONS = {
     viewCommissions: true, viewAllCommissions: false, // seulement ses commerciaux
     manageProviders: false, importExport: false,
     dashboardFull: false, viewGroups: true,
+    manageBroadcast: false, manageGallery: false, manageBlog: false,
   },
   CONSEILLERE_CLIENTELE: {
     createAgents: false, viewAgents: false, createOnlyBasicAgents: false,
@@ -36,6 +39,26 @@ const PERMISSIONS = {
     viewCommissions: false, viewAllCommissions: false,
     manageProviders: true, importExport: true, // import/export + établissements
     dashboardFull: false, viewGroups: false,
+    manageBroadcast: false, manageGallery: false, manageBlog: false,
+  },
+  APPORTEUR_AFFAIRES: {
+    createAgents: false, viewAgents: false, createOnlyBasicAgents: false,
+    createClients: true, viewClients: true, // clients finaux uniquement
+    createPayments: false, viewPayments: false,
+    viewCommissions: true, viewAllCommissions: false, // commission adhésion 5%
+    manageProviders: false, importExport: false,
+    dashboardFull: false, viewGroups: false,
+    manageBroadcast: false, manageGallery: false, manageBlog: false,
+  },
+  COMMUNITY_MANAGER: {
+    createAgents: false, viewAgents: false, createOnlyBasicAgents: false,
+    createClients: true, viewClients: true,
+    createPayments: false, viewPayments: false,
+    viewCommissions: false, viewAllCommissions: false,
+    manageProviders: true,  // établissements
+    importExport: false,
+    dashboardFull: false, viewGroups: false,
+    manageBroadcast: true, manageGallery: true, manageBlog: true,
   },
 };
 
@@ -46,6 +69,7 @@ export const ROLE_LABELS = {
   RESPONSABLE_COMMERCIAL: "Responsable Commercial",
   CONSEILLERE_CLIENTELE:  "Conseillère Clientèle",
   APPORTEUR_AFFAIRES: "Apporteur d'Affaires",
+  COMMUNITY_MANAGER: "Community Manager",
 };
 
 export const ROLE_COLORS = {
@@ -54,6 +78,7 @@ export const ROLE_COLORS = {
   RESPONSABLE_COMMERCIAL: { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   CONSEILLERE_CLIENTELE:  { bg: "bg-teal-100",   text: "text-teal-700",   dot: "bg-teal-500" },
   APPORTEUR_AFFAIRES: { bg:"bg-orange-50", text:"text-orange-700", dot:"bg-orange-500" },
+  COMMUNITY_MANAGER:  { bg:"bg-pink-50",   text:"text-pink-700",   dot:"bg-pink-500" },
 };
 
 export function useRole() {
@@ -68,6 +93,7 @@ export function useRole() {
     isAgent:   role === "AGENT",
     isRC:      role === "RESPONSABLE_COMMERCIAL",
     isCC:      role === "CONSEILLERE_CLIENTELE",
+    isCM:      role === "COMMUNITY_MANAGER",
     can:       (perm) => perms[perm] === true,
     perms,
   };

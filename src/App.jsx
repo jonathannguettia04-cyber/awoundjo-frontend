@@ -234,7 +234,7 @@ function PageLoader() {
 }
 
 // ── Guards ───────────────────────────────────────────────────
-const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"];
+const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"];
 
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
 const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog"];
@@ -385,7 +385,7 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}
@@ -430,12 +430,12 @@ export default function App() {
 
             {/* ── ADMIN — Blog ─────────────────────────── */}
             <Route path="/admin/blog" element={
-              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminBlog /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "COMMUNITY_MANAGER"]}><AdminBlog /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Broadcast ────────────────────── */}
             <Route path="/admin/broadcasts" element={
-              <ProtectedRoute allowedRoles={["ADMIN"]}><AdminBroadcasts /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "COMMUNITY_MANAGER"]}><AdminBroadcasts /></ProtectedRoute>
             } />
 
             {/* ── CLIENT ──────────────────────────────────── */}

@@ -46,6 +46,12 @@ function getNavLinks(role) {
       { to: "/healthcare",      label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
       { to: "/admin/providers", label: "Établissements",  icon: "ti-building-hospital" },
     ],
+    COMMUNITY_MANAGER: [
+      ...common,
+      { to: "/admin/broadcasts", label: "Broadcast",      icon: "ti-speakerphone" },
+      { to: "/admin/providers",  label: "Établissements",  icon: "ti-building-hospital" },
+      { to: "/admin/blog",       label: "Blog",            icon: "ti-notes" },
+    ],
   };
 
   return byRole[role] || common;
