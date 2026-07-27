@@ -382,10 +382,10 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
             } />
             <Route path="/healthcare" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><HealthcareAdmin /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"]}><HealthcareAdmin /></ProtectedRoute>
             } />
             <Route path="/admin/providers" element={
-              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"]}><AdminProviders /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}
