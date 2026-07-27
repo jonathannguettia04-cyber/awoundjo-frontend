@@ -391,22 +391,34 @@ function DepCard({ dep, depNumber, titular }) {
                 className="dep-carte-print"
                 style={{ background: gradient, borderRadius: 20, padding: 20, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.25)", marginBottom: 12 }}>
 
-                {/* Texture de fond façon mappemonde (décorative) */}
-                <div style={{
-                  position:"absolute", inset:0, opacity:.10, pointerEvents:"none",
-                  backgroundImage:"radial-gradient(rgba(255,255,255,.9) 1px, transparent 1.5px)",
-                  backgroundSize:"14px 14px",
-                }} />
+                {/* Mappemonde en filigrane façon carte bancaire premium */}
+                <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:.13, pointerEvents:"none" }}>
+                  <g fill="#ffffff">
+                    <path d="M28 40c8-10 22-14 34-10 10 3 14 12 24 14 9 2 16-4 24 1 7 4 6 14 13 18 9 5 10 16 4 23-7 8-19 6-27 12-9 7-9 19-19 24-11 5-24 0-31-9-6-8-3-19-9-27-7-9-20-9-25-19-5-9 2-19 12-27z"/>
+                    <path d="M95 118c8-4 18-2 24 5 7 8 4 19 8 28 4 10 14 16 13 27-1 10-11 17-21 16-9-1-14-10-16-19-3-12 3-24-3-35-5-9-15-13-16-23 0-1 5-4 11 1z"/>
+                    <path d="M186 34c7-6 17-7 25-3 6 3 7 11 13 14 7 3 15-1 21 4 5 4 3 12 8 16 4 4 11 2 14 7 3 6-2 12-8 14-8 3-16-2-24 0-9 2-14 11-23 11-8 0-13-8-20-12-8-5-19-4-24-12-4-8 3-16 4-25 1-6-1-11 4-14z"/>
+                    <path d="M198 88c11-3 23 2 30 11 8 10 6 24 11 35 6 13 18 21 18 35 0 13-11 24-24 26-12 2-22-8-28-19-6-11 1-24-5-35-6-11-19-15-24-27-5-11 3-23 22-26z"/>
+                    <path d="M258 30c14-8 32-9 46-2 12 6 15 20 26 27 12 8 29 5 38 16 8 10 1 24-8 32-10 9-24 5-35 11-10 6-14 18-25 22-12 4-25-3-32-13-6-9 1-20-4-30-5-9-17-11-22-20-6-10-1-22 8-30 2-2 5-9 8-13z"/>
+                    <path d="M330 148c9-3 19 1 24 9 5 8 1 18-6 24-8 6-19 3-26-3-6-6-6-15-1-22 2-3 6-6 9-8z"/>
+                  </g>
+                </svg>
                 {/* Cercles décoratifs */}
                 <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
                 <div style={{ position: "absolute", bottom: -30, left: -20, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
+                {/* Filigrane anneaux entrelacés façon carte bancaire premium (près du badge type, loin du QR) */}
+                <div style={{ position:"absolute", top:16, right:60, width:28, height:20, pointerEvents:"none", opacity:.22 }}>
+                  <div style={{ position:"absolute", left:0, top:0, width:20, height:20, borderRadius:"50%", border:"2px solid #fff" }} />
+                  <div style={{ position:"absolute", left:9, top:0, width:20, height:20, borderRadius:"50%", border:"2px solid #fff" }} />
+                </div>
 
                 {/* ── Ligne 1 : puce + badge type ── */}
                 <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, position:"relative" }}>
-                  <div style={{ width:38, height:29, borderRadius:6, background:"linear-gradient(135deg,#F5D889,#C9A24B)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.15)" }}>
-                    <div style={{ position:"absolute", inset:4, border:"1px solid rgba(0,0,0,.25)", borderRadius:3 }} />
-                    <div style={{ position:"absolute", top:"50%", left:4, right:4, height:1, background:"rgba(0,0,0,.25)" }} />
-                    <div style={{ position:"absolute", left:"50%", top:4, bottom:4, width:1, background:"rgba(0,0,0,.25)" }} />
+                  <div style={{ width:40, height:31, borderRadius:7, background:"linear-gradient(135deg,#FCEAB0 0%,#E8C877 35%,#C9A24B 65%,#B8903A 100%)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.25)" }}>
+                    <div style={{ position:"absolute", inset:4, border:"1px solid rgba(0,0,0,.3)", borderRadius:4 }} />
+                    <div style={{ position:"absolute", top:4, bottom:4, left:"33%", width:1, background:"rgba(0,0,0,.28)" }} />
+                    <div style={{ position:"absolute", top:4, bottom:4, left:"66%", width:1, background:"rgba(0,0,0,.28)" }} />
+                    <div style={{ position:"absolute", left:4, right:4, top:"50%", height:1, background:"rgba(0,0,0,.28)" }} />
+                    <div style={{ position:"absolute", top:2, left:2, width:14, height:7, borderRadius:4, background:"rgba(255,255,255,.35)", filter:"blur(2px)" }} />
                   </div>
                   <div style={{ background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)", borderRadius:8, padding:"4px 10px", border:"1px solid rgba(255,255,255,.25)" }}>
                     <div style={{ fontSize:10, fontWeight:800, letterSpacing:.5 }}>{dep.type === "spouse" ? "CONJOINT(E)" : "ENFANT"}</div>
@@ -414,7 +426,7 @@ function DepCard({ dep, depNumber, titular }) {
                 </div>
 
                 {/* ── Numéro façon carte bancaire ── */}
-                <div style={{ fontSize:15, fontWeight:700, fontFamily:"monospace", letterSpacing:1.5, marginBottom:16, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)" }}>
+                <div style={{ fontSize:16, fontWeight:700, fontFamily:"monospace", letterSpacing:2, marginBottom:16, position:"relative", textShadow:"0 1px 0 rgba(255,255,255,.25), 0 -1px 1px rgba(0,0,0,.35)" }}>
                   {depNumber}
                 </div>
 
