@@ -22,6 +22,13 @@ function buildQrUrl(card) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(content)}&bgcolor=ffffff&color=1a56db&margin=10&ecc=H`;
 }
 
+// ── Formatte un numéro (carte ou mutualiste) en groupes de 4 façon carte bancaire ──
+function formatCardNumber(str) {
+  const clean = (str || "").toString().replace(/[\s-]+/g, "");
+  const groups = clean.match(/.{1,4}/g);
+  return groups ? groups.join(" ") : clean;
+}
+
 
 // ── QR Code avec logo centré (canvas overlay) ─────────────────────────────
 function QrWithLogo({ qrUrl, size = 280 }) {
@@ -166,6 +173,9 @@ export default function ClientCarte() {
   const gradient  = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
   const isActive  = card.status === "active" || card.status === "actif";
   const numeroCarte = card.numero_carte || card.mutual_number;
+  const expiryStr = card.expiration_date
+    ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "2-digit" })
+    : "12/26";
 
   return (
     <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
@@ -220,75 +230,78 @@ export default function ClientCarte() {
         id="carte-physique"
         ref={carteRef}
         style={{
-          background: gradient, borderRadius: 24, padding: 22, color: "#fff",
+          background: gradient, borderRadius: 20, padding: 24, color: "#fff",
           position: "relative", overflow: "hidden",
           boxShadow: "0 16px 48px rgba(26,86,219,.35)", marginBottom: 14,
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
           transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
+          minHeight: 200,
         }}
       >
-        {/* Cercles décoratifs */}
-        <div style={{ position:"absolute", top:-50, right:-50, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.08)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", bottom:-60, right:60, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", top:40, left:-30, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,.06)", pointerEvents:"none" }} />
+        {/* Texture de fond façon mappemonde (décorative, non figurative) */}
+        <div style={{
+          position:"absolute", inset:0, opacity:.10, pointerEvents:"none",
+          backgroundImage:"radial-gradient(rgba(255,255,255,.9) 1px, transparent 1.5px)",
+          backgroundSize:"14px 14px",
+        }} />
+        <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.07)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-70, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
 
-        {/* ── Ligne 1 : logo + N° carte en haut à droite ── */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10, position:"relative" }}>
-          <div style={{ width:42, height:42, background:"rgba(255,255,255,.2)", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:20, backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,.2)" }}>A</div>
-          <div>
-            <div style={{ fontSize:14, fontWeight:800, letterSpacing:2 }}>AWOUNDJÔ</div>
-            <div style={{ fontSize:10, opacity:.7, letterSpacing:.5 }}>Mutuelle Santé · Côte d'Ivoire</div>
+        {/* ── Ligne 1 : puce + badge formule (haut droite) ── */}
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:22, position:"relative" }}>
+          {/* Puce dorée */}
+          <div style={{ width:44, height:34, borderRadius:6, background:"linear-gradient(135deg,#F5D889,#C9A24B)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.15)" }}>
+            <div style={{ position:"absolute", inset:5, border:"1px solid rgba(0,0,0,.25)", borderRadius:3 }} />
+            <div style={{ position:"absolute", top:"50%", left:5, right:5, height:1, background:"rgba(0,0,0,.25)" }} />
+            <div style={{ position:"absolute", left:"50%", top:5, bottom:5, width:1, background:"rgba(0,0,0,.25)" }} />
           </div>
-          {/* N° Carte — haut à droite */}
-          <div style={{ marginLeft:"auto", textAlign:"right" }}>
-            <div style={{ fontSize:9, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>N° Carte</div>
-            <div style={{
-              fontSize:11, fontWeight:800, fontFamily:"monospace", letterSpacing:.5,
-              background:"rgba(255,255,255,.18)", borderRadius:8, padding:"3px 10px",
-              border:"1px solid rgba(255,255,255,.25)",
-            }}>
-              {numeroCarte}
-            </div>
+
+          <div style={{
+            background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)",
+            borderRadius:8, padding:"5px 12px", border:"1px solid rgba(255,255,255,.25)",
+            textAlign:"right",
+          }}>
+            <div style={{ fontSize:12, fontWeight:800, letterSpacing:.5 }}>{plan.name}</div>
+            <div style={{ fontSize:8, opacity:.75, letterSpacing:.5, textTransform:"uppercase" }}>{plan.coverage} couverture</div>
           </div>
         </div>
 
-        {/* ── Statut ── */}
-        <div style={{ marginBottom:10, position:"relative" }}>
+        {/* ── Numéro façon carte bancaire, groupé par 4 ── */}
+        <div style={{
+          fontSize:20, fontWeight:700, fontFamily:"monospace", letterSpacing:2.5,
+          marginBottom:22, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)",
+        }}>
+          {formatCardNumber(numeroCarte)}
+        </div>
+
+        {/* ── Titulaire + expiration ── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:18, position:"relative" }}>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Titulaire</div>
+            <div style={{ fontSize:16, fontWeight:800, letterSpacing:.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+              {card.name?.toUpperCase()}
+            </div>
+          </div>
+          <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
+            <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
+            <div style={{ fontSize:16, fontWeight:800 }}>{expiryStr}</div>
+          </div>
+        </div>
+
+        {/* ── Bas de carte : logo + marque | statut ── */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ width:30, height:30, background:"rgba(255,255,255,.9)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:15, color: gradient.match(/#[0-9a-fA-F]{6}/)?.[0] || "#1a56db" }}>A</div>
+            <div style={{ fontSize:9, fontWeight:800, letterSpacing:.6, lineHeight:1.25 }}>
+              MUTUELLE SANTÉ<br />AWOUNDJÔ
+            </div>
+          </div>
+
           <div style={{ display:"inline-flex", alignItems:"center", gap:5, background: isActive ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)", backdropFilter:"blur(8px)", borderRadius:20, padding:"4px 12px", border:`1px solid ${isActive ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}` }}>
             <span style={{ width:7, height:7, borderRadius:"50%", background: isActive ? "#10B981" : "#EF4444", display:"inline-block", boxShadow: isActive ? "0 0 6px #10B981" : "none" }} />
             <span style={{ fontSize:10, fontWeight:700, letterSpacing:.5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
           </div>
-        </div>
-
-        {/* ── Nom + mutualiste ── */}
-        <div style={{ marginBottom:14, position:"relative" }}>
-          <div style={{ fontSize:10, opacity:.6, letterSpacing:1.5, marginBottom:3, textTransform:"uppercase" }}>Adhérent(e)</div>
-          <div style={{ fontSize:21, fontWeight:800, letterSpacing:-.3 }}>{card.name}</div>
-          <div style={{ fontSize:12, opacity:.75, fontFamily:"monospace", letterSpacing:2, marginTop:2 }}>{card.mutual_number}</div>
-        </div>
-
-        {/* ── Formule + expiration + QR mini (comme carte OLEA) ── */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", position:"relative" }}>
-          <div>
-            <div style={{ fontSize:10, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>Formule</div>
-            <div style={{ fontSize:15, fontWeight:800 }}>{plan.name}</div>
-            <div style={{ fontSize:10, opacity:.7 }}>{plan.coverage} couverture</div>
-          </div>
-          <div style={{ textAlign:"center" }}>
-            <div style={{ fontSize:10, opacity:.6, letterSpacing:1, textTransform:"uppercase", marginBottom:2 }}>Expire le</div>
-            <div style={{ fontSize:14, fontWeight:800 }}>
-              {card.expiration_date
-                ? new Date(card.expiration_date).toLocaleDateString("fr-FR", { month:"2-digit", year:"numeric" })
-                : "12/2026"}
-            </div>
-          </div>
-          {/* QR mini intégré dans la carte */}
-          {qrUrl && (
-            <div style={{ width:52, height:52, background:"#fff", borderRadius:8, overflow:"hidden", border:"2px solid rgba(255,255,255,.3)", flexShrink:0 }}>
-              <img src={qrUrl} alt="QR" style={{ width:"100%", height:"100%", objectFit:"contain" }} crossOrigin="anonymous" />
-            </div>
-          )}
         </div>
       </div>
 

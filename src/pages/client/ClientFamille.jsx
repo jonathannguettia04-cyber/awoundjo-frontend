@@ -318,8 +318,8 @@ function DepCard({ dep, depNumber, titular }) {
 
   const gradient = DEP_GRADIENTS[dep.type] || DEP_GRADIENTS.child;
   const expiry   = titular?.expiration_date
-    ? new Date(titular.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "numeric" })
-    : "12/2026";
+    ? new Date(titular.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "2-digit" })
+    : "12/26";
 
   const qrUrl = depNumber
     ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(buildQrContent(dep, depNumber))}&bgcolor=ffffff&color=1a56db&margin=8`
@@ -389,60 +389,67 @@ function DepCard({ dep, depNumber, titular }) {
               <div
                 ref={carteRef}
                 className="dep-carte-print"
-                style={{ background: gradient, borderRadius: 20, padding: 18, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.25)", marginBottom: 12 }}>
+                style={{ background: gradient, borderRadius: 20, padding: 20, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.25)", marginBottom: 12 }}>
 
+                {/* Texture de fond façon mappemonde (décorative) */}
+                <div style={{
+                  position:"absolute", inset:0, opacity:.10, pointerEvents:"none",
+                  backgroundImage:"radial-gradient(rgba(255,255,255,.9) 1px, transparent 1.5px)",
+                  backgroundSize:"14px 14px",
+                }} />
                 {/* Cercles décoratifs */}
                 <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.08)", pointerEvents: "none" }} />
                 <div style={{ position: "absolute", bottom: -30, left: -20, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
 
-                {/* Ligne 1 : logo + N° */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <div style={{ width: 36, height: 36, background: "rgba(255,255,255,.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.2)", flexShrink: 0 }}>A</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2 }}>AWOUNDJÔ</div>
-                    <div style={{ fontSize: 9, opacity: .7 }}>Mutuelle Santé · Côte d'Ivoire</div>
+                {/* ── Ligne 1 : puce + badge type ── */}
+                <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, position:"relative" }}>
+                  <div style={{ width:38, height:29, borderRadius:6, background:"linear-gradient(135deg,#F5D889,#C9A24B)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.15)" }}>
+                    <div style={{ position:"absolute", inset:4, border:"1px solid rgba(0,0,0,.25)", borderRadius:3 }} />
+                    <div style={{ position:"absolute", top:"50%", left:4, right:4, height:1, background:"rgba(0,0,0,.25)" }} />
+                    <div style={{ position:"absolute", left:"50%", top:4, bottom:4, width:1, background:"rgba(0,0,0,.25)" }} />
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 8, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Ayant droit</div>
-                    <div style={{ fontSize: 10, fontWeight: 800, fontFamily: "monospace", background: "rgba(255,255,255,.18)", borderRadius: 6, padding: "2px 8px", border: "1px solid rgba(255,255,255,.25)" }}>
-                      {depNumber}
-                    </div>
+                  <div style={{ background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)", borderRadius:8, padding:"4px 10px", border:"1px solid rgba(255,255,255,.25)" }}>
+                    <div style={{ fontSize:10, fontWeight:800, letterSpacing:.5 }}>{dep.type === "spouse" ? "CONJOINT(E)" : "ENFANT"}</div>
                   </div>
                 </div>
 
-                {/* Ligne 2 : photo + nom */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.4)", flexShrink: 0, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
-                    {dep.photo
-                      ? <img src={dep.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
-                      : (dep.type === "spouse" ? "💑" : "👶")}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
-                      {dep.type === "spouse" ? "Conjoint(e)" : "Enfant"}
+                {/* ── Numéro façon carte bancaire ── */}
+                <div style={{ fontSize:15, fontWeight:700, fontFamily:"monospace", letterSpacing:1.5, marginBottom:16, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)" }}>
+                  {depNumber}
+                </div>
+
+                {/* ── Titulaire (ayant droit) + expiration ── */}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:16, position:"relative" }}>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Ayant droit</div>
+                    <div style={{ fontSize:15, fontWeight:800, letterSpacing:.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                      {dep.firstname} {dep.name}
                     </div>
-                    <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: -.3 }}>{dep.firstname} {dep.name}</div>
                     {dep.birth_date && (
-                      <div style={{ fontSize: 10, opacity: .75, marginTop: 2 }}>
-                        Né(e) le {new Date(dep.birth_date).toLocaleDateString("fr-FR")}
-                      </div>
+                      <div style={{ fontSize:10, opacity:.75, marginTop:3 }}>Né(e) le {new Date(dep.birth_date).toLocaleDateString("fr-FR")}</div>
                     )}
                   </div>
+                  <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
+                    <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
+                    <div style={{ fontSize:14, fontWeight:800 }}>{expiry}</div>
+                  </div>
                 </div>
 
-                {/* Ligne 3 : formule + expiry + QR */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                  <div>
-                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Formule</div>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>{titular?.plan || "ESSENTIELLE"}</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 9, opacity: .6, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Expire le</div>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>{expiry}</div>
+                {/* ── Bas de carte : photo + logo/marque | QR ── */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", position:"relative" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", border:"1px solid rgba(255,255,255,.35)", flexShrink:0, background:"rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+                      {dep.photo
+                        ? <img src={dep.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} crossOrigin="anonymous" />
+                        : (dep.type === "spouse" ? "💑" : "👶")}
+                    </div>
+                    <div style={{ fontSize:8, fontWeight:800, letterSpacing:.5, lineHeight:1.25 }}>
+                      MUTUELLE SANTÉ<br />AWOUNDJÔ
+                    </div>
                   </div>
                   {qrUrl && (
-                    <div style={{ width: 48, height: 48, background: "#fff", borderRadius: 8, overflow: "hidden", border: "2px solid rgba(255,255,255,.3)", flexShrink: 0 }}>
-                      <img src={qrUrl} alt="QR" style={{ width: "100%", height: "100%", objectFit: "contain" }} crossOrigin="anonymous" />
+                    <div style={{ width:44, height:44, background:"#fff", borderRadius:8, overflow:"hidden", border:"2px solid rgba(255,255,255,.3)", flexShrink:0 }}>
+                      <img src={qrUrl} alt="QR" style={{ width:"100%", height:"100%", objectFit:"contain" }} crossOrigin="anonymous" />
                     </div>
                   )}
                 </div>
