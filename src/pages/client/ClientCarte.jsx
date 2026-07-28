@@ -178,7 +178,7 @@ export default function ClientCarte() {
     : "12/26";
 
   return (
-    <div style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
+    <div id="carte-page-root" style={{ padding: "16px 16px 100px", fontFamily: "'Poppins',sans-serif", background: "#F8FAFC", minHeight: "100vh" }}>
 
       {/* ── CSS impression CNI 85.6mm × 54mm ────────────────────────────── */}
       <style>{`
@@ -187,15 +187,22 @@ export default function ClientCarte() {
         @media print {
           body * { visibility: hidden !important; }
 
+          /* Le reste de la page ne doit occuper AUCUNE hauteur, sinon l'imprimante
+             paginé sur toute la hauteur du scroll (d'où les pages blanches en trop) */
+          body[data-print-mode="carte"] #carte-page-root,
+          body[data-print-mode="qr"]    #carte-page-root {
+            height: 0 !important; min-height: 0 !important; max-height: 0 !important;
+            overflow: hidden !important; padding: 0 !important; margin: 0 !important;
+          }
+
           /* === MODE CARTE === */
           body[data-print-mode="carte"] #carte-physique,
           body[data-print-mode="carte"] #carte-physique * { visibility: visible !important; }
           body[data-print-mode="carte"] #carte-physique {
             position: fixed !important; left: 0 !important; top: 0 !important;
-            width: 109.7mm !important; height: 69.2mm !important;
-            transform: scale(.78) !important; transform-origin: top left !important;
-            border-radius: 5mm !important; box-shadow: none !important;
-            margin: 0 !important; padding: 4mm !important; overflow: hidden !important;
+            width: 85.6mm !important; height: 54mm !important;
+            border-radius: 4mm !important; box-shadow: none !important;
+            margin: 0 !important; padding: 3mm !important; overflow: hidden !important;
             -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
           }
 
@@ -240,57 +247,57 @@ export default function ClientCarte() {
           minHeight: 200,
         }}
       >
-        {/* Mappemonde en filigrane — Afrique mise en évidence */}
-        <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none" }}>
-          <g fill="#ffffff" opacity=".07">
-            <path d="M20 30c8-9 20-12 30-9 9 3 12 11 21 13 8 2 14-3 21 1 6 4 5 13 12 16 8 5 9 15 4 21-6 7-17 5-24 11-8 6-8 17-17 22-10 4-22 0-28-8-6-7-3-17-8-24-6-8-18-8-23-17-4-8 2-17 12-26z"/>
-            <path d="M340 20c12-7 27-8 39-2 10 5 13 17 22 23 10 7 25 4 32 14 7 8 1 20-7 27-8 8-21 4-30 9-9 5-12 15-22 19-10 3-21-3-27-11-5-8 1-17-3-26-4-8-15-9-19-17-5-9-1-18 7-25 2-2 4-8 8-11z"/>
-            <path d="M355 145c8-3 16 1 20 8 4 7 1 15-5 20-7 5-16 3-22-2-5-5-5-13-1-19 2-3 5-5 8-7z"/>
-            <path d="M150 190c6-3 13-1 17 4 5 6 3 14-2 19-6 5-14 3-19-2-4-5-4-12 0-17 1-1 2-3 4-4z"/>
-          </g>
-          <g fill="#ffffff" opacity=".32">
-            <path d="M188 66c14-5 30 0 39 12 8 10 4 24 10 36 7 14 20 22 21 38 1 15-11 29-26 31-14 2-26-9-32-21-6-13 2-27-4-40-6-13-21-17-25-30-4-13 4-23 17-26z"/>
-          </g>
+        {/* Fond mappemonde stylisée — Afrique mise en évidence (illustration originale, décorative) */}
+        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice"
+          style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none" }}>
+          <defs>
+            <radialGradient id="africaGlow" cx="50%" cy="45%" r="65%">
+              <stop offset="0%" stopColor="rgba(255,255,255,.35)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </radialGradient>
+          </defs>
+          {/* Amérique du Nord */}
+          <path d="M18,18 Q42,8 68,22 Q92,12 108,32 Q98,54 78,58 Q58,74 38,62 Q14,52 18,18 Z" fill="rgba(255,255,255,.09)" />
+          {/* Amérique du Sud */}
+          <path d="M68,108 Q90,98 100,128 Q106,160 88,192 Q73,202 63,180 Q52,148 68,108 Z" fill="rgba(255,255,255,.09)" />
+          {/* Europe */}
+          <path d="M182,18 Q202,8 222,18 Q228,34 212,44 Q196,50 186,40 Q176,30 182,18 Z" fill="rgba(255,255,255,.09)" />
+          {/* Halo derrière l'Afrique */}
+          <circle cx="208" cy="120" r="90" fill="url(#africaGlow)" />
+          {/* Afrique — mise en évidence */}
+          <path d="M188,58 Q222,52 238,80 Q248,112 237,146 Q227,178 206,188 Q184,178 178,146 Q168,112 174,80 Q179,64 188,58 Z"
+            fill="rgba(255,255,255,.38)" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" />
+          {/* Asie */}
+          <path d="M244,24 Q292,13 332,34 Q353,55 337,80 Q311,91 280,76 Q254,65 244,45 Q239,34 244,24 Z" fill="rgba(255,255,255,.09)" />
+          {/* Océanie */}
+          <path d="M318,158 Q345,152 356,174 Q351,190 330,190 Q314,180 318,158 Z" fill="rgba(255,255,255,.09)" />
         </svg>
-        <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.07)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", bottom:-70, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-70, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.04)", pointerEvents:"none" }} />
 
         {/* ── Ligne 1 : puce + badge formule (haut droite) ── */}
         <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:22, position:"relative" }}>
-          {/* Puce dorée façon carte bancaire */}
-          <div style={{ width:46, height:36, borderRadius:7, background:"linear-gradient(135deg,#FCEAB0 0%,#E8C877 35%,#C9A24B 65%,#B8903A 100%)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.25)" }}>
-            <div style={{ position:"absolute", inset:4, border:"1px solid rgba(0,0,0,.3)", borderRadius:4 }} />
-            {/* Grille de contacts */}
-            <div style={{ position:"absolute", top:4, bottom:4, left:"33%", width:1, background:"rgba(0,0,0,.28)" }} />
-            <div style={{ position:"absolute", top:4, bottom:4, left:"66%", width:1, background:"rgba(0,0,0,.28)" }} />
-            <div style={{ position:"absolute", left:4, right:4, top:"50%", height:1, background:"rgba(0,0,0,.28)" }} />
-            <div style={{ position:"absolute", left:4, right:4, top:"25%", height:1, background:"rgba(0,0,0,.18)" }} />
-            <div style={{ position:"absolute", left:4, right:4, top:"75%", height:1, background:"rgba(0,0,0,.18)" }} />
-            {/* Reflet lumineux */}
-            <div style={{ position:"absolute", top:2, left:2, width:16, height:8, borderRadius:4, background:"rgba(255,255,255,.35)", filter:"blur(2px)" }} />
+          {/* Puce dorée */}
+          <div style={{ width:44, height:34, borderRadius:6, background:"linear-gradient(135deg,#F5D889,#C9A24B)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.15)" }}>
+            <div style={{ position:"absolute", inset:5, border:"1px solid rgba(0,0,0,.25)", borderRadius:3 }} />
+            <div style={{ position:"absolute", top:"50%", left:5, right:5, height:1, background:"rgba(0,0,0,.25)" }} />
+            <div style={{ position:"absolute", left:"50%", top:5, bottom:5, width:1, background:"rgba(0,0,0,.25)" }} />
           </div>
 
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:7 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-              <span style={{ fontSize:15, fontWeight:900, fontStyle:"italic", letterSpacing:.3 }}>VISA</span>
-              <span style={{ fontSize:10, fontWeight:800, letterSpacing:.5, background:"rgba(255,255,255,.9)", color:"#1a3a6e", borderRadius:4, padding:"1px 6px" }}>SANTÉ</span>
-            </div>
-            <div style={{
-              background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)",
-              borderRadius:8, padding:"5px 12px", border:"1px solid rgba(255,255,255,.25)",
-              textAlign:"right",
-            }}>
-              <div style={{ fontSize:12, fontWeight:800, letterSpacing:.5 }}>{plan.name}</div>
-              <div style={{ fontSize:8, opacity:.75, letterSpacing:.5, textTransform:"uppercase" }}>{plan.coverage} couverture</div>
-            </div>
+          <div style={{
+            background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)",
+            borderRadius:8, padding:"5px 12px", border:"1px solid rgba(255,255,255,.25)",
+            textAlign:"right",
+          }}>
+            <div style={{ fontSize:12, fontWeight:800, letterSpacing:.5 }}>{plan.name}</div>
+            <div style={{ fontSize:8, opacity:.75, letterSpacing:.5, textTransform:"uppercase" }}>{plan.coverage} couverture</div>
           </div>
         </div>
 
         {/* ── Numéro façon carte bancaire, groupé par 4 ── */}
         <div style={{
-          fontSize:21, fontWeight:700, fontFamily:"monospace", letterSpacing:3,
-          marginBottom:22, position:"relative",
-          textShadow:"0 1px 0 rgba(255,255,255,.25), 0 -1px 1px rgba(0,0,0,.35)",
+          fontSize:20, fontWeight:700, fontFamily:"monospace", letterSpacing:2.5,
+          marginBottom:22, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)",
         }}>
           {formatCardNumber(numeroCarte)}
         </div>
