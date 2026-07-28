@@ -102,12 +102,25 @@ export default function ClientCarte() {
     if (!carteRef.current || !data) return;
     setDownloading(true);
     try {
+      // Scroller la carte en vue AVANT capture : évite que html2canvas
+      // calcule mal l'offset et rogne le bas de l'élément si la page est scrollée.
+      carteRef.current.scrollIntoView({ block: "center", behavior: "instant" });
+      await new Promise(r => setTimeout(r, 50));
+
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(carteRef.current, {
+      const el = carteRef.current;
+      const canvas = await html2canvas(el, {
         scale: 3,
         useCORS: true,
         backgroundColor: null,
         logging: false,
+        // Fige les dimensions réelles de la carte pour ne rien couper
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        windowWidth: document.documentElement.scrollWidth,
+        windowHeight: document.documentElement.scrollHeight,
+        scrollX: 0,
+        scrollY: -window.scrollY,
       });
       const link = document.createElement("a");
       link.download = `carte-mutualiste-${data.card.numero_carte || data.card.mutual_number}.png`;
