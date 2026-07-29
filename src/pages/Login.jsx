@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ADMIN_BASE } from "../config/adminBase";
 
 export default function Login() {
   const { login, loading } = useAuth();
@@ -13,7 +14,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     const res = await login(form.phone.trim(), form.password);
-    if (res.success) navigate("/");
+    if (res.success) navigate(ADMIN_BASE);
     else setError(res.error);
   }
 

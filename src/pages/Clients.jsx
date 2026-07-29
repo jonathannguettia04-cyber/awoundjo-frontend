@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Copy, Check, ExternalLink, Shield, Key, User } from "lucide-react";
 import { clientAPI } from "../services/api";
+import { ADMIN_BASE } from "../config/adminBase";
 import { StatusBadge, PlanBadge } from "../components/Badge";
 import Modal from "../components/Modal";
 
@@ -184,8 +185,8 @@ export default function Clients() {
           client_id:    pendingPayment.clientId,
           type:         "adhesion",
           jeko_method:  jekoMethod,
-          success_url: `${window.location.origin}/clients?payment=success&tx=${txId}`,
-          failed_url:  `${window.location.origin}/clients?payment=failed`,
+          success_url: `${window.location.origin}${ADMIN_BASE}/clients?payment=success&tx=${txId}`,
+          failed_url:  `${window.location.origin}${ADMIN_BASE}/clients?payment=failed`,
         }),
       });
 
@@ -333,7 +334,7 @@ export default function Clients() {
                   {clients.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3">
-                        <Link to={`/clients/${c.id}`} className="font-semibold text-brand-600 hover:underline">
+                        <Link to={`${ADMIN_BASE}/clients/${c.id}`} className="font-semibold text-brand-600 hover:underline">
                           {c.name}
                         </Link>
                       </td>
@@ -373,7 +374,7 @@ export default function Clients() {
           {/* ── CARTES (mobile < md) ────────────────────────────── */}
           <div className="md:hidden space-y-3">
             {clients.map((c) => (
-              <Link key={c.id} to={`/clients/${c.id}`}
+              <Link key={c.id} to={`${ADMIN_BASE}/clients/${c.id}`}
                 className="block bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow active:scale-[.99]">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="font-bold text-slate-800 text-base leading-tight">{c.name}</p>

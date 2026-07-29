@@ -236,6 +236,12 @@ function PageLoader() {
 // ── Guards ───────────────────────────────────────────────────
 const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"];
 
+// [SÉCURITÉ] Préfixe non devinable, isolé dans ./config/adminBase pour
+// éviter tout import circulaire avec les pages (Login.jsx, api.js, etc.).
+// "/" reste TOUJOURS la vitrine publique, quel que soit l'état de connexion.
+import { ADMIN_BASE } from "./config/adminBase";
+export { ADMIN_BASE };
+
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
 const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog"];
 
@@ -255,9 +261,9 @@ function ProtectedRoute({ children, allowedRoles = null }) {
   // Attend que le localStorage soit lu avant de décider
   if (initializing) return <PageLoader />;
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to={`${ADMIN_BASE}/login`} replace />;
   if (allowedRoles && !allowedRoles.includes(user.role))
-    return <Navigate to="/" replace />;
+    return <Navigate to={ADMIN_BASE} replace />;
   return children;
 }
 
@@ -318,14 +324,15 @@ export default function App() {
   const isCollectePage  = pathname.startsWith("/collecte");
   // [PARRAINAGE CLIENT] La page publique de parrainage client — pas de navbar
   const isRejoindrePage = pathname.startsWith("/rejoindre");
-  // [LANDING] Page publique d'accueil — pas de navbar SAUF si connecté (admin)
-  const isLandingPage   = pathname === "/" && !user;
+  // [LANDING] "/" est TOUJOURS la vitrine publique, connecté ou non
+  const isLandingPage   = pathname === "/";
   // [LANDING] Pages vitrine publiques (about, formules, etc.) — pas de navbar agent
   const isPublicPage    = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/blog/");
+  const isAgentAdminPage = pathname.startsWith(ADMIN_BASE);
 
-  const showNavbar = user && !isClientPage && !isProviderPage && !isDiasporaPage
+  const showNavbar = user && isAgentAdminPage && !isClientPage && !isProviderPage && !isDiasporaPage
     && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
-    && !isCollectePage && !isRejoindrePage && !isLandingPage && !isPublicPage;
+    && !isCollectePage && !isRejoindrePage;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -334,22 +341,17 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
 
-            {/* ── Auth ────────────────────────────────────── */}
-            {/* FIX : la redirection après login ne se déclenche que si
-                c'est un agent connecté — un provider_token seul ne redirige
-                plus vers le dashboard admin */}
-            <Route path="/login" element={
-              user ? <Navigate to="/" replace /> : <Login />
+            {/* ── Auth (back-office agent, préfixe non devinable) ── */}
+            <Route path={`${ADMIN_BASE}/login`} element={
+              user ? <Navigate to={ADMIN_BASE} replace /> : <Login />
             } />
-            <Route path="/hub"      element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
+            <Route path={`${ADMIN_BASE}/hub`}      element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
             <Route path="/portail"  element={<PortailHub />} />
 
-            {/* ── LANDING / AGENT ─────────────────────────── */}
-            {/* Si connecté (agent) → Dashboard ; sinon → Landing page publique */}
-            <Route path="/" element={
-              user
-                ? <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
-                : <LandingPage />
+            {/* ── LANDING (toujours publique) ─────────────── */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path={ADMIN_BASE} element={
+              <ProtectedRoute allowedRoles={AGENT_ROLES}><Dashboard /></ProtectedRoute>
             } />
             <Route path="/about"          element={<AboutPage />} />
             <Route path="/formules"       element={<FormulesPage />} />
@@ -363,78 +365,78 @@ export default function App() {
             <Route path="/adhesion"       element={<AdhesionPage />} />
             <Route path="/blog"           element={<BlogPage />} />
             <Route path="/blog/:slug"     element={<BlogPostPage />} />
-            <Route path="/clients" element={
+            <Route path={`${ADMIN_BASE}/clients`} element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
             } />
-            <Route path="/clients/:id" element={
+            <Route path={`${ADMIN_BASE}/clients/:id`} element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><ClientDetails /></ProtectedRoute>
             } />
-            <Route path="/payments" element={
+            <Route path={`${ADMIN_BASE}/payments`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
             } />
-            <Route path="/commissions" element={
+            <Route path={`${ADMIN_BASE}/commissions`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
             } />
-            <Route path="/groups" element={
+            <Route path={`${ADMIN_BASE}/groups`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
             } />
-            <Route path="/agents" element={
+            <Route path={`${ADMIN_BASE}/agents`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
             } />
-            <Route path="/healthcare" element={
+            <Route path={`${ADMIN_BASE}/healthcare`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"]}><HealthcareAdmin /></ProtectedRoute>
             } />
-            <Route path="/admin/providers" element={
+            <Route path={`${ADMIN_BASE}/providers`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE"]}><AdminProviders /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — ambassadeurs & credentials ──────── */}
-            <Route path="/admin/diaspora" element={
+            <Route path={`${ADMIN_BASE}/diaspora`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminDiaspora /></ProtectedRoute>
             } />
-            <Route path="/admin/federation" element={
+            <Route path={`${ADMIN_BASE}/federation`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminFederation /></ProtectedRoute>
             } />
-            <Route path="/admin/credentials" element={
+            <Route path={`${ADMIN_BASE}/credentials`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminCredentials /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — outils ──────────────────────────── */}
-            <Route path="/admin/exports" element={
+            <Route path={`${ADMIN_BASE}/exports`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminExports /></ProtectedRoute>
             } />
-            <Route path="/admin/clients/validation" element={
+            <Route path={`${ADMIN_BASE}/clients/validation`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminValidationClients /></ProtectedRoute>
             } />
-            <Route path="/admin/clients/reset-password" element={
+            <Route path={`${ADMIN_BASE}/clients/reset-password`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminResetPassword /></ProtectedRoute>
             } />
-            <Route path="/admin/sms" element={
+            <Route path={`${ADMIN_BASE}/sms`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminSmsDelivery /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Affilié ──────────────────────────── */}
-            <Route path="/admin/affilie" element={
+            <Route path={`${ADMIN_BASE}/affilie`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminAffilie /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Business ─────────────────────── */}
-            <Route path="/admin/business" element={
+            <Route path={`${ADMIN_BASE}/business`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminBusiness /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — CNEPECI ──────────────────────── */}
-            <Route path="/admin/cnepeci" element={
+            <Route path={`${ADMIN_BASE}/cnepeci`} element={
               <ProtectedRoute allowedRoles={["ADMIN"]}><AdminCnepeci /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Blog ─────────────────────────── */}
-            <Route path="/admin/blog" element={
+            <Route path={`${ADMIN_BASE}/blog`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "COMMUNITY_MANAGER"]}><AdminBlog /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Broadcast ────────────────────── */}
-            <Route path="/admin/broadcasts" element={
+            <Route path={`${ADMIN_BASE}/broadcasts`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "COMMUNITY_MANAGER"]}><AdminBroadcasts /></ProtectedRoute>
             } />
 

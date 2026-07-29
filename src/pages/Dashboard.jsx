@@ -4,6 +4,7 @@ import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import PlanModal from "./PlanModal";
+import { ADMIN_BASE } from "../config/adminBase";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -420,11 +421,11 @@ export default function Dashboard() {
               {isAdmin && (
                 <>
                   <button className="awj-btn-ghost" onClick={() => setShowPlans((v) => !v)}>📋 Formules</button>
-                  <Link to="/agents" style={{ textDecoration: "none" }}><button className="awj-btn-ghost">👥 Agents</button></Link>
-                  <Link to="/admin/broadcasts" style={{ textDecoration: "none" }}><button className="awj-btn-ghost">📣 Broadcasts</button></Link>
+                  <Link to={`${ADMIN_BASE}/agents`} style={{ textDecoration: "none" }}><button className="awj-btn-ghost">👥 Agents</button></Link>
+                  <Link to={`${ADMIN_BASE}/broadcasts`} style={{ textDecoration: "none" }}><button className="awj-btn-ghost">📣 Broadcasts</button></Link>
                 </>
               )}
-              <Link to="/clients/new" style={{ textDecoration: "none" }}>
+              <Link to={`${ADMIN_BASE}/clients/new`} style={{ textDecoration: "none" }}>
                 <button className="awj-btn-primary"><span>+</span> Nouveau Mutualiste</button>
               </Link>
             </div>
@@ -761,7 +762,7 @@ export default function Dashboard() {
                   <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", margin: "0 0 14px" }}>🎯 Alertes Operational Intelligence</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {totalAttente > 0 && (
-                      <Link to="/clients?status=attente" style={{ textDecoration: "none" }}>
+                      <Link to={`${ADMIN_BASE}/clients?status=attente`} style={{ textDecoration: "none" }}>
                         <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 10, padding: "10px 14px", transition: "all 0.2s" }}
                           onMouseEnter={e => e.currentTarget.style.background = "rgba(245,158,11,0.1)"}
                           onMouseLeave={e => e.currentTarget.style.background = "rgba(245,158,11,0.06)"}
@@ -799,7 +800,7 @@ export default function Dashboard() {
             <div className="awj-card" style={{ marginBottom: 32, overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: "#ffffff" }}>🏆 Classement Performance Commerciale</p>
-                <Link to="/agents" className="awj-link">Performance Réseau →</Link>
+                <Link to={`${ADMIN_BASE}/agents`} className="awj-link">Performance Réseau →</Link>
               </div>
               <div>
                 {top_agents.slice(0, 5).map((agent, idx) => {
@@ -807,7 +808,7 @@ export default function Dashboard() {
                   const maxRevenue = Math.max(...top_agents.map(a => Number(a.total_revenue || 0)), 1);
                   const pct = Math.round((Number(agent.total_revenue) / maxRevenue) * 100);
                   return (
-                    <Link key={agent.id} to="/agents" className="awj-row-item" style={{ textDecoration: "none", color: "inherit" }}>
+                    <Link key={agent.id} to={`${ADMIN_BASE}/agents`} className="awj-row-item" style={{ textDecoration: "none", color: "inherit" }}>
                       <div style={{ width: 28, height: 28, borderRadius: 8, background: medal.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: medal.text, flexShrink: 0 }}>
                         {medal.label}
                       </div>
@@ -835,12 +836,12 @@ export default function Dashboard() {
             <div className="awj-card" style={{ overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: "#fff" }}>Dernières Inscriptions</p>
-                <Link to="/clients" className="awj-link">Consulter le registre →</Link>
+                <Link to={`${ADMIN_BASE}/clients`} className="awj-link">Consulter le registre →</Link>
               </div>
               {!last_clients?.length ? (
                 <p style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 12, padding: "40px 0" }}>Aucune donnée sociétaire disponible.</p>
               ) : last_clients.map((c) => (
-                <Link key={c.id} to={`/clients/${c.id}`} className="awj-row-item">
+                <Link key={c.id} to={`${ADMIN_BASE}/clients/${c.id}`} className="awj-row-item">
                   <div className="awj-avatar">{c.name?.charAt(0)?.toUpperCase()}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, color: "#fff", display: "block" }}>{c.name}</span>
@@ -853,14 +854,14 @@ export default function Dashboard() {
                 </Link>
               ))}
               <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <Link to="/clients/new" className="awj-link">+ Enregistrer un mutualiste</Link>
+                <Link to={`${ADMIN_BASE}/clients/new`} className="awj-link">+ Enregistrer un mutualiste</Link>
               </div>
             </div>
 
             <div className="awj-card" style={{ overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: "#fff" }}>Journal des Opérations Financières</p>
-                <Link to="/payments" className="awj-link">Grand livre de caisse →</Link>
+                <Link to={`${ADMIN_BASE}/payments`} className="awj-link">Grand livre de caisse →</Link>
               </div>
               {!last_payments?.length ? (
                 <p style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 12, padding: "40px 0" }}>Aucun flux monétaire enregistré.</p>
@@ -884,7 +885,7 @@ export default function Dashboard() {
                 </div>
               ))}
               <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <Link to="/clients" className="awj-link">+ Enregistrer un paiement</Link>
+                <Link to={`${ADMIN_BASE}/clients`} className="awj-link">+ Enregistrer un paiement</Link>
               </div>
             </div>
           </div>

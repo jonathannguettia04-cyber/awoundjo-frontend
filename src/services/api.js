@@ -1,5 +1,6 @@
 // src/services/api.js
 import axios from "axios";
+import { ADMIN_BASE } from "../config/adminBase";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -21,7 +22,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      window.location.href = `${ADMIN_BASE}/login`;
     }
     return Promise.reject(error);
   }

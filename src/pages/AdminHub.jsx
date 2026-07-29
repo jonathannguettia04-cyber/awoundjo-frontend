@@ -1,6 +1,7 @@
 // src/pages/AdminHub.jsx
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ADMIN_BASE } from "../config/adminBase";
 
 const ROLE_LABELS = {
   ADMIN:       { label: "Administrateur Général",  accent: "#00c4b4", dim: "rgba(0,196,180,0.12)"  },
@@ -18,17 +19,17 @@ const SECTIONS = [
     dim: "rgba(167,139,250,0.07)",
     glow: "rgba(167,139,250,0.18)",
     links: [
-      { icon: "📊", label: "Tableau de bord général",    path: "/",                              desc: "KPIs, revenus, stats globales" },
-      { icon: "👥", label: "Gestion des agents",          path: "/agents",                        desc: "Créer, modifier, suspendre" },
-      { icon: "✅", label: "Validation clients",          path: "/admin/clients/validation",      desc: "Approuver / rejeter les inscriptions" },
-      { icon: "🔑", label: "Reset MDP clients",           path: "/admin/clients/reset-password",  desc: "Réinitialiser les mots de passe" },
-      { icon: "🏨", label: "Portail établissements",      path: "/admin/providers",               desc: "Valider les demandes d'accès" },
-      { icon: "🏥", label: "Réseau de soins",             path: "/healthcare",                    desc: "Gérer les établissements partenaires" },
-      { icon: "💰", label: "Commissions globales",        path: "/commissions",                   desc: "Toutes les commissions agents" },
-      { icon: "🌍", label: "Ambassadeurs Diaspora",       path: "/admin/diaspora",                desc: "Gérer le réseau ambassadeurs" },
-      { icon: "⛪", label: "Ambassadeurs Fédérations",    path: "/admin/federation",              desc: "Gérer fédérations & églises" },
-      { icon: "💼", label: "Réseau Business",             path: "/admin/business",                desc: "Directrices, Leaders, Superviseurs" },
-      { icon: "📣", label: "Notifications Broadcast",    path: "/admin/broadcasts",              desc: "Envoyer des messages à tous les clients" },
+      { icon: "📊", label: "Tableau de bord général",    path: `${ADMIN_BASE}`,                              desc: "KPIs, revenus, stats globales" },
+      { icon: "👥", label: "Gestion des agents",          path: `${ADMIN_BASE}/agents`,                        desc: "Créer, modifier, suspendre" },
+      { icon: "✅", label: "Validation clients",          path: `${ADMIN_BASE}/admin/clients/validation`,      desc: "Approuver / rejeter les inscriptions" },
+      { icon: "🔑", label: "Reset MDP clients",           path: `${ADMIN_BASE}/admin/clients/reset-password`,  desc: "Réinitialiser les mots de passe" },
+      { icon: "🏨", label: "Portail établissements",      path: `${ADMIN_BASE}/admin/providers`,               desc: "Valider les demandes d'accès" },
+      { icon: "🏥", label: "Réseau de soins",             path: `${ADMIN_BASE}/healthcare`,                    desc: "Gérer les établissements partenaires" },
+      { icon: "💰", label: "Commissions globales",        path: `${ADMIN_BASE}/commissions`,                   desc: "Toutes les commissions agents" },
+      { icon: "🌍", label: "Ambassadeurs Diaspora",       path: `${ADMIN_BASE}/admin/diaspora`,                desc: "Gérer le réseau ambassadeurs" },
+      { icon: "⛪", label: "Ambassadeurs Fédérations",    path: `${ADMIN_BASE}/admin/federation`,              desc: "Gérer fédérations & églises" },
+      { icon: "💼", label: "Réseau Business",             path: `${ADMIN_BASE}/admin/business`,                desc: "Directrices, Leaders, Superviseurs" },
+      { icon: "📣", label: "Notifications Broadcast",    path: `${ADMIN_BASE}/admin/broadcasts`,              desc: "Envoyer des messages à tous les clients" },
     ],
   },
   {
@@ -39,11 +40,11 @@ const SECTIONS = [
     dim: "rgba(26,95,168,0.07)",
     glow: "rgba(26,95,168,0.18)",
     links: [
-      { icon: "📈", label: "Dashboard commercial",        path: "/",            desc: "Stats de l'équipe commerciale" },
-      { icon: "👤", label: "Mes commerciaux",             path: "/agents",      desc: "Gérer et suivre les commerciaux" },
-      { icon: "💳", label: "Commissions équipe",          path: "/commissions", desc: "Performances et rémunérations" },
-      { icon: "👥", label: "Clients (lecture)",           path: "/clients",     desc: "Consulter la base clients" },
-      { icon: "💵", label: "Paiements",                   path: "/payments",    desc: "Historique des paiements" },
+      { icon: "📈", label: "Dashboard commercial",        path: `${ADMIN_BASE}`,            desc: "Stats de l'équipe commerciale" },
+      { icon: "👤", label: "Mes commerciaux",             path: `${ADMIN_BASE}/agents`,      desc: "Gérer et suivre les commerciaux" },
+      { icon: "💳", label: "Commissions équipe",          path: `${ADMIN_BASE}/commissions`, desc: "Performances et rémunérations" },
+      { icon: "👥", label: "Clients (lecture)",           path: `${ADMIN_BASE}/clients`,     desc: "Consulter la base clients" },
+      { icon: "💵", label: "Paiements",                   path: `${ADMIN_BASE}/payments`,    desc: "Historique des paiements" },
     ],
   },
   {
@@ -54,10 +55,10 @@ const SECTIONS = [
     dim: "rgba(244,114,182,0.07)",
     glow: "rgba(244,114,182,0.18)",
     links: [
-      { icon: "👥", label: "Gérer les clients",           path: "/clients",    desc: "Créer, modifier, importer" },
-      { icon: "📥", label: "Import CSV clients",          path: "/clients",    desc: "Importation en masse" },
-      { icon: "🏥", label: "Établissements réseau",       path: "/healthcare", desc: "Gérer les établissements partenaires" },
-      { icon: "👨‍👩‍👧‍👦", label: "Groupes",                  path: "/groups",     desc: "Gérer les groupes cotisants" },
+      { icon: "👥", label: "Gérer les clients",           path: `${ADMIN_BASE}/clients`,    desc: "Créer, modifier, importer" },
+      { icon: "📥", label: "Import CSV clients",          path: `${ADMIN_BASE}/clients`,    desc: "Importation en masse" },
+      { icon: "🏥", label: "Établissements réseau",       path: `${ADMIN_BASE}/healthcare`, desc: "Gérer les établissements partenaires" },
+      { icon: "👨‍👩‍👧‍👦", label: "Groupes",                  path: `${ADMIN_BASE}/groups`,     desc: "Gérer les groupes cotisants" },
     ],
   },
   {
@@ -68,11 +69,11 @@ const SECTIONS = [
     dim: "rgba(251,146,60,0.07)",
     glow: "rgba(251,146,60,0.18)",
     links: [
-      { icon: "👥", label: "Export clients",              path: "/admin/exports", desc: "Télécharger la base clients (CSV/Excel)" },
-      { icon: "👤", label: "Export agents",               path: "/admin/exports", desc: "Télécharger la liste des agents" },
-      { icon: "🌍", label: "Export Diaspora",             path: "/admin/exports", desc: "Télécharger le réseau diaspora" },
-      { icon: "⛪", label: "Export Fédérations",          path: "/admin/exports", desc: "Télécharger le réseau fédérations" },
-      { icon: "🏥", label: "Export établissements",       path: "/admin/exports", desc: "Télécharger les établissements partenaires" },
+      { icon: "👥", label: "Export clients",              path: `${ADMIN_BASE}/admin/exports`, desc: "Télécharger la base clients (CSV/Excel)" },
+      { icon: "👤", label: "Export agents",               path: `${ADMIN_BASE}/admin/exports`, desc: "Télécharger la liste des agents" },
+      { icon: "🌍", label: "Export Diaspora",             path: `${ADMIN_BASE}/admin/exports`, desc: "Télécharger le réseau diaspora" },
+      { icon: "⛪", label: "Export Fédérations",          path: `${ADMIN_BASE}/admin/exports`, desc: "Télécharger le réseau fédérations" },
+      { icon: "🏥", label: "Export établissements",       path: `${ADMIN_BASE}/admin/exports`, desc: "Télécharger les établissements partenaires" },
     ],
   },
   {
@@ -83,13 +84,13 @@ const SECTIONS = [
     dim: "rgba(0,196,180,0.07)",
     glow: "rgba(0,196,180,0.18)",
     links: [
-      { icon: "🌍", label: "Admin Diaspora",              path: "/admin/diaspora",               desc: "Gérer ambassadeurs diaspora" },
-      { icon: "⛪", label: "Admin Fédérations",           path: "/admin/federation",             desc: "Gérer ambassadeurs fédérations" },
-      { icon: "💼", label: "Admin Business",              path: "/admin/business",               desc: "Directrices, Leaders, Superviseurs" },
+      { icon: "🌍", label: "Admin Diaspora",              path: `${ADMIN_BASE}/admin/diaspora`,               desc: "Gérer ambassadeurs diaspora" },
+      { icon: "⛪", label: "Admin Fédérations",           path: `${ADMIN_BASE}/admin/federation`,             desc: "Gérer ambassadeurs fédérations" },
+      { icon: "💼", label: "Admin Business",              path: `${ADMIN_BASE}/admin/business`,               desc: "Directrices, Leaders, Superviseurs" },
       { icon: "🚪", label: "Portail Ambassadeurs",        path: "/diaspora/login",               desc: "Accéder au portail unifié", external: true },
       { icon: "🔐", label: "Portail Business",            path: "/business/login",               desc: "Espace membres réseau business", external: true },
-      { icon: "🏆", label: "Classement Global",           path: "/admin/ambassador-leaderboard", desc: "Classement diaspora + fédérations" },
-      { icon: "💰", label: "Commissions Ambassadeurs",    path: "/admin/ambassador-commissions", desc: "Toutes les commissions réseau" },
+      { icon: "🏆", label: "Classement Global",           path: `${ADMIN_BASE}/admin/ambassador-leaderboard`, desc: "Classement diaspora + fédérations" },
+      { icon: "💰", label: "Commissions Ambassadeurs",    path: `${ADMIN_BASE}/admin/ambassador-commissions`, desc: "Toutes les commissions réseau" },
     ],
   },
   {
@@ -100,11 +101,11 @@ const SECTIONS = [
     dim: "rgba(96,165,250,0.07)",
     glow: "rgba(96,165,250,0.18)",
     links: [
-      { icon: "📊", label: "Admin CNEPECI",               path: "/admin/cnepeci", desc: "Vue d'ensemble du réseau" },
-      { icon: "👥", label: "Membres CNEPECI",             path: "/admin/cnepeci", desc: "Bureaux, Coordonnateurs, Pasteurs" },
-      { icon: "💰", label: "Paiements CNEPECI",           path: "/admin/cnepeci", desc: "Adhésions, cotisations, cash" },
-      { icon: "🏆", label: "Commissions & Bonus",         path: "/admin/cnepeci", desc: "Commissions réseau + bonus 1,5%" },
-      { icon: "🏛️", label: "Bureau Centrale",             path: "/admin/cnepeci", desc: "Coordonnateurs généraux" },
+      { icon: "📊", label: "Admin CNEPECI",               path: `${ADMIN_BASE}/admin/cnepeci`, desc: "Vue d'ensemble du réseau" },
+      { icon: "👥", label: "Membres CNEPECI",             path: `${ADMIN_BASE}/admin/cnepeci`, desc: "Bureaux, Coordonnateurs, Pasteurs" },
+      { icon: "💰", label: "Paiements CNEPECI",           path: `${ADMIN_BASE}/admin/cnepeci`, desc: "Adhésions, cotisations, cash" },
+      { icon: "🏆", label: "Commissions & Bonus",         path: `${ADMIN_BASE}/admin/cnepeci`, desc: "Commissions réseau + bonus 1,5%" },
+      { icon: "🏛️", label: "Bureau Centrale",             path: `${ADMIN_BASE}/admin/cnepeci`, desc: "Coordonnateurs généraux" },
       { icon: "🔐", label: "Portail Membre CNEPECI",      path: "/cnepeci/login", desc: "Accéder au portail membres", external: true },
     ],
   },
@@ -118,7 +119,7 @@ const SECTIONS = [
     links: [
       { icon: "👤", label: "Portail Adhérent",            path: "/client/login",   desc: "Espace client mutualiste",        external: true },
       { icon: "🏥", label: "Portail Établissement",       path: "/etablissement",  desc: "Espace prestataires de soins",    external: true },
-      { icon: "🔐", label: "Connexion Admin/Agent",       path: "/login",          desc: "Connexion espace commercial",     external: true },
+      { icon: "🔐", label: "Connexion Admin/Agent",       path: `${ADMIN_BASE}/login`,          desc: "Connexion espace commercial",     external: true },
       { icon: "🌍", label: "Portail Diaspora",            path: "/diaspora/login", desc: "Espace ambassadeurs diaspora",    external: true },
       { icon: "⛪", label: "Portail Fédération",          path: "/diaspora/login", desc: "Espace ambassadeurs fédération",  external: true },
       { icon: "💼", label: "Portail Business",            path: "/business/login", desc: "Espace membres réseau business",  external: true },
