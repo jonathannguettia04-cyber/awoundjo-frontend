@@ -11,8 +11,14 @@ const EMPTY_CHILD  = { type: "child",  name: "", firstname: "", birth_date: "", 
 const SURPRIME_ENFANT = { ESSENTIELLE: 2000, IVOIRIENNE: 3000, TURQUOISE: 5000 };
 
 const DEP_GRADIENTS = {
-  spouse: "linear-gradient(135deg, #DB2777 0%, #9D174D 100%)",
-  child:  "linear-gradient(135deg, #059669 0%, #064e3b 100%)",
+  spouse: "linear-gradient(135deg, #FCE9F2 0%, #F6C6DE 45%, #E17BAF 100%)",
+  child:  "linear-gradient(135deg, #EAFBF3 0%, #C6EBDA 45%, #6FC79A 100%)",
+};
+
+// Couleur de texte/lignes adaptée à un fond clair
+const DEP_INK = {
+  spouse: "#7A1653",
+  child:  "#0F5B3D",
 };
 
 // Génère le numéro de carte ayant droit
@@ -325,6 +331,7 @@ function DepCard({ dep, depNumber, titular }) {
   const carteRef = useRef();
 
   const gradient = DEP_GRADIENTS[dep.type] || DEP_GRADIENTS.child;
+  const ink      = DEP_INK[dep.type] || DEP_INK.child;
   const expiry   = titular?.expiration_date
     ? new Date(titular.expiration_date).toLocaleDateString("fr-FR", { month: "2-digit", year: "2-digit" })
     : "12/26";
@@ -402,7 +409,7 @@ function DepCard({ dep, depNumber, titular }) {
           {/* Bouton afficher carte */}
           <button
             onClick={() => setShowCarte(!showCarte)}
-            style={{ width: "100%", background: showCarte ? "#F1F5F9" : gradient, color: showCarte ? "#475569" : "#fff", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .2s" }}>
+            style={{ width: "100%", background: showCarte ? "#F1F5F9" : gradient, color: showCarte ? "#475569" : ink, border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Poppins',sans-serif", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .2s" }}>
             💳 {showCarte ? "Masquer la carte" : "Voir la carte mutualiste"}
           </button>
 
@@ -414,29 +421,22 @@ function DepCard({ dep, depNumber, titular }) {
               <div
                 ref={carteRef}
                 className="dep-carte-print"
-                style={{ background: gradient, borderRadius: 20, padding: 20, color: "#fff", position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.25)", marginBottom: 12 }}>
+                style={{ background: gradient, borderRadius: 20, padding: 20, color: ink, position: "relative", overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,.15)", marginBottom: 12 }}>
 
-                {/* Fond mappemonde stylisée — Afrique mise en évidence */}
+                {/* Fond mappemonde stylisée, bien visible façon carte bancaire */}
                 <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice"
-                  style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none" }}>
-                  <defs>
-                    <radialGradient id={`africaGlow-${dep.id || depNumber}`} cx="50%" cy="45%" r="65%">
-                      <stop offset="0%" stopColor="rgba(255,255,255,.35)" />
-                      <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                    </radialGradient>
-                  </defs>
-                  <path d="M18,18 Q42,8 68,22 Q92,12 108,32 Q98,54 78,58 Q58,74 38,62 Q14,52 18,18 Z" fill="rgba(255,255,255,.09)" />
-                  <path d="M68,108 Q90,98 100,128 Q106,160 88,192 Q73,202 63,180 Q52,148 68,108 Z" fill="rgba(255,255,255,.09)" />
-                  <path d="M182,18 Q202,8 222,18 Q228,34 212,44 Q196,50 186,40 Q176,30 182,18 Z" fill="rgba(255,255,255,.09)" />
-                  <circle cx="208" cy="120" r="90" fill={`url(#africaGlow-${dep.id || depNumber})`} />
-                  <path d="M188,58 Q222,52 238,80 Q248,112 237,146 Q227,178 206,188 Q184,178 178,146 Q168,112 174,80 Q179,64 188,58 Z"
-                    fill="rgba(255,255,255,.38)" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" />
-                  <path d="M244,24 Q292,13 332,34 Q353,55 337,80 Q311,91 280,76 Q254,65 244,45 Q239,34 244,24 Z" fill="rgba(255,255,255,.09)" />
-                  <path d="M318,158 Q345,152 356,174 Q351,190 330,190 Q314,180 318,158 Z" fill="rgba(255,255,255,.09)" />
+                  style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none", opacity:.5 }}>
+                  <path d="M10,10 Q46,-4 82,16 Q112,4 132,30 Q120,60 92,66 Q66,86 40,70 Q4,56 10,10 Z" fill={ink} fillOpacity=".14" />
+                  <path d="M64,116 Q92,104 104,140 Q112,178 90,214 Q72,226 60,200 Q46,162 64,116 Z" fill={ink} fillOpacity=".14" />
+                  <path d="M188,12 Q214,-2 240,10 Q248,30 228,42 Q208,50 196,38 Q182,26 188,12 Z" fill={ink} fillOpacity=".14" />
+                  <path d="M196,58 Q236,50 254,84 Q266,122 253,162 Q241,198 214,210 Q188,198 181,162 Q168,122 176,84 Q182,66 196,58 Z"
+                    fill={ink} fillOpacity=".22" />
+                  <path d="M256,20 Q314,6 362,32 Q388,58 368,88 Q336,101 298,82 Q266,68 256,44 Q250,32 256,20 Z" fill={ink} fillOpacity=".14" />
+                  <path d="M330,168 Q362,160 375,186 Q369,206 344,206 Q325,194 330,168 Z" fill={ink} fillOpacity=".14" />
                 </svg>
                 {/* Cercles décoratifs */}
-                <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.05)", pointerEvents: "none" }} />
-                <div style={{ position: "absolute", bottom: -30, left: -20, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,.04)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.35)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", bottom: -30, left: -20, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,.2)", pointerEvents: "none" }} />
 
                 {/* ── Ligne 1 : puce + badge type ── */}
                 <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, position:"relative" }}>
@@ -445,37 +445,37 @@ function DepCard({ dep, depNumber, titular }) {
                     <div style={{ position:"absolute", top:"50%", left:4, right:4, height:1, background:"rgba(0,0,0,.25)" }} />
                     <div style={{ position:"absolute", left:"50%", top:4, bottom:4, width:1, background:"rgba(0,0,0,.25)" }} />
                   </div>
-                  <div style={{ background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)", borderRadius:8, padding:"4px 10px", border:"1px solid rgba(255,255,255,.25)" }}>
+                  <div style={{ background:`${ink}18`, borderRadius:8, padding:"4px 10px", border:`1px solid ${ink}30` }}>
                     <div style={{ fontSize:10, fontWeight:800, letterSpacing:.5 }}>{dep.type === "spouse" ? "CONJOINT(E)" : "ENFANT"}</div>
                   </div>
                 </div>
 
                 {/* ── Numéro façon carte bancaire ── */}
-                <div style={{ fontSize:15, fontWeight:700, fontFamily:"monospace", letterSpacing:1.5, marginBottom:16, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)" }}>
+                <div style={{ fontSize:15, fontWeight:700, fontFamily:"monospace", letterSpacing:1.5, marginBottom:16, position:"relative" }}>
                   {depNumber}
                 </div>
 
                 {/* ── Titulaire (ayant droit) + expiration ── */}
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:16, position:"relative" }}>
                   <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Ayant droit</div>
+                    <div style={{ fontSize:9, opacity:.6, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Ayant droit</div>
                     <div style={{ fontSize:15, fontWeight:800, letterSpacing:.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                       {dep.firstname} {dep.name}
                     </div>
                     {dep.birth_date && (
-                      <div style={{ fontSize:10, opacity:.75, marginTop:3 }}>Né(e) le {new Date(dep.birth_date).toLocaleDateString("fr-FR")}</div>
+                      <div style={{ fontSize:10, opacity:.7, marginTop:3 }}>Né(e) le {new Date(dep.birth_date).toLocaleDateString("fr-FR")}</div>
                     )}
                   </div>
                   <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
-                    <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
+                    <div style={{ fontSize:9, opacity:.6, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
                     <div style={{ fontSize:14, fontWeight:800 }}>{expiry}</div>
                   </div>
                 </div>
 
-                {/* ── Bas de carte : photo + logo/marque | QR ── */}
+                {/* ── Bas de carte : photo + logo/marque | anneaux + QR ── */}
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", position:"relative" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", border:"1px solid rgba(255,255,255,.35)", flexShrink:0, background:"rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", border:`1px solid ${ink}40`, flexShrink:0, background:"rgba(255,255,255,.5)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
                       {dep.photo
                         ? <img src={dep.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} crossOrigin="anonymous" />
                         : (dep.type === "spouse" ? "💑" : "👶")}
@@ -484,11 +484,18 @@ function DepCard({ dep, depNumber, titular }) {
                       MUTUELLE SANTÉ<br />AWOUNDJÔ
                     </div>
                   </div>
-                  {qrUrl && (
-                    <div style={{ width:44, height:44, background:"#fff", borderRadius:8, overflow:"hidden", border:"2px solid rgba(255,255,255,.3)", flexShrink:0 }}>
-                      <img src={qrUrl} alt="QR" style={{ width:"100%", height:"100%", objectFit:"contain" }} crossOrigin="anonymous" />
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    {/* Anneaux entrelacés décoratifs */}
+                    <div style={{ position:"relative", width:34, height:20, flexShrink:0 }}>
+                      <div style={{ position:"absolute", left:0, top:0, width:20, height:20, borderRadius:"50%", background:"rgba(255,255,255,.55)", border:`1.5px solid ${ink}55` }} />
+                      <div style={{ position:"absolute", right:0, top:0, width:20, height:20, borderRadius:"50%", background:"rgba(255,255,255,.35)", border:`1.5px solid ${ink}55` }} />
                     </div>
-                  )}
+                    {qrUrl && (
+                      <div style={{ width:44, height:44, background:"#fff", borderRadius:8, overflow:"hidden", border:`2px solid ${ink}30`, flexShrink:0 }}>
+                        <img src={qrUrl} alt="QR" style={{ width:"100%", height:"100%", objectFit:"contain" }} crossOrigin="anonymous" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -3,10 +3,18 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientCardAPI, PLANS } from "../../clientApi";
 
+// ── Style "carte bancaire" clair/métallique, façon Visa Santé ──────────────
 const PLAN_GRADIENTS = {
-  ESSENTIELLE: "linear-gradient(135deg, #1a56db 0%, #1e3a8a 100%)",
-  IVOIRIENNE:  "linear-gradient(135deg, #059669 0%, #064e3b 100%)",
-  TURQUOISE:   "linear-gradient(135deg, #0891B2 0%, #164e63 100%)",
+  ESSENTIELLE: "linear-gradient(135deg, #EAF3FC 0%, #BFDCF5 45%, #6FA8DC 100%)",
+  IVOIRIENNE:  "linear-gradient(135deg, #EAFBF3 0%, #C6EBDA 45%, #6FC79A 100%)",
+  TURQUOISE:   "linear-gradient(135deg, #E7FAFC 0%, #BEE9EF 45%, #5FB9C9 100%)",
+};
+
+// Couleur de texte/lignes adaptée à un fond clair (au lieu du blanc sur fond foncé)
+const PLAN_INK = {
+  ESSENTIELLE: "#0F3D75",
+  IVOIRIENNE:  "#0F5B3D",
+  TURQUOISE:   "#0B4A54",
 };
 
 // ── QR dynamique : Carte + Nom + Mutualiste ──────────────────────────────────
@@ -184,6 +192,7 @@ export default function ClientCarte() {
   const { card, dependents } = data;
   const plan      = PLANS[card.plan] || PLANS.ESSENTIELLE;
   const gradient  = PLAN_GRADIENTS[card.plan] || PLAN_GRADIENTS.ESSENTIELLE;
+  const ink       = PLAN_INK[card.plan] || PLAN_INK.ESSENTIELLE;
   const isActive  = card.status === "active" || card.status === "actif";
   const numeroCarte = card.numero_carte || card.mutual_number;
   const expiryStr = card.expiration_date
@@ -251,45 +260,37 @@ export default function ClientCarte() {
         id="carte-physique"
         ref={carteRef}
         style={{
-          background: gradient, borderRadius: 20, padding: 24, color: "#fff",
+          background: gradient, borderRadius: 20, padding: 24, color: ink,
           position: "relative", overflow: "hidden",
-          boxShadow: "0 16px 48px rgba(26,86,219,.35)", marginBottom: 14,
+          boxShadow: "0 16px 48px rgba(15,61,117,.25)", marginBottom: 14,
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(.97)",
           transition: "all .5s cubic-bezier(.34,1.56,.64,1)",
           minHeight: 200,
         }}
       >
-        {/* Fond mappemonde stylisée — Afrique mise en évidence (illustration originale, décorative) */}
+        {/* Fond mappemonde stylisée, bien visible façon carte bancaire (illustration originale, décorative) */}
         <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice"
-          style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none" }}>
-          <defs>
-            <radialGradient id="africaGlow" cx="50%" cy="45%" r="65%">
-              <stop offset="0%" stopColor="rgba(255,255,255,.35)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </radialGradient>
-          </defs>
+          style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none", opacity:.5 }}>
           {/* Amérique du Nord */}
-          <path d="M18,18 Q42,8 68,22 Q92,12 108,32 Q98,54 78,58 Q58,74 38,62 Q14,52 18,18 Z" fill="rgba(255,255,255,.09)" />
+          <path d="M10,10 Q46,-4 82,16 Q112,4 132,30 Q120,60 92,66 Q66,86 40,70 Q4,56 10,10 Z" fill={ink} fillOpacity=".14" />
           {/* Amérique du Sud */}
-          <path d="M68,108 Q90,98 100,128 Q106,160 88,192 Q73,202 63,180 Q52,148 68,108 Z" fill="rgba(255,255,255,.09)" />
+          <path d="M64,116 Q92,104 104,140 Q112,178 90,214 Q72,226 60,200 Q46,162 64,116 Z" fill={ink} fillOpacity=".14" />
           {/* Europe */}
-          <path d="M182,18 Q202,8 222,18 Q228,34 212,44 Q196,50 186,40 Q176,30 182,18 Z" fill="rgba(255,255,255,.09)" />
-          {/* Halo derrière l'Afrique */}
-          <circle cx="208" cy="120" r="90" fill="url(#africaGlow)" />
-          {/* Afrique — mise en évidence */}
-          <path d="M188,58 Q222,52 238,80 Q248,112 237,146 Q227,178 206,188 Q184,178 178,146 Q168,112 174,80 Q179,64 188,58 Z"
-            fill="rgba(255,255,255,.38)" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" />
+          <path d="M188,12 Q214,-2 240,10 Q248,30 228,42 Q208,50 196,38 Q182,26 188,12 Z" fill={ink} fillOpacity=".14" />
+          {/* Afrique */}
+          <path d="M196,58 Q236,50 254,84 Q266,122 253,162 Q241,198 214,210 Q188,198 181,162 Q168,122 176,84 Q182,66 196,58 Z"
+            fill={ink} fillOpacity=".22" />
           {/* Asie */}
-          <path d="M244,24 Q292,13 332,34 Q353,55 337,80 Q311,91 280,76 Q254,65 244,45 Q239,34 244,24 Z" fill="rgba(255,255,255,.09)" />
+          <path d="M256,20 Q314,6 362,32 Q388,58 368,88 Q336,101 298,82 Q266,68 256,44 Q250,32 256,20 Z" fill={ink} fillOpacity=".14" />
           {/* Océanie */}
-          <path d="M318,158 Q345,152 356,174 Q351,190 330,190 Q314,180 318,158 Z" fill="rgba(255,255,255,.09)" />
+          <path d="M330,168 Q362,160 375,186 Q369,206 344,206 Q325,194 330,168 Z" fill={ink} fillOpacity=".14" />
         </svg>
-        <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.05)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", bottom:-70, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.04)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", top:-70, right:-70, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,.35)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-80, left:-50, width:240, height:240, borderRadius:"50%", background:"rgba(255,255,255,.2)", pointerEvents:"none" }} />
 
-        {/* ── Ligne 1 : puce + badge formule (haut droite) ── */}
-        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:22, position:"relative" }}>
+        {/* ── Ligne 1 : puce (gauche) + marque "AWOUNDJÔ SANTÉ" (droite, façon VISA) ── */}
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:20, position:"relative" }}>
           {/* Puce dorée */}
           <div style={{ width:44, height:34, borderRadius:6, background:"linear-gradient(135deg,#F5D889,#C9A24B)", position:"relative", boxShadow:"inset 0 0 0 1px rgba(0,0,0,.15)" }}>
             <div style={{ position:"absolute", inset:5, border:"1px solid rgba(0,0,0,.25)", borderRadius:3 }} />
@@ -297,50 +298,57 @@ export default function ClientCarte() {
             <div style={{ position:"absolute", left:"50%", top:5, bottom:5, width:1, background:"rgba(0,0,0,.25)" }} />
           </div>
 
-          <div style={{
-            background:"rgba(255,255,255,.18)", backdropFilter:"blur(8px)",
-            borderRadius:8, padding:"5px 12px", border:"1px solid rgba(255,255,255,.25)",
-            textAlign:"right",
-          }}>
-            <div style={{ fontSize:12, fontWeight:800, letterSpacing:.5 }}>{plan.name}</div>
-            <div style={{ fontSize:8, opacity:.75, letterSpacing:.5, textTransform:"uppercase" }}>{plan.coverage} couverture</div>
+          <div style={{ textAlign:"right" }}>
+            <div style={{ fontSize:15, fontWeight:900, letterSpacing:.3 }}>
+              AWOUNDJÔ <span style={{ background: ink, color:"#fff", borderRadius:5, padding:"2px 7px", marginLeft:4 }}>SANTÉ</span>
+            </div>
+            <div style={{ fontSize:9, fontWeight:700, opacity:.7, letterSpacing:.5, textTransform:"uppercase", marginTop:3 }}>
+              {plan.name} · {plan.coverage} couverture
+            </div>
           </div>
         </div>
 
         {/* ── Numéro façon carte bancaire, groupé par 4 ── */}
         <div style={{
-          fontSize:20, fontWeight:700, fontFamily:"monospace", letterSpacing:2.5,
-          marginBottom:22, position:"relative", textShadow:"0 1px 2px rgba(0,0,0,.15)",
+          fontSize:22, fontWeight:700, fontFamily:"monospace", letterSpacing:3,
+          marginBottom:20, position:"relative",
         }}>
           {formatCardNumber(numeroCarte)}
         </div>
 
         {/* ── Titulaire + expiration ── */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:18, position:"relative" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:20, position:"relative" }}>
           <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Titulaire</div>
+            <div style={{ fontSize:9, opacity:.6, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Titulaire</div>
             <div style={{ fontSize:16, fontWeight:800, letterSpacing:.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
               {card.name?.toUpperCase()}
             </div>
           </div>
           <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
-            <div style={{ fontSize:9, opacity:.65, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
+            <div style={{ fontSize:9, opacity:.6, letterSpacing:1.2, textTransform:"uppercase", marginBottom:3 }}>Expire fin</div>
             <div style={{ fontSize:16, fontWeight:800 }}>{expiryStr}</div>
           </div>
         </div>
 
-        {/* ── Bas de carte : logo + marque | statut ── */}
+        {/* ── Bas de carte : logo + marque | anneaux entrelacés + statut ── */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", position:"relative" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:30, height:30, background:"rgba(255,255,255,.9)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:15, color: gradient.match(/#[0-9a-fA-F]{6}/)?.[0] || "#1a56db" }}>A</div>
+            <div style={{ width:30, height:30, background: ink, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:15, color:"#fff" }}>A</div>
             <div style={{ fontSize:9, fontWeight:800, letterSpacing:.6, lineHeight:1.25 }}>
               MUTUELLE SANTÉ<br />AWOUNDJÔ
             </div>
           </div>
 
-          <div style={{ display:"inline-flex", alignItems:"center", gap:5, background: isActive ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)", backdropFilter:"blur(8px)", borderRadius:20, padding:"4px 12px", border:`1px solid ${isActive ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}` }}>
-            <span style={{ width:7, height:7, borderRadius:"50%", background: isActive ? "#10B981" : "#EF4444", display:"inline-block", boxShadow: isActive ? "0 0 6px #10B981" : "none" }} />
-            <span style={{ fontSize:10, fontWeight:700, letterSpacing:.5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ display:"inline-flex", alignItems:"center", gap:5, background: isActive ? "rgba(16,129,89,.18)" : "rgba(180,40,40,.18)", borderRadius:20, padding:"4px 12px", border:`1px solid ${isActive ? "rgba(16,129,89,.35)" : "rgba(180,40,40,.35)"}` }}>
+              <span style={{ width:7, height:7, borderRadius:"50%", background: isActive ? "#0E9F6E" : "#C0392B", display:"inline-block" }} />
+              <span style={{ fontSize:10, fontWeight:700, letterSpacing:.5 }}>{isActive ? "ACTIVE" : "INACTIVE"}</span>
+            </div>
+            {/* Anneaux entrelacés décoratifs, façon réseau bancaire */}
+            <div style={{ position:"relative", width:44, height:26, flexShrink:0 }}>
+              <div style={{ position:"absolute", left:0, top:0, width:26, height:26, borderRadius:"50%", background:"rgba(255,255,255,.55)", border:`1.5px solid ${ink}55` }} />
+              <div style={{ position:"absolute", right:0, top:0, width:26, height:26, borderRadius:"50%", background:"rgba(255,255,255,.35)", border:`1.5px solid ${ink}55` }} />
+            </div>
           </div>
         </div>
       </div>
