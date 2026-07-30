@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRole } from "../context/RoleContext";
+import { ADMIN_BASE } from "../config/adminBase";
 
 // Nombre max de liens visibles directement dans la navbar (avant "Plus...")
 // Ajuste cette valeur selon la largeur que tu veux allouer aux liens
@@ -10,47 +11,47 @@ const MAX_VISIBLE = 6;
 
 function getNavLinks(role) {
   const common = [
-    { to: "/",        label: "Tableau de bord", icon: "ti-layout-dashboard" },
-    { to: "/clients", label: "Clients",         icon: "ti-users" },
+    { to: ADMIN_BASE,              label: "Tableau de bord", icon: "ti-layout-dashboard" },
+    { to: `${ADMIN_BASE}/clients`,   label: "Clients",         icon: "ti-users" },
   ];
 
   const byRole = {
     ADMIN: [
       ...common,
-      { to: "/groups",          label: "Groupes",         icon: "ti-users-group" },
-      { to: "/payments",        label: "Paiements",       icon: "ti-credit-card" },
-      { to: "/commissions",     label: "Commissions",     icon: "ti-coins" },
-      { to: "/healthcare",      label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
-      { to: "/admin/providers", label: "Établissements",  icon: "ti-building-hospital" },
-      { to: "/agents",          label: "Agents",          icon: "ti-id-badge" },
-      { to: "/admin/diaspora",  label: "Diaspora",        icon: "ti-world" },
-      { to: "/admin/blog",      label: "Blog",            icon: "ti-notes" },
-      { to: "/hub",             label: "Hub Admin",       icon: "ti-key" },
+      { to: `${ADMIN_BASE}/groups`,          label: "Groupes",         icon: "ti-users-group" },
+      { to: `${ADMIN_BASE}/payments`,        label: "Paiements",       icon: "ti-credit-card" },
+      { to: `${ADMIN_BASE}/commissions`,     label: "Commissions",     icon: "ti-coins" },
+      { to: `${ADMIN_BASE}/healthcare`,      label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
+      { to: `${ADMIN_BASE}/providers`, label: "Établissements",  icon: "ti-building-hospital" },
+      { to: `${ADMIN_BASE}/agents`,          label: "Agents",          icon: "ti-id-badge" },
+      { to: `${ADMIN_BASE}/diaspora`,  label: "Diaspora",        icon: "ti-world" },
+      { to: `${ADMIN_BASE}/blog`,      label: "Blog",            icon: "ti-notes" },
+      { to: `${ADMIN_BASE}/hub`,             label: "Hub Admin",       icon: "ti-key" },
     ],
     AGENT: [
       ...common,
-      { to: "/groups",      label: "Groupes",     icon: "ti-users-group" },
-      { to: "/payments",    label: "Paiements",   icon: "ti-credit-card" },
-      { to: "/commissions", label: "Commissions", icon: "ti-coins" },
+      { to: `${ADMIN_BASE}/groups`,      label: "Groupes",     icon: "ti-users-group" },
+      { to: `${ADMIN_BASE}/payments`,    label: "Paiements",   icon: "ti-credit-card" },
+      { to: `${ADMIN_BASE}/commissions`, label: "Commissions", icon: "ti-coins" },
     ],
     RESPONSABLE_COMMERCIAL: [
       ...common,
-      { to: "/groups",      label: "Groupes",     icon: "ti-users-group" },
-      { to: "/payments",    label: "Paiements",   icon: "ti-credit-card" },
-      { to: "/commissions", label: "Commissions", icon: "ti-coins" },
-      { to: "/agents",      label: "Mon équipe",  icon: "ti-id-badge" },
+      { to: `${ADMIN_BASE}/groups`,      label: "Groupes",     icon: "ti-users-group" },
+      { to: `${ADMIN_BASE}/payments`,    label: "Paiements",   icon: "ti-credit-card" },
+      { to: `${ADMIN_BASE}/commissions`, label: "Commissions", icon: "ti-coins" },
+      { to: `${ADMIN_BASE}/agents`,      label: "Mon équipe",  icon: "ti-id-badge" },
     ],
     CONSEILLERE_CLIENTELE: [
       ...common,
-      { to: "/groups",          label: "Groupes",         icon: "ti-users-group" },
-      { to: "/healthcare",      label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
-      { to: "/admin/providers", label: "Établissements",  icon: "ti-building-hospital" },
+      { to: `${ADMIN_BASE}/groups`,          label: "Groupes",         icon: "ti-users-group" },
+      { to: `${ADMIN_BASE}/healthcare`,      label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
+      { to: `${ADMIN_BASE}/providers`, label: "Établissements",  icon: "ti-building-hospital" },
     ],
     COMMUNITY_MANAGER: [
       ...common,
-      { to: "/admin/broadcasts", label: "Broadcast",      icon: "ti-speakerphone" },
-      { to: "/healthcare",       label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
-      { to: "/admin/blog",       label: "Blog",            icon: "ti-notes" },
+      { to: `${ADMIN_BASE}/broadcasts`, label: "Broadcast",      icon: "ti-speakerphone" },
+      { to: `${ADMIN_BASE}/healthcare`,       label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
+      { to: `${ADMIN_BASE}/blog`,       label: "Blog",            icon: "ti-notes" },
     ],
   };
 
@@ -68,7 +69,7 @@ function initials(name = "") {
 
 /** Lien de navigation desktop (réutilisable) */
 function NavLink({ to, label, icon, pathname, onClick }) {
-  const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
+  const isActive = to === ADMIN_BASE ? pathname === to : pathname.startsWith(to);
   return (
     <Link
       to={to}
@@ -110,7 +111,7 @@ export default function Navbar() {
 
   // Un lien caché est-il actif ? → on le signale sur le bouton "Plus..."
   const moreIsActive = hiddenLinks.some(({ to }) =>
-    to === "/" ? pathname === "/" : pathname.startsWith(to)
+    to === ADMIN_BASE ? pathname === to : pathname.startsWith(to)
   );
 
   // Fermer le dropdown si clic en dehors
@@ -130,7 +131,7 @@ export default function Navbar() {
 
   function handleLogout() {
     logout();
-    navigate("/login");
+    navigate(`${ADMIN_BASE}/login`);
   }
 
   return (
@@ -139,7 +140,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 h-[52px] flex items-center gap-2">
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 flex-shrink-0 no-underline">
+        <Link to={ADMIN_BASE} className="flex items-center gap-2 flex-shrink-0 no-underline">
           <img
             src="/logo-icon.png"
             alt="Awoundjô"
@@ -208,7 +209,7 @@ export default function Navbar() {
                   }}
                 >
                   {hiddenLinks.map(({ to, label, icon }) => {
-                    const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
+                    const isActive = to === ADMIN_BASE ? pathname === to : pathname.startsWith(to);
                     return (
                       <Link
                         key={to}
@@ -323,7 +324,7 @@ export default function Navbar() {
           style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}
         >
           {links.map(({ to, label, icon }) => {
-            const isActive = to === "/" ? pathname === "/" : pathname.startsWith(to);
+            const isActive = to === ADMIN_BASE ? pathname === to : pathname.startsWith(to);
             return (
               <Link
                 key={to}
