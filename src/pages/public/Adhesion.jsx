@@ -138,7 +138,7 @@ export default function Adhesion() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, #08172B 0%, ${C.green} 100%)`,
         padding: "120px 24px 56px",
         position: "relative", overflow: "hidden",
       }}>
@@ -148,14 +148,14 @@ export default function Adhesion() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
             Rejoignez la mutuelle <span style={{ color: C.gold }}>Awoundjô</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A8CDB8", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
             Adhésion en ligne. Couverture activée sous 24h. Paiement Mobile Money sécurisé.
           </p>
         </div>
       </section>
 
       {/* ── ÉTAPES RAPIDES ───────────────────────────────────── */}
-      <div style={{ background: C.white, borderBottom: "1.5px solid #EBF5F0", padding: "20px 24px" }}>
+      <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "center", gap: 0 }}>
           {[
             { n: "1", label: "Vos informations" },
@@ -187,7 +187,7 @@ export default function Adhesion() {
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
               {/* Infos personnelles */}
-              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #EBF5F0" }}>
+              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
                 <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate, marginBottom: 20 }}>
                   1. Vos informations
                 </div>
@@ -223,7 +223,7 @@ export default function Adhesion() {
               </div>
 
               {/* Choix formule */}
-              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #EBF5F0" }}>
+              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
                   <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate }}>2. Votre formule</div>
                   <Link to="/formules" style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.green, textDecoration: "none", fontWeight: 600 }}>Comparer →</Link>
@@ -264,7 +264,7 @@ export default function Adhesion() {
 
             {/* ── Colonne droite : paiement ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #EBF5F0" }}>
+              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
                 <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate, marginBottom: 20 }}>3. Paiement</div>
 
                 {/* Récapitulatif */}
@@ -280,7 +280,7 @@ export default function Adhesion() {
                       <span style={{ fontWeight: 600, color: C.slate }}>{selectedPlan.mensualite} F</span>
                     </div>
                   </div>
-                  <div style={{ borderTop: "1.5px solid #DCF0E5", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ borderTop: "1.5px solid #D6E6F5", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate }}>Total à payer aujourd'hui</span>
                     <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 22, color: C.green }}>{fcfa(total)}</span>
                   </div>
@@ -346,7 +346,7 @@ export default function Adhesion() {
               </div>
 
               {/* Aide */}
-              <div style={{ background: C.white, borderRadius: 16, padding: "18px 20px", border: "1.5px solid #EBF5F0", display: "flex", gap: 14, alignItems: "center" }}>
+              <div style={{ background: C.white, borderRadius: 16, padding: "18px 20px", border: "1.5px solid #E0EEF9", display: "flex", gap: 14, alignItems: "center" }}>
                 <div style={{ fontSize: 28, flexShrink: 0 }}>💬</div>
                 <div>
                   <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13, color: C.slate, marginBottom: 4 }}>Besoin d'aide ?</div>

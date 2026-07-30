@@ -25,7 +25,7 @@ export default function LandingPage() {
         minHeight: "100vh",
         position: "relative",
         overflow: "hidden",
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 45%, #1a5c35 100%)`,
+        background: `linear-gradient(150deg, #08172B 0%, ${C.green} 45%, #12406e 100%)`,
         display: "flex",
         alignItems: "center",
         paddingTop: 64,
@@ -85,7 +85,7 @@ export default function LandingPage() {
 
             <p style={{
               fontFamily: "Inter, sans-serif", fontSize: 17,
-              color: "#A8CDB8", lineHeight: 1.75,
+              color: "#A9C6E0", lineHeight: 1.75,
               marginBottom: 40, maxWidth: 500,
             }}>
               Awoundjô vous donne accès à plus de 120 établissements partenaires en Côte d'Ivoire. Soins, hospitalisation, maternité, optique — sans avancer les frais.
@@ -94,7 +94,7 @@ export default function LandingPage() {
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 52 }}>
               <Link to="/adhesion" style={{
                 background: C.gold,
-                color: "#0A1F12",
+                color: "#0A1628",
                 fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 15,
                 padding: "15px 30px", borderRadius: 10, textDecoration: "none",
                 boxShadow: `0 6px 24px ${C.gold}50`,
@@ -115,7 +115,7 @@ export default function LandingPage() {
               {STATS.map(s => (
                 <div key={s.label}>
                   <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 30, color: C.gold, lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#7AA88C", marginTop: 4, letterSpacing: 0.3 }}>{s.label}</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#7A9BC0", marginTop: 4, letterSpacing: 0.3 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -153,22 +153,22 @@ export default function LandingPage() {
               position: "absolute", bottom: -32, left: "50%",
               transform: "translateX(-50%) rotate(-3deg)",
               width: 290, height: 176, borderRadius: 16,
-              background: `linear-gradient(135deg, #0D2B18 0%, #1B6B3A 100%)`,
+              background: `linear-gradient(135deg, #0A1628 0%, #1a5fa8 100%)`,
               boxShadow: `0 28px 64px rgba(0,0,0,0.55), 0 0 0 1px ${C.gold}30`,
               padding: 22, overflow: "hidden",
             }}>
               <div style={{ position: "absolute", right: -30, top: -30, width: 150, height: 150, borderRadius: "50%", background: `${C.gold}12` }} />
               <div style={{ position: "absolute", right: 20, bottom: 20, width: 90, height: 90, borderRadius: "50%", background: `${C.greenLight}15` }} />
               <div style={{ fontFamily: "Playfair Display, serif", color: C.gold, fontWeight: 700, fontSize: 16, marginBottom: 2 }}>Awoundjô</div>
-              <div style={{ fontFamily: "Inter, sans-serif", color: "#6B9E80", fontSize: 8, letterSpacing: 1.5, marginBottom: 20 }}>MUTUELLE DE SANTÉ — CÔTE D'IVOIRE</div>
+              <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1.5, marginBottom: 20 }}>MUTUELLE DE SANTÉ — CÔTE D'IVOIRE</div>
               <div style={{ fontFamily: "Inter, sans-serif", color: "#FFFFFF", fontSize: 13, letterSpacing: 2.5, marginBottom: 14 }}>AWJ-2026-XXXXXX</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                 <div>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B9E80", fontSize: 8, letterSpacing: 1 }}>ADHÉRENT</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1 }}>ADHÉRENT</div>
                   <div style={{ fontFamily: "Inter, sans-serif", color: "#FFFFFF", fontSize: 12, fontWeight: 700 }}>FAMILLE KOUASSI</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B9E80", fontSize: 8, letterSpacing: 1 }}>FORMULE</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1 }}>FORMULE</div>
                   <div style={{ fontFamily: "Inter, sans-serif", color: C.gold, fontSize: 11, fontWeight: 800 }}>IVOIRIENNE</div>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function LandingPage() {
       </section>
 
       {/* ═══ PARTENAIRES TYPES ═════════════════════════════════════════ */}
-      <div style={{ background: "#F0F7F3", borderBottom: "1px solid #DCF0E5", padding: "18px 24px" }}>
+      <div style={{ background: "#EDF3FA", borderBottom: "1px solid #D6E6F5", padding: "18px 24px" }}>
         <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gray, letterSpacing: 1, marginRight: 8, textTransform: "uppercase", fontWeight: 600 }}>Réseau acceptant la carte Mansa :</span>
           {PARTENAIRES.map((p, i) => (
@@ -217,7 +217,7 @@ export default function LandingPage() {
                 icon: "👨‍👩‍👧",
                 title: "Toute la famille couverte",
                 desc: "Un seul contrat couvre votre foyer entier. Conjoint, enfants et parents à charge reçoivent chacun leur carte personnalisée.",
-                accent: "#0E7490",
+                accent: "#00c4b4",
               },
               {
                 icon: "🏥",
@@ -235,12 +235,12 @@ export default function LandingPage() {
                 icon: "🩺",
                 title: "Téléconsultation incluse",
                 desc: "Consultez un médecin en ligne depuis chez vous, sans frais supplémentaires. Disponible 6 jours sur 7, ordonnance électronique incluse.",
-                accent: "#0E7490",
+                accent: "#00c4b4",
               },
             ].map(f => (
               <div key={f.title} style={{
                 background: C.white, borderRadius: 16, padding: "28px 26px",
-                border: "1.5px solid #EBF5F0",
+                border: "1.5px solid #E0EEF9",
                 boxShadow: "0 2px 16px rgba(27,107,58,0.05)",
               }}>
                 <div style={{
@@ -275,7 +275,7 @@ export default function LandingPage() {
               <div key={plan.name} style={{
                 borderRadius: 20, overflow: "hidden",
                 boxShadow: i === 1 ? `0 12px 48px ${C.gold}25` : "0 2px 20px rgba(0,0,0,0.06)",
-                border: i === 1 ? `2.5px solid ${C.gold}` : "1.5px solid #E8F5EE",
+                border: i === 1 ? `2.5px solid ${C.gold}` : "1.5px solid #E9F1FB",
                 background: C.white,
                 transform: i === 1 ? "scale(1.03)" : "scale(1)",
               }}>
@@ -365,10 +365,10 @@ export default function LandingPage() {
                   boxShadow: `0 6px 24px ${C.gold}55`,
                   position: "relative", zIndex: 1,
                 }}>
-                  <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 20, color: "#0A1F12" }}>{step.n}</span>
+                  <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 20, color: "#0A1628" }}>{step.n}</span>
                 </div>
                 <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: "#FFFFFF", marginBottom: 8 }}>{step.label}</div>
-                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#8FB8A0", lineHeight: 1.65 }}>{step.desc}</div>
+                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#8FADC9", lineHeight: 1.65 }}>{step.desc}</div>
               </div>
             ))}
           </div>
@@ -414,7 +414,7 @@ export default function LandingPage() {
             {TESTIMONIALS.map(t => (
               <div key={t.name} style={{
                 background: C.cream, borderRadius: 20, padding: "32px 28px",
-                border: "1.5px solid #E8F5EE",
+                border: "1.5px solid #E9F1FB",
               }}>
                 <div style={{ fontFamily: "Playfair Display, serif", fontSize: 52, color: `${C.gold}60`, lineHeight: 0.8, marginBottom: 18 }}>"</div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: C.slate, lineHeight: 1.75, marginBottom: 24, fontStyle: "italic" }}>{t.text}</p>
@@ -476,7 +476,7 @@ export default function LandingPage() {
 
       {/* ═══ CTA FINAL ════════════════════════════════════════════════ */}
       <section style={{
-        background: `linear-gradient(135deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(135deg, #08172B 0%, ${C.green} 100%)`,
         padding: "96px 24px", textAlign: "center", position: "relative", overflow: "hidden",
       }}>
         <div style={{ position: "absolute", inset: 0, opacity: 0.06, background: `radial-gradient(circle at 30% 50%, ${C.gold} 0%, transparent 60%)` }} />
@@ -487,12 +487,12 @@ export default function LandingPage() {
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.2 }}>
             Commencez dès aujourd'hui,<br />couverture activée en 24h.
           </h2>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.7, marginBottom: 40 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A9C6E0", lineHeight: 1.7, marginBottom: 40 }}>
             Adhésion en ligne en 5 minutes. Paiement Mobile Money. Aucun déplacement requis.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <Link to="/adhesion" style={{
-              background: C.gold, color: "#0A1F12",
+              background: C.gold, color: "#0A1628",
               fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 15,
               padding: "16px 36px", borderRadius: 10, textDecoration: "none",
               boxShadow: `0 8px 32px ${C.gold}50`,

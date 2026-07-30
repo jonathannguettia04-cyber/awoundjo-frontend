@@ -35,7 +35,7 @@ export default function Formules() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
@@ -45,7 +45,7 @@ export default function Formules() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.15 }}>
             Choisissez la couverture<br /><span style={{ color: C.gold }}>qui vous correspond</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75, maxWidth: 540, margin: "0 auto 32px" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.75, maxWidth: 540, margin: "0 auto 32px" }}>
             Frais d'adhésion uniques de 15 000 F pour toutes les formules. Mensualités dès 10 000 F. Couverture activée sous 24h après paiement.
           </p>
           {/* Tabs */}
@@ -72,7 +72,7 @@ export default function Formules() {
                 <div key={plan.name} style={{
                   borderRadius: 22, overflow: "hidden",
                   boxShadow: i === 1 ? `0 16px 56px ${C.gold}25` : "0 4px 24px rgba(0,0,0,0.07)",
-                  border: i === 1 ? `2.5px solid ${C.gold}` : "1.5px solid #E8F5EE",
+                  border: i === 1 ? `2.5px solid ${C.gold}` : `1.5px solid ${C.greenPale}`,
                   background: C.white,
                   transform: i === 1 ? "translateY(-8px)" : "none",
                 }}>
@@ -145,22 +145,22 @@ export default function Formules() {
       {activeTab === "compare" && (
         <section style={{ background: C.cream, padding: "72px 24px 96px" }}>
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
-            <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1.5px solid #E8F5EE" }}>
+            <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: `1.5px solid ${C.greenPale}` }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ background: "#F8FBF9", padding: "18px 20px", fontFamily: "Inter, sans-serif", fontSize: 12, color: C.gray, textAlign: "left", fontWeight: 600, borderBottom: "1.5px solid #E8F5EE", width: "40%" }}>
+                    <th style={{ background: C.cream, padding: "18px 20px", fontFamily: "Inter, sans-serif", fontSize: 12, color: C.gray, textAlign: "left", fontWeight: 600, borderBottom: `1.5px solid ${C.greenPale}`, width: "40%" }}>
                       Garanties
                     </th>
                     {PLANS.map((p, i) => (
                       <th key={p.name} style={{
-                        background: i === 1 ? C.gold : "#F8FBF9",
+                        background: i === 1 ? C.gold : C.cream,
                         padding: "18px 20px",
                         fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 800,
                         color: i === 1 ? "#FFFFFF" : C.slate,
                         textAlign: "center",
-                        borderBottom: "1.5px solid #E8F5EE",
-                        borderLeft: "1px solid #E8F5EE",
+                        borderBottom: `1.5px solid ${C.greenPale}`,
+                        borderLeft: `1px solid ${C.greenPale}`,
                       }}>
                         {p.name}
                         <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, opacity: 0.85, marginTop: 3 }}>{p.mensualite} F/mois</div>
@@ -171,7 +171,7 @@ export default function Formules() {
                 <tbody>
                   {COMPARATIF.map((row, ri) => (
                     <tr key={row.label} style={{ background: ri % 2 === 0 ? "#FFFFFF" : "#FAFCFA" }}>
-                      <td style={{ padding: "14px 20px", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.slate, borderBottom: "1px solid #EBF5F0" }}>
+                      <td style={{ padding: "14px 20px", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.slate, borderBottom: `1px solid ${C.greenPale}` }}>
                         {row.label}
                       </td>
                       {row.vals.map((v, vi) => (
@@ -179,17 +179,17 @@ export default function Formules() {
                           padding: "14px 20px", textAlign: "center",
                           fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700,
                           color: v === "✗" ? "#CBD5E0" : v === "✓" ? C.green : C.slate,
-                          borderBottom: "1px solid #EBF5F0",
-                          borderLeft: "1px solid #EBF5F0",
+                          borderBottom: `1px solid ${C.greenPale}`,
+                          borderLeft: `1px solid ${C.greenPale}`,
                         }}>{v}</td>
                       ))}
                     </tr>
                   ))}
                   {/* Ligne CTA */}
                   <tr>
-                    <td style={{ padding: "20px", background: "#F8FBF9" }} />
+                    <td style={{ padding: "20px", background: C.cream }} />
                     {PLANS.map((p, i) => (
-                      <td key={p.name} style={{ padding: "16px 14px", background: "#F8FBF9", borderLeft: "1px solid #E8F5EE" }}>
+                      <td key={p.name} style={{ padding: "16px 14px", background: C.cream, borderLeft: `1px solid ${C.greenPale}` }}>
                         <Link to={`/adhesion?formule=${p.name.toLowerCase()}`} style={{
                           display: "block", textAlign: "center",
                           background: i === 1 ? C.gold : p.color,
@@ -222,7 +222,7 @@ export default function Formules() {
               { q: "Combien de personnes puis-je couvrir ?", r: "Votre conjoint et vos 3 (trois) enfants, limite d'âge inférieure à 21 ans. Pour les parents, une extension est possible." },
               { q: "Que couvre le bilan de santé offert ?", r: "Consultation générale, glycémie, cholestérol, tension artérielle et bilan rénal. À effectuer dans les 3 mois suivant l'adhésion." },
             ].map(f => (
-              <div key={f.q} style={{ background: C.cream, borderRadius: 14, padding: "20px 22px", border: "1.5px solid #EBF5F0" }}>
+              <div key={f.q} style={{ background: C.cream, borderRadius: 14, padding: "20px 22px", border: `1.5px solid ${C.greenPale}` }}>
                 <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate, marginBottom: 8 }}>{f.q}</div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray, lineHeight: 1.7, margin: 0 }}>{f.r}</p>
               </div>
@@ -232,7 +232,7 @@ export default function Formules() {
       </section>
 
       {/* ── CTA SIMULATEUR ───────────────────────────────────── */}
-      <section style={{ background: C.greenPale, padding: "72px 24px", textAlign: "center", borderTop: "1.5px solid #DCF0E5" }}>
+      <section style={{ background: C.greenPale, padding: "72px 24px", textAlign: "center", borderTop: `1.5px solid ${C.greenPale}` }}>
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <div style={{ fontSize: 44, marginBottom: 16 }}>🧮</div>
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.4rem, 2.5vw, 2rem)", color: C.slate, margin: "0 0 16px" }}>

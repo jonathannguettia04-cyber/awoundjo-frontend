@@ -56,7 +56,7 @@ export default function Fonctionnement() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 96px",
         position: "relative", overflow: "hidden",
       }}>
@@ -66,7 +66,7 @@ export default function Fonctionnement() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3.2rem)", color: "#FFFFFF", margin: "0 0 24px", lineHeight: 1.15 }}>
             Adhérez en <span style={{ color: C.gold }}>5 étapes</span>,<br />couvert en 24h
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75, maxWidth: 560, margin: "0 auto" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.75, maxWidth: 560, margin: "0 auto" }}>
             De l'inscription au premier soin, voici exactement comment fonctionne votre adhésion à la mutuelle Awoundjô.
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function Fonctionnement() {
                     <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 22, color: "#FFFFFF" }}>{step.n}</span>
                   </div>
                   {i < STEPS_DETAIL.length - 1 && (
-                    <div style={{ width: 2, flex: 1, background: "#EBF5F0", minHeight: 40, margin: "8px 0" }} />
+                    <div style={{ width: 2, flex: 1, background: C.greenPale, minHeight: 40, margin: "8px 0" }} />
                   )}
                 </div>
 
@@ -120,7 +120,7 @@ export default function Fonctionnement() {
       </section>
 
       {/* ── MÉTHODES DE PAIEMENT ─────────────────────────────── */}
-      <section style={{ background: C.cream, padding: "80px 24px", borderTop: "1.5px solid #EBF5F0" }}>
+      <section style={{ background: C.cream, padding: "80px 24px", borderTop: `1.5px solid ${C.greenPale}` }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
           <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.gold, marginBottom: 14, textTransform: "uppercase" }}>Paiement</div>
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.5rem, 2.5vw, 2rem)", color: C.slate, margin: "0 0 16px" }}>
@@ -164,7 +164,7 @@ export default function Fonctionnement() {
               { icon: "🪪", step: "2", title: "Présentez votre carte Mansa", desc: "Montrez votre carte numérique à l'accueil (QR code ou numéro de membre). L'établissement vérifie votre couverture en temps réel." },
               { icon: "✅", step: "3", title: "Soins sans avance de frais", desc: "Vous êtes pris en charge immédiatement. L'établissement facture directement Awoundjô. Vous ne payez rien de votre poche." },
             ].map(s => (
-              <div key={s.title} style={{ background: C.cream, borderRadius: 18, padding: "30px 26px", border: "1.5px solid #EBF5F0" }}>
+              <div key={s.title} style={{ background: C.cream, borderRadius: 18, padding: "30px 26px", border: `1.5px solid ${C.greenPale}` }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 14,
                   background: `${C.green}15`, display: "flex", alignItems: "center",
@@ -188,12 +188,12 @@ export default function Fonctionnement() {
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.5rem, 2.5vw, 2.2rem)", color: "#FFFFFF", margin: "0 0 16px" }}>
             Prêt à commencer ?
           </h2>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A8CDB8", lineHeight: 1.7, marginBottom: 32 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, marginBottom: 32 }}>
             Adhérez maintenant en ligne. Couverture activée sous 24h.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <Link to="/adhesion" style={{
-              background: C.gold, color: "#0A1F12",
+              background: C.gold, color: C.slate,
               fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 15,
               padding: "15px 32px", borderRadius: 10, textDecoration: "none",
             }}>Adhérer maintenant →</Link>

@@ -37,7 +37,7 @@ export default function About() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, #08172B 0%, ${C.green} 100%)`,
         padding: "140px 24px 96px",
         position: "relative",
         overflow: "hidden",
@@ -50,14 +50,14 @@ export default function About() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3.2rem)", color: "#FFFFFF", margin: "0 0 24px", lineHeight: 1.15 }}>
             Une mutuelle née en Côte d'Ivoire,<br /><span style={{ color: C.gold }}>pour les Ivoiriens</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, color: "#A8CDB8", lineHeight: 1.75, maxWidth: 640, margin: "0 auto" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, color: "#A9C6E0", lineHeight: 1.75, maxWidth: 640, margin: "0 auto" }}>
             Fondée en 2018, Awoundjô a une mission simple : rendre les soins de santé accessibles à chaque famille ivoirienne, quelle que soit sa situation économique.
           </p>
         </div>
       </section>
 
       {/* ── STATS BANDE ──────────────────────────────────────── */}
-      <div style={{ background: C.white, borderBottom: "1px solid #EBF5F0" }}>
+      <div style={{ background: C.white, borderBottom: "1px solid #E0EEF9" }}>
         <div className="awj-grid-4" style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 24px", gap: 32 }}>
           {STATS.map(s => (
             <div key={s.label} style={{ textAlign: "center" }}>
@@ -121,7 +121,7 @@ export default function About() {
             {VALEURS.map(v => (
               <div key={v.label} style={{
                 background: C.cream, borderRadius: 16, padding: "28px 24px",
-                border: "1.5px solid #EBF5F0",
+                border: "1.5px solid #E0EEF9",
                 display: "flex", flexDirection: "column", gap: 12,
               }}>
                 <div style={{ fontSize: 30 }}>{v.icon}</div>
@@ -144,14 +144,14 @@ export default function About() {
           </div>
           <div style={{ position: "relative" }}>
             {/* Ligne verticale */}
-            <div style={{ position: "absolute", left: 31, top: 0, bottom: 0, width: 2, background: "#DCF0E5" }} />
+            <div style={{ position: "absolute", left: 31, top: 0, bottom: 0, width: 2, background: "#D6E6F5" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
               {TIMELINE.map((item) => (
                 <div key={item.year} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
                   <div style={{
                     width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
                     background: item.current ? C.green : C.white,
-                    border: `2px solid ${item.current ? C.green : "#DCF0E5"}`,
+                    border: `2px solid ${item.current ? C.green : "#D6E6F5"}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     boxShadow: item.current ? `0 4px 20px ${C.green}40` : "none",
                     position: "relative", zIndex: 1,
@@ -183,12 +183,12 @@ export default function About() {
             <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.5rem, 2.5vw, 2.2rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.25 }}>
               Notre équipe vous accueille<br />à Abidjan
             </h2>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A8CDB8", lineHeight: 1.75, marginBottom: 32 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.75, marginBottom: 32 }}>
               Jules Verne, derrière l'école Akenji, Abidjan. Du lundi au vendredi de 8h à 17h, le samedi de 8h à 13h. Venez rencontrer notre équipe ou adhérez directement en ligne.
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               <Link to="/contact" style={{
-                background: C.gold, color: "#0A1F12",
+                background: C.gold, color: "#0A1628",
                 fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 14,
                 padding: "13px 28px", borderRadius: 10, textDecoration: "none",
               }}>Nous contacter →</Link>

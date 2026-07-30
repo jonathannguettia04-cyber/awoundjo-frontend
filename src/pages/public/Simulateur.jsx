@@ -92,7 +92,7 @@ export default function Simulateur() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
@@ -102,7 +102,7 @@ export default function Simulateur() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.15 }}>
             Quelle formule<br /><span style={{ color: C.gold }}>vous correspond ?</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.75 }}>
             4 questions. 1 minute. La formule idéale pour votre budget et vos besoins.
           </p>
         </div>
@@ -112,14 +112,14 @@ export default function Simulateur() {
       <section style={{ background: C.cream, padding: "72px 24px 96px" }}>
         <div style={{ maxWidth: 680, margin: "0 auto" }}>
           {!result ? (
-            <div style={{ background: C.white, borderRadius: 24, padding: "40px 36px", boxShadow: "0 4px 32px rgba(0,0,0,0.08)", border: "1.5px solid #EBF5F0" }}>
+            <div style={{ background: C.white, borderRadius: 24, padding: "40px 36px", boxShadow: "0 4px 32px rgba(0,0,0,0.08)", border: `1.5px solid ${C.greenPale}` }}>
               {/* Progress */}
               <div style={{ marginBottom: 32 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                   <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: C.gray }}>Étape {step + 1} / {QUESTIONS.length}</span>
                   <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: C.green }}>{Math.round(((step + 1) / QUESTIONS.length) * 100)}%</span>
                 </div>
-                <div style={{ height: 6, background: "#EBF5F0", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ height: 6, background: C.greenPale, borderRadius: 4, overflow: "hidden" }}>
                   <div style={{
                     width: `${((step + 1) / QUESTIONS.length) * 100}%`,
                     height: "100%",
@@ -172,7 +172,7 @@ export default function Simulateur() {
           ) : (
             /* Résultat */
             <div>
-              <div style={{ background: C.white, borderRadius: 24, overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.10)", border: "1.5px solid #EBF5F0", marginBottom: 24 }}>
+              <div style={{ background: C.white, borderRadius: 24, overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.10)", border: `1.5px solid ${C.greenPale}`, marginBottom: 24 }}>
                 {/* Header résultat */}
                 <div style={{ background: plan.color, padding: "36px 32px", position: "relative", overflow: "hidden" }}>
                   <div style={{ position: "absolute", right: -30, top: -30, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />

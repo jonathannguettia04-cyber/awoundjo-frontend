@@ -36,7 +36,7 @@ export default function Verification() {
           <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.3rem, 2.5vw, 2rem)", color: C.white, marginBottom: 12 }}>
             Vérifier un numéro mutualiste
           </div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#8FB8A0", marginBottom: 28 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 28 }}>
             Confirmez qu'un adhérent est bien enregistré chez Awoundjô.
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

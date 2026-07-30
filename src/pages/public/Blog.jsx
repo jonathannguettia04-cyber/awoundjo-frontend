@@ -13,7 +13,7 @@ const API = import.meta.env.VITE_API_URL || "";
 const CATEGORY_COLOR = {
   Conseils:   { bg: `${C.green}14`,   color: C.green },
   Pratique:   { bg: `${C.gold}14`,    color: C.gold },
-  Actualités: { bg: "#0E749014",      color: "#0E7490" },
+  Actualités: { bg: "#00c4b414",      color: "#00c4b4" },
 };
 
 function formatDate(iso) {
@@ -48,7 +48,7 @@ export default function Blog() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, #08172B 0%, ${C.green} 100%)`,
         padding: "140px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
@@ -58,7 +58,7 @@ export default function Blog() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.15 }}>
             Conseils, actualités<br /><span style={{ color: C.gold }}>et guides santé</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A9C6E0", lineHeight: 1.75 }}>
             L'équipe Awoundjô vous partage des ressources pratiques pour mieux prendre soin de vous et de votre famille.
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function Blog() {
                   textDecoration: "none", display: "grid",
                   gridTemplateColumns: "1.4fr 1fr",
                   borderRadius: 22, overflow: "hidden",
-                  border: "1.5px solid #EBF5F0",
+                  border: "1.5px solid #E0EEF9",
                   boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
                   background: C.white,
                 }} className="awj-grid-2-featured">
@@ -133,7 +133,7 @@ export default function Blog() {
                   <Link key={post.slug} to={`/blog/${post.slug}`} style={{
                     textDecoration: "none", background: C.white, borderRadius: 18, overflow: "hidden",
                     boxShadow: "0 2px 16px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column",
-                    border: "1.5px solid #EBF5F0", transition: "box-shadow .2s",
+                    border: "1.5px solid #E0EEF9", transition: "box-shadow .2s",
                   }}>
                     <div style={{ aspectRatio: "16/10", overflow: "hidden", background: C.greenPale }}>
                       {post.image && (
@@ -164,7 +164,7 @@ export default function Blog() {
       )}
 
       {/* ── NEWSLETTER ───────────────────────────────────────── */}
-      <section style={{ background: C.greenPale, padding: "72px 24px", borderTop: "1.5px solid #DCF0E5" }}>
+      <section style={{ background: C.greenPale, padding: "72px 24px", borderTop: "1.5px solid #D6E6F5" }}>
         <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
           <div style={{ fontSize: 36, marginBottom: 16 }}>📬</div>
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.4rem, 2.5vw, 2rem)", color: C.slate, margin: "0 0 12px" }}>
@@ -174,7 +174,7 @@ export default function Blog() {
             Conseils santé, actualités réseau, nouveaux remboursements — directement dans votre boîte.
           </p>
           {subscribed ? (
-            <div style={{ background: C.white, borderRadius: 14, padding: "20px", border: "1.5px solid #DCF0E5" }}>
+            <div style={{ background: C.white, borderRadius: 14, padding: "20px", border: "1.5px solid #D6E6F5" }}>
               <span style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 600, color: C.green }}>✓ Vous êtes abonné ! Merci.</span>
             </div>
           ) : (
@@ -186,7 +186,7 @@ export default function Blog() {
                 placeholder="votre@email.com"
                 style={{
                   flex: 1, padding: "13px 16px", borderRadius: 10,
-                  border: "1.5px solid #DCF0E5", fontFamily: "Inter, sans-serif",
+                  border: "1.5px solid #D6E6F5", fontFamily: "Inter, sans-serif",
                   fontSize: 14, outline: "none", boxSizing: "border-box",
                 }}
               />

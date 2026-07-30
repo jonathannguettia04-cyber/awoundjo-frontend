@@ -57,7 +57,7 @@ export default function Reseau() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
@@ -67,14 +67,14 @@ export default function Reseau() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.15 }}>
             Soignez-vous partout<br /><span style={{ color: C.gold }}>en Côte d'Ivoire</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.75 }}>
             120+ établissements partenaires dans 12 villes vous accueillent avec votre carte Mansa, sans avance de frais.
           </p>
         </div>
       </section>
 
       {/* ── STATS RÉSEAU ─────────────────────────────────────── */}
-      <div style={{ background: C.white, borderBottom: "1.5px solid #EBF5F0" }}>
+      <div style={{ background: C.white, borderBottom: `1.5px solid ${C.greenPale}` }}>
         <div className="awj-grid-4" style={{ maxWidth: 1000, margin: "0 auto", padding: "36px 24px", gap: 24 }}>
           {RESEAU_STATS.map(s => (
             <div key={s.label} style={{ textAlign: "center" }}>
@@ -155,7 +155,7 @@ export default function Reseau() {
             {filtered.map(p => (
               <div key={p.name} style={{
                 background: C.white, borderRadius: 14, padding: "18px 20px",
-                border: "1.5px solid #EBF5F0", display: "flex", gap: 14, alignItems: "flex-start",
+                border: `1.5px solid ${C.greenPale}`, display: "flex", gap: 14, alignItems: "flex-start",
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -198,7 +198,7 @@ export default function Reseau() {
       </section>
 
       {/* ── POUR LES ÉTABLISSEMENTS ──────────────────────────── */}
-      <section style={{ background: C.greenPale, padding: "80px 24px", borderTop: "1.5px solid #DCF0E5" }}>
+      <section style={{ background: C.greenPale, padding: "80px 24px", borderTop: `1.5px solid ${C.greenPale}` }}>
         <div style={{ maxWidth: 860, margin: "0 auto", textAlign: "center" }}>
           <div style={{ fontSize: 36, marginBottom: 16 }}>🏥</div>
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.4rem, 2.5vw, 2rem)", color: C.slate, margin: "0 0 14px" }}>

@@ -71,7 +71,7 @@ export default function Contact() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
@@ -81,7 +81,7 @@ export default function Contact() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.15 }}>
             Nous sommes là<br /><span style={{ color: C.gold }}>pour vous aider</span>
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.75 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.75 }}>
             Une question, un problème ou un projet ? Notre équipe vous répond sous 24h en semaine.
           </p>
         </div>
@@ -97,7 +97,7 @@ export default function Contact() {
             <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.gold, marginBottom: 20, textTransform: "uppercase" }}>Nos coordonnées</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 36 }}>
               {INFOS.map(c => (
-                <div key={c.label} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: C.white, padding: "16px 18px", borderRadius: 14, border: "1.5px solid #EBF5F0" }}>
+                <div key={c.label} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: C.white, padding: "16px 18px", borderRadius: 14, border: `1.5px solid ${C.greenPale}` }}>
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: C.greenPale, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{c.icon}</div>
                   <div>
                     <div style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: C.gray, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 3 }}>{c.label}</div>
@@ -112,7 +112,7 @@ export default function Contact() {
             </div>
 
             {/* Horaires */}
-            <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: "1.5px solid #EBF5F0", marginBottom: 28 }}>
+            <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: `1.5px solid ${C.greenPale}`, marginBottom: 28 }}>
               <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.gold, textTransform: "uppercase", marginBottom: 14 }}>Horaires d'ouverture</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
@@ -131,7 +131,7 @@ export default function Contact() {
             {/* Rappel rapide */}
             <div style={{ background: C.green, borderRadius: 16, padding: "24px 20px" }}>
               <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: "#FFFFFF", marginBottom: 6 }}>Être rappelé rapidement</div>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#A8CDB8", marginBottom: 16, lineHeight: 1.6 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "rgba(255,255,255,0.75)", marginBottom: 16, lineHeight: 1.6 }}>
                 Laissez vos coordonnées, nous vous rappelons dans les 2h ouvrables.
               </p>
               {recallSent ? (
@@ -155,7 +155,7 @@ export default function Contact() {
                     />
                     <button
                       onClick={() => { if (recall.nom && recall.tel) setRecallSent(true); }}
-                      style={{ background: C.gold, color: "#0A1F12", border: "none", padding: "11px 18px", borderRadius: 9, fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      style={{ background: C.gold, color: C.slate, border: "none", padding: "11px 18px", borderRadius: 9, fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
                       Rappeler →
                     </button>
                   </div>
@@ -165,7 +165,7 @@ export default function Contact() {
           </div>
 
           {/* Colonne droite : formulaire */}
-          <div style={{ background: C.white, borderRadius: 20, padding: "36px 32px", boxShadow: "0 4px 32px rgba(0,0,0,0.07)", border: "1.5px solid #EBF5F0" }}>
+          <div style={{ background: C.white, borderRadius: 20, padding: "36px 32px", boxShadow: "0 4px 32px rgba(0,0,0,0.07)", border: `1.5px solid ${C.greenPale}` }}>
             {sent ? (
               <div style={{ textAlign: "center", padding: "48px 0" }}>
                 <div style={{ fontSize: 56, marginBottom: 20 }}>✅</div>

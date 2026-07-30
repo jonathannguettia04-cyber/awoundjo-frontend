@@ -39,9 +39,11 @@ export default function Nav() {
     }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 64, justifyContent: "space-between" }}>
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${C.green}, ${C.gold})`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <span style={{ color: C.white, fontWeight: 900, fontSize: 16, fontFamily: "Playfair Display, serif" }}>A</span>
-          </div>
+          <img
+            src="/logo-icon.png"
+            alt="Awoundjô"
+            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+          />
           <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 20, color: textColor }}>Awoundjô</span>
         </Link>
 

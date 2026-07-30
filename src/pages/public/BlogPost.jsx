@@ -96,7 +96,7 @@ export default function BlogPost() {
 
       {/* ── HERO ARTICLE ─────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 56px",
         position: "relative", overflow: "hidden",
       }}>
@@ -117,7 +117,7 @@ export default function BlogPost() {
           <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 20px", lineHeight: 1.2 }}>
             {post.title}
           </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "#A8CDB8", lineHeight: 1.7, maxWidth: 680 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, maxWidth: 680 }}>
             {post.excerpt}
           </p>
         </div>
@@ -175,7 +175,7 @@ export default function BlogPost() {
                 borderRadius: 18, padding: "28px 28px",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 gap: 20, flexWrap: "wrap",
-                border: "1.5px solid #DCF0E5",
+                border: `1.5px solid ${C.greenPale}`,
               }}>
                 <div>
                   <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 15, color: C.green, marginBottom: 4 }}>
@@ -193,7 +193,7 @@ export default function BlogPost() {
               </div>
 
               {/* Partager */}
-              <div style={{ marginTop: 36, paddingTop: 28, borderTop: "1.5px solid #EBF5F0" }}>
+              <div style={{ marginTop: 36, paddingTop: 28, borderTop: `1.5px solid ${C.greenPale}` }}>
                 <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: C.gray, letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Partager cet article</div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <a href={`https://wa.me/?text=${encodeURIComponent(post.title + " — " + window.location.href)}`} target="_blank" rel="noopener noreferrer" style={{
@@ -216,7 +216,7 @@ export default function BlogPost() {
             <aside style={{ position: "sticky", top: 84 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 {/* À propos */}
-                <div style={{ background: C.cream, borderRadius: 16, padding: "22px 20px", border: "1.5px solid #EBF5F0" }}>
+                <div style={{ background: C.cream, borderRadius: 16, padding: "22px 20px", border: `1.5px solid ${C.greenPale}` }}>
                   <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 14 }}>À propos d'Awoundjô</div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray, lineHeight: 1.7, marginBottom: 16 }}>
                     La première mutuelle de santé digitale de Côte d'Ivoire. 2 400+ adhérents, 120+ établissements partenaires.
@@ -230,11 +230,11 @@ export default function BlogPost() {
                 </div>
 
                 {/* Contact rapide */}
-                <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: "1.5px solid #EBF5F0" }}>
+                <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: `1.5px solid ${C.greenPale}` }}>
                   <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 14 }}>Une question ?</div>
                   <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" style={{
                     display: "flex", alignItems: "center", gap: 10, textDecoration: "none",
-                    background: "#E8F9EF", padding: "12px 14px", borderRadius: 10,
+                    background: C.greenPale, padding: "12px 14px", borderRadius: 10,
                   }}>
                     <span style={{ fontSize: 20 }}>💬</span>
                     <div>
@@ -246,7 +246,7 @@ export default function BlogPost() {
 
                 {/* Articles liés */}
                 {related.length > 0 && (
-                  <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: "1.5px solid #EBF5F0" }}>
+                  <div style={{ background: C.white, borderRadius: 16, padding: "22px 20px", border: `1.5px solid ${C.greenPale}` }}>
                     <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 14 }}>Lire aussi</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                       {related.map(r => (

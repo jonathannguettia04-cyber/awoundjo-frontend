@@ -55,7 +55,7 @@ export default function Faq() {
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section style={{
-        background: `linear-gradient(150deg, #0A2E18 0%, ${C.green} 100%)`,
+        background: `linear-gradient(150deg, ${C.slate} 0%, ${C.green} 100%)`,
         padding: "140px 24px 72px",
         position: "relative", overflow: "hidden",
       }}>
@@ -83,7 +83,7 @@ export default function Faq() {
       </section>
 
       {/* ── CATÉGORIES ───────────────────────────────────────── */}
-      <div style={{ background: C.white, padding: "20px 24px", borderBottom: "1.5px solid #EBF5F0", position: "sticky", top: 64, zIndex: 10 }}>
+      <div style={{ background: C.white, padding: "20px 24px", borderBottom: `1.5px solid ${C.greenPale}`, position: "sticky", top: 64, zIndex: 10 }}>
         <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
           {CATS.map(c => (
             <button key={c} onClick={() => { setCat(c); setOpen(null); }} style={{
@@ -140,7 +140,7 @@ export default function Faq() {
           <h2 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.4rem, 2.5vw, 2rem)", color: "#FFFFFF", margin: "0 0 14px" }}>
             Vous n'avez pas trouvé votre réponse ?
           </h2>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A8CDB8", lineHeight: 1.7, marginBottom: 28 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, marginBottom: 28 }}>
             Notre équipe répond dans les 24h par email, ou immédiatement sur WhatsApp.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
@@ -150,7 +150,7 @@ export default function Faq() {
               padding: "13px 28px", borderRadius: 10, textDecoration: "none",
             }}>💬 WhatsApp</a>
             <Link to="/contact" style={{
-              background: C.gold, color: "#0A1F12",
+              background: C.gold, color: C.slate,
               fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14,
               padding: "13px 28px", borderRadius: 10, textDecoration: "none",
             }}>Nous écrire →</Link>

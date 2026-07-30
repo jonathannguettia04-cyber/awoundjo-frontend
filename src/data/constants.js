@@ -2,12 +2,12 @@
 // Tokens de design + données statiques partagées entre toutes les pages Awoundjô
 
 export const C = {
-  green:      "#1B6B3A",
-  greenLight: "#2D8A52",
-  greenPale:  "#E8F5EE",
+  green:      "#1a5fa8",   // bleu principal (charte graphique)
+  greenLight: "#00c4b4",   // turquoise accent
+  greenPale:  "#E9F1FB",
   gold:       "#D4A017",
   goldLight:  "#F5E6B0",
-  cream:      "#F9F6F0",
+  cream:      "#F7F9FC",
   slate:      "#2D3748",
   gray:       "#718096",
   white:      "#FFFFFF",
@@ -34,7 +34,7 @@ export const PLANS = [
   },
   {
     name: "Turquoise",
-    color: "#0E7490",
+    color: "#00c4b4",
     badge: "Premium",
     adhesion: "15 000",
     mensualite: "35 000",
