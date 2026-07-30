@@ -123,53 +123,55 @@ export default function LandingPage() {
 
           {/* Visual droite */}
           <div style={{ display: "flex", justifyContent: "center", position: "relative" }}>
-            <div style={{
-              width: "100%", maxWidth: 460,
-              aspectRatio: "4/5",
-              borderRadius: 24, overflow: "hidden",
-              boxShadow: "0 40px 80px rgba(0,0,0,0.5)",
-              position: "relative",
-            }}>
-              <img
-                src={FAMILY_PHOTO}
-                alt="Famille ivoirienne adhérente Awoundjô"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
+            <div style={{ position: "relative", width: "100%", maxWidth: 460, paddingBottom: 36 }}>
               <div style={{
-                position: "absolute", inset: 0,
-                background: `linear-gradient(180deg, transparent 55%, ${C.green}AA 100%)`,
-              }} />
-              <div style={{
-                position: "absolute", bottom: 20, left: 20, right: 20,
-                fontFamily: "Inter, sans-serif", fontSize: 13, color: "#FFFFFF",
-                fontWeight: 600,
+                position: "relative",
+                aspectRatio: "4/5",
+                borderRadius: 18,
+                overflow: "hidden",
+                boxShadow: "0 24px 48px rgba(4,14,28,0.35)",
               }}>
-                ✓ Sans avance de frais dans tout le réseau
-              </div>
-            </div>
-
-            {/* Carte mutualiste overlay */}
-            <div style={{
-              position: "absolute", bottom: -32, left: "50%",
-              transform: "translateX(-50%) rotate(-3deg)",
-              width: 290, height: 176, borderRadius: 16,
-              background: `linear-gradient(135deg, #0A1628 0%, #1a5fa8 100%)`,
-              boxShadow: `0 28px 64px rgba(0,0,0,0.55), 0 0 0 1px ${C.gold}30`,
-              padding: 22, overflow: "hidden",
-            }}>
-              <div style={{ position: "absolute", right: -30, top: -30, width: 150, height: 150, borderRadius: "50%", background: `${C.gold}12` }} />
-              <div style={{ position: "absolute", right: 20, bottom: 20, width: 90, height: 90, borderRadius: "50%", background: `${C.greenLight}15` }} />
-              <div style={{ fontFamily: "Playfair Display, serif", color: C.gold, fontWeight: 700, fontSize: 16, marginBottom: 2 }}>Awoundjô</div>
-              <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1.5, marginBottom: 20 }}>MUTUELLE DE SANTÉ — CÔTE D'IVOIRE</div>
-              <div style={{ fontFamily: "Inter, sans-serif", color: "#FFFFFF", fontSize: 13, letterSpacing: 2.5, marginBottom: 14 }}>AWJ-2026-XXXXXX</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <div>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1 }}>ADHÉRENT</div>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: "#FFFFFF", fontSize: 12, fontWeight: 700 }}>FAMILLE KOUASSI</div>
+                <img
+                  src={FAMILY_PHOTO}
+                  alt="Famille ivoirienne adhérente Awoundjô"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+                <div style={{
+                  position: "absolute", inset: 0,
+                  background: `linear-gradient(180deg, transparent 50%, ${C.green}E0 100%)`,
+                }} />
+                <div style={{
+                  position: "absolute", bottom: 24, left: 24, right: 24,
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <span style={{ color: C.gold, fontSize: 15, lineHeight: 1 }}>✓</span>
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#FFFFFF", fontWeight: 600 }}>
+                    Sans avance de frais dans tout le réseau
+                  </span>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: "#6B93B8", fontSize: 8, letterSpacing: 1 }}>FORMULE</div>
-                  <div style={{ fontFamily: "Inter, sans-serif", color: C.gold, fontSize: 11, fontWeight: 800 }}>IVOIRIENNE</div>
+              </div>
+
+              {/* Badge preuve sociale */}
+              <div style={{
+                position: "absolute", bottom: 0, left: 24,
+                background: "#FFFFFF", borderRadius: 14,
+                padding: "12px 18px",
+                boxShadow: "0 16px 36px rgba(4,14,28,0.28)",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{ display: "flex" }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: `linear-gradient(135deg, ${C.green}, ${C.greenLight})`,
+                      border: "2px solid #FFFFFF",
+                      marginLeft: i === 0 ? 0 : -10,
+                    }} />
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 15, color: C.slate, lineHeight: 1.1 }}>2 400+ familles</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, color: C.gray }}>protégées avec Awoundjô</div>
                 </div>
               </div>
             </div>
