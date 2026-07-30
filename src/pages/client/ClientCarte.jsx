@@ -333,7 +333,11 @@ export default function ClientCarte() {
         {/* ── Bas de carte : logo + marque | anneaux entrelacés + statut ── */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", position:"relative" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:30, height:30, background: ink, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:15, color:"#fff" }}>A</div>
+            <img
+              src="/logo-icon.png"
+              alt="Awoundjô"
+              style={{ width:30, height:30, borderRadius:"50%", objectFit:"cover", flexShrink:0 }}
+            />
             <div style={{ fontSize:9, fontWeight:800, letterSpacing:.6, lineHeight:1.25 }}>
               MUTUELLE SANTÉ<br />AWOUNDJÔ
             </div>
