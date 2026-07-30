@@ -140,12 +140,11 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 no-underline">
-          <div
-            className="flex items-center justify-center rounded-md text-white font-bold text-sm"
-            style={{ width: 28, height: 28, background: "#00c4b4", letterSpacing: "-0.5px" }}
-          >
-            Aw
-          </div>
+          <img
+            src="/logo-icon.png"
+            alt="Awoundjô"
+            style={{ width: 28, height: 28, borderRadius: 6, objectFit: "contain" }}
+          />
           <span className="hidden sm:block text-white font-bold text-sm">Awoundjô</span>
         </Link>
 
