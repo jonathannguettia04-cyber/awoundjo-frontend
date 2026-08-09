@@ -301,7 +301,7 @@ export default function LandingPage() {
         `}</style>
 
         {/* ===== HERO ===== */}
-        <section className="hero" id="hero">
+        <section className="hero awj-hero-pad" id="hero" style={{ paddingTop: 64 }}>
           <video ref={videoRef} className={`hero-video ${videoPlaying ? "playing" : ""}`} playsInline preload="metadata" onEnded={() => setVideoPlaying(false)}>
             {/* <source src="votre-video.mp4" type="video/mp4" /> */}
           </video>
