@@ -174,6 +174,9 @@ export default function LandingPage() {
           .awj-lp .hero-video.playing { opacity: .85; }
           .awj-lp .hero-overlay { position: absolute; inset: 0; background: rgba(4,42,80,.55); z-index: 2; transition: background .8s ease; }
           .awj-lp .hero-video.playing ~ .hero-overlay { background: rgba(4,42,80,.75); }
+          .awj-lp .hero-pattern { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+          .awj-lp .hero-pattern-sq { position: absolute; width: 180px; height: 180px; border-radius: 6px; }
+          .awj-lp .hero-glow { position: absolute; right: 5%; top: 10%; width: 500px; height: 500px; border-radius: 50%; }
           .awj-lp .hero-content { position: relative; z-index: 3; max-width: 720px; transition: opacity .6s ease; }
           .awj-lp .hero-content.video-playing { opacity: .05; }
           .awj-lp .hero-content.video-paused { opacity: 1; }
@@ -306,6 +309,23 @@ export default function LandingPage() {
             {/* <source src="votre-video.mp4" type="video/mp4" /> */}
           </video>
           <div className="hero-overlay" />
+
+          <div className="hero-pattern">
+            {Array.from({ length: 14 }).map((_, i) => (
+              <div
+                key={i}
+                className="hero-pattern-sq"
+                style={{
+                  left: `${(i % 5) * 22}%`,
+                  top: `${Math.floor(i / 5) * 40 - 10}%`,
+                  background: i % 2 === 0 ? "var(--gold)" : "var(--cyan)",
+                  opacity: 0.05,
+                  transform: `rotate(45deg) scale(${0.4 + (i % 3) * 0.2})`,
+                }}
+              />
+            ))}
+            <div className="hero-glow" style={{ background: "radial-gradient(circle, var(--gold) 0%, transparent 70%)", opacity: 0.15 }} />
+          </div>
 
           <div className={`hero-content ${videoPlaying ? "video-playing" : "video-paused"}`}>
             <div className="hero-brand">MUTUELLE SANTÉ</div>
