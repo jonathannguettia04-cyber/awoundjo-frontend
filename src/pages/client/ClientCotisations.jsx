@@ -615,8 +615,9 @@ export default function ClientCotisations() {
   if (client?.status_validation === "pending")  return <ValidationPendingScreen client={client} />;
   if (client?.status_validation === "rejected") return <ValidationRejectedScreen />;
 
-  const plan    = client?.plan || "IVOIRIENNE";
-  const monthly = client?.monthly_amount ?? PLAN_PRICES[plan] ?? 15000;
+  const plan     = client?.plan || "IVOIRIENNE";
+  const surprime = Number(client?.surcharge_pathologie) || 0;
+  const monthly  = (client?.monthly_amount ?? PLAN_PRICES[plan] ?? 15000) + surprime;
   const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
   const totalPaid = cotisations

@@ -34,6 +34,20 @@ const GUARANTEES = [
   "Résiliation sans frais dans les 7 jours",
 ];
 
+const PATHOLOGIES = [
+  "Diabète",
+  "Hypertension artérielle",
+  "Maladie cardiaque",
+  "Insuffisance rénale",
+  "Drépanocytose",
+  "VIH / Sida",
+  "Cancer",
+  "Asthme sévère",
+];
+
+const SURCHARGE_PAR_PATHOLOGIE = 10000;
+const CAUTION_MOIS = 3;
+
 function Field({ label, required, children, error, hint }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -68,6 +82,14 @@ export default function Adhesion() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [agreed, setAgreed] = useState(false);
+  const [pathologies, setPathologies] = useState([]);
+  const [autrePathologie, setAutrePathologie] = useState("");
+
+  function togglePathologie(nom) {
+    setPathologies(prev =>
+      prev.includes(nom) ? prev.filter(p => p !== nom) : [...prev, nom]
+    );
+  }
 
   function validate() {
     const errs = {};
@@ -105,6 +127,9 @@ export default function Adhesion() {
             city:      form.city.trim()  || undefined,
             plan_slug: selectedPlan.name.toUpperCase(),
             nb_beneficiaires: parseInt(form.nb_beneficiaires) || 1,
+            pathologies_declarees: [...pathologies, ...(autrePathologie.trim() ? [autrePathologie.trim()] : [])],
+            surcharge_pathologie: surchargePathologie,
+            caution_pathologie: caution,
             montant_initial: totalAmount,
           },
           jeko_method:  methode,
@@ -128,7 +153,10 @@ export default function Adhesion() {
 
   const adhesion   = Number(selectedPlan.adhesion.replace(/\s/g, ""));
   const mensualite = Number(selectedPlan.mensualite.replace(/\s/g, ""));
-  const total      = adhesion + mensualite;
+  const nbPathologies      = pathologies.length + (autrePathologie.trim() ? 1 : 0);
+  const surchargePathologie = nbPathologies * SURCHARGE_PAR_PATHOLOGIE;
+  const caution             = nbPathologies > 0 ? mensualite * CAUTION_MOIS : 0;
+  const total      = adhesion + mensualite + surchargePathologie + caution;
 
   return (
     <>
@@ -260,6 +288,44 @@ export default function Adhesion() {
                   ℹ️ La couverture prend effet 30 jours après l'adhésion (hors urgences).
                 </div>
               </div>
+
+              {/* Antécédents médicaux / grosses pathologies */}
+              <div style={{ background: C.white, borderRadius: 18, padding: "28px 24px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
+                <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate, marginBottom: 6 }}>
+                  Antécédents médicaux
+                </div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 18px" }}>
+                  Déclarez ici toute pathologie lourde déjà diagnostiquée. Chaque pathologie déclarée entraîne une surcharge de {fcfa(SURCHARGE_PAR_PATHOLOGIE)} et le paiement d'une caution équivalente à {CAUTION_MOIS} mois de cotisation, réglée en une fois à l'adhésion.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                  {PATHOLOGIES.map(p => {
+                    const checked = pathologies.includes(p);
+                    return (
+                      <label key={p} style={{
+                        display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                        padding: "10px 12px", borderRadius: 10,
+                        border: `1.5px solid ${checked ? C.green : "#E2E8F0"}`,
+                        background: checked ? `${C.green}0E` : C.white,
+                        transition: "all .15s",
+                      }}>
+                        <input type="checkbox" checked={checked} onChange={() => togglePathologie(p)}
+                          style={{ flexShrink: 0, accentColor: C.green }} />
+                        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.slate }}>{p}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <Field label="Autre pathologie" hint="optionnel, si non listée ci-dessus">
+                  <input style={inputStyle}
+                    value={autrePathologie} onChange={e => setAutrePathologie(e.target.value)}
+                    placeholder="Précisez la pathologie" />
+                </Field>
+                {nbPathologies > 0 && (
+                  <div style={{ marginTop: 14, padding: "10px 14px", background: "#FFF7E6", border: "1.5px solid #F5D48A", borderRadius: 10, fontFamily: "Inter, sans-serif", fontSize: 12, color: "#8A6416", lineHeight: 1.6 }}>
+                    ⚠️ {nbPathologies} pathologie{nbPathologies > 1 ? "s" : ""} déclarée{nbPathologies > 1 ? "s" : ""} — surcharge de {fcfa(surchargePathologie)} + caution de {fcfa(caution)} ({CAUTION_MOIS} mois de cotisation) ajoutées au paiement.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ── Colonne droite : paiement ── */}
@@ -279,6 +345,18 @@ export default function Adhesion() {
                       <span>1ère mensualité — {selectedPlan.name}</span>
                       <span style={{ fontWeight: 600, color: C.slate }}>{selectedPlan.mensualite} F</span>
                     </div>
+                    {nbPathologies > 0 && (
+                      <>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
+                          <span>Surcharge pathologie ({nbPathologies} × {fcfa(SURCHARGE_PAR_PATHOLOGIE)})</span>
+                          <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(surchargePathologie)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
+                          <span>Caution ({CAUTION_MOIS} mois de cotisation)</span>
+                          <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(caution)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div style={{ borderTop: "1.5px solid #D6E6F5", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate }}>Total à payer aujourd'hui</span>

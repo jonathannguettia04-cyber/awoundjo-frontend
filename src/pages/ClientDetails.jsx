@@ -489,6 +489,45 @@ export default function ClientDetails() {
         </div>
       </div>
 
+      {/* Antécédents médicaux */}
+      {(() => {
+        const rawPatho = c.pathologies;
+        const patho = Array.isArray(rawPatho)
+          ? rawPatho
+          : (typeof rawPatho === "string" && rawPatho.length
+              ? (() => { try { return JSON.parse(rawPatho); } catch { return []; } })()
+              : []);
+        if (!patho.length) return null;
+        return (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <span>🩺</span>
+              Antécédents médicaux déclarés
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {patho.map((p, i) => (
+                <span
+                  key={i}
+                  className="text-xs font-medium bg-white border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-amber-200/60">
+              <div>
+                <p className="text-xs text-amber-600 uppercase tracking-wider mb-1">Surprime / mois</p>
+                <p className="text-sm font-bold text-amber-800">{fmt(c.surcharge_pathologie || 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-amber-600 uppercase tracking-wider mb-1">Caution (3 mois)</p>
+                <p className="text-sm font-bold text-amber-800">{fmt(c.caution_pathologie || 0)}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Historique paiements */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-50">
