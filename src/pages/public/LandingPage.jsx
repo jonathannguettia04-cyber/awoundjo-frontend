@@ -1,5 +1,5 @@
 // src/pages/public/LandingPage.jsx
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
@@ -106,6 +106,19 @@ export default function LandingPage() {
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    // Autoplay dès l'arrivée sur la page (muted requis par les navigateurs pour l'autoplay)
+    video.muted = true;
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => setVideoPlaying(true))
+        .catch(() => setVideoPlaying(false));
+    }
+  }, []);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -121,6 +134,11 @@ export default function LandingPage() {
   const scrollToProblem = (e) => {
     e.preventDefault();
     document.getElementById("problem")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToFormulas = (e) => {
+    e.preventDefault();
+    document.getElementById("formulas")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -305,7 +323,7 @@ export default function LandingPage() {
 
         {/* ===== HERO ===== */}
         <section className="hero awj-hero-pad" id="hero" style={{ paddingTop: 64 }}>
-          <video ref={videoRef} className={`hero-video ${videoPlaying ? "playing" : ""}`} playsInline preload="metadata" onEnded={() => setVideoPlaying(false)}>
+          <video ref={videoRef} className={`hero-video ${videoPlaying ? "playing" : ""}`} playsInline autoPlay muted preload="auto" onEnded={() => setVideoPlaying(false)}>
             {/* <source src="votre-video.mp4" type="video/mp4" /> */}
           </video>
           <div className="hero-overlay" />
@@ -343,8 +361,7 @@ export default function LandingPage() {
             <p className="sub">Jusqu'à 80 % de vos soins médicaux pris en charge.<br />Sans sélection médicale. 100% en ligne.</p>
 
             <div className="hero-actions">
-              <a href={waLink("Bonjour, je souhaite souscrire à Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer">
-                <WaIcon />
+              <a href="#formulas" className="btn-wa" onClick={scrollToFormulas}>
                 Souscrire maintenant
               </a>
               <a href="#problem" className="btn-scroll" onClick={scrollToProblem}>Vous hésitez encore ? ↓</a>
@@ -384,8 +401,7 @@ export default function LandingPage() {
             </div>
 
             <div style={{ textAlign: "center", marginTop: 48 }}>
-              <a href={waLink("Bonjour, je souhaite souscrire maintenant.")} className="btn-wa" target="_blank" rel="noopener noreferrer">
-                <WaIcon />
+              <a href="#formulas" className="btn-wa" onClick={scrollToFormulas}>
                 Souscrire maintenant
               </a>
             </div>
@@ -410,9 +426,9 @@ export default function LandingPage() {
             </div>
 
             <div style={{ textAlign: "center", marginTop: 48 }}>
-              <a href={waLink("Bonjour, je veux souscrire à Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer">
+              <a href={waLink("Bonjour, je veux plus d'informations sur Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer">
                 <WaIcon />
-                Souscrire Awoundjô
+                Contactez-nous pour plus d'infos
               </a>
             </div>
           </div>
