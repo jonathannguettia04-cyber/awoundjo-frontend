@@ -1,5 +1,6 @@
 // src/pages/public/LandingPage.jsx
 import { useRef, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
@@ -474,9 +475,9 @@ export default function LandingPage() {
                   <div className="formula-price">{f.price}<small> F/mois</small></div>
                   <p className="formula-desc">{f.desc}</p>
                   <p className="formula-entry"><strong>Adhésion :</strong> 15 000 F</p>
-                  <a href={waLink(`Bonjour, je veux souscrire à la formule ${f.name}.`)} className="btn-wa" target="_blank" rel="noopener noreferrer">
+                  <Link to={`/adhesion?formule=${f.name.toLowerCase()}`} className="btn-wa">
                     Choisir {f.name}
-                  </a>
+                  </Link>
                 </div>
               ))}
             </div>
