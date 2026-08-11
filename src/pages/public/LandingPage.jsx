@@ -175,7 +175,7 @@ export default function LandingPage() {
             display: inline-flex; align-items: center; gap: 8px;
             background: transparent; color: var(--white); font-weight: 600; font-size: 15px;
             padding: 14px 30px; border-radius: 50px; text-decoration: none; border: 2px solid rgba(255,255,255,.4);
-            transition: border-color .2s;
+            transition: border-color .2s, opacity .6s ease;
           }
           .awj-lp .btn-scroll:hover { border-color: var(--cyan); color: var(--cyan); }
 
@@ -200,7 +200,9 @@ export default function LandingPage() {
           .awj-lp .hero-text { transition: opacity .6s ease; }
           .awj-lp .hero-content.video-playing .hero-text { opacity: .05; }
           .awj-lp .hero-content.video-paused .hero-text { opacity: 1; }
-          .awj-lp .hero-actions { opacity: 1 !important; }
+          .awj-lp .hero-content.video-playing .hero-actions .btn-scroll { opacity: .05; }
+          .awj-lp .hero-content.video-paused .hero-actions .btn-scroll { opacity: 1; }
+          .awj-lp .hero-actions .btn-wa { opacity: 1 !important; }
           .awj-lp .hero-brand { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 4px; margin-bottom: 4px; }
           .awj-lp .hero-brand-name { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: 2px; margin-bottom: 40px; }
           .awj-lp .hero h1 { color: var(--white); font-size: clamp(32px,7vw,58px); line-height: 1.15; margin-bottom: 16px; font-weight: 900; }
