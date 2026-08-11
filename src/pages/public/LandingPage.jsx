@@ -197,8 +197,10 @@ export default function LandingPage() {
           .awj-lp .hero-pattern-sq { position: absolute; width: 180px; height: 180px; border-radius: 6px; }
           .awj-lp .hero-glow { position: absolute; right: 5%; top: 10%; width: 500px; height: 500px; border-radius: 50%; }
           .awj-lp .hero-content { position: relative; z-index: 3; max-width: 720px; transition: opacity .6s ease; }
-          .awj-lp .hero-content.video-playing { opacity: .05; }
-          .awj-lp .hero-content.video-paused { opacity: 1; }
+          .awj-lp .hero-text { transition: opacity .6s ease; }
+          .awj-lp .hero-content.video-playing .hero-text { opacity: .05; }
+          .awj-lp .hero-content.video-paused .hero-text { opacity: 1; }
+          .awj-lp .hero-actions { opacity: 1 !important; }
           .awj-lp .hero-brand { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 4px; margin-bottom: 4px; }
           .awj-lp .hero-brand-name { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: 2px; margin-bottom: 40px; }
           .awj-lp .hero h1 { color: var(--white); font-size: clamp(32px,7vw,58px); line-height: 1.15; margin-bottom: 16px; font-weight: 900; }
@@ -358,8 +360,10 @@ export default function LandingPage() {
               )}
             </button>
 
-            <h1>Votre mutuelle santé<br /><span>activée en 24h.</span></h1>
-            <p className="sub">Jusqu'à 80 % de vos soins médicaux pris en charge.<br />Sans sélection médicale. 100% en ligne.</p>
+            <div className="hero-text">
+              <h1>Votre mutuelle santé<br /><span>activée en 24h.</span></h1>
+              <p className="sub">Jusqu'à 80 % de vos soins médicaux pris en charge.<br />Sans sélection médicale. 100% en ligne.</p>
+            </div>
 
             <div className="hero-actions">
               <a href="#formulas" className="btn-wa" onClick={scrollToFormulas}>
@@ -515,7 +519,7 @@ export default function LandingPage() {
 
             <div className="contact-row">
               <span>📞 <a href="tel:+2250171721668">01 71 72 16 68</a></span>
-              <span>🌐 <a href="https://www.mutuelleawoundjo.com" target="_blank" rel="noopener noreferrer">mutuelleawoundjo.com</a></span>
+              <span>🌐 <a href="https://www.mutuelleawoundjo.org" target="_blank" rel="noopener noreferrer">mutuelleawoundjo.org</a></span>
               <span>📧 <a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a></span>
             </div>
           </div>
