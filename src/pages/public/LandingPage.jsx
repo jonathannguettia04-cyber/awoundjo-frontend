@@ -11,11 +11,11 @@ const WA_NUMBER = "2250171721668";
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
 
 const STEPS = [
-  { n: 1, title: "Vous vous inscrivez depuis votre téléphone.", text: "Vos infos, vos bénéficiaires, votre formule. 5 minutes suffisent." },
-  { n: 2, title: "On valide vos dossiers sous 24h maximum.", text: "Vous recevez une confirmation par SMS et WhatsApp." },
-  { n: 3, title: "Payez par Mobile Money vos frais d'adhésion.", text: "Wave, Orange Money, MTN MoMo ou Moov. Paiement sécurisé." },
-  { n: 4, title: "Vous recevez ensuite votre carte mutualiste.", text: "Carte numérique personnalisée, une par bénéficiaire." },
-  { n: 5, title: "Vous la présentez pour avoir accès aux soins.", text: "Aucune avance de frais. Prise en charge immédiate." },
+  { n: 1, title: "Vous vous inscrivez depuis votre téléphone", text: "Vos infos, vos bénéficiaires, votre formule, 5 minutes suffisent" },
+  { n: 2, title: "On valide vos dossiers sous 24h maximum", text: "Vous recevez une confirmation par SMS et WhatsApp" },
+  { n: 3, title: "Payez par Mobile Money vos frais d'adhésion", text: "Wave, Orange Money, MTN MoMo ou Moov, paiement sécurisé" },
+  { n: 4, title: "Vous recevez ensuite votre carte mutualiste", text: "Carte numérique personnalisée, une par bénéficiaire" },
+  { n: 5, title: "Vous la présentez pour avoir accès aux soins", text: "Aucune avance de frais, prise en charge immédiate" },
 ];
 
 const BENEFITS = [
@@ -23,22 +23,22 @@ const BENEFITS = [
     highlight: true,
     icon: "M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-1 10h-4v4h-4v-4H6v-4h4V5h4v4h4v4z",
     title: "Jusqu'à 80 % de prise en charge",
-    text: "Consultations, médicaments, hospitalisation, maternité, dentaire, optique — selon votre formule.",
+    text: "Consultations, médicaments, hospitalisation, maternité, dentaire, optique selon votre formule",
   },
   {
     icon: "M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z",
     title: "Téléconsultation médicale",
-    text: "Un médecin accessible à distance, sans déplacement. Depuis votre téléphone.",
+    text: "Un médecin accessible à distance, directement depuis votre téléphone, où que vous soyez",
   },
   {
     icon: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
-    title: "Dossier médical à jour",
-    text: "Historique de soins et ordonnances accessibles en permanence depuis votre mobile.",
+    title: "Dossier médical toujours à jour",
+    text: "Votre historique de soins accessible en permanence sur votre mobile, fini les ordonnances perdues",
   },
   {
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
     title: "Bilan de santé annuel offert",
-    text: "Chaque année, un bilan complet offert à tous les comptes actifs. La prévention en action.",
+    text: "Chaque année, un bilan complet offert à tous les comptes actifs, la prévention en action",
   },
 ];
 
@@ -48,25 +48,25 @@ const PROOF_STATS = [
   { num: "24h", label: "Activation de votre carte" },
 ];
 
-const PARTNERS = ["Giepharm", "Mansa-Bank", "CNEPECI", "CEL-CI", "Meditrans", "Sonam-Assurances"];
+const PARTNERS = ["🏥 Giepharm", "🏦 Mansa-Bank", "🏛 CNEPECI", "🤝 CEL-CI", "🚑 Meditrans", "🛡 Sonam-Assurances"];
 
 const FORMULAS = [
   {
     name: "Essentielle",
     price: "10 000",
-    desc: "L'accès aux soins de base — consultations, médicaments, hospitalisation. La porte d'entrée vers la protection santé.",
+    desc: "L'accès aux soins de base, consultations, médicaments, hospitalisation, la porte d'entrée vers votre protection santé",
     popular: false,
   },
   {
     name: "Ivoirienne",
     price: "15 000",
-    desc: "La formule de référence des familles. Maternité renforcée, couverture élargie, la plus choisie par nos adhérents.",
+    desc: "La formule de référence des familles avec maternité renforcée et couverture élargie, la plus choisie par nos adhérents",
     popular: true,
   },
   {
     name: "Turquoise",
     price: "35 000",
-    desc: "La couverture la plus complète — dentisterie, optique et prestations étendues pour une protection maximale.",
+    desc: "La couverture maximale avec dentisterie, optique et prestations étendues pour une protection complète",
     popular: false,
   },
 ];
@@ -74,11 +74,11 @@ const FORMULAS = [
 const FAQS = [
   {
     q: "Et si je ne suis jamais malade, j'ai perdu mon argent ?",
-    a: "Non. Votre cotisation finance un bilan de santé annuel offert, la téléconsultation, et la tranquillité de savoir que le jour où un imprévu arrive, vous êtes couvert sans chercher l'argent en urgence. La vraie perte, c'est de ne pas être prêt.",
+    a: "Votre cotisation finance un bilan de santé annuel offert, la téléconsultation, et la tranquillité de savoir que le jour où un imprévu arrive, vous êtes couvert sans chercher l'argent en urgence. La vraie perte, c'est de ne pas être prêt.",
   },
   {
     q: "Quelle est la différence avec la CMU ?",
-    a: "La CMU est le régime public de base. Awoundjô est complémentaire : une activation en 24h au lieu de semaines de démarches, une prise en charge jusqu'à 80 %, la téléconsultation, et aucune sélection médicale. Les deux se complètent.",
+    a: "La CMU est le régime public de base. Awoundjô est complémentaire : activation en 24h, prise en charge jusqu'à 80 %, téléconsultation, aucune sélection médicale. Les deux se complètent.",
   },
   {
     q: "Comment je renouvelle ma cotisation chaque mois ?",
@@ -86,10 +86,10 @@ const FAQS = [
   },
   {
     q: "Est-ce que mes antécédents médicaux comptent ?",
-    a: "Non. Aucune sélection médicale à l'adhésion. Tout le monde est accepté, quels que soient ses antécédents. C'est un principe fondateur d'Awoundjô.",
+    a: "Aucune sélection médicale à l'adhésion, tout le monde est accepté quels que soient ses antécédents, c'est un principe fondateur d'Awoundjô.",
   },
   {
-    q: "Combien de personnes peuvent être couvertes avec une seule adhésion ?",
+    q: "Combien de personnes puis-je couvrir ?",
     a: "Vous pouvez inscrire vos bénéficiaires (conjoint, enfants) lors de l'adhésion. Chaque personne reçoit sa propre carte Mansa personnalisée.",
   },
 ];
@@ -363,8 +363,8 @@ export default function LandingPage() {
             </button>
 
             <div className="hero-text">
-              <h1>Votre mutuelle santé<br /><span>activée en 24h.</span></h1>
-              <p className="sub">Jusqu'à 80 % de vos soins médicaux pris en charge.<br />Sans sélection médicale. 100% en ligne.</p>
+              <h1>La santé ne doit pas<br /><span>ruiner votre budget.</span></h1>
+              <p className="sub">Prendre soin de sa santé, c'est aussi la prévenir, et vous pouvez commencer dès aujourd'hui en vous protégeant vous et votre famille<br />Obtenez votre carte mutualiste <strong>en 24 heures</strong>, sans vous déplacer, et bénéficiez de jusqu'à <strong>80 % de vos soins médicaux</strong> pris en charge</p>
             </div>
 
             <div className="hero-actions">
@@ -380,10 +380,10 @@ export default function LandingPage() {
         <section className="problem" id="problem">
           <div className="container">
             <p className="section-kicker">Le saviez-vous ?</p>
-            <div className="stat">– 20 %</div>
-            <p className="stat-label">Moins de 20 % des Ivoiriens disposent d'une couverture santé. Quand l'urgence arrive, il est déjà trop tard.</p>
+            <div className="stat">20 %</div>
+            <p className="stat-label">Moins de 20 % des Ivoiriens disposent d'une couverture santé et quand l'urgence arrive, il est déjà trop tard.</p>
             <div className="bridge">
-              <p>Comment éviter cela ?<br /><span>5 étapes simples et faciles.</span></p>
+              <p>Awoundjô répond à cela<br /><span>en 5 étapes simples et faciles.</span></p>
             </div>
           </div>
         </section>
@@ -511,7 +511,7 @@ export default function LandingPage() {
         {/* ===== CTA FINAL ===== */}
         <section className="cta-final" id="cta">
           <div className="container">
-            <h2 className="section-title">Tout le monde a droit à la santé.</h2>
+            <h2 className="section-title">Tout le monde a droit à la santé</h2>
             <div className="tagline">VOTRE CARTE. VOTRE SANTÉ. VOTRE DIGNITÉ.</div>
 
             <a href={waLink("Bonjour, je veux ma carte Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer" style={{ fontSize: 20, padding: "20px 48px" }}>
