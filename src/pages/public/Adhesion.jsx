@@ -48,6 +48,13 @@ const PATHOLOGIES = [
 const SURCHARGE_PAR_PATHOLOGIE = 10000;
 const CAUTION_MOIS = 3;
 
+// Surprime mensuelle par enfant supplémentaire au-delà des bénéficiaires inclus, selon la formule
+const SURCHARGE_ENFANT_PAR_FORMULE = {
+  essentielle: 1500,
+  ivoirienne: 3000,
+  turquoise: 5000,
+};
+
 function Field({ label, required, children, error, hint }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -73,6 +80,59 @@ export default function Adhesion() {
   const [searchParams] = useSearchParams();
   const preselected = searchParams.get("formule");
 
+  const [mode, setMode] = useState(searchParams.get("type") === "entreprise" ? "entreprise" : "particulier");
+
+  // ── B2B : formulaire de demande de devis (pas de paiement direct) ──
+  const [bizForm, setBizForm] = useState({
+    entreprise: "", secteur: "", effectif: "1-10",
+    contact: "", fonction: "", phone: "", email: "", ville: "", message: "",
+  });
+  const [bizErrors, setBizErrors] = useState({});
+  const [bizSubmitting, setBizSubmitting] = useState(false);
+  const [bizSent, setBizSent] = useState(false);
+
+  function validateBiz() {
+    const errs = {};
+    if (!bizForm.entreprise.trim()) errs.entreprise = "Le nom de l'entreprise est requis.";
+    if (!bizForm.contact.trim())    errs.contact    = "Le nom du contact est requis.";
+    if (!bizForm.phone.trim())      errs.phone      = "Le numéro de téléphone est requis.";
+    return errs;
+  }
+
+  function handleBizSubmit(e) {
+    e.preventDefault();
+    const errs = validateBiz();
+    setBizErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setBizSubmitting(true);
+    const lines = [
+      "Nouvelle demande de devis Entreprise — Awoundjô",
+      `Entreprise : ${bizForm.entreprise}`,
+      bizForm.secteur ? `Secteur : ${bizForm.secteur}` : null,
+      `Effectif à couvrir : ${bizForm.effectif}`,
+      `Contact : ${bizForm.contact}${bizForm.fonction ? " (" + bizForm.fonction + ")" : ""}`,
+      `Téléphone : ${bizForm.phone}`,
+      bizForm.email ? `Email : ${bizForm.email}` : null,
+      bizForm.ville ? `Ville : ${bizForm.ville}` : null,
+      bizForm.message ? `Message : ${bizForm.message}` : null,
+    ].filter(Boolean).join("\n");
+
+    const waUrl = `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(lines)}`;
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+    setBizSubmitting(false);
+    setBizSent(true);
+  }
+
+  function handleModeChange(id) {
+    setMode(id);
+    if (id === "famille") {
+      const familyPlan = PLANS.find(p => p.name.toLowerCase() === "ivoirienne");
+      if (familyPlan) setSelectedPlan(familyPlan);
+      if (form.nb_beneficiaires === "1") setForm(f => ({ ...f, nb_beneficiaires: "5" }));
+    }
+  }
+
   const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", nb_beneficiaires: "1" });
   const [errors, setErrors] = useState({});
   const [selectedPlan, setSelectedPlan] = useState(
@@ -84,6 +144,7 @@ export default function Adhesion() {
   const [agreed, setAgreed] = useState(false);
   const [pathologies, setPathologies] = useState([]);
   const [autrePathologie, setAutrePathologie] = useState("");
+  const [extraEnfants, setExtraEnfants] = useState(0);
 
   function togglePathologie(nom) {
     setPathologies(prev =>
@@ -126,7 +187,10 @@ export default function Adhesion() {
             email:     form.email.trim() || undefined,
             city:      form.city.trim()  || undefined,
             plan_slug: selectedPlan.name.toUpperCase(),
+            mode,
             nb_beneficiaires: parseInt(form.nb_beneficiaires) || 1,
+            enfants_supplementaires: extraEnfants,
+            surcharge_enfants: surchargeEnfants,
             pathologies_declarees: [...pathologies, ...(autrePathologie.trim() ? [autrePathologie.trim()] : [])],
             surcharge_pathologie: surchargePathologie,
             caution_pathologie: caution,
@@ -156,7 +220,9 @@ export default function Adhesion() {
   const nbPathologies      = pathologies.length + (autrePathologie.trim() ? 1 : 0);
   const surchargePathologie = nbPathologies * SURCHARGE_PAR_PATHOLOGIE;
   const caution             = nbPathologies > 0 ? mensualite * CAUTION_MOIS : 0;
-  const total      = adhesion + mensualite + surchargePathologie + caution;
+  const surchargeEnfantUnitaire = SURCHARGE_ENFANT_PAR_FORMULE[selectedPlan.name.toLowerCase()] || 0;
+  const surchargeEnfants   = mode === "famille" ? extraEnfants * surchargeEnfantUnitaire : 0;
+  const total      = adhesion + mensualite + surchargePathologie + caution + surchargeEnfants;
 
   return (
     <>
@@ -173,16 +239,184 @@ export default function Adhesion() {
         <div style={{ position: "absolute", inset: 0, opacity: 0.05, background: `radial-gradient(circle at 70% 40%, ${C.gold} 0%, transparent 60%)` }} />
         <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
           <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.gold, marginBottom: 14, textTransform: "uppercase" }}>Adhésion</div>
-          <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
-            Rejoignez la mutuelle <span style={{ color: C.gold }}>Awoundjô</span>
-          </h1>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
-            Adhésion en ligne. Couverture activée sous 24h. Paiement Mobile Money sécurisé.
-          </p>
+          {mode === "entreprise" ? (
+            <>
+              <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
+                Protégez vos salariés avec <span style={{ color: C.gold }}>Awoundjô</span>
+              </h1>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
+                Une couverture santé collective pour réduire le turnover et fidéliser vos équipes. Un conseiller vous recontacte sous 24h avec un devis adapté.
+              </p>
+            </>
+          ) : mode === "famille" ? (
+            <>
+              <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
+                Protégez toute votre famille avec <span style={{ color: C.gold }}>Awoundjô</span>
+              </h1>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
+                Conjoint, enfants : chaque bénéficiaire reçoit sa propre carte. Couverture activée sous 24h, paiement Mobile Money sécurisé.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
+                Rejoignez la mutuelle <span style={{ color: C.gold }}>Awoundjô</span>
+              </h1>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
+                Adhésion en ligne. Couverture activée sous 24h. Paiement Mobile Money sécurisé.
+              </p>
+            </>
+          )}
+
+          {/* ── Bascule Particulier / Famille / Entreprise ── */}
+          <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 50, padding: 4, marginTop: 28, flexWrap: "wrap", justifyContent: "center" }}>
+            {[
+              { id: "particulier", label: "Pour moi" },
+              { id: "famille",     label: "Ma famille" },
+              { id: "entreprise",  label: "Pour mon entreprise" },
+            ].map(o => (
+              <button key={o.id} type="button" onClick={() => handleModeChange(o.id)} style={{
+                border: "none", cursor: "pointer", borderRadius: 50, padding: "10px 20px",
+                fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
+                background: mode === o.id ? C.gold : "transparent",
+                color: mode === o.id ? "#08172B" : "#FFFFFF",
+                transition: "all .15s",
+              }}>{o.label}</button>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── ÉTAPES RAPIDES ───────────────────────────────────── */}
+      {mode === "entreprise" ? (
+        <>
+          {/* ── ÉTAPES ENTREPRISE ───────────────────────────────── */}
+          <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
+            <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "center", gap: 0 }}>
+              {[
+                { n: "1", label: "Votre entreprise" },
+                { n: "2", label: "Vos besoins" },
+                { n: "3", label: "Un conseiller vous recontacte" },
+              ].map((s, i) => (
+                <div key={s.n} style={{ display: "flex", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: C.green, color: "#FFFFFF",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 12,
+                    }}>{s.n}</div>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.slate }}>{s.label}</span>
+                  </div>
+                  {i < 2 && <div style={{ width: 40, height: 1.5, background: "#E2E8F0", margin: "0 12px" }} />}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── FORMULAIRE ENTREPRISE ───────────────────────────── */}
+          <section style={{ background: C.cream, padding: "56px 24px 96px" }}>
+            <div style={{ maxWidth: 640, margin: "0 auto" }}>
+              <div style={{ background: C.white, borderRadius: 18, padding: "32px 28px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
+
+                {bizSent ? (
+                  <div style={{ textAlign: "center", padding: "24px 0" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                    <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 19, color: C.slate, marginBottom: 8 }}>
+                      Demande envoyée
+                    </div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray, lineHeight: 1.6 }}>
+                      Votre demande a été transmise sur WhatsApp à notre équipe commerciale. Un conseiller vous recontacte sous 24h avec un devis adapté à votre entreprise.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleBizSubmit}>
+                    <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate, marginBottom: 6 }}>
+                      Demande de devis Entreprise
+                    </div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 22px" }}>
+                      Décrivez votre entreprise, un conseiller vous recontacte avec une formule et un tarif adaptés à votre effectif.
+                    </p>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      <Field label="Nom de l'entreprise" required error={bizErrors.entreprise}>
+                        <input style={{ ...inputStyle, borderColor: bizErrors.entreprise ? "#C0392B" : "#E2E8F0" }}
+                          value={bizForm.entreprise} onChange={e => setBizForm({ ...bizForm, entreprise: e.target.value })}
+                          placeholder="Ex : Société Ivoire SARL" />
+                      </Field>
+
+                      <div className="awj-grid-2" style={{ gap: 12 }}>
+                        <Field label="Secteur d'activité" hint="optionnel">
+                          <input style={inputStyle}
+                            value={bizForm.secteur} onChange={e => setBizForm({ ...bizForm, secteur: e.target.value })}
+                            placeholder="Ex : BTP, commerce..." />
+                        </Field>
+                        <Field label="Effectif à couvrir">
+                          <select style={inputStyle} value={bizForm.effectif} onChange={e => setBizForm({ ...bizForm, effectif: e.target.value })}>
+                            {["1-10", "11-50", "51-200", "200+"].map(n => <option key={n} value={n}>{n} salariés</option>)}
+                          </select>
+                        </Field>
+                      </div>
+
+                      <div className="awj-grid-2" style={{ gap: 12 }}>
+                        <Field label="Nom du contact" required error={bizErrors.contact}>
+                          <input style={{ ...inputStyle, borderColor: bizErrors.contact ? "#C0392B" : "#E2E8F0" }}
+                            value={bizForm.contact} onChange={e => setBizForm({ ...bizForm, contact: e.target.value })}
+                            placeholder="Ex : Aya Kouassi" />
+                        </Field>
+                        <Field label="Fonction" hint="optionnel">
+                          <input style={inputStyle}
+                            value={bizForm.fonction} onChange={e => setBizForm({ ...bizForm, fonction: e.target.value })}
+                            placeholder="Ex : RH, Directeur..." />
+                        </Field>
+                      </div>
+
+                      <div className="awj-grid-2" style={{ gap: 12 }}>
+                        <Field label="Téléphone" required error={bizErrors.phone}>
+                          <input style={{ ...inputStyle, borderColor: bizErrors.phone ? "#C0392B" : "#E2E8F0" }}
+                            value={bizForm.phone} onChange={e => setBizForm({ ...bizForm, phone: e.target.value })}
+                            placeholder="Ex : 07 00 00 00 00" />
+                        </Field>
+                        <Field label="Email" hint="optionnel">
+                          <input style={inputStyle} type="email"
+                            value={bizForm.email} onChange={e => setBizForm({ ...bizForm, email: e.target.value })}
+                            placeholder="vous@entreprise.com" />
+                        </Field>
+                      </div>
+
+                      <Field label="Ville" hint="optionnel">
+                        <input style={inputStyle}
+                          value={bizForm.ville} onChange={e => setBizForm({ ...bizForm, ville: e.target.value })}
+                          placeholder="Ex : Abidjan" />
+                      </Field>
+
+                      <Field label="Besoins spécifiques" hint="optionnel">
+                        <textarea style={{ ...inputStyle, minHeight: 90, resize: "vertical", fontFamily: "Inter, sans-serif" }}
+                          value={bizForm.message} onChange={e => setBizForm({ ...bizForm, message: e.target.value })}
+                          placeholder="Ex : couverture maternité renforcée, dentaire, etc." />
+                      </Field>
+                    </div>
+
+                    <button type="submit" disabled={bizSubmitting} style={{
+                      width: "100%", marginTop: 24, background: bizSubmitting ? C.gray : C.green, color: "#FFFFFF", border: "none",
+                      fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 16,
+                      padding: "17px", borderRadius: 12, cursor: bizSubmitting ? "wait" : "pointer",
+                      boxShadow: bizSubmitting ? "none" : `0 6px 24px ${C.green}40`,
+                      transition: "all .2s", letterSpacing: 0.2,
+                    }}>
+                      {bizSubmitting ? "Envoi en cours..." : "📩 Demander un devis"}
+                    </button>
+
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gray, textAlign: "center", marginTop: 12 }}>
+                      Votre demande sera envoyée sur WhatsApp à notre équipe commerciale.
+                    </p>
+                  </form>
+                )}
+              </div>
+            </div>
+          </section>
+        </>
+      ) : (
+      <>
       <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "center", gap: 0 }}>
           {[
@@ -247,6 +481,27 @@ export default function Adhesion() {
                       {["1","2","3","4","5","6+"].map(n => <option key={n} value={n}>{n} personne{n !== "1" ? "s" : ""}</option>)}
                     </select>
                   </Field>
+
+                  {mode === "famille" && (
+                    <Field label="Enfants supplémentaires" hint={`au-delà des ${form.nb_beneficiaires} bénéficiaires ci-dessus`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <button type="button" onClick={() => setExtraEnfants(n => Math.max(0, n - 1))} style={{
+                          width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                          fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                        }}>–</button>
+                        <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 16, color: C.slate, minWidth: 24, textAlign: "center" }}>{extraEnfants}</span>
+                        <button type="button" onClick={() => setExtraEnfants(n => n + 1)} style={{
+                          width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                          fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                        }}>+</button>
+                      </div>
+                      {extraEnfants > 0 && (
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.gray, margin: "6px 0 0" }}>
+                          Surprime de {fcfa(surchargeEnfantUnitaire)} / mois par enfant supplémentaire pour la formule {selectedPlan.name} — soit {fcfa(surchargeEnfants)} ajoutés ce mois-ci.
+                        </p>
+                      )}
+                    </Field>
+                  )}
                 </div>
               </div>
 
@@ -345,6 +600,12 @@ export default function Adhesion() {
                       <span>1ère mensualité — {selectedPlan.name}</span>
                       <span style={{ fontWeight: 600, color: C.slate }}>{selectedPlan.mensualite} F</span>
                     </div>
+                    {surchargeEnfants > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
+                        <span>Enfants supplémentaires ({extraEnfants} × {fcfa(surchargeEnfantUnitaire)})</span>
+                        <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(surchargeEnfants)}</span>
+                      </div>
+                    )}
                     {nbPathologies > 0 && (
                       <>
                         <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
@@ -439,6 +700,8 @@ export default function Adhesion() {
           </form>
         </div>
       </section>
+      </>
+      )}
 
       <Footer />
       <WhatsAppFloat />

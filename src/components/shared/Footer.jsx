@@ -186,9 +186,9 @@ export default function Footer() {
           </span>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             {[
-              { label: "Mentions légales", to: "/mentions" },
-              { label: "Politique de confidentialité", to: "/confidentialite" },
-              { label: "CGU", to: "/cgu" },
+              { label: "Mentions légales", to: "/politiques#mentions" },
+              { label: "Politique de confidentialité", to: "/politiques#confidentialite" },
+              { label: "CGU", to: "/politiques#cgu" },
             ].map(l => (
               <Link key={l.to} to={l.to} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#3A5A78", textDecoration: "none" }}>{l.label}</Link>
             ))}

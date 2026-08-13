@@ -372,6 +372,9 @@ export default function LandingPage() {
                 Souscrire maintenant
               </a>
               <a href="#problem" className="btn-scroll" onClick={scrollToProblem}>Vous hésitez encore ? ↓</a>
+              <Link to="/adhesion?type=entreprise" className="btn-scroll" style={{ marginTop: 4 }}>
+                Vous êtes une entreprise ? →
+              </Link>
             </div>
           </div>
         </section>
@@ -523,6 +526,12 @@ export default function LandingPage() {
               <span>📞 <a href="tel:+2250171721668">01 71 72 16 68</a></span>
               <span>🌐 <a href="https://www.mutuelleawoundjo.org" target="_blank" rel="noopener noreferrer">mutuelleawoundjo.org</a></span>
               <span>📧 <a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a></span>
+            </div>
+
+            <div style={{ marginTop: 32, fontSize: 14 }}>
+              <Link to="/adhesion?type=entreprise" style={{ color: "var(--cyan)", textDecoration: "underline" }}>
+                Vous dirigez une entreprise ? Demandez un devis pour vos salariés →
+              </Link>
             </div>
           </div>
         </section>
