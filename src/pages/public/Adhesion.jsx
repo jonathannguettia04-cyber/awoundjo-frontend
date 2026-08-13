@@ -49,8 +49,9 @@ const SURCHARGE_PAR_PATHOLOGIE = 10000;
 const CAUTION_MOIS = 3;
 
 // Surprime mensuelle par enfant supplémentaire au-delà des bénéficiaires inclus, selon la formule
+// (doit rester en sync avec SURPRIME_ENFANT dans routes/clientPortalRoutes.js)
 const SURCHARGE_ENFANT_PAR_FORMULE = {
-  essentielle: 1500,
+  essentielle: 2000,
   ivoirienne: 3000,
   turquoise: 5000,
 };
