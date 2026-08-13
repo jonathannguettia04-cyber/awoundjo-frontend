@@ -220,6 +220,7 @@ const ContactPage        = lazy(() => import("./pages/public/Contact"));
 const AdhesionPage       = lazy(() => import("./pages/public/Adhesion"));
 const BlogPage           = lazy(() => import("./pages/public/Blog"));
 const BlogPostPage       = lazy(() => import("./pages/public/BlogPost"));
+const PoliciesPage       = lazy(() => import("./pages/public/PoliciesPage"));
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
@@ -243,7 +244,7 @@ import { ADMIN_BASE } from "./config/adminBase";
 export { ADMIN_BASE };
 
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
-const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog"];
+const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog", "/politiques"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user, initializing } = useAuth();
@@ -365,6 +366,7 @@ export default function App() {
             <Route path="/adhesion"       element={<AdhesionPage />} />
             <Route path="/blog"           element={<BlogPage />} />
             <Route path="/blog/:slug"     element={<BlogPostPage />} />
+            <Route path="/politiques"     element={<PoliciesPage />} />
             <Route path={`${ADMIN_BASE}/clients`} element={
               <ProtectedRoute allowedRoles={AGENT_ROLES}><Clients /></ProtectedRoute>
             } />
