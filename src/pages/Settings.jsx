@@ -47,15 +47,17 @@ export default function Settings() {
   const [drafts, setDrafts]       = useState({});   // key -> valeur en cours d'édition
   const [dirty, setDirty]         = useState({});   // key -> bool
   const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState(null); // message si le chargement a échoué (distinct de "liste vide")
   const [savingKey, setSavingKey] = useState(null);
   const [toast, setToast]         = useState(null);  // { type, msg }
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`${BASE}/api/agents/settings`, { headers: authHeaders() });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Erreur de chargement");
+      if (!res.ok) throw new Error(data?.error || `Erreur ${res.status}`);
       const list = data.settings || data.data?.settings || [];
       setSettings(list);
       const initial = {};
@@ -63,7 +65,9 @@ export default function Settings() {
       setDrafts(initial);
       setDirty({});
     } catch (e) {
-      setToast({ type: "err", msg: e.message || "Impossible de charger les paramètres" });
+      const msg = e.message || "Impossible de charger les paramètres";
+      setLoadError(msg);
+      setToast({ type: "err", msg });
     } finally {
       setLoading(false);
     }
@@ -142,6 +146,19 @@ export default function Settings() {
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-100 h-40 animate-pulse" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="bg-white rounded-2xl border border-red-100 px-6 py-16 text-center">
+          <i className="ti ti-alert-triangle text-red-500" style={{ fontSize: 30 }} aria-hidden="true" />
+          <p className="text-slate-700 font-semibold mt-3 mb-1">Le chargement des paramètres a échoué</p>
+          <p className="text-slate-400 text-sm mb-5">{loadError}</p>
+          <button
+            onClick={load}
+            className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+          >
+            <i className="ti ti-refresh" style={{ fontSize: 14 }} aria-hidden="true" />
+            Réessayer
+          </button>
         </div>
       ) : settings.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 px-6 py-16 text-center">
