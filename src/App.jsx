@@ -337,7 +337,7 @@ export default function App() {
     && !isCollectePage && !isRejoindrePage;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {showNavbar && <Sidebar />}
       <main className="flex-1 min-w-0">
         <Suspense fallback={<PageLoader />}>
