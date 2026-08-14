@@ -399,12 +399,12 @@ export default function Dashboard() {
               <Eyebrow icon="ti-apps">Portails applicatifs</Eyebrow>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
                 {[
-                  { key: "admin", icon: "ti-shield-check", label: "Administration", desc: "Configuration centrale", color: BRAND_LT, link: "/dashboard", stat: `${totalClients} membres` },
-                  { key: "agent", icon: "ti-id-badge", label: "Réseau Agents", desc: "Outils de collecte terrain", color: TEAL, link: "/agents", stat: `${top_agents?.length ?? 0} actifs` },
-                  { key: "client", icon: "ti-user", label: "Espace Adhérent", desc: "Suivi des garanties", color: BRAND_LT, link: "/clients", stat: `${totalActifs} actifs` },
-                  { key: "diaspora", icon: "ti-world", label: "Guichet Diaspora", desc: "Souscriptions internationales", color: AMBER, link: "/diaspora", stat: "Canal actif" },
-                  { key: "business", icon: "ti-building", label: "Espace Corporate", desc: "Grands comptes CNEPECI", color: VIOLET, link: "/business", stat: "B2B actif" },
-                  { key: "parrainage", icon: "ti-link", label: "Affiliation", desc: "Programme de référents", color: "#ea8a4d", link: "/referral", stat: "10% intéressement" },
+                  { key: "admin", icon: "ti-shield-check", label: "Administration", desc: "Configuration centrale", color: BRAND_LT, link: ADMIN_BASE, stat: `${totalClients} membres` },
+                  { key: "agent", icon: "ti-id-badge", label: "Réseau Agents", desc: "Outils de collecte terrain", color: TEAL, link: `${ADMIN_BASE}/agents`, stat: `${top_agents?.length ?? 0} actifs` },
+                  { key: "client", icon: "ti-user", label: "Espace Adhérent", desc: "Suivi des garanties", color: BRAND_LT, link: `${ADMIN_BASE}/clients`, stat: `${totalActifs} actifs` },
+                  { key: "diaspora", icon: "ti-world", label: "Guichet Diaspora", desc: "Souscriptions internationales", color: AMBER, link: `${ADMIN_BASE}/diaspora`, stat: "Canal actif" },
+                  { key: "business", icon: "ti-building", label: "Espace Corporate", desc: "Grands comptes CNEPECI", color: VIOLET, link: `${ADMIN_BASE}/business`, stat: "B2B actif" },
+                  { key: "parrainage", icon: "ti-link", label: "Affiliation", desc: "Programme de référents", color: "#ea8a4d", link: `${ADMIN_BASE}/federation`, stat: "10% intéressement" },
                 ].map((portal) => (
                   <Link key={portal.key} to={portal.link} style={{ textDecoration: "none" }}>
                     <div className="awj-card awj-card-hover" style={{ padding: 16, cursor: "pointer", height: "100%", display: "flex", flexDirection: "column" }}>
