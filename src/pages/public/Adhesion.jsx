@@ -332,23 +332,24 @@ export default function Adhesion() {
         <>
           {/* ── ÉTAPES ENTREPRISE ───────────────────────────────── */}
           <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
-            <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "center", gap: 0 }}>
+            <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexWrap: "wrap", justifyContent: "center", rowGap: 10, gap: 0 }}>
               {[
                 { n: "1", label: "Votre entreprise" },
                 { n: "2", label: "Vos besoins" },
                 { n: "3", label: "Un conseiller vous recontacte" },
               ].map((s, i) => (
-                <div key={s.n} style={{ display: "flex", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div key={s.n} style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: "50%",
                       background: C.green, color: "#FFFFFF",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 12,
+                      flexShrink: 0,
                     }}>{s.n}</div>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.slate }}>{s.label}</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.slate, whiteSpace: "nowrap" }}>{s.label}</span>
                   </div>
-                  {i < 2 && <div style={{ width: 40, height: 1.5, background: "#E2E8F0", margin: "0 12px" }} />}
+                  {i < 2 && <div style={{ width: 40, height: 1.5, background: "#E2E8F0", margin: "0 12px", flexShrink: 0 }} />}
                 </div>
               ))}
             </div>
@@ -459,23 +460,24 @@ export default function Adhesion() {
       ) : (
       <>
       <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "center", gap: 0 }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexWrap: "wrap", justifyContent: "center", rowGap: 10, gap: 0 }}>
           {[
             { n: "1", label: "Vos informations" },
             { n: "2", label: "Votre formule" },
             { n: "3", label: "Paiement" },
           ].map((s, i) => (
-            <div key={s.n} style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={s.n} style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: "50%",
                   background: C.green, color: "#FFFFFF",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 12,
+                  flexShrink: 0,
                 }}>{s.n}</div>
-                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.slate }}>{s.label}</span>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.slate, whiteSpace: "nowrap" }}>{s.label}</span>
               </div>
-              {i < 2 && <div style={{ width: 40, height: 1.5, background: "#E2E8F0", margin: "0 12px" }} />}
+              {i < 2 && <div style={{ width: 40, height: 1.5, background: "#E2E8F0", margin: "0 12px", flexShrink: 0 }} />}
             </div>
           ))}
         </div>
@@ -599,7 +601,7 @@ export default function Adhesion() {
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 18px" }}>
                   Déclarez ici toute pathologie lourde déjà diagnostiquée. Chaque pathologie déclarée entraîne une surcharge de {fcfa(SURCHARGE_PAR_PATHOLOGIE)} et le paiement d'une caution équivalente à {CAUTION_MOIS} mois de cotisation, réglée en une fois à l'adhésion.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                <div className="awj-grid-2" style={{ gap: 10, marginBottom: 16 }}>
                   {PATHOLOGIES.map(p => {
                     const checked = pathologies.includes(p);
                     return (
