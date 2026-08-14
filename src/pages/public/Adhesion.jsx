@@ -1,5 +1,5 @@
 // src/pages/public/Adhesion.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
@@ -45,16 +45,17 @@ const PATHOLOGIES = [
   "Asthme sévère",
 ];
 
-const SURCHARGE_PAR_PATHOLOGIE = 10000;
-const CAUTION_MOIS = 3;
-
-// Surprime mensuelle par enfant supplémentaire au-delà des bénéficiaires inclus, selon la formule
-// (doit rester en sync avec SURPRIME_ENFANT dans routes/clientPortalRoutes.js)
-const SURCHARGE_ENFANT_PAR_FORMULE = {
-  essentielle: 2000,
-  ivoirienne: 3000,
-  turquoise: 5000,
+// Valeurs par défaut (repli) tant que /api/settings/public n'a pas répondu,
+// ou si l'appel échoue. Source de vérité normale : table `settings` (backoffice),
+// doit rester en sync avec SURPRIME_ENFANT dans routes/clientPortalRoutes.js.
+const SURCHARGE_PAR_PATHOLOGIE_DEFAULT = 10000;
+const CAUTION_MOIS_DEFAULT = 3;
+const SURCHARGE_ENFANT_PAR_FORMULE_DEFAULT = {
+  ESSENTIELLE: 2000,
+  IVOIRIENNE: 3000,
+  TURQUOISE: 5000,
 };
+const BASE_CHILDREN_CAP_DEFAULT = 3;
 
 function Field({ label, required, children, error, hint }) {
   return (
@@ -82,6 +83,38 @@ export default function Adhesion() {
   const preselected = searchParams.get("formule");
 
   const [mode, setMode] = useState(searchParams.get("type") === "entreprise" ? "entreprise" : "particulier");
+
+  // ── Paramètres backoffice (surprimes, cap enfants...) ──────────────
+  // Chargés depuis /api/settings/public ; on garde les valeurs par défaut
+  // en repli tant que la réponse n'est pas arrivée (ou en cas d'échec réseau).
+  const [settings, setSettings] = useState({
+    surcharge_pathologie: SURCHARGE_PAR_PATHOLOGIE_DEFAULT,
+    caution_mois: CAUTION_MOIS_DEFAULT,
+    surprime_enfant: SURCHARGE_ENFANT_PAR_FORMULE_DEFAULT,
+    base_children_cap: BASE_CHILDREN_CAP_DEFAULT,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(`/api/settings/public`)
+      .then((res) => {
+        if (cancelled) return;
+        const data = res?.data || res; // selon la forme exacte de la réponse ok()
+        setSettings((prev) => ({
+          surcharge_pathologie: data?.surcharge_pathologie ?? prev.surcharge_pathologie,
+          caution_mois: data?.caution_mois ?? prev.caution_mois,
+          surprime_enfant: data?.surprime_enfant ?? prev.surprime_enfant,
+          base_children_cap: data?.base_children_cap ?? prev.base_children_cap,
+        }));
+      })
+      .catch((e) => {
+        console.warn("[Adhesion] /api/settings/public indisponible, valeurs par défaut utilisées:", e.message);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const SURCHARGE_PAR_PATHOLOGIE = Number(settings.surcharge_pathologie) || SURCHARGE_PAR_PATHOLOGIE_DEFAULT;
+  const CAUTION_MOIS = Number(settings.caution_mois) || CAUTION_MOIS_DEFAULT;
 
   // ── B2B : formulaire de demande de devis (pas de paiement direct) ──
   const [bizForm, setBizForm] = useState({
@@ -130,7 +163,14 @@ export default function Adhesion() {
     if (id === "famille") {
       const familyPlan = PLANS.find(p => p.name.toLowerCase() === "ivoirienne");
       if (familyPlan) setSelectedPlan(familyPlan);
+      // Défaut d'affichage (2 parents + cap enfants de base) — n'affecte pas le calcul
+      // monétaire, qui lui utilise bien settings.base_children_cap / surprime_enfant.
       if (form.nb_beneficiaires === "1") setForm(f => ({ ...f, nb_beneficiaires: "5" }));
+    } else {
+      // "Pour moi" ou "Pour mon entreprise" : adhésion individuelle, pas de bénéficiaires
+      // multiples ni de surprime enfants — on repart sur des valeurs propres.
+      setForm(f => ({ ...f, nb_beneficiaires: "1" }));
+      setExtraEnfants(0);
     }
   }
 
@@ -221,7 +261,7 @@ export default function Adhesion() {
   const nbPathologies      = pathologies.length + (autrePathologie.trim() ? 1 : 0);
   const surchargePathologie = nbPathologies * SURCHARGE_PAR_PATHOLOGIE;
   const caution             = nbPathologies > 0 ? mensualite * CAUTION_MOIS : 0;
-  const surchargeEnfantUnitaire = SURCHARGE_ENFANT_PAR_FORMULE[selectedPlan.name.toLowerCase()] || 0;
+  const surchargeEnfantUnitaire = (settings.surprime_enfant?.[selectedPlan.name.toUpperCase()]) || 0;
   const surchargeEnfants   = mode === "famille" ? extraEnfants * surchargeEnfantUnitaire : 0;
   const total      = adhesion + mensualite + surchargePathologie + caution + surchargeEnfants;
 
@@ -477,11 +517,17 @@ export default function Adhesion() {
                         placeholder="Ex : Abidjan" />
                     </Field>
                   </div>
-                  <Field label="Nombre de bénéficiaires" hint="vous inclus">
-                    <select style={inputStyle} value={form.nb_beneficiaires} onChange={e => setForm({ ...form, nb_beneficiaires: e.target.value })}>
-                      {["1","2","3","4","5","6+"].map(n => <option key={n} value={n}>{n} personne{n !== "1" ? "s" : ""}</option>)}
-                    </select>
-                  </Field>
+                  {mode === "famille" ? (
+                    <Field label="Nombre de bénéficiaires" hint="vous inclus">
+                      <select style={inputStyle} value={form.nb_beneficiaires} onChange={e => setForm({ ...form, nb_beneficiaires: e.target.value })}>
+                        {["1","2","3","4","5","6+"].map(n => <option key={n} value={n}>{n} personne{n !== "1" ? "s" : ""}</option>)}
+                      </select>
+                    </Field>
+                  ) : (
+                    <div style={{ background: C.cream, borderRadius: 12, padding: "12px 14px", fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray }}>
+                      Adhésion individuelle — 1 bénéficiaire (vous). Pour couvrir votre conjoint et vos enfants, choisissez <strong style={{ color: C.slate }}>« Ma famille »</strong> en haut de page.
+                    </div>
+                  )}
 
                   {mode === "famille" && (
                     <Field label="Enfants supplémentaires" hint={`au-delà des ${form.nb_beneficiaires} bénéficiaires ci-dessus`}>

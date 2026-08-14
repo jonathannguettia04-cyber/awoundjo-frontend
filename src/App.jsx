@@ -13,7 +13,7 @@ import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
 import BusinessAuth from "./pages/business/BusinessAuth";
 
-import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 
 // ── Helper localStorage sécurisé (mobile / iOS privé) ────────
 function safeLocalStorage(method, ...args) {
@@ -28,6 +28,7 @@ const Clients             = lazy(() => import("./pages/Clients"));
 const ClientDetails       = lazy(() => import("./pages/ClientDetails"));
 const Payments            = lazy(() => import("./pages/Payments"));
 const Agents              = lazy(() => import("./pages/Agents"));
+const Settings             = lazy(() => import("./pages/Settings"));
 const Commissions         = lazy(() => import("./pages/Commissions"));
 const Groups              = lazy(() => import("./pages/Groups"));
 const HealthcareAdmin     = lazy(() => import("./pages/HealthcareAdmin"));
@@ -336,9 +337,9 @@ export default function App() {
     && !isCollectePage && !isRejoindrePage;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {showNavbar && <Navbar />}
-      <main className={showNavbar ? "pt-16" : ""}>
+    <div className="min-h-screen bg-slate-50 flex">
+      {showNavbar && <Sidebar />}
+      <main className="flex-1 min-w-0">
         <Suspense fallback={<PageLoader />}>
           <Routes>
 
@@ -384,6 +385,9 @@ export default function App() {
             } />
             <Route path={`${ADMIN_BASE}/agents`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>
+            } />
+            <Route path={`${ADMIN_BASE}/settings`} element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><Settings /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/healthcare`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"]}><HealthcareAdmin /></ProtectedRoute>
