@@ -10,6 +10,12 @@ import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
 const WA_NUMBER = "2250171721668";
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
 
+// ── Tracking conversion (Meta Pixel + Google Analytics) ─────────
+function trackCTA(fbEvent, gaEvent, params = {}) {
+  if (typeof window.fbq === "function") window.fbq("track", fbEvent, params);
+  if (typeof window.gtag === "function") window.gtag("event", gaEvent, params);
+}
+
 const STEPS = [
   { n: 1, title: "Vous vous inscrivez depuis votre téléphone", text: "Vos infos, vos bénéficiaires, votre formule, 5 minutes suffisent" },
   { n: 2, title: "On valide vos dossiers sous 24h maximum", text: "Vous recevez une confirmation par SMS et WhatsApp" },
@@ -372,7 +378,8 @@ export default function LandingPage() {
                 Souscrire maintenant
               </a>
               <a href="#problem" className="btn-scroll" onClick={scrollToProblem}>Vous hésitez encore ? ↓</a>
-              <Link to="/adhesion?type=entreprise" className="btn-scroll" style={{ marginTop: 4 }}>
+              <Link to="/adhesion?type=entreprise" className="btn-scroll" style={{ marginTop: 4 }}
+                onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Entreprise", content_category: "segment" })}>
                 Vous êtes une entreprise ? →
               </Link>
             </div>
@@ -436,7 +443,8 @@ export default function LandingPage() {
             </div>
 
             <div style={{ textAlign: "center", marginTop: 48 }}>
-              <a href={waLink("Bonjour, je veux plus d'informations sur Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer">
+              <a href={waLink("Bonjour, je veux plus d'informations sur Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer"
+                onClick={() => trackCTA("Contact", "contact", { content_name: "WhatsApp — plus d'infos" })}>
                 <WaIcon />
                 Contactez-nous pour plus d'infos
               </a>
@@ -484,7 +492,8 @@ export default function LandingPage() {
                   <div className="formula-price">{f.price}<small> F/mois</small></div>
                   <p className="formula-desc">{f.desc}</p>
                   <p className="formula-entry"><strong>Adhésion :</strong> 15 000 F</p>
-                  <Link to={`/adhesion?formule=${f.name.toLowerCase()}`} className="btn-wa">
+                  <Link to={`/adhesion?formule=${f.name.toLowerCase()}`} className="btn-wa"
+                    onClick={() => trackCTA("ViewContent", "select_item", { content_name: f.name, content_category: "formule" })}>
                     Choisir {f.name}
                   </Link>
                 </div>
@@ -517,7 +526,8 @@ export default function LandingPage() {
             <h2 className="section-title">Tout le monde a droit à la santé</h2>
             <div className="tagline">VOTRE CARTE. VOTRE SANTÉ. VOTRE DIGNITÉ.</div>
 
-            <a href={waLink("Bonjour, je veux ma carte Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer" style={{ fontSize: 20, padding: "20px 48px" }}>
+            <a href={waLink("Bonjour, je veux ma carte Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer" style={{ fontSize: 20, padding: "20px 48px" }}
+              onClick={() => trackCTA("Contact", "contact", { content_name: "WhatsApp — obtenir ma carte" })}>
               <WaIcon size={26} />
               Obtenir ma carte maintenant
             </a>
@@ -529,7 +539,8 @@ export default function LandingPage() {
             </div>
 
             <div style={{ marginTop: 32, fontSize: 14 }}>
-              <Link to="/adhesion?type=entreprise" style={{ color: "var(--cyan)", textDecoration: "underline" }}>
+              <Link to="/adhesion?type=entreprise" style={{ color: "var(--cyan)", textDecoration: "underline" }}
+                onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Entreprise", content_category: "segment" })}>
                 Vous dirigez une entreprise ? Demandez un devis pour vos salariés →
               </Link>
             </div>

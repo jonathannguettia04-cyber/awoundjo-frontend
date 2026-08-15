@@ -7,7 +7,7 @@
 //    AFFILIE   : /affilie/*   (Directrice → Leader → Superviseur → Recruteur)
 //  Auth partagée via DiasporaAuth + même token JWT
 // ─────────────────────────────────────────────────────────────
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
@@ -219,6 +219,8 @@ const FaqPage            = lazy(() => import("./pages/public/Faq"));
 const VerificationPage   = lazy(() => import("./pages/public/Verification"));
 const ContactPage        = lazy(() => import("./pages/public/Contact"));
 const AdhesionPage       = lazy(() => import("./pages/public/Adhesion"));
+const AdhesionMerciPage  = lazy(() => import("./pages/public/AdhesionMerci"));
+const AdhesionEchecPage  = lazy(() => import("./pages/public/AdhesionEchec"));
 const BlogPage           = lazy(() => import("./pages/public/Blog"));
 const BlogPostPage       = lazy(() => import("./pages/public/BlogPost"));
 const PoliciesPage       = lazy(() => import("./pages/public/PoliciesPage"));
@@ -245,7 +247,7 @@ import { ADMIN_BASE } from "./config/adminBase";
 export { ADMIN_BASE };
 
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
-const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/blog", "/politiques"];
+const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/adhesion/merci", "/adhesion/echec", "/blog", "/politiques"];
 
 function ProtectedRoute({ children, allowedRoles = null }) {
   const { user, initializing } = useAuth();
@@ -332,6 +334,26 @@ export default function App() {
   const isPublicPage    = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/blog/");
   const isAgentAdminPage = pathname.startsWith(ADMIN_BASE);
 
+  // ── Tracking PageView (Meta Pixel + Google Analytics) ────────
+  // Se déclenche à chaque changement de route SPA. Le tout premier
+  // PageView (chargement initial) est déjà envoyé par les scripts
+  // de base dans index.html — on l'ignore ici via isFirstRender
+  // pour éviter un double comptage sur la toute première page vue.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "PageView");
+    }
+    if (typeof window.gtag === "function") {
+      window.gtag("config", "G-YN55L7L63G", { page_path: pathname });
+    }
+  }, [pathname]);
+
+
   const showNavbar = user && isAgentAdminPage && !isClientPage && !isProviderPage && !isDiasporaPage
     && !isReferralPage && !isAffiliePage && !isBusinessPage && !isCnepeciPage
     && !isCollectePage && !isRejoindrePage;
@@ -365,6 +387,8 @@ export default function App() {
             <Route path="/verification"   element={<VerificationPage />} />
             <Route path="/contact"        element={<ContactPage />} />
             <Route path="/adhesion"       element={<AdhesionPage />} />
+            <Route path="/adhesion/merci" element={<AdhesionMerciPage />} />
+            <Route path="/adhesion/echec" element={<AdhesionEchecPage />} />
             <Route path="/blog"           element={<BlogPage />} />
             <Route path="/blog/:slug"     element={<BlogPostPage />} />
             <Route path="/politiques"     element={<PoliciesPage />} />

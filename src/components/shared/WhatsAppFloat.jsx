@@ -2,10 +2,20 @@
 import { C, CONTACT } from "../../data/constants";
 
 export default function WhatsAppFloat() {
+  const handleClick = () => {
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "Contact", { content_name: "WhatsApp — bouton flottant" });
+    }
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "contact", { content_name: "WhatsApp — bouton flottant" });
+    }
+  };
+
   return (
     <a href={`https://wa.me/${CONTACT.whatsapp}?text=Bonjour%2C%20je%20souhaite%20des%20informations%20sur%20la%20mutuelle%20Awoundj%C3%B4`}
       target="_blank" rel="noreferrer"
       className="awj-wa-float"
+      onClick={handleClick}
       style={{
         position: "fixed", bottom: 20, right: 20, zIndex: 999,
         background: "#25D366", color: C.white,

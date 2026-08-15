@@ -154,6 +154,21 @@ export default function Adhesion() {
 
     const waUrl = `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(lines)}`;
     window.open(waUrl, "_blank", "noopener,noreferrer");
+
+    // ── Tracking conversion : demande de devis entreprise ──────
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "Lead", {
+        content_name: "Demande devis entreprise",
+        content_category: "adhesion_entreprise",
+      });
+    }
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "generate_lead", {
+        event_category: "adhesion",
+        event_label: "entreprise",
+      });
+    }
+
     setBizSubmitting(false);
     setBizSent(true);
   }
@@ -245,6 +260,38 @@ export default function Adhesion() {
 
       const redirectUrl = res?.data?.redirect_url || res?.redirect_url;
       if (redirectUrl) {
+        // ── Tracking conversion : paiement lancé (avant redirection Jeko) ──
+        if (typeof window.fbq === "function") {
+          window.fbq("track", "InitiateCheckout", {
+            content_name: `Adhésion ${selectedPlan.name}`,
+            content_category: mode,
+            value: totalAmount,
+            currency: "XOF",
+          });
+        }
+        if (typeof window.gtag === "function") {
+          window.gtag("event", "begin_checkout", {
+            currency: "XOF",
+            value: totalAmount,
+            items: [{ item_name: selectedPlan.name, item_category: mode }],
+          });
+        }
+
+        // ── Sauvegarde pour la page /adhesion/merci (confirmation + Purchase) ──
+        // Le paiement direct (nouveau client) n'est pas encore en table `payments`
+        // à ce stade (seulement `pending_payments`), donc pas d'endpoint fiable à
+        // interroger depuis la page merci : on transmet les infos via sessionStorage.
+        const txId = res?.data?.transaction_id || res?.transaction_id || null;
+        try {
+          sessionStorage.setItem("awj_last_adhesion", JSON.stringify({
+            tx: txId,
+            amount: totalAmount,
+            plan: selectedPlan.name,
+            mode,
+            savedAt: Date.now(),
+          }));
+        } catch { /* sessionStorage indisponible (navigation privée) — pas bloquant */ }
+
         window.location.href = redirectUrl;
       } else {
         setFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez ou contactez-nous." });
