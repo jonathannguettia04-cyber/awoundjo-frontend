@@ -9,6 +9,33 @@ import Modal from "../components/Modal";
 const STATUSES = ["actif", "attente", "suspendu"];
 const EMPTY    = { name: "", phone: "", city: "", plan: "", status: "attente", is_returning_client: false, expiration_date: "" };
 
+const DATE_RANGES = [
+  { value: "",     label: "Toutes les dates" },
+  { value: "7",     label: "7 derniers jours" },
+  { value: "14",    label: "14 derniers jours" },
+  { value: "28",    label: "28 derniers jours" },
+  { value: "90",    label: "90 derniers jours" },
+  { value: "custom", label: "Période personnalisée" },
+];
+
+// Convertit une plage ("7","14","28","90","custom") en bornes date_from/date_to (YYYY-MM-DD)
+function resolveDateRange(range, customFrom, customTo) {
+  if (!range) return {};
+  if (range === "custom") {
+    const out = {};
+    if (customFrom) out.date_from = customFrom;
+    if (customTo)   out.date_to   = customTo;
+    return out;
+  }
+  const days = Number(range);
+  if (!days) return {};
+  const to   = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (days - 1)); // inclut le jour courant
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  return { date_from: fmt(from), date_to: fmt(to) };
+}
+
 function parseCSV(text) {
   const lines = text.trim().split("\n").filter(Boolean);
   if (lines.length < 2) return { headers: [], rows: [] };
@@ -45,6 +72,9 @@ export default function Clients() {
   const [search,       setSearch]       = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPlan,   setFilterPlan]   = useState("");
+  const [dateRange,    setDateRange]    = useState("");   // "", "7", "14", "28", "90", "custom"
+  const [customFrom,   setCustomFrom]   = useState("");
+  const [customTo,     setCustomTo]     = useState("");
   const [plans,        setPlans]        = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [pagination,   setPagination]   = useState({ total: 0, page: 1, pages: 1 });
@@ -81,12 +111,13 @@ export default function Clients() {
       if (search)       params.search = search;
       if (filterStatus) params.status = filterStatus;
       if (filterPlan)   params.plan   = filterPlan;
+      Object.assign(params, resolveDateRange(dateRange, customFrom, customTo));
       const { data } = await clientAPI.getAll(params);
       setClients(data.clients);
       setPagination(data.pagination);
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [search, filterStatus, filterPlan]);
+  }, [search, filterStatus, filterPlan, dateRange, customFrom, customTo]);
 
   // Charger les formules depuis l'API
   useEffect(() => {
@@ -287,11 +318,11 @@ export default function Clients() {
       </div>
 
       {/* ── Filtres ─────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-5">
         <input
           type="text" placeholder="🔍 Rechercher nom, téléphone, numéro…"
           value={search} onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="flex-1 min-w-[220px] border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -303,6 +334,23 @@ export default function Clients() {
           <option value="">Toutes les formules</option>
           {plans.map((p) => <option key={p.slug} value={p.slug.toUpperCase()}>{p.name}</option>)}
         </select>
+        <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}
+          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          {DATE_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        {dateRange === "custom" && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <span className="text-slate-400 text-sm">→</span>
+            <input
+              type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Contenu ─────────────────────────────────────────────── */}
