@@ -22,7 +22,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Awoundjô — Mutuelle Santé</title>
 
-    <!-- Meta Pixel Code -->
+    <!-- Meta Pixel Code (script de base — le <noscript> associé est en tout début de <body>, pas ici : un <img> n'est pas autorisé comme enfant direct d'un <noscript> placé dans <head>, Vite/parse5 rejette le build sinon) -->
     <script>
     !function(f,b,e,v,n,t,s)
     {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -35,12 +35,13 @@
     fbq('init', '894014440132768');
     fbq('track', 'PageView');
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=894014440132768&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
   </head>
   <body>
+    <!-- Meta Pixel — fallback noscript, doit être en tout début de <body> -->
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=894014440132768&ev=PageView&noscript=1"
+    /></noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
