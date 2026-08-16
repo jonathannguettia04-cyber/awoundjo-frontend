@@ -62,14 +62,28 @@ export const authAPI = {
 
 // ── AGENTS ───────────────────────────────────────────────────────
 export const agentsAPI = {
-  getAll:  (params)   => api.get("/agents", { params }),
-  getById: (id)       => api.get(`/agents/${id}`),
-  create:  (data)     => api.post("/agents", data),
-  update:  (id, data) => api.put(`/agents/${id}`, data),
-  delete:  (id)       => api.delete(`/agents/${id}`),
+  getAll:      (params)   => api.get("/agents", { params }),
+  getById:     (id)       => api.get(`/agents/${id}`),
+  create:      (data)     => api.post("/agents", data),
+  update:      (id, data) => api.put(`/agents/${id}`, data),
+  delete:      (id)       => api.delete(`/agents/${id}`),
+  assignRole:  (id, role) => api.patch(`/agents/${id}/role`, { role }),
+  toggleStatus:(id)       => api.patch(`/agents/${id}/toggle-status`),
 };
 // Alias sans "s" pour compatibilité avec Agents.jsx
 export const agentAPI = agentsAPI;
+
+// ── RÔLES & PERMISSIONS ──────────────────────────────────────────
+// Préfixe séparé /api/roles (pas /api/agents/roles) — voir rolesRoutes.js
+export const rolesAPI = {
+  getAll:              ()               => api.get("/roles"),
+  create:              (data)           => api.post("/roles", data),
+  delete:              (roleId)         => api.delete(`/roles/${roleId}`),
+  getAllPermissions:   ()               => api.get("/roles/permissions"),
+  getRolePermissions:  (roleId)         => api.get(`/roles/${roleId}/permissions`),
+  setRolePermissions:  (roleId, ids)    => api.put(`/roles/${roleId}/permissions`, { permission_ids: ids }),
+  getAgentPermissions: (agentId)        => api.get(`/agents/${agentId}/permissions`), // reste sous /api/agents
+};
 
 // ── CLIENTS ──────────────────────────────────────────────────────
 export const clientAPI = {

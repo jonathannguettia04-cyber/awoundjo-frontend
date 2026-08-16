@@ -31,8 +31,9 @@ function getNavSections(role) {
         { to: `${ADMIN_BASE}/providers`,  label: "Établissements",  icon: "ti-building-hospital" },
       ]},
       { title: "Organisation", links: [
-        { to: `${ADMIN_BASE}/agents`,   label: "Agents",   icon: "ti-id-badge" },
-        { to: `${ADMIN_BASE}/diaspora`, label: "Diaspora", icon: "ti-world" },
+        { to: `${ADMIN_BASE}/agents`,       label: "Agents",            icon: "ti-id-badge" },
+        { to: `${ADMIN_BASE}/agents-roles`, label: "Rôles & permissions", icon: "ti-shield-lock" },
+        { to: `${ADMIN_BASE}/diaspora`,     label: "Diaspora",          icon: "ti-world" },
       ]},
       { title: "Contenu", links: [
         { to: `${ADMIN_BASE}/blog`, label: "Blog", icon: "ti-notes" },
@@ -101,7 +102,10 @@ function initials(name = "") {
 }
 
 function isLinkActive(to, pathname) {
-  return to === ADMIN_BASE ? pathname === ADMIN_BASE : pathname.startsWith(to);
+  if (to === ADMIN_BASE) return pathname === ADMIN_BASE;
+  // startsWith seul est ambigu entre chemins qui partagent un préfixe
+  // (ex: /agents et /agents-roles) — on exige une frontière de segment.
+  return pathname === to || pathname.startsWith(`${to}/`);
 }
 
 /** Lien de nav — s'adapte à l'état collapsed (icône seule + tooltip) */
