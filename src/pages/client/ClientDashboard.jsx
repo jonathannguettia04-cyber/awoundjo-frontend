@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientProfileAPI, clientApi, PLANS, STATUS_LABELS } from "../../clientApi";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
 
 const MENU = [
   { path: "/client/dossier",          icon: "📋", label: "Dossier Médical",  color: "#7C3AED", bg: "linear-gradient(135deg,#EDE9FE,#F5F3FF)" },
@@ -541,6 +542,8 @@ export default function ClientDashboard() {
   const [shareLoading, setShareLoading] = useState(false);
   const [copied,       setCopied]       = useState(false);
   const cardRef = useRef();
+
+  usePushNotifications();
 
   useEffect(() => {
     clientProfileAPI.get()

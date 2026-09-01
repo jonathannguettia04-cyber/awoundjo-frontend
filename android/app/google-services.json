@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "420774402083",
+    "project_id": "awoundjo-client-portal",
+    "storage_bucket": "awoundjo-client-portal.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420774402083:android:0127dc99f409581225f996",
+        "android_client_info": {
+          "package_name": "com.mutuelleawoundjo.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3RbM7__4z8JBCnWYYn9vChjoUN-303rU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
