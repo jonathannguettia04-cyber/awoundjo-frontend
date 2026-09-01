@@ -3,6 +3,9 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientProfileAPI, clientApi, PLANS, STATUS_LABELS } from "../../clientApi";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
+import { Capacitor } from "@capacitor/core";
+
+const APK_DOWNLOAD_URL = "https://vkrnqoajmyyyatfdlmbk.supabase.co/storage/v1/object/public/app-releases/app-release.apk";
 
 const MENU = [
   { path: "/client/dossier",          icon: "📋", label: "Dossier Médical",  color: "#7C3AED", bg: "linear-gradient(135deg,#EDE9FE,#F5F3FF)" },
@@ -967,6 +970,50 @@ export default function ClientDashboard() {
           )}
         </div>
       )}
+
+      {/* ── Téléchargement app Android (web uniquement) ──────────────── */}
+      <AppDownloadBanner visible={visible} />
+    </div>
+  );
+}
+
+
+// ─── Bannière téléchargement app Android (masquée si déjà dans l'app native) ──
+function AppDownloadBanner({ visible }) {
+  if (Capacitor.isNativePlatform()) return null;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)",
+      border: "1.5px solid #BFDBFE",
+      borderRadius: 18, padding: "16px",
+      display: "flex", alignItems: "center", gap: 14,
+      marginBottom: 20,
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(10px)",
+      transition: "all .5s .7s cubic-bezier(.34,1.56,.64,1)",
+    }}>
+      <div style={{ width: 44, height: 44, background: "#fff", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
+        📲
+      </div>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13, fontWeight: 800, color: "#1E3A8A", margin: "0 0 2px" }}>Téléchargez l'app Awoundjô</p>
+        <p style={{ fontSize: 11, color: "#3B5998", margin: 0 }}>Notifications en temps réel et accès plus rapide</p>
+      </div>
+      <a
+        href={APK_DOWNLOAD_URL}
+        download
+        style={{
+          background: "linear-gradient(135deg,#1a56db,#1e3a8a)",
+          color: "#fff", borderRadius: 10,
+          padding: "9px 14px", fontSize: 12,
+          fontWeight: 700, textDecoration: "none",
+          boxShadow: "0 4px 10px rgba(26,86,219,.3)",
+          whiteSpace: "nowrap", flexShrink: 0,
+        }}
+      >
+        Installer
+      </a>
     </div>
   );
 }

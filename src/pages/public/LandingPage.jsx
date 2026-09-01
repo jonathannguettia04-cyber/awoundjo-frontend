@@ -9,6 +9,7 @@ import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
 
 const WA_NUMBER = "2250171721668";
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
+const APK_DOWNLOAD_URL = "https://vkrnqoajmyyyatfdlmbk.supabase.co/storage/v1/object/public/app-releases/app-release.apk";
 
 // ── Tracking conversion (Meta Pixel + Google Analytics) ─────────
 function trackCTA(fbEvent, gaEvent, params = {}) {
@@ -536,6 +537,9 @@ export default function LandingPage() {
               <span>📞 <a href="tel:+2250171721668">01 71 72 16 68</a></span>
               <span>🌐 <a href="https://www.mutuelleawoundjo.org" target="_blank" rel="noopener noreferrer">mutuelleawoundjo.org</a></span>
               <span>📧 <a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a></span>
+              <span>📲 <a href={APK_DOWNLOAD_URL} download
+                onClick={() => trackCTA("ViewContent", "select_item", { content_name: "App Android", content_category: "download" })}>
+                Télécharger l'app Android</a></span>
             </div>
 
             <div style={{ marginTop: 32, fontSize: 14 }}>
