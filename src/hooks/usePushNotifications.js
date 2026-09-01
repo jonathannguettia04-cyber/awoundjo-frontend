@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
-import { clientApi } from "../../clientApi"; // ⚠️ adapte le chemin relatif si besoin
+import { clientApi } from "../clientApi";
 
 /**
  * À appeler une seule fois, dans ClientDashboard, une fois que le
