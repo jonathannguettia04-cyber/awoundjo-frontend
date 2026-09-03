@@ -1,18 +1,20 @@
 // src/pages/client/ClientLogin.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { clientAuthAPI } from "../../clientApi";
 
 export default function ClientLogin() {
   const navigate = useNavigate();
-  const [step, setStep]         = useState("login");
+  const [searchParams] = useSearchParams();
+
+  const [step, setStep]         = useState(searchParams.get("step") === "setup" ? "setup" : "login");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const [showPwd, setShowPwd]   = useState(false);
 
-  const [mutual_number, setMN]  = useState("");
+  const [mutual_number, setMN]  = useState((searchParams.get("mn") || "").toUpperCase());
   const [password, setPwd]      = useState("");
-  const [access_code, setCode]  = useState("");
+  const [access_code, setCode]  = useState(searchParams.get("code") || "");
   const [new_pwd, setNewPwd]    = useState("");
   const [confirm, setConfirm]   = useState("");
 
