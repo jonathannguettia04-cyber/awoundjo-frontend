@@ -239,7 +239,7 @@ function PageLoader() {
 }
 
 // ── Guards ───────────────────────────────────────────────────
-const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER"];
+const AGENT_ROLES = ["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE", "COMMUNITY_MANAGER", "APPORTEUR_AFFAIRES"];
 
 // [SÉCURITÉ] Préfixe non devinable, isolé dans ./config/adminBase pour
 // éviter tout import circulaire avec les pages (Login.jsx, api.js, etc.).
