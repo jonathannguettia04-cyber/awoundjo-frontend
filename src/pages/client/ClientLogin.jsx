@@ -1,6 +1,6 @@
 // src/pages/client/ClientLogin.jsx
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { clientAuthAPI } from "../../clientApi";
 
 export default function ClientLogin() {
@@ -107,6 +107,9 @@ export default function ClientLogin() {
                 Première connexion ? Activer mon compte
               </button>
             </form>
+            <Link to="/adhesion" style={s.createLink}>
+              Pas encore de compte ? <strong>Adhérer maintenant</strong>
+            </Link>
           </>
         ) : (
           <>
@@ -249,5 +252,6 @@ const s = {
   eye:      { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", display: "flex", padding: 0 },
   btn:      { background: "#1a56db", color: "#fff", border: "none", borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Poppins',sans-serif" },
   link:     { background: "none", border: "none", color: "#1a56db", fontSize: 13, cursor: "pointer", textAlign: "center", fontFamily: "'Poppins',sans-serif" },
+  createLink: { display: "block", textAlign: "center", marginTop: 20, fontSize: 13, color: "#374151", textDecoration: "none", fontFamily: "'Poppins',sans-serif" },
   footer:   { textAlign: "center", color: "#9CA3AF", fontSize: 12, marginTop: 24, marginBottom: 0 },
 };
