@@ -31,6 +31,7 @@ const Agents              = lazy(() => import("./pages/Agents"));
 const AgentsRoles          = lazy(() => import("./pages/admin/AgentsRoles"));
 const Settings             = lazy(() => import("./pages/Settings"));
 const Commissions         = lazy(() => import("./pages/Commissions"));
+const Cotations           = lazy(() => import("./pages/Cotations"));
 const Groups              = lazy(() => import("./pages/Groups"));
 const HealthcareAdmin     = lazy(() => import("./pages/HealthcareAdmin"));
 const AdminProviders      = lazy(() => import("./pages/AdminProviders"));
@@ -404,6 +405,9 @@ export default function App() {
             } />
             <Route path={`${ADMIN_BASE}/commissions`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "APPORTEUR_AFFAIRES"]}><Commissions /></ProtectedRoute>
+            } />
+            <Route path={`${ADMIN_BASE}/cotations`} element={
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "APPORTEUR_AFFAIRES"]}><Cotations /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/groups`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>

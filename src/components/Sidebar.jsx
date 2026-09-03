@@ -94,7 +94,8 @@ function getNavSections(role) {
     APPORTEUR_AFFAIRES: [
       { title: null, links: [dashboard] },
       { title: "Adhésions", links: [
-        { to: `${ADMIN_BASE}/clients`, label: "Clients", icon: "ti-users" },
+        { to: `${ADMIN_BASE}/clients`,    label: "Clients",    icon: "ti-users" },
+        { to: `${ADMIN_BASE}/cotations`,  label: "Cotations",  icon: "ti-file-text" },
       ]},
       { title: "Finance", links: [
         { to: `${ADMIN_BASE}/commissions`, label: "Commissions", icon: "ti-coins" },
