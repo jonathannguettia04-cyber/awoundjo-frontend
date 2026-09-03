@@ -31,9 +31,8 @@ function getNavSections(role) {
         { to: `${ADMIN_BASE}/providers`,  label: "Établissements",  icon: "ti-building-hospital" },
       ]},
       { title: "Organisation", links: [
-        { to: `${ADMIN_BASE}/agents`,       label: "Agents",            icon: "ti-id-badge" },
-        { to: `${ADMIN_BASE}/agents-roles`, label: "Rôles & permissions", icon: "ti-shield-lock" },
-        { to: `${ADMIN_BASE}/diaspora`,     label: "Diaspora",          icon: "ti-world" },
+        { to: `${ADMIN_BASE}/agents`,   label: "Agents",   icon: "ti-id-badge" },
+        { to: `${ADMIN_BASE}/diaspora`, label: "Diaspora", icon: "ti-world" },
       ]},
       { title: "Contenu", links: [
         { to: `${ADMIN_BASE}/blog`, label: "Blog", icon: "ti-notes" },
@@ -92,6 +91,15 @@ function getNavSections(role) {
         { to: `${ADMIN_BASE}/healthcare`, label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
       ]},
     ],
+    APPORTEUR_AFFAIRES: [
+      { title: null, links: [dashboard] },
+      { title: "Adhésions", links: [
+        { to: `${ADMIN_BASE}/clients`, label: "Clients", icon: "ti-users" },
+      ]},
+      { title: "Finance", links: [
+        { to: `${ADMIN_BASE}/commissions`, label: "Commissions", icon: "ti-coins" },
+      ]},
+    ],
   };
 
   return sectionsByRole[role] || [{ title: null, links: [dashboard] }];
@@ -102,10 +110,7 @@ function initials(name = "") {
 }
 
 function isLinkActive(to, pathname) {
-  if (to === ADMIN_BASE) return pathname === ADMIN_BASE;
-  // startsWith seul est ambigu entre chemins qui partagent un préfixe
-  // (ex: /agents et /agents-roles) — on exige une frontière de segment.
-  return pathname === to || pathname.startsWith(`${to}/`);
+  return to === ADMIN_BASE ? pathname === ADMIN_BASE : pathname.startsWith(to);
 }
 
 /** Lien de nav — s'adapte à l'état collapsed (icône seule + tooltip) */
