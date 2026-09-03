@@ -403,7 +403,7 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Payments /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/commissions`} element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL"]}><Commissions /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "APPORTEUR_AFFAIRES"]}><Commissions /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/groups`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>

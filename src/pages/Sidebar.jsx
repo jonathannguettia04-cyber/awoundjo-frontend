@@ -91,6 +91,15 @@ function getNavSections(role) {
         { to: `${ADMIN_BASE}/healthcare`, label: "Réseau de soins", icon: "ti-heart-rate-monitor" },
       ]},
     ],
+    APPORTEUR_AFFAIRES: [
+      { title: null, links: [dashboard] },
+      { title: "Adhésions", links: [
+        { to: `${ADMIN_BASE}/clients`, label: "Clients", icon: "ti-users" },
+      ]},
+      { title: "Finance", links: [
+        { to: `${ADMIN_BASE}/commissions`, label: "Commissions", icon: "ti-coins" },
+      ]},
+    ],
   };
 
   return sectionsByRole[role] || [{ title: null, links: [dashboard] }];
