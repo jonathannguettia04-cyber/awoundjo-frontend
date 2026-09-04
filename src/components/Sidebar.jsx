@@ -31,8 +31,9 @@ function getNavSections(role) {
         { to: `${ADMIN_BASE}/providers`,  label: "Établissements",  icon: "ti-building-hospital" },
       ]},
       { title: "Organisation", links: [
-        { to: `${ADMIN_BASE}/agents`,   label: "Agents",   icon: "ti-id-badge" },
-        { to: `${ADMIN_BASE}/diaspora`, label: "Diaspora", icon: "ti-world" },
+        { to: `${ADMIN_BASE}/agents`,       label: "Agents",             icon: "ti-id-badge" },
+        { to: `${ADMIN_BASE}/agents-roles`, label: "Rôles & permissions", icon: "ti-shield-lock" },
+        { to: `${ADMIN_BASE}/diaspora`,     label: "Diaspora",           icon: "ti-world" },
       ]},
       { title: "Contenu", links: [
         { to: `${ADMIN_BASE}/blog`, label: "Blog", icon: "ti-notes" },
