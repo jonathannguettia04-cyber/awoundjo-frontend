@@ -95,6 +95,7 @@ function getNavSections(role) {
       { title: null, links: [dashboard] },
       { title: "Adhésions", links: [
         { to: `${ADMIN_BASE}/clients`,    label: "Clients",    icon: "ti-users" },
+        { to: `${ADMIN_BASE}/groups`,     label: "Groupes",    icon: "ti-users-group" },
         { to: `${ADMIN_BASE}/cotations`,  label: "Cotations",  icon: "ti-file-text" },
       ]},
       { title: "Finance", links: [
@@ -146,14 +147,30 @@ function SidebarLink({ to, label, icon, active, collapsed, onClick }) {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const { role, label: roleLabel } = useRole();
+  const { role, label: roleLabel, can } = useRole();
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("awj_sidebar_collapsed") === "1");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const sections = getNavSections(role);
+  const rawSections = getNavSections(role);
+  // Liens pilotables depuis le backoffice (Rôles & permissions) — masqués
+  // tant que la permission correspondante n'est pas accordée au rôle,
+  // affichés dès qu'un admin la coche, sans redéploiement.
+  const LINK_PERMISSION = {
+    [`${ADMIN_BASE}/groups`]:    "viewGroups",
+    [`${ADMIN_BASE}/cotations`]: "viewCotations",
+  };
+  const sections = rawSections
+    .map((section) => ({
+      ...section,
+      links: section.links.filter((l) => {
+        const perm = LINK_PERMISSION[l.to];
+        return !perm || can(perm);
+      }),
+    }))
+    .filter((section) => section.links.length > 0);
   const width = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
   useEffect(() => {

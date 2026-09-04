@@ -82,9 +82,17 @@ export const ROLE_COLORS = {
 };
 
 export function useRole() {
-  const { user } = useAuth();
+  const { user, permissions: dynamicPermissions } = useAuth();
   const role = user?.role || "AGENT";
   const perms = PERMISSIONS[role] || PERMISSIONS.AGENT;
+
+  // Permissions accordées dynamiquement depuis le backoffice (table
+  // role_permissions), en plus des permissions statiques ci-dessus.
+  // Additif uniquement : une permission déjà à `true` en dur le reste ;
+  // une permission absente du dictionnaire statique (ex: "viewCotations",
+  // "viewGroups" pour un rôle qui ne l'avait pas) devient disponible dès
+  // qu'un admin la coche pour ce rôle, sans redéploiement.
+  const dynamicCodes = new Set((dynamicPermissions || []).map((p) => p.code));
 
   return {
     role,
@@ -94,7 +102,7 @@ export function useRole() {
     isRC:      role === "RESPONSABLE_COMMERCIAL",
     isCC:      role === "CONSEILLERE_CLIENTELE",
     isCM:      role === "COMMUNITY_MANAGER",
-    can:       (perm) => perms[perm] === true,
+    can:       (perm) => perms[perm] === true || dynamicCodes.has(perm),
     perms,
   };
 }

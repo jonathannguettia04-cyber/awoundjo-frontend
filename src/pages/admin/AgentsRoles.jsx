@@ -157,25 +157,44 @@ function PermissionsMatrix() {
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState("");
 
-  useEffect(() => {
-    rolesAPI.getAll()
+  // ── Création de rôle ──────────────────────────────────────────
+  const [showNewRole, setShowNewRole] = useState(false);
+  const [newRole, setNewRole]         = useState({ code: "", label: "", description: "" });
+  const [savingRole, setSavingRole]   = useState(false);
+  const [roleFormError, setRoleFormError] = useState("");
+
+  // ── Création de permission ────────────────────────────────────
+  const [showNewPerm, setShowNewPerm] = useState(false);
+  const [newPerm, setNewPerm]         = useState({ code: "", label: "", category: "", description: "" });
+  const [savingPerm, setSavingPerm]   = useState(false);
+  const [permFormError, setPermFormError] = useState("");
+
+  function loadRoles() {
+    return rolesAPI.getAll()
       .then(res => {
-        const list = (res.data.roles || []).filter(r => r.code !== "ADMIN");
+        const list = (res.data.roles || res.data.data?.roles || []).filter(r => r.code !== "ADMIN");
         setRoles(list);
-        if (list.length) setSelected(list[0]);
+        return list;
       })
-      .catch(e => setError(e.response?.data?.error || "Erreur de chargement"))
+      .catch(e => { setError(e.response?.data?.error || "Erreur de chargement"); return []; });
+  }
+
+  useEffect(() => {
+    loadRoles()
+      .then(list => { if (list.length) setSelected(list[0]); })
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
+  function loadRolePermissions() {
     if (!selectedRole) return;
     setLoading(true);
-    rolesAPI.getRolePermissions(selectedRole.id)
-      .then(res => setPermissions(res.data.permissions || []))
+    return rolesAPI.getRolePermissions(selectedRole.id)
+      .then(res => setPermissions(res.data.permissions || res.data.data?.permissions || []))
       .catch(e => setError(e.response?.data?.error || "Erreur de chargement"))
       .finally(() => setLoading(false));
-  }, [selectedRole]);
+  }
+
+  useEffect(() => { loadRolePermissions(); }, [selectedRole]);
 
   function toggle(permId) {
     setPermissions(prev => prev.map(p => p.id === permId ? { ...p, granted: !p.granted } : p));
@@ -191,6 +210,49 @@ function PermissionsMatrix() {
       setError(e.response?.data?.error || "Erreur d'enregistrement");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCreateRole(e) {
+    e.preventDefault();
+    setRoleFormError("");
+    if (!newRole.code.trim() || !newRole.label.trim()) {
+      setRoleFormError("Le code et le libellé sont requis.");
+      return;
+    }
+    setSavingRole(true);
+    try {
+      const res = await rolesAPI.create(newRole);
+      const created = res.data.role || res.data.data?.role;
+      setShowNewRole(false);
+      setNewRole({ code: "", label: "", description: "" });
+      const list = await loadRoles();
+      const match = list.find(r => r.code === created?.code) || list[list.length - 1];
+      if (match) setSelected(match);
+    } catch (e) {
+      setRoleFormError(e.response?.data?.error || "Erreur de création du rôle");
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function handleCreatePermission(e) {
+    e.preventDefault();
+    setPermFormError("");
+    if (!newPerm.code.trim() || !newPerm.label.trim() || !newPerm.category.trim()) {
+      setPermFormError("Le code, le libellé et la catégorie sont requis.");
+      return;
+    }
+    setSavingPerm(true);
+    try {
+      await rolesAPI.createPermission(newPerm);
+      setShowNewPerm(false);
+      setNewPerm({ code: "", label: "", category: "", description: "" });
+      await loadRolePermissions(); // la nouvelle permission apparaît, non cochée, prête à assigner
+    } catch (e) {
+      setPermFormError(e.response?.data?.error || "Erreur de création de la permission");
+    } finally {
+      setSavingPerm(false);
     }
   }
 
@@ -217,6 +279,13 @@ function PermissionsMatrix() {
             {r.label}
           </button>
         ))}
+        <button
+          onClick={() => setShowNewRole(true)}
+          className="w-full text-left px-3 py-2.5 rounded-lg text-sm mt-1 text-brand-600 hover:bg-brand-50 font-medium flex items-center gap-1.5"
+        >
+          <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" />
+          Nouveau rôle
+        </button>
       </div>
 
       {/* Matrice de permissions */}
@@ -227,15 +296,24 @@ function PermissionsMatrix() {
           <div className="text-center text-slate-400 text-sm py-8">Chargement…</div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-5 gap-3">
               <h3 className="font-semibold text-slate-800">{selectedRole?.label}</h3>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {saving ? "Enregistrement…" : "Enregistrer"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowNewPerm(true)}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1"
+                >
+                  <i className="ti ti-plus" style={{ fontSize: 13 }} aria-hidden="true" />
+                  Nouvelle permission
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-5">
@@ -269,6 +347,105 @@ function PermissionsMatrix() {
           </>
         )}
       </div>
+
+      {/* ── Modale Nouveau rôle ── */}
+      {showNewRole && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50" onClick={() => setShowNewRole(false)}>
+          <form onSubmit={handleCreateRole} className="bg-white rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-slate-800 mb-4">Nouveau rôle</h3>
+            {roleFormError && <div className="mb-3 p-2.5 bg-red-50 text-red-600 text-xs rounded-lg">{roleFormError}</div>}
+            <div className="space-y-3">
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Code (ex: SUPERVISEUR_REGIONAL)</span>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newRole.code}
+                  onChange={e => setNewRole(f => ({ ...f, code: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Libellé affiché</span>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newRole.label}
+                  onChange={e => setNewRole(f => ({ ...f, label: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Description (optionnel)</span>
+                <textarea
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newRole.description}
+                  onChange={e => setNewRole(f => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowNewRole(false)} className="flex-1 py-2 text-sm text-slate-500 hover:text-slate-700">
+                Annuler
+              </button>
+              <button type="submit" disabled={savingRole} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium py-2 rounded-lg">
+                {savingRole ? "Création…" : "Créer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── Modale Nouvelle permission ── */}
+      {showNewPerm && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50" onClick={() => setShowNewPerm(false)}>
+          <form onSubmit={handleCreatePermission} className="bg-white rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-slate-800 mb-1">Nouvelle permission</h3>
+            <p className="text-xs text-slate-400 mb-4">Ajoutée au catalogue, non accordée à aucun rôle par défaut.</p>
+            {permFormError && <div className="mb-3 p-2.5 bg-red-50 text-red-600 text-xs rounded-lg">{permFormError}</div>}
+            <div className="space-y-3">
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Code (ex: viewGroups)</span>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newPerm.code}
+                  onChange={e => setNewPerm(f => ({ ...f, code: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Libellé affiché</span>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newPerm.label}
+                  onChange={e => setNewPerm(f => ({ ...f, label: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Catégorie (ex: Adhésions)</span>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newPerm.category}
+                  onChange={e => setNewPerm(f => ({ ...f, category: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 mb-1">Description (optionnel)</span>
+                <textarea
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  value={newPerm.description}
+                  onChange={e => setNewPerm(f => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowNewPerm(false)} className="flex-1 py-2 text-sm text-slate-500 hover:text-slate-700">
+                Annuler
+              </button>
+              <button type="submit" disabled={savingPerm} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium py-2 rounded-lg">
+                {savingPerm ? "Création…" : "Créer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

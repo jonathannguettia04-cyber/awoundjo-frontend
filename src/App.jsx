@@ -10,6 +10,7 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { useRole } from "./context/RoleContext";
 import { isDiasporaTokenValid } from "./diasporaApi";
 import BusinessAuth from "./pages/business/BusinessAuth";
 
@@ -251,8 +252,9 @@ export { ADMIN_BASE };
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
 const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/adhesion/merci", "/adhesion/echec", "/blog", "/politiques"];
 
-function ProtectedRoute({ children, allowedRoles = null }) {
+function ProtectedRoute({ children, allowedRoles = null, requiredPermission = null }) {
   const { user, initializing } = useAuth();
+  const { can } = useRole();
   const { pathname } = useLocation();
 
   // Ne pas interférer avec les portails indépendants
@@ -268,6 +270,15 @@ function ProtectedRoute({ children, allowedRoles = null }) {
   if (initializing) return <PageLoader />;
 
   if (!user) return <Navigate to={`${ADMIN_BASE}/login`} replace />;
+
+  // Garde par permission dynamique (backoffice) — prioritaire si fournie.
+  // ADMIN garde toujours accès (même filet de sécurité que côté backend).
+  if (requiredPermission) {
+    if (user.role !== "ADMIN" && !can(requiredPermission))
+      return <Navigate to={ADMIN_BASE} replace />;
+    return children;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role))
     return <Navigate to={ADMIN_BASE} replace />;
   return children;
@@ -407,10 +418,10 @@ export default function App() {
               <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "APPORTEUR_AFFAIRES"]}><Commissions /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/cotations`} element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "APPORTEUR_AFFAIRES"]}><Cotations /></ProtectedRoute>
+              <ProtectedRoute requiredPermission="viewCotations"><Cotations /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/groups`} element={
-              <ProtectedRoute allowedRoles={["ADMIN", "AGENT", "RESPONSABLE_COMMERCIAL", "CONSEILLERE_CLIENTELE"]}><Groups /></ProtectedRoute>
+              <ProtectedRoute requiredPermission="viewGroups"><Groups /></ProtectedRoute>
             } />
             <Route path={`${ADMIN_BASE}/agents`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "RESPONSABLE_COMMERCIAL"]}><Agents /></ProtectedRoute>

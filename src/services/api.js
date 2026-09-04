@@ -80,6 +80,7 @@ export const rolesAPI = {
   create:              (data)           => api.post("/roles", data),
   delete:              (roleId)         => api.delete(`/roles/${roleId}`),
   getAllPermissions:   ()               => api.get("/roles/permissions"),
+  createPermission:    (data)           => api.post("/roles/permissions", data),
   getRolePermissions:  (roleId)         => api.get(`/roles/${roleId}/permissions`),
   setRolePermissions:  (roleId, ids)    => api.put(`/roles/${roleId}/permissions`, { permission_ids: ids }),
   getAgentPermissions: (agentId)        => api.get(`/agents/${agentId}/permissions`), // reste sous /api/agents
