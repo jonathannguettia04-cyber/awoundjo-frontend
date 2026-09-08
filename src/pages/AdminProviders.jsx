@@ -1272,7 +1272,7 @@ export default function AdminProviders() {
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t border-amber-200 mt-1">
                   <span className="text-sm text-slate-600">Lien de connexion</span>
-                  <a href="http://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
+                  <a href="https://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
                     className="text-xs font-semibold text-blue-600 underline truncate max-w-[180px]">
                     mutuelleawoundjo.org/etablissement/login
                   </a>
@@ -1283,7 +1283,7 @@ export default function AdminProviders() {
               ⚠️ Notez ces identifiants — ils ne seront plus affichés.
             </p>
             <button onClick={() => {
-              const text = `Login : ${modal.item.phone}\nMot de passe : ${tempPass}\nLien : http://mutuelleawoundjo.org/etablissement/login`;
+              const text = `Login : ${modal.item.phone}\nMot de passe : ${tempPass}\nLien : https://mutuelleawoundjo.org/etablissement/login`;
               try { navigator.clipboard.writeText(text); } catch {
                 const ta = document.createElement("textarea");
                 ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
@@ -1321,7 +1321,7 @@ export default function AdminProviders() {
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t border-amber-200 mt-1">
                   <span className="text-sm text-slate-600">Lien de connexion</span>
-                  <a href="http://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
+                  <a href="https://mutuelleawoundjo.org/etablissement/login" target="_blank" rel="noopener noreferrer"
                     className="text-xs font-semibold text-blue-600 underline truncate max-w-[180px]">
                     mutuelleawoundjo.org/etablissement/login
                   </a>
@@ -1330,7 +1330,7 @@ export default function AdminProviders() {
             </div>
             <p className="text-xs text-slate-400 mb-3 text-center">⚠️ Notez ces identifiants — ils ne seront plus affichés.</p>
             <button onClick={() => {
-              const text = `Login : ${modal.item.phone}\nMot de passe : ${resetPass}\nLien : http://mutuelleawoundjo.org/etablissement/login`;
+              const text = `Login : ${modal.item.phone}\nMot de passe : ${resetPass}\nLien : https://mutuelleawoundjo.org/etablissement/login`;
               try { navigator.clipboard.writeText(text); } catch {
                 const ta = document.createElement("textarea");
                 ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
