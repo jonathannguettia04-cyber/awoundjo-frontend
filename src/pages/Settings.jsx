@@ -13,6 +13,7 @@ const CATEGORY_META = {
   famille:     { label: "Famille & enfants",  icon: "ti-users",        color: "brand" },
   pathologie:  { label: "Pathologies",        icon: "ti-heart-rate-monitor", color: "amber" },
   commissions: { label: "Commissions agents", icon: "ti-coins",        color: "emerald" },
+  tarifs:      { label: "Tarifs groupe",      icon: "ti-report-money", color: "brand" },
   general:     { label: "Général",            icon: "ti-settings",     color: "slate" },
 };
 
@@ -122,7 +123,7 @@ export default function Settings() {
     const cat = s.category || "general";
     (grouped[cat] ||= []).push(s);
   });
-  const categoryOrder = ["famille", "pathologie", "commissions", "general"].filter((c) => grouped[c]);
+  const categoryOrder = ["famille", "pathologie", "commissions", "tarifs", "general"].filter((c) => grouped[c]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
@@ -270,6 +271,81 @@ function SettingControl({ settingKey, value, onChange }) {
             </div>
           </label>
         ))}
+      </div>
+    );
+  }
+
+  if (settingKey === "tarifs_groupe" && value && typeof value === "object") {
+    const tranches = Array.isArray(value.tranches) ? value.tranches : [];
+
+    function updateTranche(i, field, v) {
+      const next = tranches.map((t, idx) => (idx === i ? { ...t, [field]: v } : t));
+      onChange({ ...value, tranches: next });
+    }
+
+    return (
+      <div className="space-y-4">
+        <label className="block max-w-xs">
+          <span className="text-xs text-slate-500 mb-1 block">Adhésion (fixe, tous effectifs)</span>
+          <div className="relative">
+            <input
+              type="number" min="0" step="500"
+              value={value.adhesion ?? 0}
+              onChange={(e) => onChange({ ...value, adhesion: Number(e.target.value) })}
+              className="w-full border border-slate-200 rounded-lg pl-3 pr-12 py-2 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">F</span>
+          </div>
+        </label>
+
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-sm min-w-[420px]">
+            <thead>
+              <tr className="text-left text-[11px] text-slate-400 uppercase tracking-wide">
+                <th className="font-semibold px-1 py-1.5">Effectif min</th>
+                <th className="font-semibold px-1 py-1.5">Effectif max</th>
+                <th className="font-semibold px-1 py-1.5 text-right">Ivoirienne</th>
+                <th className="font-semibold px-1 py-1.5 text-right">Turquoise</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tranches.map((t, i) => (
+                <tr key={i} className="border-t border-slate-50">
+                  <td className="px-1 py-2">
+                    <input
+                      type="number" min="0"
+                      value={t.min ?? 0}
+                      onChange={(e) => updateTranche(i, "min", Number(e.target.value))}
+                      className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </td>
+                  <td className="px-1 py-2">
+                    <input
+                      type="number" min="0"
+                      placeholder="∞"
+                      value={t.max ?? ""}
+                      onChange={(e) => updateTranche(i, "max", e.target.value === "" ? null : Number(e.target.value))}
+                      className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </td>
+                  {["ivoirienne", "turquoise"].map((plan) => (
+                    <td key={plan} className="px-1 py-2">
+                      <div className="relative w-28 ml-auto">
+                        <input
+                          type="number" min="0" step="500"
+                          value={t[plan] ?? 0}
+                          onChange={(e) => updateTranche(i, plan, Number(e.target.value))}
+                          className="w-full border border-slate-200 rounded-lg pl-2.5 pr-6 py-1.5 text-sm text-right font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">F</span>
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }

@@ -2,12 +2,22 @@
 // Génération de devis PDF pour prospects entreprise/groupe.
 // Saisie 100% manuelle (pas de calcul automatique lié aux formules/barèmes) —
 // l'agent renseigne lui-même les tarifs qu'il propose au prospect.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
 const PLAN_OPTIONS = ["Basique", "Essentielle", "Ivoirienne", "Turquoise", "Sur mesure"];
+const BAREME_PLANS = ["Ivoirienne", "Turquoise"]; // formules couvertes par le barème groupe
+
+// Cherche la tranche d'effectif applicable dans le barème (min inclus, max inclus ou null = infini)
+function findTranche(tranches, effectif) {
+  if (!Array.isArray(tranches)) return null;
+  const eff = Number(effectif) || 0;
+  return tranches.find((t) => eff >= (t.min ?? 0) && (t.max == null || eff <= t.max)) || null;
+}
 
 function todayPlus(days) {
   const d = new Date();
@@ -54,8 +64,40 @@ export default function Cotations() {
   const [lines, setLines] = useState([emptyLine()]);
   const [error, setError] = useState("");
 
+  // ── Barème groupe (paramètre back-office public "tarifs_groupe") ──────
+  const [tarifsGroupe, setTarifsGroupe] = useState(null); // { adhesion, tranches } | null tant que non chargé
+  const [baremeError, setBaremeError]   = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE}/api/settings/public`);
+        const data = await res.json(); // objet plat { key: value, ... }
+        if (!res.ok) throw new Error();
+        if (!cancelled && data?.tarifs_groupe) setTarifsGroupe(data.tarifs_groupe);
+      } catch {
+        if (!cancelled) setBaremeError(true); // pas bloquant : saisie manuelle reste possible
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   function updateLine(i, field, value) {
-    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, [field]: value } : l)));
+    setLines((ls) => ls.map((l, idx) => {
+      if (idx !== i) return l;
+      const next = { ...l, [field]: value };
+
+      // Auto-remplissage depuis le barème quand la formule ou l'effectif changent
+      if ((field === "formule" || field === "effectif") && tarifsGroupe && BAREME_PLANS.includes(next.formule)) {
+        const tranche = findTranche(tarifsGroupe.tranches, next.effectif);
+        if (tranche) {
+          next.prix_adhesion = tarifsGroupe.adhesion ?? next.prix_adhesion;
+          next.prix_mensualite = tranche[next.formule.toLowerCase()] ?? next.prix_mensualite;
+        }
+      }
+      return next;
+    }));
   }
   function addLine() {
     setLines((ls) => [...ls, emptyLine()]);
@@ -73,6 +115,8 @@ export default function Cotations() {
     if (!contact.trim())    return "Le nom du contact est requis.";
     if (!phone.trim())      return "Le téléphone du contact est requis.";
     if (!lines.length)      return "Ajoutez au moins une ligne de formule.";
+    const tropPetite = lines.find((l) => BAREME_PLANS.includes(l.formule) && (Number(l.effectif) || 0) < 20);
+    if (tropPetite) return `Effectif minimum 20 personnes pour la formule ${tropPetite.formule}.`;
     return "";
   }
 
@@ -216,6 +260,13 @@ export default function Cotations() {
         </div>
       )}
 
+      {baremeError && (
+        <div className="mb-5 flex items-center gap-2 bg-amber-50 border border-amber-100 text-amber-700 text-sm font-medium rounded-xl px-4 py-3">
+          <i className="ti ti-alert-triangle" style={{ fontSize: 15 }} aria-hidden="true" />
+          Barème groupe indisponible — saisissez les prix manuellement.
+        </div>
+      )}
+
       {/* ── Bloc entreprise ─────────────────────────────────── */}
       <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sm:p-6 mb-5">
         <h2 className="text-sm font-bold text-slate-700 mb-4">Entreprise / groupe</h2>
@@ -269,7 +320,12 @@ export default function Cotations() {
                 </select>
               </Field>
               <Field label="Effectif" small>
-                <input className="input" type="number" min="1" value={line.effectif} onChange={(e) => updateLine(i, "effectif", e.target.value)} />
+                <input
+                  className="input" type="number"
+                  min={BAREME_PLANS.includes(line.formule) ? 20 : 1}
+                  value={line.effectif}
+                  onChange={(e) => updateLine(i, "effectif", e.target.value)}
+                />
               </Field>
               <Field label="Prix adhésion (F CFA / pers.)" small>
                 <input className="input" type="number" min="0" step="500" value={line.prix_adhesion} onChange={(e) => updateLine(i, "prix_adhesion", e.target.value)} />
