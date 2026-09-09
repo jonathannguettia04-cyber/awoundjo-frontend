@@ -67,6 +67,27 @@ function computeCarryOver(collectes) {
     .reduce((sum, c) => sum + Math.max(0, c.target - c.paid), 0);
 }
 
+/** Regroupe les cotisations par mois et neutralise les lignes "attente"
+ *  orphelines quand une ligne "payé" existe déjà pour le même mois
+ *  (doublons Jeko, webhook non traité, etc.) — évite le faux "X mois impayé". */
+function dedupeByMonth(cotisations) {
+  const byMonth = new Map();
+  for (const c of cotisations) {
+    const isPaid = c.status === "payé" || c.status === "paid";
+    const d = new Date((isPaid ? c.paid_at : null) || c.created_at);
+    if (isNaN(d)) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const existing = byMonth.get(key);
+    if (!existing) {
+      byMonth.set(key, c);
+    } else {
+      const existingPaid = existing.status === "payé" || existing.status === "paid";
+      if (isPaid && !existingPaid) byMonth.set(key, c); // la ligne payée gagne toujours
+    }
+  }
+  return Array.from(byMonth.values());
+}
+
 // ─── Composants UI ─────────────────────────────────────────────────────────
 
 function Card({ children, style = {} }) {
@@ -603,7 +624,7 @@ export default function ClientCotisations() {
 
   // Initialiser monthsToPay au nombre de mois en retard dès le chargement
   useEffect(() => {
-    const overdue = cotisations.filter(c =>
+    const overdue = dedupeByMonth(cotisations).filter(c =>
       c.status === 'attente' || c.status === 'pending' ||
       c.status === 'retard'  || c.status === 'overdue'
     ).length;
@@ -618,7 +639,8 @@ export default function ClientCotisations() {
   const plan     = client?.plan || "IVOIRIENNE";
   const surprime = Number(client?.surcharge_pathologie) || 0;
   const monthly  = (client?.monthly_amount ?? PLAN_PRICES[plan] ?? 15000) + surprime;
-  const pending   = cotisations.find(c => c.status === "attente" || c.status === "pending");
+  const effectiveCotisations = dedupeByMonth(cotisations);
+  const pending   = effectiveCotisations.find(c => c.status === "attente" || c.status === "pending");
   const paidCount = cotisations.filter(c => c.status === "payé" || c.status === "paid").length;
   const totalPaid = cotisations
     .filter(c => c.status === "payé" || c.status === "paid")
@@ -643,7 +665,7 @@ export default function ClientCotisations() {
   const isUpToDate = !pending && paidCount > 0;
 
   // Nombre de mois en retard (cotisations pending/overdue)
-  const overdueCount = cotisations.filter(c =>
+  const overdueCount = effectiveCotisations.filter(c =>
     c.status === 'attente' || c.status === 'pending' ||
     c.status === 'retard'  || c.status === 'overdue'
   ).length;
