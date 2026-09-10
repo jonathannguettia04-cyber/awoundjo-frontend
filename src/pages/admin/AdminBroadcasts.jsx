@@ -186,6 +186,139 @@ function LeaderboardModal({ notif, onClose, onRefresh, token }) {
   );
 }
 
+/* ─────────── MODAL SMS EN MASSE ─────────── */
+function BulkSmsModal({ onClose, token }) {
+  const { post } = useAdminFetch(token);
+  const [status, setStatus]   = useState("all");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult]   = useState(null); // { total, sent, failed, skipped, failures, message }
+  const [error, setError]     = useState(null);
+
+  const STATUS_OPTIONS = [
+    { value: "all",      label: "Tous les clients" },
+    { value: "actif",    label: "Actifs uniquement" },
+    { value: "attente",  label: "En attente" },
+    { value: "suspendu", label: "Suspendus" },
+  ];
+
+  const handleSend = async () => {
+    setError(null);
+    if (!message.trim()) return setError("Le message est requis");
+
+    const label = STATUS_OPTIONS.find(o => o.value === status)?.label ?? status;
+    if (!confirm(`Envoyer ce SMS à : ${label} ? Cette action ne peut pas être annulée.`)) return;
+
+    setSending(true);
+    setResult(null);
+    try {
+      const d = await post("/api/broadcasts/bulk-sms", { message: message.trim(), status });
+      setResult(d.data);
+    } catch (e) {
+      setError(e.message ?? "Erreur lors de l'envoi");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+          <p className="font-semibold text-gray-800 flex items-center gap-2">
+            <Icon.Send /> SMS en masse
+          </p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon.Close /></button>
+        </div>
+
+        <div className="overflow-y-auto p-5 space-y-4 flex-1">
+
+          {/* Destinataires */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Destinataires</label>
+            <div className="grid grid-cols-2 gap-2">
+              {STATUS_OPTIONS.map(o => (
+                <button
+                  key={o.value}
+                  onClick={() => setStatus(o.value)}
+                  className={`py-2 rounded-xl text-sm font-medium transition-colors ${
+                    status === o.value
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={4}
+              maxLength={160}
+              placeholder="Votre message (160 caractères max)…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
+            />
+            <p className={`text-xs mt-1 text-right ${message.length > 160 ? "text-red-500" : "text-gray-400"}`}>
+              {message.length}/160
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 space-y-2">
+              <p className="text-sm font-semibold text-teal-800">{result.message}</p>
+              <div className="flex gap-4 text-xs text-teal-700">
+                <span>✅ {result.sent} envoyé{result.sent !== 1 ? "s" : ""}</span>
+                {result.failed > 0 && (
+                  <span className="text-red-600">❌ {result.failed} échoué{result.failed !== 1 ? "s" : ""}</span>
+                )}
+                {result.skipped > 0 && (
+                  <span className="text-amber-600">⚠️ {result.skipped} numéro{result.skipped !== 1 ? "s" : ""} invalide{result.skipped !== 1 ? "s" : ""}</span>
+                )}
+              </div>
+              {result.failures?.length > 0 && (
+                <div className="pt-1 max-h-28 overflow-y-auto space-y-1">
+                  {result.failures.map((f, i) => (
+                    <p key={i} className="text-xs text-red-600">{f.name} — {f.reason}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        <div className="px-5 py-4 border-t shrink-0">
+          <button
+            onClick={handleSend}
+            disabled={sending || !message.trim()}
+            className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors"
+          >
+            <Icon.Send />
+            {sending ? "Envoi en cours…" : "Envoyer le SMS"}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 /* ─────────── MODAL CRÉATION ─────────── */
 function CreateModal({ onClose, onSuccess, token }) {
   const { post, postForm } = useAdminFetch(token);
@@ -540,6 +673,7 @@ export default function AdminBroadcasts() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading]             = useState(true);
   const [showCreate, setShowCreate]       = useState(false);
+  const [showBulkSms, setShowBulkSms]     = useState(false);
   const [leaderTarget, setLeaderTarget]   = useState(null);
 
   const fetchAll = useCallback(async () => {
@@ -574,12 +708,20 @@ export default function AdminBroadcasts() {
             {notifications.length} notification{notifications.length !== 1 ? "s" : ""} envoyée{notifications.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-teal-200"
-        >
-          <Icon.Plus /> Nouvelle
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBulkSms(true)}
+            className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+          >
+            <Icon.Send /> SMS en masse
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-teal-200"
+          >
+            <Icon.Plus /> Nouvelle
+          </button>
+        </div>
       </div>
 
       {/* Résumé global */}
@@ -633,6 +775,9 @@ export default function AdminBroadcasts() {
       {/* Modals */}
       {showCreate && (
         <CreateModal onClose={() => setShowCreate(false)} onSuccess={fetchAll} token={token} />
+      )}
+      {showBulkSms && (
+        <BulkSmsModal onClose={() => setShowBulkSms(false)} token={token} />
       )}
       {leaderTarget && (
         <LeaderboardModal

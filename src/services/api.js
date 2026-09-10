@@ -94,6 +94,7 @@ export const clientAPI = {
   update:  (id, data) => api.put(`/clients/${id}`, data),
   delete:  (id)       => api.delete(`/clients/${id}`),
   search:        (q)        => api.get("/clients/search", { params: { q } }),
+  sendSms: (id, message) => api.post(`/broadcasts/manual-sms/${id}`, { message }),
 };
 
 // ── PAIEMENTS ────────────────────────────────────────────────────

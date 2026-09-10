@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Copy, Check, ExternalLink, Shield, Key, User } from "lucide-react";
+import { Copy, Check, ExternalLink, Shield, Key, User, Send } from "lucide-react";
 import { clientAPI } from "../services/api";
 import { ADMIN_BASE } from "../config/adminBase";
 import { StatusBadge, PlanBadge } from "../components/Badge";
@@ -95,6 +95,12 @@ export default function Clients() {
   const [paySuccess,     setPaySuccess]     = useState("");
   const [paying,         setPaying]         = useState(false);
   const [jekoMethod,     setJekoMethod]     = useState("orange");
+
+  // Envoi SMS manuel
+  const [smsTarget,  setSmsTarget]  = useState(null); // client ciblé
+  const [smsMessage, setSmsMessage] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResult,  setSmsResult]  = useState(null); // { ok, ticket } | { ok:false, error }
 
   const [showImport,   setShowImport]   = useState(false);
   const [csvRows,      setCsvRows]      = useState([]);
@@ -284,6 +290,25 @@ export default function Clients() {
     if (results.success > 0) load(1);
   }
 
+  function openSmsModal(client) {
+    setSmsTarget(client);
+    setSmsMessage("");
+    setSmsResult(null);
+  }
+
+  async function handleSendSms() {
+    if (!smsTarget || !smsMessage.trim()) return;
+    setSmsSending(true); setSmsResult(null);
+    try {
+      const { data } = await clientAPI.sendSms(smsTarget.id, smsMessage.trim());
+      setSmsResult({ ok: true, ticket: data.data.ticket });
+    } catch (err) {
+      setSmsResult({ ok: false, error: err.response?.data?.error || "Erreur envoi SMS" });
+    } finally {
+      setSmsSending(false);
+    }
+  }
+
   function toggleRow(i) {
     setCsvRows((prev) => prev.map((r, idx) => idx === i ? { ...r, _selected: !r._selected } : r));
   }
@@ -376,6 +401,7 @@ export default function Clients() {
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Statut</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">N° Mutuel</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Total payé</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -393,6 +419,16 @@ export default function Clients() {
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{c.mutual_number}</td>
                       <td className="px-4 py-3 font-semibold text-slate-700">
                         {Number(c.total_paid).toLocaleString("fr-FR")} FCFA
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => openSmsModal(c)}
+                          title="Envoyer un SMS"
+                          className="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        >
+                          <Send size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -426,7 +462,17 @@ export default function Clients() {
                 className="block bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow active:scale-[.99]">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="font-bold text-slate-800 text-base leading-tight">{c.name}</p>
-                  <StatusBadge status={c.status} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSmsModal(c); }}
+                      title="Envoyer un SMS"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                    >
+                      <Send size={15} />
+                    </button>
+                    <StatusBadge status={c.status} />
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
                   <PlanBadge plan={c.plan} />
@@ -897,6 +943,54 @@ export default function Clients() {
           </div>
         );
       })()}
+
+      {/* ── Modal envoi SMS manuel ──────────────────────────────── */}
+      <Modal
+        open={!!smsTarget}
+        onClose={() => { setSmsTarget(null); setSmsMessage(""); setSmsResult(null); }}
+        title={`💬 SMS à ${smsTarget?.name || ""}`}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Destinataire : <span className="font-medium text-slate-700">{smsTarget?.phone}</span>
+          </p>
+
+          <div>
+            <textarea
+              rows={4}
+              maxLength={160}
+              value={smsMessage}
+              onChange={(e) => setSmsMessage(e.target.value)}
+              placeholder="Votre message (160 caractères max)…"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+            />
+            <p className={`text-xs mt-1 text-right ${smsMessage.length > 160 ? "text-red-500" : "text-slate-400"}`}>
+              {smsMessage.length}/160
+            </p>
+          </div>
+
+          {smsResult && (
+            smsResult.ok ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3">
+                ✅ SMS envoyé (ticket : {smsResult.ticket})
+              </div>
+            ) : (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                {smsResult.error}
+              </div>
+            )
+          )}
+
+          <button
+            type="button"
+            onClick={handleSendSms}
+            disabled={smsSending || !smsMessage.trim()}
+            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white py-3 rounded-xl text-sm font-semibold transition-colors"
+          >
+            {smsSending ? "Envoi en cours…" : "Envoyer le SMS"}
+          </button>
+        </div>
+      </Modal>
 
       {/* ── Modal import CSV ─────────────────────────────────── */}
       <Modal open={showImport} onClose={() => setShowImport(false)} title="📂 Importer des anciens clients">
