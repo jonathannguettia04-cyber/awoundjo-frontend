@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 
 import axios from "axios";
 import { clientAPI, paymentsAPI, depsAPI } from "../services/api";
+import { ADMIN_BASE } from "../config/adminBase";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 import { useAuth } from "../context/AuthContext";
@@ -112,7 +113,7 @@ export default function ClientDetails() {
       headers: { Authorization: `Bearer ${token}` },
       data: { adminPassword: password },
     });
-    navigate("/clients");
+    navigate(`${ADMIN_BASE}/clients`);
   }
 
   async function handleForceActivate() {
@@ -315,7 +316,7 @@ export default function ClientDetails() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="bg-red-50 text-red-700 rounded-xl p-6 text-center">{error}</div>
       <div className="text-center mt-4">
-        <Link to="/clients" className="text-brand-500 hover:underline text-sm">← Retour aux clients</Link>
+        <Link to={`${ADMIN_BASE}/clients`} className="text-brand-500 hover:underline text-sm">← Retour aux clients</Link>
       </div>
     </div>
   );
@@ -336,7 +337,7 @@ export default function ClientDetails() {
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in space-y-6">
 
       {/* Breadcrumb */}
-      <Link to="/clients" className="text-sm text-brand-500 hover:underline">← Retour aux clients</Link>
+      <Link to={`${ADMIN_BASE}/clients`} className="text-sm text-brand-500 hover:underline">← Retour aux clients</Link>
 
       {/* Bandeau suspension manuelle — admin only */}
       {isAdmin && c.status === "suspendu" && (

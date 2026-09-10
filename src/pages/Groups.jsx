@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { groupAPI, clientAPI } from "../services/api";
+import { ADMIN_BASE } from "../config/adminBase";
 import Modal from "../components/Modal";
 import { StatusBadge, PlanBadge } from "../components/Badge";
 
@@ -324,10 +325,10 @@ export default function Groups() {
                         {m.name?.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-800">
+                        <Link to={`${ADMIN_BASE}/clients/${m.id}`} className="text-sm font-medium text-slate-800 hover:text-brand-600 hover:underline">
                           {m.name}
                           {m.is_referent && <span className="ml-1.5 text-xs bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">Référent</span>}
-                        </p>
+                        </Link>
                         <p className="text-xs text-slate-400 font-mono">{m.mutual_number}</p>
                       </div>
                     </div>
