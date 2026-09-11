@@ -88,7 +88,7 @@ export default function ClientDetails() {
 
   // Payment modal
   const [showPay,    setShowPay]    = useState(false);
-  const [payForm,    setPayForm]    = useState({ amount: "", type: "mensualite", payment_method: "cash" });
+  const [payForm,    setPayForm]    = useState({ amount: "", type: "mensualite", payment_method: "cash", include_first_month: false });
   const [paySaving,  setPaySaving]  = useState(false);
   const [payError,   setPayError]   = useState("");
   const [paySuccess,    setPaySuccess]    = useState("");
@@ -238,7 +238,6 @@ export default function ClientDetails() {
     setPayError(""); setPaySuccess(""); setPaySaving(true);
 
     const amount = Number(payForm.amount);
-
     if (payForm.payment_method === "jeko") {
       // JEKO — redirection
       try {
@@ -256,7 +255,7 @@ export default function ClientDetails() {
           body: JSON.stringify({
             amount,
             transaction_id: txId,
-            description: `${payForm.type === "adhesion" ? "Adhésion" : "Mensualité"} — ${clientData.name || ""}`,
+            description: `${payForm.type === "adhesion" ? (payForm.include_first_month ? "Adhésion + 1er mois" : "Adhésion") : "Mensualité"} — ${clientData.name || ""}`,
             client_name:  clientData.name  || "Client",
             client_email: clientData.email || "client@awoundjo.ci",
             client_id:    id,
@@ -290,7 +289,7 @@ export default function ClientDetails() {
           payment_method: "cash",
         });
         setShowPay(false);
-        setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
+        setPayForm({ amount: "", type: "mensualite", payment_method: "cash", include_first_month: false });
         loadClient();
       } catch (err) {
         setPayError(err.response?.data?.error || "Erreur lors du paiement");
@@ -302,7 +301,7 @@ export default function ClientDetails() {
     setShowPay(false);
     setPaySuccess("");
     setPayError("");
-    setPayForm({ amount: "", type: "mensualite", payment_method: "cash" });
+    setPayForm({ amount: "", type: "mensualite", payment_method: "cash", include_first_month: false });
     loadClient();
   }
 
@@ -332,6 +331,11 @@ export default function ClientDetails() {
     neutral:  { bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-600",  icon: "ℹ️" },
   };
   const cs = cotisStyles[cotisInfo.level] || cotisStyles.neutral;
+
+  // Prix du plan du client — pour la case "adhésion + 1er mois"
+  const clientPlan   = plans.find((p) => (p.slug || "").toUpperCase() === (c.plan || "").toUpperCase());
+  const adhesionPrice = Number(clientPlan?.adhesion_price) || 15000;
+  const monthlyPrice  = Number(clientPlan?.monthly_price)  || 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in space-y-6">
@@ -752,13 +756,48 @@ export default function ClientDetails() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-            <select value={payForm.type} onChange={(e) => setPayForm({ ...payForm, type: e.target.value })}
+            <select
+              value={payForm.type}
+              onChange={(e) => {
+                const type = e.target.value;
+                setPayForm({
+                  ...payForm,
+                  type,
+                  include_first_month: false,
+                  amount: type === "adhesion" ? String(adhesionPrice) : payForm.amount,
+                });
+              }}
               disabled={paySaving}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="mensualite">Mensualité</option>
               <option value="adhesion">Adhésion</option>
             </select>
           </div>
+
+          {/* Adhésion + 1er mois — active immédiatement le compte au lieu de le mettre en attente */}
+          {payForm.type === "adhesion" && monthlyPrice > 0 && (
+            <label className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={payForm.include_first_month}
+                disabled={paySaving}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setPayForm({
+                    ...payForm,
+                    include_first_month: checked,
+                    amount: String(checked ? adhesionPrice + monthlyPrice : adhesionPrice),
+                  });
+                }}
+              />
+              <span className="text-sm text-blue-900">
+                Inclure le 1er mois de mensualité ({fmt(monthlyPrice)}) — le compte sera
+                <strong> activé immédiatement</strong>. Sans cette case, le compte reste
+                <strong> en attente</strong> jusqu'au prochain paiement.
+              </span>
+            </label>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Méthode</label>
