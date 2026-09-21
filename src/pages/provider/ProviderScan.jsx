@@ -1,4 +1,6 @@
 // src/pages/provider/ProviderScan.jsx
+// Reprise d'un acte déjà validé : /etablissement/scan?service=<id>
+//   → recharge l'acte et propose d'ajouter les examens / la prescription manquante.
 // Flux principal de prise en charge — 6 étapes :
 //   1. Identifier le patient
 //   2. Vérifier l'éligibilité + choisir l'acte du catalogue
@@ -8,7 +10,7 @@
 //   6. Confirmation finale
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   providerClientAPI, providerServiceAPI,
   providerCatalogAPI, providerPrescriptionAPI,
@@ -109,6 +111,9 @@ function needsPriorAuth(entry) {
 // ─── Composant principal ─────────────────────────────────────
 export default function ProviderScan() {
   const navigate  = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resumeServiceId = searchParams.get("service");
+  const resumeFocus     = searchParams.get("focus"); // "prescription" → ouvre directement l'ordonnance
   const provider  = getProviderData();
 
   const [step,        setStep]       = useState(1);
@@ -132,6 +137,7 @@ export default function ProviderScan() {
   const [totalAmount, setTotalAmount]= useState("");
   const [saving,      setSaving]     = useState(false);
   const [service,     setService]    = useState(null);
+  const [existingServiceId, setExistingServiceId] = useState(null); // acte déjà enregistré aujourd'hui (409)
 
   // Ordonnance
   const [prescription,    setPrescription]    = useState("");
@@ -199,6 +205,58 @@ export default function ProviderScan() {
       .catch(() => {});
   }, [selectedCat, client]);
 
+  // ── Reprise d'un acte existant (examens / ordonnance oubliés) ──
+  const resumeService = useCallback(async (serviceId) => {
+    setLoading(true); setError(""); setExistingServiceId(null);
+    try {
+      const { data } = await providerServiceAPI.getById(serviceId);
+      const svc = data.service;
+      if (!svc) throw new Error("introuvable");
+
+      // Client : rechargé via son numéro mutualiste, bénéficiaire = celui de l'acte
+      const { data: cData } = await providerClientAPI.scan(svc.mutual_number);
+      setClient({ ...cData.client, dependent_id: svc.dependent_id || undefined });
+
+      const category  = svc.category;
+      const needsExam  = EXAM_REQUIRED_CATEGORIES.includes(category);
+      const needsPresc = PRESCRIPTION_REQUIRED_CATEGORIES.includes(category);
+      const hasPresc   = Boolean(svc.prescription_content);
+      const exams      = svc.exam_requests || [];
+
+      setSelectedCat({ code: svc.catalog_code, label: svc.catalog_label, category });
+      setService(svc);
+      setExamRequired(needsExam);
+      setPrescriptionRequired(needsPresc);
+      setPrescDone(hasPresc);
+      setExamResults(exams.filter(x => x.status !== "REJECTED"));
+      setExamDone(exams.some(x => x.status !== "REJECTED"));
+      const examsTotal = exams
+        .filter(x => x.status !== "REJECTED")
+        .reduce((sum, x) => sum + Number(x.estimated_amount || 0), 0);
+      setExamTotals({
+        consultation_amount:   Number(svc.total_amount || 0),
+        estimated_exams_total: examsTotal,
+        estimated_grand_total: Number(svc.total_amount || 0) + examsTotal,
+      });
+
+      // Reprise : ordonnance directe si demandée, sinon examens d'abord (consultation)
+      if (resumeFocus === "prescription" && needsPresc && !hasPresc) setStep(5);
+      else if (needsExam)               setStep(4);
+      else if (needsPresc && !hasPresc) setStep(5);
+      else                              setStep(6);
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible de recharger cet acte");
+    } finally { setLoading(false); }
+  }, [resumeFocus]);
+
+  // Ouverture directe depuis l'historique : /etablissement/scan?service=<id>
+  useEffect(() => {
+    if (resumeServiceId) resumeService(resumeServiceId);
+  }, [resumeServiceId, resumeService]);
+
+  // Étape suivante après les examens : ordonnance seulement si requise et pas encore saisie
+  const stepAfterExams = () => (prescriptionRequired && !prescDone ? 5 : 6);
+
   // ── Recherche patient ─────────────────────────────────────
   async function handleSearch(e) {
     e.preventDefault();
@@ -254,6 +312,8 @@ export default function ProviderScan() {
       else setStep(6);
     } catch (err) {
       setError(err.response?.data?.error || "Erreur lors de l'enregistrement");
+      if (err.response?.status === 409 && err.response?.data?.existing_service_id)
+        setExistingServiceId(err.response.data.existing_service_id);
     } finally { setSaving(false); }
   }
 
@@ -287,7 +347,7 @@ export default function ProviderScan() {
     e.preventDefault();
     const hasAutre = examAutre.active && examAutre.nom.trim();
     if (!examSelected.length && !hasAutre) {
-      setStep(prescriptionRequired ? 5 : 6);
+      setStep(stepAfterExams());
       return;
     }
     setExamSaving(true); setError("");
@@ -329,9 +389,11 @@ export default function ProviderScan() {
         estimated_grand_total: data.estimated_grand_total ?? Number(service.total_amount),
       });
       if (data.solde_annuel) setSoldeAnnuel(data.solde_annuel);
-      setExamResults(data.exam_requests || []);
+      setExamResults(prev => [...prev, ...(data.exam_requests || [])]);
       setExamDone(true);
-      setStep(prescriptionRequired ? 5 : 6);
+      setExamSelected([]); setExamPrices({});
+      setExamAutre({ active: false, nom: "", prix: "" });
+      setStep(stepAfterExams());
     } catch (err) {
       setError(err.response?.data?.error || "Erreur lors de la soumission des examens");
     } finally { setExamSaving(false); }
@@ -339,7 +401,7 @@ export default function ProviderScan() {
 
   // ── Passer les examens ────────────────────────────────────
   function skipExams() {
-    setStep(prescriptionRequired ? 5 : 6);
+    setStep(stepAfterExams());
   }
 
   // ── Passer l'ordonnance (non bloquant) ───────────────────
@@ -357,7 +419,7 @@ export default function ProviderScan() {
     setExamAutre({ active: false, nom: "", prix: "" });
     setExamDone(false); setExamResults([]); setExamSoldes({});
     setExamTotals({ consultation_amount: 0, estimated_exams_total: 0, estimated_grand_total: 0 });
-    setSoldeAnnuel(null);
+    setSoldeAnnuel(null); setExistingServiceId(null);
   }
 
   // ── Calculs financiers ────────────────────────────────────
@@ -424,12 +486,24 @@ export default function ProviderScan() {
 
       {error && (
         <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          ⚠️ {error}
+          <span style={{ flex: 1 }}>⚠️ {error}</span>
+          {existingServiceId && (
+            <button type="button" onClick={() => resumeService(existingServiceId)}
+              style={{ ...s.btnSecondary, whiteSpace: "nowrap" }}>
+              Compléter l'acte existant →
+            </button>
+          )}
+        </div>
+      )}
+
+      {resumeServiceId && loading && (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#64748B", fontSize: 14 }}>
+          <Spinner /> Chargement de l'acte…
         </div>
       )}
 
       {/* ══ ÉTAPE 1 — Identification ══ */}
-      {step === 1 && (
+      {step === 1 && !(resumeServiceId && loading) && (
         <div style={s.card}>
           <h2 style={s.stepTitle}>🔍 Identifier l'assuré</h2>
           <p style={s.stepDesc}>Numéro mutualiste, téléphone ou nom</p>
@@ -750,6 +824,20 @@ export default function ProviderScan() {
 
           {client && <ClientCard client={client} planConfig={planConfig} />}
 
+          {examResults.length > 0 && (
+            <div style={{ ...s.card, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: .8, margin: "0 0 8px" }}>
+                Examens déjà soumis pour cet acte
+              </p>
+              {examResults.map((x, i) => (
+                <div key={x.id || i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < examResults.length - 1 ? "1px solid #F1F5F9" : "none", fontSize: 13 }}>
+                  <span style={{ color: "#1E293B" }}>{x.exam_label || x.autre_label || x.description || x.catalog_code}</span>
+                  <span style={{ color: "#64748B", fontWeight: 600 }}>{x.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={s.card}>
             <form onSubmit={handleExams}>
               {examCatalog.length === 0 ? (
@@ -1001,6 +1089,9 @@ export default function ProviderScan() {
               {error && <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 10 }}>⚠️ {error}</div>}
 
               <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={skipPrescription} style={s.btnSecondary}>
+                  Plus tard
+                </button>
                 <button type="submit" disabled={prescSaving || !prescription.trim()}
                   style={{ ...s.btnPrimary, flex: 1, opacity: !prescription.trim() ? 0.5 : 1 }}>
                   {prescSaving ? <><Spinner /> Enregistrement…</> : "📋 Enregistrer l'ordonnance"}
@@ -1099,6 +1190,25 @@ export default function ProviderScan() {
               </div>
             )}
           </div>
+
+          {prescriptionRequired && !prescDone && (
+            <div style={{ maxWidth: 480, margin: "0 auto 14px", padding: "12px 14px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 12, textAlign: "left" }}>
+              <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#92400E" }}>
+                📋 Ordonnance non saisie pour cet acte
+              </p>
+              <button type="button" onClick={() => setStep(5)} style={{ ...s.btnPrimary, width: "100%" }}>
+                Saisir l'ordonnance maintenant
+              </button>
+            </div>
+          )}
+
+          {examRequired && (
+            <div style={{ maxWidth: 480, margin: "0 auto 14px" }}>
+              <button type="button" onClick={() => setStep(4)} style={{ ...s.btnSecondary, width: "100%" }}>
+                🔬 {examDone ? "Ajouter d'autres examens" : "Ajouter des examens"}
+              </button>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto" }}>
             <button onClick={reset} style={{ ...s.btnPrimary, flex: 1 }}>

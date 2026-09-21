@@ -1,10 +1,11 @@
 // src/pages/provider/ProviderServices.jsx
-// Historique des actes enregistrés — lecture seule
-// L'enregistrement se fait uniquement via ProviderScan
+// Historique des actes enregistrés
+// L'enregistrement se fait via ProviderScan ; les examens / l'ordonnance oubliés
+// se complètent depuis ici (ProviderScan?service=<id>).
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { providerServiceAPI } from "../../providerApi";
+import { providerServiceAPI, getProviderData } from "../../providerApi";
 
 const fmt     = (n) => Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -34,6 +35,15 @@ const CATEGORY_CONFIG = {
   transport_ambulance:         { icon: "🚑",  label: "Transport sanitaire",      color: "#7C3AED", bg: "#F5F3FF" },
 };
 
+// Doit rester synchronisé avec ProviderScan.jsx / providerController.js
+const EXAM_REQUIRED_CATEGORIES = ["consultation_generaliste", "consultation_specialiste", "consultation_urgence"];
+const PRESCRIPTION_REQUIRED_CATEGORIES = [
+  "consultation_generaliste", "consultation_specialiste", "consultation_urgence",
+  "hospitalisation_hebergement", "hospitalisation_chirurgie",
+  "maternite_simple", "maternite_multiple", "maternite_chirurgicale",
+];
+const CAN_PRESCRIBE_TYPES = ["clinic", "hospital", "midwife"];
+
 const CATEGORIES = [
   { id: "",                          label: "Tous les actes" },
   { id: "consultation_generaliste",  label: "Cons. générale" },
@@ -52,6 +62,7 @@ const CATEGORIES = [
 
 export default function ProviderServices() {
   const navigate = useNavigate();
+  const canPrescribe = CAN_PRESCRIBE_TYPES.includes(getProviderData()?.type);
   const [services,  setServices]  = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState("");
@@ -165,6 +176,9 @@ export default function ProviderServices() {
           {services.map(svc => {
             const cat = CATEGORY_CONFIG[svc.category] || { icon: "📋", label: svc.category, color: "#64748B", bg: "#F8FAFC" };
             const isOpen = selected?.id === svc.id;
+            const needsPrescription = canPrescribe && PRESCRIPTION_REQUIRED_CATEGORIES.includes(svc.category) && !svc.prescription_content;
+            // Les examens modifient le total : impossible une fois l'acte facturé
+            const canAddExams = canPrescribe && EXAM_REQUIRED_CATEGORIES.includes(svc.category) && !svc.invoice_id;
             return (
               <div key={svc.id}
                 onClick={() => setSelected(isOpen ? null : svc)}
@@ -181,6 +195,11 @@ export default function ProviderServices() {
                       {svc.exam_requests?.length > 0 && (
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#0891B2", background: "#ECFEFF", borderRadius: 8, padding: "2px 6px" }}>
                           🔬 + examen
+                        </span>
+                      )}
+                      {needsPrescription && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#92400E", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, padding: "2px 6px" }}>
+                          📋 Ordonnance à saisir
                         </span>
                       )}
                     </p>
@@ -267,6 +286,24 @@ export default function ProviderServices() {
                       <div style={{ marginTop: 8, background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, padding: "8px 12px" }}>
                         <p style={{ fontSize: 10, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: .6, margin: "0 0 4px" }}>📋 Ordonnance</p>
                         <p style={{ fontSize: 12, color: "#78350F", margin: 0, whiteSpace: "pre-line" }}>{svc.prescription_content}</p>
+                      </div>
+                    )}
+                    {(canAddExams || needsPrescription) && (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                        {canAddExams && (
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/etablissement/scan?service=${svc.id}`); }}
+                            style={{ background: "#ECFEFF", border: "1px solid #BAE6FD", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#0C447C", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+                            🔬 {svc.exam_requests?.length > 0 ? "Ajouter d'autres examens" : "Ajouter des examens"}
+                          </button>
+                        )}
+                        {needsPrescription && (
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/etablissement/scan?service=${svc.id}&focus=prescription`); }}
+                            style={{ background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#92400E", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+                            📋 Saisir l'ordonnance
+                          </button>
+                        )}
                       </div>
                     )}
                     <button
