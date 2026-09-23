@@ -36,6 +36,7 @@ const Cotations           = lazy(() => import("./pages/Cotations"));
 const Groups              = lazy(() => import("./pages/Groups"));
 const HealthcareAdmin     = lazy(() => import("./pages/HealthcareAdmin"));
 const AdminProviders      = lazy(() => import("./pages/AdminProviders"));
+const AirmsDashboard      = lazy(() => import("./pages/admin/AirmsDashboard"));
 
 // ── Pages ADMIN ambassadeurs ─────────────────────────────────
 const AdminDiaspora             = lazy(() => import("./pages/AdminDiaspora"));
@@ -482,6 +483,11 @@ export default function App() {
             {/* ── ADMIN — Blog ─────────────────────────── */}
             <Route path={`${ADMIN_BASE}/blog`} element={
               <ProtectedRoute allowedRoles={["ADMIN", "COMMUNITY_MANAGER"]}><AdminBlog /></ProtectedRoute>
+            } />
+
+            {/* ── ADMIN — Rapports réglementaires AIRMS ──── */}
+            <Route path={`${ADMIN_BASE}/airms`} element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}><AirmsDashboard /></ProtectedRoute>
             } />
 
             {/* ── ADMIN — Broadcast ────────────────────── */}

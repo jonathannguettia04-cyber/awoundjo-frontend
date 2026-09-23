@@ -38,6 +38,9 @@ function getNavSections(role) {
       { title: "Contenu", links: [
         { to: `${ADMIN_BASE}/blog`, label: "Blog", icon: "ti-notes" },
       ]},
+      { title: "Réglementaire", links: [
+        { to: `${ADMIN_BASE}/airms`, label: "Rapports AIRMS", icon: "ti-clipboard-check" },
+      ]},
       { title: "Système", links: [
         { to: `${ADMIN_BASE}/settings`, label: "Paramètres", icon: "ti-adjustments" },
         { to: `${ADMIN_BASE}/hub`,      label: "Hub Admin",  icon: "ti-key" },
