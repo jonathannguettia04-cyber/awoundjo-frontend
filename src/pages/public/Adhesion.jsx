@@ -81,6 +81,11 @@ const fcfa = (n) => new Intl.NumberFormat("fr-FR").format(n) + " F";
 export default function Adhesion() {
   const [searchParams] = useSearchParams();
   const preselected = searchParams.get("formule");
+  // Attribution partenaire (ex: redirection depuis TransfertCI) —
+  // transmis tel quel dans form_data pour rattacher le client créé
+  // au partenaire, sans changer le flux de paiement Jeko existant.
+  const partnerSlug = searchParams.get("partner") || undefined;
+  const partnerRef  = searchParams.get("ref")     || undefined;
 
   const [mode, setMode] = useState(searchParams.get("type") === "entreprise" ? "entreprise" : "particulier");
 
@@ -251,6 +256,8 @@ export default function Adhesion() {
             surcharge_pathologie: surchargePathologie,
             caution_pathologie: caution,
             montant_initial: totalAmount,
+            ...(partnerSlug && { partner_slug: partnerSlug }),
+            ...(partnerRef  && { partner_ref:  partnerRef  }),
           },
           jeko_method:  methode,
           success_url:  `${BASE}/adhesion/merci`,
