@@ -112,6 +112,22 @@ export default function AirmsDashboard() {
     }
   }
 
+  const [notesDraft, setNotesDraft] = useState({});
+  async function handleNotesSave(elementKey, currentStatus) {
+    setSavingKey(elementKey + ":notes");
+    try {
+      await apiFetch(`/api/airms/dashboard/${elementKey}`, {
+        method: "PUT",
+        body: JSON.stringify({ exercice, status: currentStatus, notes: notesDraft[elementKey] ?? "" }),
+      });
+      await load(exercice);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const [generatingType, setGeneratingType] = useState(null); // 'technique' | 'financier' | null
   const [reports, setReports] = useState([]);
@@ -234,34 +250,50 @@ export default function AirmsDashboard() {
             {data.elements.map((el) => {
               const isManual = el.source === "manuel";
               return (
-                <div
-                  key={el.key}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3"
-                >
-                  <div>
+                <div key={el.key} className="rounded-lg border border-gray-200 px-4 py-3">
+                  <div className="flex items-center justify-between gap-4">
                     <div className="text-sm font-medium text-gray-900">
                       {ELEMENT_LABELS[el.key] || el.key}
                     </div>
-                    {el.notes && (
-                      <div className="text-xs text-gray-500 mt-0.5">{el.notes}</div>
-                    )}
+
+                    <div className="flex items-center gap-3">
+                      <StatusBadge status={el.status} />
+                      {isManual && (
+                        <select
+                          value={el.status}
+                          disabled={savingKey === el.key}
+                          onChange={(e) => handleManualUpdate(el.key, e.target.value)}
+                          className="rounded-md border border-gray-300 px-2 py-1 text-xs bg-white disabled:opacity-50"
+                        >
+                          {MANUAL_STATUS_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{STATUS_META[s].label}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={el.status} />
-                    {isManual && (
-                      <select
-                        value={el.status}
-                        disabled={savingKey === el.key}
-                        onChange={(e) => handleManualUpdate(el.key, e.target.value)}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-xs bg-white disabled:opacity-50"
+                  {el.key === "rapport_moral" && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Synthèse (utilisée dans le PDF du rapport moral)
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Activités, gouvernance, réalisations, observations de l'exercice…"
+                        value={notesDraft[el.key] ?? el.notes ?? ""}
+                        onChange={(e) => setNotesDraft({ ...notesDraft, [el.key]: e.target.value })}
+                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                      />
+                      <button
+                        onClick={() => handleNotesSave(el.key, el.status)}
+                        disabled={savingKey === el.key + ":notes"}
+                        className="mt-2 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
                       >
-                        {MANUAL_STATUS_OPTIONS.map((s) => (
-                          <option key={s} value={s}>{STATUS_META[s].label}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                        {savingKey === el.key + ":notes" ? "Enregistrement…" : "Enregistrer la synthèse"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -284,6 +316,13 @@ export default function AirmsDashboard() {
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {generatingType === "financier" ? "Génération…" : "Rapport financier"}
+                </button>
+                <button
+                  onClick={() => handleGenerateReport("moral")}
+                  disabled={generatingType !== null}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {generatingType === "moral" ? "Génération…" : "Rapport moral"}
                 </button>
               </div>
             </div>
