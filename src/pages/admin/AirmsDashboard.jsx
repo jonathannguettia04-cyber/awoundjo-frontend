@@ -112,7 +112,7 @@ export default function AirmsDashboard() {
   }
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-  const [generating, setGenerating] = useState(false);
+  const [generatingType, setGeneratingType] = useState(null); // 'technique' | 'financier' | null
   const [reports, setReports] = useState([]);
 
   const loadReports = useCallback(async (year) => {
@@ -126,18 +126,73 @@ export default function AirmsDashboard() {
 
   useEffect(() => { loadReports(exercice); }, [exercice, loadReports]);
 
-  async function handleGenerateTechnique() {
-    setGenerating(true);
+  async function handleGenerateReport(type) {
+    setGeneratingType(type);
     setError(null);
     try {
-      await apiFetch(`/api/airms/reports/technique/generate?exercice=${exercice}`, { method: "POST" });
+      await apiFetch(`/api/airms/reports/${type}/generate?exercice=${exercice}`, { method: "POST" });
       await loadReports(exercice);
     } catch (e) {
       setError(e.message);
     } finally {
-      setGenerating(false);
+      setGeneratingType(null);
     }
   }
+
+  // ── Finances (recettes/dépenses) ──────────────────────────────
+  const [finances, setFinances] = useState({ revenues: [], expenses: [] });
+  const [financeForm, setFinanceForm] = useState({ kind: "revenue", category: "", label: "", amount: "" });
+  const [savingFinance, setSavingFinance] = useState(false);
+
+  const loadFinances = useCallback(async (year) => {
+    try {
+      const res = await apiFetch(`/api/airms/finances?exercice=${year}`);
+      setFinances(res?.data || res || { revenues: [], expenses: [] });
+    } catch (e) {
+      // silencieux
+    }
+  }, []);
+
+  useEffect(() => { loadFinances(exercice); }, [exercice, loadFinances]);
+
+  async function handleAddFinanceEntry(e) {
+    e.preventDefault();
+    if (!financeForm.category || !financeForm.amount) return;
+    setSavingFinance(true);
+    setError(null);
+    try {
+      const endpoint = financeForm.kind === "revenue" ? "revenues" : "expenses";
+      await apiFetch(`/api/airms/finances/${endpoint}`, {
+        method: "POST",
+        body: JSON.stringify({
+          exercice,
+          category: financeForm.category,
+          label: financeForm.label || undefined,
+          amount: Number(financeForm.amount),
+        }),
+      });
+      setFinanceForm({ kind: financeForm.kind, category: "", label: "", amount: "" });
+      await Promise.all([loadFinances(exercice), load(exercice)]); // refresh statut "finances" aussi
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSavingFinance(false);
+    }
+  }
+
+  async function handleDeleteFinanceEntry(kind, id) {
+    const endpoint = kind === "revenue" ? "revenues" : "expenses";
+    try {
+      await apiFetch(`/api/airms/finances/${endpoint}/${id}`, { method: "DELETE" });
+      await Promise.all([loadFinances(exercice), load(exercice)]);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  const totalRevenues = finances.revenues.reduce((s, r) => s + Number(r.amount), 0);
+  const totalExpenses  = finances.expenses.reduce((s, r) => s + Number(r.amount), 0);
+  const fmt = (n) => Number(n).toLocaleString("fr-FR") + " FCFA";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -213,14 +268,23 @@ export default function AirmsDashboard() {
 
           <div className="mt-8 rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900">Rapport technique</h2>
-              <button
-                onClick={handleGenerateTechnique}
-                disabled={generating}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {generating ? "Génération…" : "Générer le PDF"}
-              </button>
+              <h2 className="text-sm font-semibold text-gray-900">Rapports</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleGenerateReport("technique")}
+                  disabled={generatingType !== null}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {generatingType === "technique" ? "Génération…" : "Rapport technique"}
+                </button>
+                <button
+                  onClick={() => handleGenerateReport("financier")}
+                  disabled={generatingType !== null}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {generatingType === "financier" ? "Génération…" : "Rapport financier"}
+                </button>
+              </div>
             </div>
 
             {reports.length === 0 ? (
@@ -247,6 +311,123 @@ export default function AirmsDashboard() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="mt-8 rounded-xl border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Recettes & dépenses (hors cotisations)</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Les cotisations sont déjà comptées automatiquement. Ajoutez ici les autres recettes
+              (subventions, dons...) et les dépenses de l'exercice.
+            </p>
+
+            <form onSubmit={handleAddFinanceEntry} className="flex flex-wrap items-end gap-2 mb-5">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Type</label>
+                <select
+                  value={financeForm.kind}
+                  onChange={(e) => setFinanceForm({ ...financeForm, kind: e.target.value })}
+                  className="rounded-md border border-gray-300 px-2 py-1.5 text-sm bg-white"
+                >
+                  <option value="revenue">Recette</option>
+                  <option value="expense">Dépense</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Catégorie</label>
+                <input
+                  type="text"
+                  placeholder="ex: subvention, prestations..."
+                  value={financeForm.category}
+                  onChange={(e) => setFinanceForm({ ...financeForm, category: e.target.value })}
+                  className="rounded-md border border-gray-300 px-2 py-1.5 text-sm w-40"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Libellé (optionnel)</label>
+                <input
+                  type="text"
+                  value={financeForm.label}
+                  onChange={(e) => setFinanceForm({ ...financeForm, label: e.target.value })}
+                  className="rounded-md border border-gray-300 px-2 py-1.5 text-sm w-48"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Montant (FCFA)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={financeForm.amount}
+                  onChange={(e) => setFinanceForm({ ...financeForm, amount: e.target.value })}
+                  className="rounded-md border border-gray-300 px-2 py-1.5 text-sm w-32"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingFinance}
+                className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {savingFinance ? "Ajout…" : "Ajouter"}
+              </button>
+            </form>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase">Recettes</h3>
+                  <span className="text-sm font-medium text-emerald-700">{fmt(totalRevenues)}</span>
+                </div>
+                {finances.revenues.length === 0 ? (
+                  <p className="text-xs text-gray-400">Aucune recette manuelle.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {finances.revenues.map((r) => (
+                      <li key={r.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{r.category}{r.label ? ` · ${r.label}` : ""}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="tabular-nums">{fmt(r.amount)}</span>
+                          <button
+                            onClick={() => handleDeleteFinanceEntry("revenue", r.id)}
+                            className="text-gray-400 hover:text-red-600 text-xs"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase">Dépenses</h3>
+                  <span className="text-sm font-medium text-red-700">{fmt(totalExpenses)}</span>
+                </div>
+                {finances.expenses.length === 0 ? (
+                  <p className="text-xs text-gray-400">Aucune dépense enregistrée.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {finances.expenses.map((r) => (
+                      <li key={r.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{r.category}{r.label ? ` · ${r.label}` : ""}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="tabular-nums">{fmt(r.amount)}</span>
+                          <button
+                            onClick={() => handleDeleteFinanceEntry("expense", r.id)}
+                            className="text-gray-400 hover:text-red-600 text-xs"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </div>
         </>
       )}
