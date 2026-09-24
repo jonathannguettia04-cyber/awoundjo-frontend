@@ -7,6 +7,7 @@
 // modifiables directement depuis cette page.
 
 import { useEffect, useState, useCallback } from "react";
+import GovernanceSection from "./GovernanceSection";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -429,6 +430,8 @@ export default function AirmsDashboard() {
               </div>
             </div>
           </div>
+
+          <GovernanceSection apiFetch={apiFetch} exercice={exercice} />
         </>
       )}
     </div>
