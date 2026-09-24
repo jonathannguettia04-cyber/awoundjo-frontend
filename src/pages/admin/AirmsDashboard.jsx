@@ -112,6 +112,32 @@ export default function AirmsDashboard() {
   }
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const [generating, setGenerating] = useState(false);
+  const [reports, setReports] = useState([]);
+
+  const loadReports = useCallback(async (year) => {
+    try {
+      const res = await apiFetch(`/api/airms/reports?exercice=${year}`);
+      setReports((res?.data || res)?.reports || []);
+    } catch (e) {
+      // silencieux — pas bloquant pour le reste du dashboard
+    }
+  }, []);
+
+  useEffect(() => { loadReports(exercice); }, [exercice, loadReports]);
+
+  async function handleGenerateTechnique() {
+    setGenerating(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/airms/reports/technique/generate?exercice=${exercice}`, { method: "POST" });
+      await loadReports(exercice);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -183,6 +209,44 @@ export default function AirmsDashboard() {
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-8 rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-900">Rapport technique</h2>
+              <button
+                onClick={handleGenerateTechnique}
+                disabled={generating}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {generating ? "Génération…" : "Générer le PDF"}
+              </button>
+            </div>
+
+            {reports.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucun rapport généré pour cet exercice.</p>
+            ) : (
+              <ul className="space-y-2">
+                {reports.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">
+                      {r.report_type} — v{r.version}
+                      {r.generated_by_name ? ` · ${r.generated_by_name}` : ""}
+                      {" · "}
+                      {new Date(r.generated_at).toLocaleString("fr-FR")}
+                    </span>
+                    <a
+                      href={`${API_BASE}${r.file_path}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 font-medium hover:underline"
+                    >
+                      Télécharger
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </>
       )}
