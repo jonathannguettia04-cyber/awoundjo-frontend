@@ -273,10 +273,10 @@ export default function AirmsDashboard() {
                     </div>
                   </div>
 
-                  {el.key === "rapport_moral" && (
+                  {["rapport_moral", "rapport_comite_controle", "assemblee_generale"].includes(el.key) && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <label className="block text-xs text-gray-500 mb-1">
-                        Synthèse (utilisée dans le PDF du rapport moral)
+                        Synthèse (utilisée dans le PDF du {ELEMENT_LABELS[el.key].toLowerCase()})
                       </label>
                       <textarea
                         rows={3}
@@ -323,6 +323,20 @@ export default function AirmsDashboard() {
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {generatingType === "moral" ? "Génération…" : "Rapport moral"}
+                </button>
+                <button
+                  onClick={() => handleGenerateReport("comite-controle")}
+                  disabled={generatingType !== null}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {generatingType === "comite-controle" ? "Génération…" : "Comité de contrôle"}
+                </button>
+                <button
+                  onClick={() => handleGenerateReport("assemblee-generale")}
+                  disabled={generatingType !== null}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {generatingType === "assemblee-generale" ? "Génération…" : "Assemblée Générale"}
                 </button>
               </div>
             </div>
