@@ -74,6 +74,112 @@ function CompletionBar({ pct }) {
   );
 }
 
+function DeadlineIndicator({ deadline, daysLeft, apiFetch, exercice, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(deadline ? deadline.slice(0, 10) : "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!value) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/airms/dossier/deadline?exercice=${exercice}`, {
+        method: "PUT",
+        body: JSON.stringify({ deadline: value }),
+      });
+      setEditing(false);
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+        />
+        <button onClick={save} disabled={saving} className="text-xs text-emerald-700 font-medium">
+          {saving ? "…" : "OK"}
+        </button>
+        <button onClick={() => setEditing(false)} className="text-xs text-gray-400">✕</button>
+      </div>
+    );
+  }
+
+  if (!deadline) {
+    return (
+      <button onClick={() => setEditing(true)} className="text-xs text-gray-400 hover:text-gray-600 underline">
+        Définir une échéance de dépôt
+      </button>
+    );
+  }
+
+  const urgent = daysLeft !== null && daysLeft <= 30;
+  return (
+    <button onClick={() => setEditing(true)} className={`text-xs font-medium ${urgent ? "text-red-600" : "text-gray-500"}`}>
+      {daysLeft >= 0 ? `${daysLeft} jour(s) avant échéance` : `Échéance dépassée de ${-daysLeft} jour(s)`}
+      {" · "}{new Date(deadline).toLocaleDateString("fr-FR")}
+    </button>
+  );
+}
+
+const AUDIT_ACTION_LABELS = {
+  element_status_updated: "Statut modifié",
+  dossier_submitted: "Dossier déposé",
+  dossier_unlocked: "Dossier déverrouillé",
+  report_generated: "Rapport généré",
+  dossier_archived: "Dossier archivé",
+};
+
+function AuditLogSection({ apiFetch, exercice }) {
+  const [logs, setLogs] = useState([]);
+  const [open, setOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/airms/audit-logs?exercice=${exercice}`);
+      setLogs((res?.data || res)?.logs || []);
+    } catch (e) {
+      // silencieux
+    }
+  }, [apiFetch, exercice]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="mt-8 rounded-xl border border-gray-200 p-5">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between text-left">
+        <h2 className="text-sm font-semibold text-gray-900">Journal d'audit ({logs.length})</h2>
+        <span className="text-xs text-gray-500">{open ? "Réduire ▲" : "Afficher ▼"}</span>
+      </button>
+      {open && (
+        logs.length === 0 ? (
+          <p className="text-xs text-gray-400 mt-3">Aucune action enregistrée pour cet exercice.</p>
+        ) : (
+          <ul className="mt-3 space-y-1.5 max-h-80 overflow-y-auto">
+            {logs.map((l) => (
+              <li key={l.id} className="flex items-center justify-between text-xs text-gray-600 border-b border-gray-50 py-1.5">
+                <span>
+                  {AUDIT_ACTION_LABELS[l.action] || l.action}
+                  {l.actor_name ? ` · ${l.actor_name}` : ""}
+                  {l.details?.type ? ` (${l.details.type})` : ""}
+                  {l.details?.element ? ` — ${ELEMENT_LABELS[l.details.element] || l.details.element}` : ""}
+                </span>
+                <span className="text-gray-400">{new Date(l.created_at).toLocaleString("fr-FR")}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function AirmsDashboard() {
   const currentYear = new Date().getFullYear();
   const [exercice, setExercice] = useState(currentYear);
@@ -371,7 +477,16 @@ export default function AirmsDashboard() {
           )}
 
           <div className="mb-8 rounded-xl border border-gray-200 p-5">
-            <div className="text-sm text-gray-600 mb-2">Progression du dossier {data.exercice}</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-gray-600">Progression du dossier {data.exercice}</div>
+              <DeadlineIndicator
+                deadline={data.deadline}
+                daysLeft={data.days_left}
+                apiFetch={apiFetch}
+                exercice={exercice}
+                onSaved={() => load(exercice)}
+              />
+            </div>
             <CompletionBar pct={data.completion_pct} />
           </div>
 
@@ -656,6 +771,8 @@ export default function AirmsDashboard() {
           </div>
 
           <GovernanceSection apiFetch={apiFetch} exercice={exercice} locked={data.dossier_status === "submitted"} />
+
+          <AuditLogSection apiFetch={apiFetch} exercice={exercice} />
         </>
       )}
     </div>
