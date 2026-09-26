@@ -248,6 +248,33 @@ export default function AirmsDashboard() {
     }
   }
 
+  const [archive, setArchive] = useState(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const loadArchive = useCallback(async (year) => {
+    try {
+      const res = await apiFetch(`/api/airms/dossier/archive?exercice=${year}`);
+      setArchive((res?.data || res)?.archive || null);
+    } catch (e) {
+      // silencieux
+    }
+  }, []);
+
+  useEffect(() => { loadArchive(exercice); }, [exercice, loadArchive]);
+
+  async function handleArchiveDossier() {
+    setArchiving(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/airms/dossier/archive?exercice=${exercice}`, { method: "POST" });
+      await loadArchive(exercice);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   const loadChecks = useCallback(async (year) => {
     try {
       const res = await apiFetch(`/api/airms/dossier-checks?exercice=${year}`);
@@ -298,13 +325,33 @@ export default function AirmsDashboard() {
                   {data.submitted_at ? ` le ${new Date(data.submitted_at).toLocaleString("fr-FR")}` : ""}
                 </div>
               </div>
-              <button
-                onClick={handleUnlockDossier}
-                disabled={submitting}
-                className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-              >
-                Déverrouiller
-              </button>
+              <div className="flex items-center gap-2">
+                {archive ? (
+                  <a
+                    href={`${API_BASE}${archive.file_path}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Télécharger l'archive
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleArchiveDossier}
+                    disabled={archiving}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {archiving ? "Archivage…" : "Archiver le dossier"}
+                  </button>
+                )}
+                <button
+                  onClick={handleUnlockDossier}
+                  disabled={submitting}
+                  className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                >
+                  Déverrouiller
+                </button>
+              </div>
             </div>
           ) : (
             checksData?.ready_to_submit && (
