@@ -105,6 +105,7 @@ export default function AirmsDashboard() {
         body: JSON.stringify({ exercice, status: newStatus }),
       });
       await load(exercice);
+      loadChecks(exercice);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -121,6 +122,7 @@ export default function AirmsDashboard() {
         body: JSON.stringify({ exercice, status: currentStatus, notes: notesDraft[elementKey] ?? "" }),
       });
       await load(exercice);
+      loadChecks(exercice);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -149,6 +151,7 @@ export default function AirmsDashboard() {
     try {
       await apiFetch(`/api/airms/reports/${type}/generate?exercice=${exercice}`, { method: "POST" });
       await loadReports(exercice);
+      loadChecks(exercice);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -190,6 +193,7 @@ export default function AirmsDashboard() {
       });
       setFinanceForm({ kind: financeForm.kind, category: "", label: "", amount: "" });
       await Promise.all([loadFinances(exercice), load(exercice)]); // refresh statut "finances" aussi
+      loadChecks(exercice);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -202,6 +206,7 @@ export default function AirmsDashboard() {
     try {
       await apiFetch(`/api/airms/finances/${endpoint}/${id}`, { method: "DELETE" });
       await Promise.all([loadFinances(exercice), load(exercice)]);
+      loadChecks(exercice);
     } catch (e) {
       setError(e.message);
     }
@@ -210,6 +215,49 @@ export default function AirmsDashboard() {
   const totalRevenues = finances.revenues.reduce((s, r) => s + Number(r.amount), 0);
   const totalExpenses  = finances.expenses.reduce((s, r) => s + Number(r.amount), 0);
   const fmt = (n) => Number(n).toLocaleString("fr-FR") + " FCFA";
+
+  // ── Contrôles de cohérence avant dépôt ────────────────────────
+  const [checksData, setChecksData] = useState(null);
+  const [checksOpen, setChecksOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmitDossier() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/airms/dossier/submit?exercice=${exercice}`, { method: "POST" });
+      await load(exercice);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUnlockDossier() {
+    if (!window.confirm("Déverrouiller ce dossier pour le modifier ?")) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/airms/dossier/unlock?exercice=${exercice}`, { method: "POST" });
+      await load(exercice);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const loadChecks = useCallback(async (year) => {
+    try {
+      const res = await apiFetch(`/api/airms/dossier-checks?exercice=${year}`);
+      setChecksData(res?.data || res);
+    } catch (e) {
+      // silencieux
+    }
+  }, []);
+
+  useEffect(() => { loadChecks(exercice); }, [exercice, loadChecks]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -241,10 +289,86 @@ export default function AirmsDashboard() {
 
       {!loading && data && (
         <>
+          {data.dossier_status === "submitted" ? (
+            <div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-5 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-blue-900">🔒 Dossier déposé et verrouillé</div>
+                <div className="text-xs text-blue-700 mt-0.5">
+                  Déposé{data.submitted_by_name ? ` par ${data.submitted_by_name}` : ""}
+                  {data.submitted_at ? ` le ${new Date(data.submitted_at).toLocaleString("fr-FR")}` : ""}
+                </div>
+              </div>
+              <button
+                onClick={handleUnlockDossier}
+                disabled={submitting}
+                className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                Déverrouiller
+              </button>
+            </div>
+          ) : (
+            checksData?.ready_to_submit && (
+              <div className="mb-8 rounded-xl border border-emerald-200 bg-emerald-50 p-5 flex items-center justify-between">
+                <div className="text-sm font-medium text-emerald-800">
+                  Toutes les conditions sont réunies pour déposer le dossier {exercice}.
+                </div>
+                <button
+                  onClick={handleSubmitDossier}
+                  disabled={submitting}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {submitting ? "Dépôt…" : "Déposer le dossier"}
+                </button>
+              </div>
+            )
+          )}
+
           <div className="mb-8 rounded-xl border border-gray-200 p-5">
             <div className="text-sm text-gray-600 mb-2">Progression du dossier {data.exercice}</div>
             <CompletionBar pct={data.completion_pct} />
           </div>
+
+          {checksData && (
+            <div
+              className={`mb-8 rounded-xl border p-5 ${
+                checksData.ready_to_submit
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              <button
+                onClick={() => setChecksOpen(!checksOpen)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <span className={`text-sm font-medium ${checksData.ready_to_submit ? "text-emerald-800" : "text-amber-800"}`}>
+                  {checksData.ready_to_submit
+                    ? "✓ Dossier prêt pour dépôt"
+                    : `${checksData.blocking_count} point(s) bloquant(s) avant dépôt`}
+                  {checksData.warning_count > 0 && ` · ${checksData.warning_count} avertissement(s)`}
+                </span>
+                <span className="text-xs text-gray-500">{checksOpen ? "Réduire ▲" : "Détails ▼"}</span>
+              </button>
+
+              {checksOpen && (
+                <ul className="mt-3 space-y-1.5">
+                  {checksData.checks.map((c) => (
+                    <li key={c.key} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className={c.ok ? "text-emerald-600" : c.level === "blocking" ? "text-red-600" : "text-amber-600"}>
+                          {c.ok ? "✓" : "✕"}
+                        </span>
+                        <span className="text-gray-700">{c.label}</span>
+                        {!c.ok && c.level === "warning" && (
+                          <span className="text-xs text-amber-600">(optionnel)</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-500">{c.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             {data.elements.map((el) => {
@@ -261,7 +385,7 @@ export default function AirmsDashboard() {
                       {isManual && (
                         <select
                           value={el.status}
-                          disabled={savingKey === el.key}
+                          disabled={savingKey === el.key || data.dossier_status === "submitted"}
                           onChange={(e) => handleManualUpdate(el.key, e.target.value)}
                           className="rounded-md border border-gray-300 px-2 py-1 text-xs bg-white disabled:opacity-50"
                         >
@@ -287,7 +411,7 @@ export default function AirmsDashboard() {
                       />
                       <button
                         onClick={() => handleNotesSave(el.key, el.status)}
-                        disabled={savingKey === el.key + ":notes"}
+                        disabled={savingKey === el.key + ":notes" || data.dossier_status === "submitted"}
                         className="mt-2 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
                       >
                         {savingKey === el.key + ":notes" ? "Enregistrement…" : "Enregistrer la synthèse"}
@@ -420,7 +544,7 @@ export default function AirmsDashboard() {
               </div>
               <button
                 type="submit"
-                disabled={savingFinance}
+                disabled={savingFinance || data.dossier_status === "submitted"}
                 className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
               >
                 {savingFinance ? "Ajout…" : "Ajouter"}
@@ -484,7 +608,7 @@ export default function AirmsDashboard() {
             </div>
           </div>
 
-          <GovernanceSection apiFetch={apiFetch} exercice={exercice} />
+          <GovernanceSection apiFetch={apiFetch} exercice={exercice} locked={data.dossier_status === "submitted"} />
         </>
       )}
     </div>

@@ -29,7 +29,7 @@ function EntryRow({ children, onDelete }) {
   );
 }
 
-export default function GovernanceSection({ apiFetch, exercice }) {
+export default function GovernanceSection({ apiFetch, exercice, locked = false }) {
   const [boardMeetings, setBoardMeetings]   = useState([]);
   const [controlMeetings, setControlMeetings] = useState([]);
   const [assemblies, setAssemblies]         = useState([]);
@@ -129,7 +129,7 @@ export default function GovernanceSection({ apiFetch, exercice }) {
           <div className="flex gap-2">
             <input type="text" placeholder="Décisions" value={boardForm.decisions}
               onChange={(e) => setBoardForm({ ...boardForm, decisions: e.target.value })} className={inputCls} />
-            <button type="submit" disabled={saving === "board"}
+            <button type="submit" disabled={saving === "board" || locked}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white shrink-0 disabled:opacity-50">
               +
             </button>
@@ -159,7 +159,7 @@ export default function GovernanceSection({ apiFetch, exercice }) {
           <div className="flex gap-2">
             <input type="text" placeholder="Recommandations" value={controlForm.recommendations}
               onChange={(e) => setControlForm({ ...controlForm, recommendations: e.target.value })} className={inputCls} />
-            <button type="submit" disabled={saving === "control"}
+            <button type="submit" disabled={saving === "control" || locked}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white shrink-0 disabled:opacity-50">
               +
             </button>
@@ -189,7 +189,7 @@ export default function GovernanceSection({ apiFetch, exercice }) {
           <div className="flex gap-2">
             <input type="text" placeholder="Lien PV (optionnel)" value={agForm.pv_document_url}
               onChange={(e) => setAgForm({ ...agForm, pv_document_url: e.target.value })} className={inputCls} />
-            <button type="submit" disabled={saving === "ag"}
+            <button type="submit" disabled={saving === "ag" || locked}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white shrink-0 disabled:opacity-50">
               +
             </button>
