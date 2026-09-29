@@ -49,6 +49,7 @@ const NAV_BY_TYPE = {
     { path: "/etablissement/dashboard",    icon: "🏠", label: "Tableau de bord" },
     { path: "/etablissement/scan",         icon: "🔍", label: "Prise en charge" },
     { path: "/etablissement/services",     icon: "📝", label: "Actes enregistrés" },
+    { path: "/etablissement/doctors",      icon: "🩺", label: "Praticiens" },
     { path: "/etablissement/billing",      icon: "💰", label: "Facturation" },
   ],
   dentist: [
