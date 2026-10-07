@@ -198,21 +198,140 @@ export default function GovernanceSection({ apiFetch, exercice, locked = false }
         {assemblies.length === 0 ? (
           <p className="text-xs text-gray-400">Aucune AG enregistrée pour cet exercice.</p>
         ) : (
-          <ul>
+          <ul className="space-y-1">
             {assemblies.map((a) => (
-              <EntryRow key={a.id} onDelete={() => deleteEntry("ag", a.id)}>
-                <span className="font-medium">{new Date(a.assembly_date).toLocaleDateString("fr-FR")}</span>
-                {a.resolutions && ` — ${a.resolutions}`}
-                {a.pv_document_url && (
-                  <a href={a.pv_document_url} target="_blank" rel="noreferrer" className="text-emerald-700 ml-2 hover:underline">
-                    PV
-                  </a>
-                )}
-              </EntryRow>
+              <li key={a.id} className="border-b border-gray-100 last:border-0 py-2">
+                <div className="flex items-start justify-between gap-3 text-sm">
+                  <div className="flex-1 text-gray-700">
+                    <span className="font-medium">{new Date(a.assembly_date).toLocaleDateString("fr-FR")}</span>
+                    {a.resolutions && ` — ${a.resolutions}`}
+                    {a.pv_document_url && (
+                      <a href={a.pv_document_url} target="_blank" rel="noreferrer" className="text-emerald-700 ml-2 hover:underline">
+                        PV
+                      </a>
+                    )}
+                  </div>
+                  <button onClick={() => deleteEntry("ag", a.id)} className="text-gray-400 hover:text-red-600 text-xs shrink-0">✕</button>
+                </div>
+                <SignatoriesManager apiFetch={apiFetch} assemblyId={a.id} locked={locked} />
+              </li>
             ))}
           </ul>
         )}
       </Card>
+    </div>
+  );
+}
+
+function SignatoriesManager({ apiFetch, assemblyId, locked }) {
+  const [open, setOpen] = useState(false);
+  const [signatories, setSignatories] = useState([]);
+  const [form, setForm] = useState({ full_name: "", role: "", phone: "" });
+  const [saving, setSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/airms/governance/general-assemblies/${assemblyId}/signatories`);
+      setSignatories((res?.data || res)?.signatories || []);
+    } catch (e) {
+      // silencieux
+    }
+  }, [apiFetch, assemblyId]);
+
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!form.full_name) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/airms/governance/general-assemblies/${assemblyId}/signatories`, {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      setForm({ full_name: "", role: "", phone: "" });
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(sigId) {
+    await apiFetch(`/api/airms/governance/general-assemblies/${assemblyId}/signatories/${sigId}`, { method: "DELETE" });
+    await load();
+  }
+
+  function copyLink(sig) {
+    navigator.clipboard.writeText(sig.sign_url);
+    setCopiedId(sig.id);
+    setTimeout(() => setCopiedId(null), 1500);
+  }
+
+  const signedCount = signatories.filter(s => s.signed_at).length;
+
+  return (
+    <div className="mt-2 ml-1">
+      <button onClick={() => setOpen(!open)} className="text-xs text-blue-700 hover:underline">
+        {open ? "Masquer" : "Gérer"} les signataires {signatories.length > 0 && `(${signedCount}/${signatories.length} signé(s))`}
+      </button>
+
+      {open && (
+        <div className="mt-2 pl-3 border-l-2 border-gray-100">
+          {!locked && (
+            <form onSubmit={submit} className="flex flex-wrap gap-2 mb-3">
+              <input type="text" placeholder="Nom complet" required value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs w-36" />
+              <input type="text" placeholder="Rôle (ex: Trésorier)" value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs w-36" />
+              <input type="text" placeholder="Téléphone (optionnel)" value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs w-36" />
+              <button type="submit" disabled={saving}
+                className="rounded-md bg-gray-900 px-3 py-1 text-xs text-white disabled:opacity-50">
+                Ajouter
+              </button>
+            </form>
+          )}
+
+          {signatories.length === 0 ? (
+            <p className="text-xs text-gray-400">Aucun signataire ajouté.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {signatories.map((s) => (
+                <li key={s.id} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-gray-700">
+                    <span className={s.signed_at ? "text-emerald-600" : "text-amber-600"}>
+                      {s.signed_at ? "✓" : "○"}
+                    </span>
+                    {s.signature_image && (
+                      <img src={s.signature_image} alt="signature" className="h-6 border border-gray-200 rounded bg-white" />
+                    )}
+                    <span>
+                      {s.full_name}{s.role ? ` — ${s.role}` : ""}
+                      {s.signed_at && (
+                        <span className="text-gray-400"> · signé le {new Date(s.signed_at).toLocaleDateString("fr-FR")}</span>
+                      )}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    {!s.signed_at && (
+                      <button onClick={() => copyLink(s)} className="text-blue-700 hover:underline">
+                        {copiedId === s.id ? "Copié !" : "Copier le lien"}
+                      </button>
+                    )}
+                    {!locked && (
+                      <button onClick={() => remove(s.id)} className="text-gray-400 hover:text-red-600">✕</button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
