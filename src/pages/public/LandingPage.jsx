@@ -13,6 +13,9 @@ const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(t
 const APK_DOWNLOAD_URL = "https://vkrnqoajmyyyatfdlmbk.supabase.co/storage/v1/object/public/app-releases/app-release.apk";
 
 const RESERVATION_FEE = "15 000";
+// Photo d'arrière-plan du haut de page : déposer le fichier dans public/images/hero.jpg
+// (sans fichier, le dégradé bleu nuit s'affiche seul).
+const HERO_IMAGE = "/images/hero.jpg";
 const reservationLink = (slug) =>
   slug ? `/adhesion?type=reservation&formule=${slug.toLowerCase()}` : "/adhesion?type=reservation";
 
@@ -131,7 +134,12 @@ export default function LandingPage() {
           .awj-lp .btn-sm { padding: 11px 20px; font-size: 14px; }
 
           /* HERO */
-          .awj-lp .hero { background: var(--ink); color: var(--white); padding: 128px 0 96px; overflow: hidden; }
+          .awj-lp .hero {
+            background-color: var(--ink); color: var(--white); padding: 128px 0 96px; overflow: hidden;
+            background-image: linear-gradient(105deg, rgba(6,34,63,.95) 0%, rgba(6,34,63,.84) 45%, rgba(6,34,63,.5) 100%), url(${HERO_IMAGE});
+            background-size: cover; background-position: center right; background-repeat: no-repeat;
+          }
+          .awj-lp .hero-pill { display: inline-block; margin-bottom: 22px; font-size: 14px; font-weight: 700; padding: 7px 16px; border-radius: 99px; background: rgba(212,168,67,.18); color: #F0D58A; border: 1px solid rgba(212,168,67,.45); }
           .awj-lp .hero-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center; }
           .awj-lp .hero h1 { font-size: clamp(38px, 6.2vw, 68px); line-height: 1.02; font-weight: 800; }
           .awj-lp .hero .sub { margin-top: 24px; font-size: 19px; color: #BFD3E6; max-width: 46ch; }
@@ -273,10 +281,11 @@ export default function LandingPage() {
         <header className="hero" id="hero">
           <div className="wrap hero-grid">
             <div>
-              <h1>Réservez votre mutuelle santé 2027</h1>
+              <span className="hero-pill">Réservations 2027 ouvertes</span>
+              <h1>La santé ne doit pas ruiner votre budget.</h1>
               <p className="sub">
-                Quatre formules, jusqu'à 100 % de prise en charge sur le réseau de soins Awoundjô.
-                Gardez votre place dès aujourd'hui pour {RESERVATION_FEE} F, réglés par Mobile Money.
+                Protégez-vous et votre famille sur un large réseau de soins, avec jusqu'à 100 % de prise en charge.
+                Réservez votre formule 2027 dès aujourd'hui pour {RESERVATION_FEE} F, par Mobile Money.
               </p>
               <div className="hero-actions">
                 <Link
