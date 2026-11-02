@@ -1,5 +1,5 @@
 // src/pages/public/LandingPage.jsx
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
@@ -81,6 +81,46 @@ function WaIcon({ size = 22 }) {
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState(null);
+  const rootRef = useRef(null);
+  const heroRef = useRef(null);
+
+  // ── Mouvement au défilement ─────────────────────────────────
+  // 1) apparition progressive des blocs (IntersectionObserver)
+  // 2) parallaxe douce du haut de page  3) barre de progression
+  // Désactivé si l'utilisateur demande moins d'animations.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+
+    root.classList.add("js-motion");
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); }
+      }),
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" }
+    );
+    root.querySelectorAll(".rv, .rv-line").forEach((el) => io.observe(el));
+
+    let ticking = false;
+    const update = () => {
+      const y = window.scrollY;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      root.style.setProperty("--p", max > 0 ? Math.min(1, y / max).toFixed(4) : "0");
+      if (heroRef.current && y < window.innerHeight * 1.3) {
+        heroRef.current.style.setProperty("--hy", `${(y * 0.22).toFixed(1)}px`);
+      }
+      ticking = false;
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+
+    return () => {
+      io.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      root.classList.remove("js-motion");
+    };
+  }, []);
 
   const scrollTo = (id) => (e) => {
     e.preventDefault();
@@ -95,7 +135,8 @@ export default function LandingPage() {
       <Nav />
       <ResponsiveStyles />
 
-      <div className="awj-lp">
+      <div className="awj-lp" ref={rootRef}>
+        <div className="progress" aria-hidden="true" />
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap');
 
@@ -104,7 +145,7 @@ export default function LandingPage() {
             --paper: #F3F7FB; --white: #FFFFFF; --line: #D8E3EE; --grey: #46607A;
             --gold: #D4A843; --orange: #F77F00; --green: #009E60;
             font-family: 'Figtree', system-ui, sans-serif; color: var(--ink); background: var(--paper);
-            -webkit-font-smoothing: antialiased; line-height: 1.55;
+            -webkit-font-smoothing: antialiased; line-height: 1.55; overflow-x: clip;
           }
           .awj-lp * { box-sizing: border-box; }
           .awj-lp h1, .awj-lp h2, .awj-lp h3, .awj-lp h4 { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; margin: 0; letter-spacing: -0.02em; }
@@ -137,7 +178,7 @@ export default function LandingPage() {
           .awj-lp .hero {
             background-color: var(--ink); color: var(--white); padding: 128px 0 96px; overflow: hidden;
             background-image: linear-gradient(105deg, rgba(6,34,63,.95) 0%, rgba(6,34,63,.84) 45%, rgba(6,34,63,.5) 100%), url(${HERO_IMAGE});
-            background-size: cover; background-position: center right; background-repeat: no-repeat;
+            background-size: cover; background-position: center calc(50% + var(--hy, 0px)); background-repeat: no-repeat;
           }
           .awj-lp .hero-pill { display: inline-block; margin-bottom: 22px; font-size: 14px; font-weight: 700; padding: 7px 16px; border-radius: 99px; background: rgba(212,168,67,.18); color: #F0D58A; border: 1px solid rgba(212,168,67,.45); }
           .awj-lp .hero-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center; }
@@ -148,7 +189,7 @@ export default function LandingPage() {
           .awj-lp .hero-note a { color: var(--white); text-underline-offset: 3px; }
 
           /* La carte (élément signature) */
-          .awj-lp .cards { position: relative; height: 340px; }
+          .awj-lp .cards { position: relative; height: 340px; transform: translateY(calc(var(--hy, 0px) * -0.4)); }
           .awj-lp .mcard {
             position: absolute; width: min(360px, 88%); aspect-ratio: 1.586; border-radius: 22px; padding: 22px 24px;
             display: flex; flex-direction: column; justify-content: space-between; color: var(--white);
@@ -196,7 +237,9 @@ export default function LandingPage() {
           .awj-lp .path .btn { margin-top: auto; align-self: flex-start; }
 
           /* Étapes de réservation (vraie séquence) */
-          .awj-lp .rsteps { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--ink); }
+          .awj-lp .rsteps { position: relative; margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--line); }
+          .awj-lp .rsteps::before { content: ""; position: absolute; top: -2px; left: 0; width: 100%; height: 2px; background: var(--ink); transform-origin: 0 50%; transition: transform 1.3s cubic-bezier(.2,.7,.2,1); }
+          .awj-lp.js-motion .rsteps:not(.is-in)::before { transform: scaleX(0); }
           .awj-lp .rstep { padding: 26px 28px 0 0; }
           .awj-lp .rstep + .rstep { padding-left: 28px; border-left: 1px solid var(--line); }
           .awj-lp .rstep-n { font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; font-weight: 800; color: var(--navy); }
@@ -252,6 +295,22 @@ export default function LandingPage() {
           .awj-lp .final-corp { margin-top: 22px; font-size: 14px; }
           .awj-lp .final-corp a { color: #8FD6F7; }
 
+          /* Mouvement */
+          .awj-lp .progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 1000; background: var(--gold); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); pointer-events: none; }
+          .awj-lp.js-motion .rv { opacity: 0; transform: translateY(34px); transition: opacity .85s cubic-bezier(.2,.7,.2,1) var(--d, 0s), transform .85s cubic-bezier(.2,.7,.2,1) var(--d, 0s); will-change: opacity, transform; }
+          .awj-lp.js-motion .rv.rv-l { transform: translateX(-56px); }
+          .awj-lp.js-motion .rv.rv-r { transform: translateX(56px); }
+          .awj-lp.js-motion .rv.is-in { opacity: 1; transform: none; }
+          @keyframes awj-rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+          @media (prefers-reduced-motion: no-preference) {
+            .awj-lp .hero-seq > * { animation: awj-rise .9s cubic-bezier(.2,.7,.2,1) both; }
+            .awj-lp .hero-seq > :nth-child(1) { animation-delay: .05s; }
+            .awj-lp .hero-seq > :nth-child(2) { animation-delay: .17s; }
+            .awj-lp .hero-seq > :nth-child(3) { animation-delay: .3s; }
+            .awj-lp .hero-seq > :nth-child(4) { animation-delay: .42s; }
+            .awj-lp .hero-seq > :nth-child(5) { animation-delay: .54s; }
+          }
+
           /* Responsive */
           @media (max-width: 900px) {
             .awj-lp .hero-grid { grid-template-columns: 1fr; gap: 64px; }
@@ -274,13 +333,14 @@ export default function LandingPage() {
           @media (prefers-reduced-motion: reduce) {
             .awj-lp .mcard-front { animation: none; }
             .awj-lp .btn, .awj-lp .faq-a { transition: none; }
+            .awj-lp .progress { display: none; }
           }
         `}</style>
 
         {/* ===== HERO ===== */}
-        <header className="hero" id="hero">
+        <header className="hero" id="hero" ref={heroRef}>
           <div className="wrap hero-grid">
-            <div>
+            <div className="hero-seq">
               <span className="hero-pill">Réservations 2027 ouvertes</span>
               <h1>La santé ne doit pas ruiner votre budget.</h1>
               <p className="sub">
@@ -331,22 +391,22 @@ export default function LandingPage() {
         {/* ===== CHIFFRES ===== */}
         <div className="facts">
           <div className="wrap facts-row">
-            <div className="fact"><b>120+</b><span>établissements de santé partenaires</span></div>
-            <div className="fact"><b>Jusqu'à 100 %</b><span>de prise en charge, formule Premium</span></div>
-            <div className="fact"><b>4 opérateurs</b><span>Wave, Orange Money, MTN MoMo, Moov</span></div>
+            <div className="fact rv"><b>120+</b><span>établissements de santé partenaires</span></div>
+            <div className="fact rv" style={{ "--d": ".12s" }}><b>Jusqu'à 100 %</b><span>de prise en charge, formule Premium</span></div>
+            <div className="fact rv" style={{ "--d": ".24s" }}><b>4 opérateurs</b><span>Wave, Orange Money, MTN MoMo, Moov</span></div>
           </div>
         </div>
 
         {/* ===== DEUX PARCOURS ===== */}
         <section className="sec" id="paths">
           <div className="wrap">
-            <h2 className="h2">Deux façons de vous protéger</h2>
-            <p className="lede">
+            <h2 className="h2 rv">Deux façons de vous protéger</h2>
+            <p className="lede rv" style={{ "--d": ".1s" }}>
               Moins de 20 % des Ivoiriens disposent d'une couverture santé. Choisissez le parcours qui vous convient.
             </p>
 
             <div className="paths">
-              <article className="path path-main">
+              <article className="path path-main rv rv-l">
                 <span className="path-tag">Réservation ouverte</span>
                 <h3>Les 4 formules 2027</h3>
                 <p>Classic, Aisance, Harmony et Premium, de 80 % à 100 % de couverture en Côte d'Ivoire.</p>
@@ -363,7 +423,7 @@ export default function LandingPage() {
                 </Link>
               </article>
 
-              <article className="path path-side">
+              <article className="path path-side rv rv-r" style={{ "--d": ".15s" }}>
                 <span className="path-tag">Dès le 1er décembre</span>
                 <h3>Formule Basique</h3>
                 <ul>
@@ -387,12 +447,12 @@ export default function LandingPage() {
         {/* ===== COMMENT RÉSERVER ===== */}
         <section className="sec sec-white" id="reserver">
           <div className="wrap">
-            <h2 className="h2">Réserver sa formule, en trois temps</h2>
-            <p className="lede">Tout se fait depuis votre téléphone, sans déplacement.</p>
+            <h2 className="h2 rv">Réserver sa formule, en trois temps</h2>
+            <p className="lede rv" style={{ "--d": ".1s" }}>Tout se fait depuis votre téléphone, sans déplacement.</p>
 
-            <div className="rsteps">
+            <div className="rsteps rv-line">
               {RESERVATION_STEPS.map((s, i) => (
-                <div className="rstep" key={s.title}>
+                <div className="rstep rv" key={s.title} style={{ "--d": `${0.25 + i * 0.22}s` }}>
                   <div className="rstep-n">Étape {i + 1}</div>
                   <h3>{s.title}</h3>
                   <p>{s.text}</p>
@@ -415,8 +475,8 @@ export default function LandingPage() {
         {/* ===== FORMULES ===== */}
         <section className="sec" id="formulas">
           <div className="wrap">
-            <h2 className="h2">Les quatre formules, prime annuelle</h2>
-            <p className="lede">
+            <h2 className="h2 rv">Les quatre formules, prime annuelle</h2>
+            <p className="lede rv" style={{ "--d": ".1s" }}>
               Tarifs particuliers, par an. Couverture en Côte d'Ivoire, sur le réseau de soins Awoundjô.
               Chaque réservation coûte {RESERVATION_FEE} F, quelle que soit la formule.
             </p>
@@ -425,10 +485,10 @@ export default function LandingPage() {
               <div className="frow frow-head" role="row">
                 <span>Formule</span><span>Solo</span><span>Famille</span><span />
               </div>
-              {GESTIONNAIRE_PLANS.map((p) => {
+              {GESTIONNAIRE_PLANS.map((p, i) => {
                 const top = p.slug === "PREMIUM";
                 return (
-                  <div className={`frow ${top ? "frow-top" : ""}`} role="row" key={p.slug}>
+                  <div className={`frow rv ${top ? "frow-top" : ""}`} role="row" key={p.slug} style={{ "--d": `${i * 0.12}s` }}>
                     <div>
                       <div className="fname">{p.name}</div>
                       <span className="fcov">Couverture {p.couverture}</span>
@@ -448,7 +508,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            <p className="fnote">
+            <p className="fnote rv">
               Ces tarifs concernent les personnes sans pathologie déclarée. Une surprime s'applique en cas de pathologie
               déclarée et à partir de 55 ans. Grille entreprise à partir de 10 familles ou 30 solos : sur demande.
               {premium ? ` La formule ${premium.name} offre la couverture ${premium.couverture}.` : ""}
@@ -459,10 +519,10 @@ export default function LandingPage() {
         {/* ===== AVANTAGES ===== */}
         <section className="sec sec-white" id="benefits">
           <div className="wrap">
-            <h2 className="h2">Ce que votre carte vous donne</h2>
+            <h2 className="h2 rv">Ce que votre carte vous donne</h2>
             <div className="benefits">
-              {BENEFITS.map((b) => (
-                <div className="benefit" key={b.title}>
+              {BENEFITS.map((b, i) => (
+                <div className="benefit rv" key={b.title} style={{ "--d": `${(i % 2) * 0.12}s` }}>
                   <h3>{b.title}</h3>
                   <p>{b.text}</p>
                 </div>
@@ -473,7 +533,7 @@ export default function LandingPage() {
 
         {/* ===== CONFIANCE ===== */}
         <div className="trust" id="proof">
-          <div className="wrap trust-row">
+          <div className="wrap trust-row rv">
             <p className="trust-agree"><b>Mutuelle agréée</b><br />n° 019-072/MEPS/CAB du 27/08/2019</p>
             <div className="partners">
               {PARTNERS.map((p) => <span key={p}>{p}</span>)}
@@ -484,10 +544,10 @@ export default function LandingPage() {
         {/* ===== FAQ ===== */}
         <section className="sec" id="faq">
           <div className="wrap">
-            <h2 className="h2">Vos questions</h2>
+            <h2 className="h2 rv">Vos questions</h2>
             <div className="faq-list">
               {FAQS.map((f, i) => (
-                <div className={`faq-item ${openFaq === i ? "open" : ""}`} key={f.q}>
+                <div className={`faq-item rv ${openFaq === i ? "open" : ""}`} key={f.q} style={{ "--d": `${i * 0.06}s` }}>
                   <button className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i}>
                     {f.q}
                     <span className="faq-mark" aria-hidden="true">{openFaq === i ? "−" : "+"}</span>
@@ -502,10 +562,10 @@ export default function LandingPage() {
         {/* ===== CTA FINAL ===== */}
         <section className="final" id="cta">
           <div className="wrap">
-            <h2>Gardez votre place pour 2027</h2>
-            <p className="lede">{RESERVATION_FEE} F par Mobile Money, et votre formule est réservée.</p>
+            <h2 className="rv">Gardez votre place pour 2027</h2>
+            <p className="lede rv" style={{ "--d": ".1s" }}>{RESERVATION_FEE} F par Mobile Money, et votre formule est réservée.</p>
 
-            <div className="final-actions">
+            <div className="final-actions rv" style={{ "--d": ".2s" }}>
               <Link
                 to={reservationLink()}
                 className="btn btn-gold"
