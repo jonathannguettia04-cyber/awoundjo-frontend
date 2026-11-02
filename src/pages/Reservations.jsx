@@ -58,11 +58,18 @@ export default function Reservations({ embedded = false, onClose }) {
     fetch(`${API}/api/payments/reservations?page=${p}&limit=${PAGE_SIZE}`, {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const json = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(json?.message || json?.error || `Erreur serveur (${r.status})`);
+        return json;
+      })
       .then((json) => {
-        const d = json?.data;
-        if (!d) throw new Error(json?.message || "Réponse invalide");
-        setRows(d.reservations || []);
+        // Accepte { data: { reservations, total } } ou { reservations, total }
+        const d = Array.isArray(json?.data?.reservations) ? json.data
+                : Array.isArray(json?.reservations) ? json
+                : null;
+        if (!d) throw new Error("Format de réponse inattendu : " + JSON.stringify(json).slice(0, 120));
+        setRows(d.reservations);
         setTotal(d.total || 0);
       })
       .catch((e) => setError(e.message || "Impossible de charger les réservations"))

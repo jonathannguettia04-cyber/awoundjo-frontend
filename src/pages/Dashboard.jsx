@@ -228,8 +228,9 @@ export default function Dashboard() {
   function fetchReservations() {
     fetch(`${API}/api/payments/reservations?limit=200`, { headers: authHeader })
       .then((r) => r.json())
-      .then(({ data }) => {
-        setReservations(data?.reservations || []);
+      .then((json) => {
+        const data = json?.data?.reservations ? json.data : json;
+        setReservations(Array.isArray(data?.reservations) ? data.reservations : []);
         setReservationsTotal(data?.total || 0);
       })
       .catch(console.error);
