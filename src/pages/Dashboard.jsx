@@ -203,6 +203,11 @@ export default function Dashboard() {
   const [planModal, setPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
 
+  // Réservations 2027 (formules gestionnaire maladie) — lues depuis
+  // GET /api/admin/reservations (pending_payments, role RESERVATION_GESTIONNAIRE_2027)
+  const [reservations, setReservations] = useState([]);
+  const [reservationsTotal, setReservationsTotal] = useState(0);
+
   const token = localStorage.getItem("token");
   const authHeader = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
@@ -213,7 +218,17 @@ export default function Dashboard() {
       .catch(console.error);
   }
 
-  useEffect(() => { if (isAdmin) fetchPlans(); }, [isAdmin]);
+  function fetchReservations() {
+    fetch(`${API}/api/admin/reservations?limit=200`, { headers: authHeader })
+      .then((r) => r.json())
+      .then(({ data }) => {
+        setReservations(data?.reservations || []);
+        setReservationsTotal(data?.total || 0);
+      })
+      .catch(console.error);
+  }
+
+  useEffect(() => { if (isAdmin) { fetchPlans(); fetchReservations(); } }, [isAdmin]);
 
   async function togglePlanActive(plan) {
     try {
@@ -347,6 +362,14 @@ export default function Dashboard() {
   const revenuMoyen = totalActifs > 0 ? Math.round(Number(ps.total_revenue || 0) / totalActifs) : 0;
   const tauxRecouvrement = ps.total_payments > 0 && ps.total_revenue > 0 ? Math.min(100, Math.round((Number(ps.mensualites_revenue || 0) / Number(ps.total_revenue)) * 100)) : 0;
 
+  // Réservations 2027 — calculées sur la page chargée (jusqu'à 200 lignes).
+  // Si le volume dépasse 200, "reservationsRevenue" sera une estimation partielle.
+  const reservationsConfirmees = reservations.filter((r) => r.confirmed).length;
+  const reservationsEnAttente = reservationsTotal - reservationsConfirmees;
+  const reservationsRevenue = reservations.reduce(
+    (s, r) => s + (r.confirmed ? Number(r.amount_paid || r.montant_reservation || 0) : 0), 0
+  );
+
   const sinistralite = data?.sinistralite ?? 42;
   const nps = data?.nps ?? 78;
   const evolutionBar = evolution.length ? evolution : Array.from({ length: 7 }, () => ({ revenue: 0 }));
@@ -404,6 +427,7 @@ export default function Dashboard() {
                   { key: "client", icon: "ti-user", label: "Espace Adhérent", desc: "Suivi des garanties", color: BRAND_LT, link: `${ADMIN_BASE}/clients`, stat: `${totalActifs} actifs` },
                   { key: "diaspora", icon: "ti-world", label: "Guichet Diaspora", desc: "Souscriptions internationales", color: AMBER, link: `${ADMIN_BASE}/diaspora`, stat: "Canal actif" },
                   { key: "business", icon: "ti-building", label: "Espace Corporate", desc: "Grands comptes CNEPECI", color: VIOLET, link: `${ADMIN_BASE}/business`, stat: "B2B actif" },
+                  { key: "reservations", icon: "ti-calendar-event", label: "Réservations 2027", desc: "Formules gestionnaire à venir", color: "#D4A017", link: `${ADMIN_BASE}/reservations`, stat: `${reservationsTotal} réservation${reservationsTotal > 1 ? "s" : ""}` },
                   { key: "parrainage", icon: "ti-link", label: "Affiliation", desc: "Programme de référents", color: "#ea8a4d", link: `${ADMIN_BASE}/federation`, stat: "10% intéressement" },
                 ].map((portal) => (
                   <Link key={portal.key} to={portal.link} style={{ textDecoration: "none" }}>
@@ -420,6 +444,34 @@ export default function Dashboard() {
                     </div>
                   </Link>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ══ RÉSERVATIONS 2027 ═══════════════════════════════════ */}
+          {isAdmin && reservationsTotal > 0 && (
+            <div className="awj-card" style={{ padding: "20px 22px", marginBottom: 32 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <Eyebrow icon="ti-calendar-event" style={{ margin: "0 0 4px" }}>Réservations formules gestionnaire (2027)</Eyebrow>
+                  <p style={{ fontSize: 12, color: TEXT_MUTED, margin: 0 }}>Adhésion de réservation à 15 000 FCFA — prime annuelle non incluse</p>
+                </div>
+                <Link to={`${ADMIN_BASE}/reservations`} className="awj-link">Voir la liste <i className="ti ti-arrow-right" style={{ fontSize: 12 }} /></Link>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                <div>
+                  <span style={{ fontSize: 10, color: TEXT_MUTED, display: "block", marginBottom: 4 }}>Total réservations</span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: TEXT }}>{reservationsTotal}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, color: TEXT_MUTED, display: "block", marginBottom: 4 }}>Paiements confirmés</span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: TEAL }}>{reservationsConfirmees}</span>
+                  {reservationsEnAttente > 0 && <span style={{ fontSize: 10, color: AMBER, display: "block", marginTop: 2 }}>{reservationsEnAttente} en attente de paiement</span>}
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, color: TEXT_MUTED, display: "block", marginBottom: 4 }}>Encaissé (page chargée)</span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: "#D4A017" }}>{fmtShort(reservationsRevenue)} FCFA</span>
+                </div>
               </div>
             </div>
           )}

@@ -1,12 +1,20 @@
 // src/pages/public/Adhesion.jsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
-import { C, PLANS, CONTACT } from "../../data/constants";
+import { C, GESTIONNAIRE_PLANS, GESTIONNAIRE_NOTE, CONTACT } from "../../data/constants";
+
+const NB_VERSEMENTS = 4; // échelonnement trimestriel (4 versements/an)
+
+// ── Réservation 2027 ─────────────────────────────────────────────
+// Les formules CLASSIC/AISANCE/HARMONY/PREMIUM (gestionnaire maladie)
+// entrent en vigueur en 2027. En attendant, on propose une adhésion de
+// réservation à prix fixe pour sécuriser sa place / son tarif.
+const RESERVATION_FEE = 15000;
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -45,17 +53,12 @@ const PATHOLOGIES = [
   "Asthme sévère",
 ];
 
-// Valeurs par défaut (repli) tant que /api/settings/public n'a pas répondu,
-// ou si l'appel échoue. Source de vérité normale : table `settings` (backoffice),
-// doit rester en sync avec SURPRIME_ENFANT dans routes/clientPortalRoutes.js.
-const SURCHARGE_PAR_PATHOLOGIE_DEFAULT = 10000;
-const CAUTION_MOIS_DEFAULT = 3;
-const SURCHARGE_ENFANT_PAR_FORMULE_DEFAULT = {
-  ESSENTIELLE: 2000,
-  IVOIRIENNE: 3000,
-  TURQUOISE: 5000,
-};
-const BASE_CHILDREN_CAP_DEFAULT = 3;
+// ── Note sur les formules du gestionnaire maladie ───────────────
+// Les tarifs CLASSIC/AISANCE/HARMONY/PREMIUM concernent les personnes sans
+// pathologie déclarée (cf. GESTIONNAIRE_NOTE). Le montant de la surprime
+// pathologie/âge ≥55 ans n'est pas publié par le gestionnaire : ces dossiers
+// ne peuvent donc pas être chiffrés en ligne et sont orientés vers WhatsApp
+// pour une étude et un tarif ajusté par le gestionnaire.
 
 function Field({ label, required, children, error, hint }) {
   return (
@@ -81,45 +84,12 @@ const fcfa = (n) => new Intl.NumberFormat("fr-FR").format(n) + " F";
 export default function Adhesion() {
   const [searchParams] = useSearchParams();
   const preselected = searchParams.get("formule");
-  // Attribution partenaire (ex: redirection depuis TransfertCI) —
-  // transmis tel quel dans form_data pour rattacher le client créé
-  // au partenaire, sans changer le flux de paiement Jeko existant.
-  const partnerSlug = searchParams.get("partner") || undefined;
-  const partnerRef  = searchParams.get("ref")     || undefined;
 
-  const [mode, setMode] = useState(searchParams.get("type") === "entreprise" ? "entreprise" : "particulier");
-
-  // ── Paramètres backoffice (surprimes, cap enfants...) ──────────────
-  // Chargés depuis /api/settings/public ; on garde les valeurs par défaut
-  // en repli tant que la réponse n'est pas arrivée (ou en cas d'échec réseau).
-  const [settings, setSettings] = useState({
-    surcharge_pathologie: SURCHARGE_PAR_PATHOLOGIE_DEFAULT,
-    caution_mois: CAUTION_MOIS_DEFAULT,
-    surprime_enfant: SURCHARGE_ENFANT_PAR_FORMULE_DEFAULT,
-    base_children_cap: BASE_CHILDREN_CAP_DEFAULT,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch(`/api/settings/public`)
-      .then((res) => {
-        if (cancelled) return;
-        const data = res?.data || res; // selon la forme exacte de la réponse ok()
-        setSettings((prev) => ({
-          surcharge_pathologie: data?.surcharge_pathologie ?? prev.surcharge_pathologie,
-          caution_mois: data?.caution_mois ?? prev.caution_mois,
-          surprime_enfant: data?.surprime_enfant ?? prev.surprime_enfant,
-          base_children_cap: data?.base_children_cap ?? prev.base_children_cap,
-        }));
-      })
-      .catch((e) => {
-        console.warn("[Adhesion] /api/settings/public indisponible, valeurs par défaut utilisées:", e.message);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const SURCHARGE_PAR_PATHOLOGIE = Number(settings.surcharge_pathologie) || SURCHARGE_PAR_PATHOLOGIE_DEFAULT;
-  const CAUTION_MOIS = Number(settings.caution_mois) || CAUTION_MOIS_DEFAULT;
+  const [mode, setMode] = useState(
+    searchParams.get("type") === "entreprise"  ? "entreprise"  :
+    searchParams.get("type") === "reservation" ? "reservation" :
+    "particulier"
+  );
 
   // ── B2B : formulaire de demande de devis (pas de paiement direct) ──
   const [bizForm, setBizForm] = useState({
@@ -178,26 +148,95 @@ export default function Adhesion() {
     setBizSent(true);
   }
 
-  function handleModeChange(id) {
-    setMode(id);
-    if (id === "famille") {
-      const familyPlan = PLANS.find(p => p.name.toLowerCase() === "ivoirienne");
-      if (familyPlan) setSelectedPlan(familyPlan);
-      // Défaut d'affichage (2 parents + cap enfants de base) — n'affecte pas le calcul
-      // monétaire, qui lui utilise bien settings.base_children_cap / surprime_enfant.
-      if (form.nb_beneficiaires === "1") setForm(f => ({ ...f, nb_beneficiaires: "5" }));
-    } else {
-      // "Pour moi" ou "Pour mon entreprise" : adhésion individuelle, pas de bénéficiaires
-      // multiples ni de surprime enfants — on repart sur des valeurs propres.
-      setForm(f => ({ ...f, nb_beneficiaires: "1" }));
-      setExtraEnfants(0);
+  // ── Réservation 2027 : adhésion à prix fixe (6 000 F) ──────────
+  const [resForm, setResForm] = useState({ name: "", phone: "", email: "", city: "" });
+  const [resErrors, setResErrors] = useState({});
+  const [resPlan, setResPlan] = useState(
+    GESTIONNAIRE_PLANS.find(p => p.slug === preselected?.toUpperCase()) || GESTIONNAIRE_PLANS[0]
+  );
+  const [resComposition, setResComposition] = useState("solo");
+  const [resMethode, setResMethode] = useState("orange");
+  const [resAgreed, setResAgreed] = useState(false);
+  const [resSubmitting, setResSubmitting] = useState(false);
+  const [resFeedback, setResFeedback] = useState(null);
+
+  function validateReservation() {
+    const errs = {};
+    if (!resForm.name.trim())  errs.name  = "Le nom complet est requis.";
+    if (!resForm.phone.trim()) errs.phone = "Le numéro de téléphone est requis.";
+    if (!resAgreed)            errs.agreed = "Veuillez accepter les conditions.";
+    return errs;
+  }
+
+  async function handleReservationSubmit(e) {
+    e.preventDefault();
+    const errs = validateReservation();
+    setResErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setResSubmitting(true);
+    setResFeedback(null);
+    const BASE = window.location.origin;
+
+    try {
+      const res = await apiFetch(`/api/payments/jeko/init`, {
+        method: "POST",
+        body: JSON.stringify({
+          amount:       RESERVATION_FEE,
+          description:  `Réservation Awoundjô 2027 — ${resPlan.name} (${resComposition === "famille" ? "Famille" : "Solo"})`,
+          client_name:  resForm.name.trim(),
+          client_phone: resForm.phone.trim(),
+          type:         "reservation",
+          role:         "RESERVATION_GESTIONNAIRE_2027",
+          form_data: {
+            name:      resForm.name.trim(),
+            phone:     resForm.phone.trim(),
+            email:     resForm.email.trim() || undefined,
+            city:      resForm.city.trim()  || undefined,
+            formule_souhaitee:      resPlan.slug,
+            composition_souhaitee:  resComposition,
+            montant_reservation:    RESERVATION_FEE,
+          },
+          jeko_method:  resMethode,
+          success_url:  `${BASE}/adhesion/merci?reservation=1`,
+          failure_url:  `${BASE}/adhesion/echec`,
+        }),
+      });
+
+      const redirectUrl = res?.data?.redirect_url || res?.redirect_url;
+      if (redirectUrl) {
+        if (typeof window.fbq === "function") {
+          window.fbq("track", "InitiateCheckout", {
+            content_name: `Réservation 2027 — ${resPlan.name}`,
+            value: RESERVATION_FEE,
+            currency: "XOF",
+          });
+        }
+        window.location.href = redirectUrl;
+      } else {
+        setResFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez ou contactez-nous." });
+      }
+    } catch (e) {
+      setResFeedback({ type: "err", msg: e.message });
+    } finally {
+      setResSubmitting(false);
     }
   }
 
-  const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", nb_beneficiaires: "1" });
+  function handleModeChange(id) {
+    setMode(id);
+    if (id !== "famille") {
+      // "Pour moi" ou "Pour mon entreprise" : adhésion individuelle (Solo),
+      // pas de PNA enfant.
+      setEnfantsSupplementaires(0);
+      setEnfantsCharge(0);
+    }
+  }
+
+  const [form, setForm] = useState({ name: "", phone: "", email: "", city: "" });
   const [errors, setErrors] = useState({});
   const [selectedPlan, setSelectedPlan] = useState(
-    PLANS.find(p => p.name.toLowerCase() === preselected?.toLowerCase()) || PLANS[1]
+    GESTIONNAIRE_PLANS.find(p => p.slug === preselected?.toUpperCase()) || GESTIONNAIRE_PLANS[0]
   );
   const [methode, setMethode] = useState("orange");
   const [submitting, setSubmitting] = useState(false);
@@ -205,7 +244,15 @@ export default function Adhesion() {
   const [agreed, setAgreed] = useState(false);
   const [pathologies, setPathologies] = useState([]);
   const [autrePathologie, setAutrePathologie] = useState("");
-  const [extraEnfants, setExtraEnfants] = useState(0);
+  const [enfantsSupplementaires, setEnfantsSupplementaires] = useState(0);
+  const [enfantsCharge, setEnfantsCharge] = useState(0);
+
+  const composition = mode === "famille" ? "famille" : "solo";
+  const prixBase = selectedPlan.particulier[composition];
+  // Dossier avec pathologie(s) déclarée(s) : le gestionnaire ne publie pas de
+  // montant de surprime, donc le paiement en ligne n'est pas chiffrable — on
+  // bascule vers une prise de contact WhatsApp pour ces cas (cf. handleSubmit).
+  const nbPathologiesDeclarees = pathologies.length + (autrePathologie.trim() ? 1 : 0);
 
   function togglePathologie(nom) {
     setPathologies(prev =>
@@ -227,17 +274,32 @@ export default function Adhesion() {
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
+    // Pathologie(s) déclarée(s) : le gestionnaire ne publie pas de montant de
+    // surprime, donc impossible de chiffrer un paiement en ligne fiable —
+    // on oriente vers WhatsApp pour une étude de dossier et un tarif ajusté.
+    if (nbPathologiesDeclarees > 0) {
+      const lignes = [
+        "Nouvelle demande d'adhésion Awoundjô — dossier avec pathologie(s) déclarée(s)",
+        `Formule souhaitée : ${selectedPlan.name} (${composition === "famille" ? "Famille" : "Solo"})`,
+        `Nom : ${form.name.trim()}`,
+        `Téléphone : ${form.phone.trim()}`,
+        `Pathologies déclarées : ${[...pathologies, ...(autrePathologie.trim() ? [autrePathologie.trim()] : [])].join(", ")}`,
+      ].join("\n");
+      window.open(`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(lignes)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     setSubmitting(true);
     setFeedback(null);
     const BASE = window.location.origin;
-    const totalAmount = total;
+    const totalAmount = versement; // 1er versement trimestriel (1/4 de la prime annuelle)
 
     try {
       const res = await apiFetch(`/api/payments/jeko/init`, {
         method: "POST",
         body: JSON.stringify({
           amount:       totalAmount,
-          description:  `Adhésion Awoundjô — ${selectedPlan.name}`,
+          description:  `Adhésion Awoundjô — ${selectedPlan.name} (1/${NB_VERSEMENTS} trimestriel)`,
           client_name:  form.name.trim(),
           client_phone: form.phone.trim(),
           type:         "adhesion",
@@ -247,17 +309,17 @@ export default function Adhesion() {
             phone:     form.phone.trim(),
             email:     form.email.trim() || undefined,
             city:      form.city.trim()  || undefined,
-            plan_slug: selectedPlan.name.toUpperCase(),
+            plan_slug: selectedPlan.slug,
+            grille: "particulier",
+            composition,
             mode,
-            nb_beneficiaires: parseInt(form.nb_beneficiaires) || 1,
-            enfants_supplementaires: extraEnfants,
-            surcharge_enfants: surchargeEnfants,
-            pathologies_declarees: [...pathologies, ...(autrePathologie.trim() ? [autrePathologie.trim()] : [])],
-            surcharge_pathologie: surchargePathologie,
-            caution_pathologie: caution,
+            enfants_supplementaires: enfantsSupplementaires,
+            enfants_charge: enfantsCharge,
+            montant_annuel: montantAnnuel,
+            nombre_versements: NB_VERSEMENTS,
+            frequence_versement: "trimestriel",
+            versement_numero: 1,
             montant_initial: totalAmount,
-            ...(partnerSlug && { partner_slug: partnerSlug }),
-            ...(partnerRef  && { partner_ref:  partnerRef  }),
           },
           jeko_method:  methode,
           success_url:  `${BASE}/adhesion/merci`,
@@ -310,14 +372,13 @@ export default function Adhesion() {
     }
   }
 
-  const adhesion   = Number(selectedPlan.adhesion.replace(/\s/g, ""));
-  const mensualite = Number(selectedPlan.mensualite.replace(/\s/g, ""));
-  const nbPathologies      = pathologies.length + (autrePathologie.trim() ? 1 : 0);
-  const surchargePathologie = nbPathologies * SURCHARGE_PAR_PATHOLOGIE;
-  const caution             = nbPathologies > 0 ? mensualite * CAUTION_MOIS : 0;
-  const surchargeEnfantUnitaire = (settings.surprime_enfant?.[selectedPlan.name.toUpperCase()]) || 0;
-  const surchargeEnfants   = mode === "famille" ? extraEnfants * surchargeEnfantUnitaire : 0;
-  const total      = adhesion + mensualite + surchargePathologie + caution + surchargeEnfants;
+  const prixBaseNum = Number(prixBase.replace(/\s/g, ""));
+  const pnaEnfantSupplementaireUnitaire = Number(selectedPlan.particulier.pna_enfant_supplementaire.replace(/\s/g, ""));
+  const pnaEnfantChargeUnitaire         = Number(selectedPlan.particulier.pna_enfant_charge.replace(/\s/g, ""));
+  const montantPnaSupplementaire = mode === "famille" ? enfantsSupplementaires * pnaEnfantSupplementaireUnitaire : 0;
+  const montantPnaCharge         = mode === "famille" ? enfantsCharge * pnaEnfantChargeUnitaire : 0;
+  const montantAnnuel = prixBaseNum + montantPnaSupplementaire + montantPnaCharge;
+  const versement      = Math.round(montantAnnuel / NB_VERSEMENTS);
 
   return (
     <>
@@ -334,7 +395,16 @@ export default function Adhesion() {
         <div style={{ position: "absolute", inset: 0, opacity: 0.05, background: `radial-gradient(circle at 70% 40%, ${C.gold} 0%, transparent 60%)` }} />
         <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
           <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.gold, marginBottom: 14, textTransform: "uppercase" }}>Adhésion</div>
-          {mode === "entreprise" ? (
+          {mode === "reservation" ? (
+            <>
+              <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
+                Réservez votre place — <span style={{ color: C.gold }}>nouvelles formules 2027</span>
+              </h1>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: "#A9C6E0", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
+                CLASSIC, AISANCE, HARMONY, PREMIUM — nos nouvelles formules entrent en vigueur en 2027. Réservez dès maintenant votre place pour {fcfa(RESERVATION_FEE)}.
+              </p>
+            </>
+          ) : mode === "entreprise" ? (
             <>
               <h1 style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", color: "#FFFFFF", margin: "0 0 16px", lineHeight: 1.15 }}>
                 Protégez vos salariés avec <span style={{ color: C.gold }}>Awoundjô</span>
@@ -364,25 +434,142 @@ export default function Adhesion() {
           )}
 
           {/* ── Bascule Particulier / Famille / Entreprise ── */}
-          <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 50, padding: 4, marginTop: 28, flexWrap: "wrap", justifyContent: "center" }}>
-            {[
-              { id: "particulier", label: "Pour moi" },
-              { id: "famille",     label: "Ma famille" },
-              { id: "entreprise",  label: "Pour mon entreprise" },
-            ].map(o => (
-              <button key={o.id} type="button" onClick={() => handleModeChange(o.id)} style={{
-                border: "none", cursor: "pointer", borderRadius: 50, padding: "10px 20px",
-                fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
-                background: mode === o.id ? C.gold : "transparent",
-                color: mode === o.id ? "#08172B" : "#FFFFFF",
-                transition: "all .15s",
-              }}>{o.label}</button>
-            ))}
-          </div>
+          {mode !== "reservation" && (
+            <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 50, padding: 4, marginTop: 28, flexWrap: "wrap", justifyContent: "center" }}>
+              {[
+                { id: "particulier", label: "Pour moi" },
+                { id: "famille",     label: "Ma famille" },
+                { id: "entreprise",  label: "Pour mon entreprise" },
+              ].map(o => (
+                <button key={o.id} type="button" onClick={() => handleModeChange(o.id)} style={{
+                  border: "none", cursor: "pointer", borderRadius: 50, padding: "10px 20px",
+                  fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
+                  background: mode === o.id ? C.gold : "transparent",
+                  color: mode === o.id ? "#08172B" : "#FFFFFF",
+                  transition: "all .15s",
+                }}>{o.label}</button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {mode === "entreprise" ? (
+      {mode === "reservation" ? (
+        <section style={{ background: C.cream, padding: "56px 24px 96px" }}>
+          <div style={{ maxWidth: 560, margin: "0 auto" }}>
+            <div style={{ background: C.white, borderRadius: 18, padding: "32px 28px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)", border: "1.5px solid #E0EEF9" }}>
+              <form onSubmit={handleReservationSubmit}>
+                <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 17, color: C.slate, marginBottom: 6 }}>
+                  Adhésion de réservation — {fcfa(RESERVATION_FEE)}
+                </div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 22px" }}>
+                  Sécurisez votre place sur la formule de votre choix avant son entrée en vigueur en 2027. Ce montant de {fcfa(RESERVATION_FEE)} réserve votre dossier — le détail de l'adhésion complète (prime annuelle, versements trimestriels) vous sera communiqué à l'ouverture.
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <Field label="Formule souhaitée">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {GESTIONNAIRE_PLANS.map(plan => {
+                        const active = resPlan.slug === plan.slug;
+                        return (
+                          <button key={plan.slug} type="button" onClick={() => setResPlan(plan)} style={{
+                            padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+                            border: `2px solid ${active ? plan.color : "#E2E8F0"}`,
+                            background: active ? `${plan.color}0E` : C.white,
+                            fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
+                            color: active ? plan.color : C.gray,
+                          }}>{plan.name}</button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+
+                  <Field label="Composition souhaitée">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {[{ id: "solo", label: "Solo" }, { id: "famille", label: "Famille" }].map(c => (
+                        <button key={c.id} type="button" onClick={() => setResComposition(c.id)} style={{
+                          padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+                          border: `2px solid ${resComposition === c.id ? C.green : "#E2E8F0"}`,
+                          background: resComposition === c.id ? `${C.green}0E` : C.white,
+                          fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
+                          color: resComposition === c.id ? C.green : C.gray,
+                        }}>{c.label}</button>
+                      ))}
+                    </div>
+                  </Field>
+
+                  <Field label="Nom complet" required error={resErrors.name}>
+                    <input style={{ ...inputStyle, borderColor: resErrors.name ? "#C0392B" : "#E2E8F0" }}
+                      value={resForm.name} onChange={e => setResForm({ ...resForm, name: e.target.value })}
+                      placeholder="Ex : Aya Kouassi" />
+                  </Field>
+                  <Field label="Téléphone Mobile Money" required error={resErrors.phone} hint="pour le paiement">
+                    <input style={{ ...inputStyle, borderColor: resErrors.phone ? "#C0392B" : "#E2E8F0" }}
+                      value={resForm.phone} onChange={e => setResForm({ ...resForm, phone: e.target.value })}
+                      placeholder="Ex : 07 00 00 00 00" />
+                  </Field>
+                  <div className="awj-grid-2" style={{ gap: 12 }}>
+                    <Field label="Email" hint="optionnel">
+                      <input style={inputStyle} type="email"
+                        value={resForm.email} onChange={e => setResForm({ ...resForm, email: e.target.value })}
+                        placeholder="vous@exemple.com" />
+                    </Field>
+                    <Field label="Ville" hint="optionnel">
+                      <input style={inputStyle}
+                        value={resForm.city} onChange={e => setResForm({ ...resForm, city: e.target.value })}
+                        placeholder="Ex : Abidjan" />
+                    </Field>
+                  </div>
+
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: C.slate, marginTop: 8 }}>Méthode de paiement</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {METHODES.map(m => {
+                      const active = resMethode === m.id;
+                      return (
+                        <button key={m.id} type="button" onClick={() => setResMethode(m.id)} style={{
+                          padding: "12px 10px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+                          border: `2px solid ${active ? m.color : "#E2E8F0"}`,
+                          background: active ? m.bg : C.white,
+                          fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
+                          color: active ? m.color : C.gray,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        }}>
+                          <span style={{ width: 24, height: 24, borderRadius: "50%", background: active ? m.color : "#E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 900, color: active ? "#FFFFFF" : C.gray, flexShrink: 0 }}>{m.logo}</span>
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer", marginTop: 4 }}>
+                    <input type="checkbox" checked={resAgreed} onChange={e => setResAgreed(e.target.checked)} style={{ marginTop: 2, flexShrink: 0, accentColor: C.green }} />
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.gray, lineHeight: 1.6 }}>
+                      J'accepte les <a href="/cgu" style={{ color: C.green, textDecoration: "none", fontWeight: 600 }}>conditions générales d'utilisation</a> et comprends que ce montant de {fcfa(RESERVATION_FEE)} réserve ma place, sans constituer le paiement de la prime annuelle.
+                    </span>
+                  </label>
+                  {resErrors.agreed && <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#C0392B" }}>{resErrors.agreed}</div>}
+
+                  {resFeedback?.type === "err" && (
+                    <div style={{ background: "#FEF2F2", color: "#C0392B", padding: "12px 14px", borderRadius: 10, fontFamily: "Inter, sans-serif", fontSize: 13, lineHeight: 1.5 }}>
+                      ⚠️ {resFeedback.msg}
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={resSubmitting} style={{
+                    width: "100%", background: resSubmitting ? C.gray : C.green, color: "#FFFFFF", border: "none",
+                    fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 16,
+                    padding: "17px", borderRadius: 12, cursor: resSubmitting ? "wait" : "pointer",
+                    boxShadow: resSubmitting ? "none" : `0 6px 24px ${C.green}40`,
+                    transition: "all .2s", letterSpacing: 0.2,
+                  }}>
+                    {resSubmitting ? "Redirection en cours..." : `💳 Réserver pour ${fcfa(RESERVATION_FEE)}`}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      ) : mode === "entreprise" ? (
         <>
           {/* ── ÉTAPES ENTREPRISE ───────────────────────────────── */}
           <div style={{ background: C.white, borderBottom: "1.5px solid #E0EEF9", padding: "20px 24px" }}>
@@ -574,36 +761,49 @@ export default function Adhesion() {
                     </Field>
                   </div>
                   {mode === "famille" ? (
-                    <Field label="Nombre de bénéficiaires" hint="vous inclus">
-                      <select style={inputStyle} value={form.nb_beneficiaires} onChange={e => setForm({ ...form, nb_beneficiaires: e.target.value })}>
-                        {["1","2","3","4","5","6+"].map(n => <option key={n} value={n}>{n} personne{n !== "1" ? "s" : ""}</option>)}
-                      </select>
-                    </Field>
+                    <div style={{ background: C.cream, borderRadius: 12, padding: "12px 14px", fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray }}>
+                      Tarif Famille {selectedPlan.name}. Ajoutez des enfants supplémentaires ou à charge ci-dessous si besoin (Prime à la Naissance — PNA).
+                    </div>
                   ) : (
                     <div style={{ background: C.cream, borderRadius: 12, padding: "12px 14px", fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray }}>
-                      Adhésion individuelle — 1 bénéficiaire (vous). Pour couvrir votre conjoint et vos enfants, choisissez <strong style={{ color: C.slate }}>« Ma famille »</strong> en haut de page.
+                      Adhésion individuelle (Solo) — 1 bénéficiaire (vous). Pour couvrir votre famille, choisissez <strong style={{ color: C.slate }}>« Ma famille »</strong> en haut de page.
                     </div>
                   )}
 
                   {mode === "famille" && (
-                    <Field label="Enfants supplémentaires" hint={`au-delà des ${form.nb_beneficiaires} bénéficiaires ci-dessus`}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <button type="button" onClick={() => setExtraEnfants(n => Math.max(0, n - 1))} style={{
-                          width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
-                          fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
-                        }}>–</button>
-                        <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 16, color: C.slate, minWidth: 24, textAlign: "center" }}>{extraEnfants}</span>
-                        <button type="button" onClick={() => setExtraEnfants(n => n + 1)} style={{
-                          width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
-                          fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
-                        }}>+</button>
-                      </div>
-                      {extraEnfants > 0 && (
-                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.gray, margin: "6px 0 0" }}>
-                          Surprime de {fcfa(surchargeEnfantUnitaire)} / mois par enfant supplémentaire pour la formule {selectedPlan.name} — soit {fcfa(surchargeEnfants)} ajoutés ce mois-ci.
+                    <>
+                      <Field label="Enfants supplémentaires (PNA)" hint={`+${fcfa(pnaEnfantSupplementaireUnitaire)}/an chacun`}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <button type="button" onClick={() => setEnfantsSupplementaires(n => Math.max(0, n - 1))} style={{
+                            width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                            fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                          }}>–</button>
+                          <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 16, color: C.slate, minWidth: 24, textAlign: "center" }}>{enfantsSupplementaires}</span>
+                          <button type="button" onClick={() => setEnfantsSupplementaires(n => n + 1)} style={{
+                            width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                            fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                          }}>+</button>
+                        </div>
+                      </Field>
+                      <Field label="Enfants à charge (PNA)" hint={`+${fcfa(pnaEnfantChargeUnitaire)}/an chacun`}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <button type="button" onClick={() => setEnfantsCharge(n => Math.max(0, n - 1))} style={{
+                            width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                            fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                          }}>–</button>
+                          <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 16, color: C.slate, minWidth: 24, textAlign: "center" }}>{enfantsCharge}</span>
+                          <button type="button" onClick={() => setEnfantsCharge(n => n + 1)} style={{
+                            width: 38, height: 38, borderRadius: 10, border: "1.5px solid #E2E8F0", background: C.white,
+                            fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 18, color: C.slate, cursor: "pointer", flexShrink: 0,
+                          }}>+</button>
+                        </div>
+                      </Field>
+                      {(enfantsSupplementaires > 0 || enfantsCharge > 0) && (
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.gray, margin: 0 }}>
+                          Soit {fcfa(montantPnaSupplementaire + montantPnaCharge)} ajoutés à la prime annuelle (réparti sur les {NB_VERSEMENTS} versements trimestriels).
                         </p>
                       )}
-                    </Field>
+                    </>
                   )}
                 </div>
               </div>
@@ -615,10 +815,11 @@ export default function Adhesion() {
                   <Link to="/formules" style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.green, textDecoration: "none", fontWeight: 600 }}>Comparer →</Link>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {PLANS.map(plan => {
-                    const active = selectedPlan.name === plan.name;
+                  {GESTIONNAIRE_PLANS.map(plan => {
+                    const active = selectedPlan.slug === plan.slug;
+                    const prixPlan = Number(plan.particulier[composition].replace(/\s/g, ""));
                     return (
-                      <button key={plan.name} type="button" onClick={() => setSelectedPlan(plan)} style={{
+                      <button key={plan.slug} type="button" onClick={() => setSelectedPlan(plan)} style={{
                         textAlign: "left", padding: "14px 16px", borderRadius: 12, cursor: "pointer",
                         border: `2px solid ${active ? plan.color : "#E2E8F0"}`,
                         background: active ? `${plan.color}0E` : C.white,
@@ -629,21 +830,21 @@ export default function Adhesion() {
                           <div style={{ width: 10, height: 10, borderRadius: "50%", background: active ? plan.color : "#E2E8F0", flexShrink: 0 }} />
                           <div>
                             <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate }}>{plan.name}</div>
-                            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.gray }}>{plan.couverture} de couverture</div>
+                            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.gray }}>{plan.couverture} Côte d'Ivoire — {composition === "famille" ? "Famille" : "Solo"}</div>
                           </div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 14, color: active ? plan.color : C.gray }}>
-                            {fcfa(Number(plan.mensualite.replace(/\s/g, "")))}
+                            {fcfa(Math.round(prixPlan / NB_VERSEMENTS))}
                           </div>
-                          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: C.gray }}>/ mois</div>
+                          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: C.gray }}>/ trimestre</div>
                         </div>
                       </button>
                     );
                   })}
                 </div>
                 <div style={{ marginTop: 14, padding: "10px 14px", background: C.greenPale, borderRadius: 10, fontFamily: "Inter, sans-serif", fontSize: 12, color: C.green }}>
-                  ℹ️ La couverture prend effet 30 jours après l'adhésion (hors urgences).
+                  ℹ️ Prime annuelle payable en {NB_VERSEMENTS} versements trimestriels. {GESTIONNAIRE_NOTE.surprime_age}
                 </div>
               </div>
 
@@ -653,7 +854,7 @@ export default function Adhesion() {
                   Antécédents médicaux
                 </div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 18px" }}>
-                  Déclarez ici toute pathologie lourde déjà diagnostiquée. Chaque pathologie déclarée entraîne une surcharge de {fcfa(SURCHARGE_PAR_PATHOLOGIE)} et le paiement d'une caution équivalente à {CAUTION_MOIS} mois de cotisation, réglée en une fois à l'adhésion.
+                  {GESTIONNAIRE_NOTE.surprime_pathologie} Le montant exact de la surprime est déterminé par le gestionnaire après étude du dossier — déclarez ici toute pathologie déjà diagnostiquée, notre équipe vous recontacte avec le tarif ajusté.
                 </p>
                 <div className="awj-grid-2" style={{ gap: 10, marginBottom: 16 }}>
                   {PATHOLOGIES.map(p => {
@@ -678,9 +879,9 @@ export default function Adhesion() {
                     value={autrePathologie} onChange={e => setAutrePathologie(e.target.value)}
                     placeholder="Précisez la pathologie" />
                 </Field>
-                {nbPathologies > 0 && (
+                {nbPathologiesDeclarees > 0 && (
                   <div style={{ marginTop: 14, padding: "10px 14px", background: "#FFF7E6", border: "1.5px solid #F5D48A", borderRadius: 10, fontFamily: "Inter, sans-serif", fontSize: 12, color: "#8A6416", lineHeight: 1.6 }}>
-                    ⚠️ {nbPathologies} pathologie{nbPathologies > 1 ? "s" : ""} déclarée{nbPathologies > 1 ? "s" : ""} — surcharge de {fcfa(surchargePathologie)} + caution de {fcfa(caution)} ({CAUTION_MOIS} mois de cotisation) ajoutées au paiement.
+                    ⚠️ {nbPathologiesDeclarees} pathologie{nbPathologiesDeclarees > 1 ? "s" : ""} déclarée{nbPathologiesDeclarees > 1 ? "s" : ""} — le paiement en ligne est désactivé pour ce dossier. En validant, vous serez redirigé vers WhatsApp pour finaliser votre adhésion avec un conseiller.
                   </div>
                 )}
               </div>
@@ -696,38 +897,32 @@ export default function Adhesion() {
                   <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: C.gray, letterSpacing: 1, textTransform: "uppercase", marginBottom: 14 }}>Récapitulatif</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
-                      <span>Frais d'adhésion (unique)</span>
-                      <span style={{ fontWeight: 600, color: C.slate }}>{selectedPlan.adhesion} F</span>
+                      <span>Prime annuelle — {selectedPlan.name} ({composition === "famille" ? "Famille" : "Solo"})</span>
+                      <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(prixBaseNum)}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
-                      <span>1ère mensualité — {selectedPlan.name}</span>
-                      <span style={{ fontWeight: 600, color: C.slate }}>{selectedPlan.mensualite} F</span>
-                    </div>
-                    {surchargeEnfants > 0 && (
+                    {montantPnaSupplementaire > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
-                        <span>Enfants supplémentaires ({extraEnfants} × {fcfa(surchargeEnfantUnitaire)})</span>
-                        <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(surchargeEnfants)}</span>
+                        <span>Enfants supplémentaires ({enfantsSupplementaires} × {fcfa(pnaEnfantSupplementaireUnitaire)})</span>
+                        <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(montantPnaSupplementaire)}</span>
                       </div>
                     )}
-                    {nbPathologies > 0 && (
-                      <>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
-                          <span>Surcharge pathologie ({nbPathologies} × {fcfa(SURCHARGE_PAR_PATHOLOGIE)})</span>
-                          <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(surchargePathologie)}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
-                          <span>Caution ({CAUTION_MOIS} mois de cotisation)</span>
-                          <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(caution)}</span>
-                        </div>
-                      </>
+                    {montantPnaCharge > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray }}>
+                        <span>Enfants à charge ({enfantsCharge} × {fcfa(pnaEnfantChargeUnitaire)})</span>
+                        <span style={{ fontWeight: 600, color: C.slate }}>{fcfa(montantPnaCharge)}</span>
+                      </div>
                     )}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.gray, fontWeight: 700 }}>
+                      <span>Prime annuelle totale</span>
+                      <span style={{ fontWeight: 700, color: C.slate }}>{fcfa(montantAnnuel)}</span>
+                    </div>
                   </div>
                   <div style={{ borderTop: "1.5px solid #D6E6F5", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate }}>Total à payer aujourd'hui</span>
-                    <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 22, color: C.green }}>{fcfa(total)}</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: C.slate }}>1er versement à payer aujourd'hui (1/{NB_VERSEMENTS})</span>
+                    <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 22, color: C.green }}>{fcfa(versement)}</span>
                   </div>
                   <div style={{ marginTop: 8, fontFamily: "Inter, sans-serif", fontSize: 11, color: C.gray }}>
-                    Puis {selectedPlan.mensualite} F / mois à partir du 2ème mois
+                    Puis {NB_VERSEMENTS - 1} versements trimestriels de {fcfa(versement)}
                   </div>
                 </div>
 
@@ -775,7 +970,11 @@ export default function Adhesion() {
                   boxShadow: submitting ? "none" : `0 6px 24px ${C.green}40`,
                   transition: "all .2s", letterSpacing: 0.2,
                 }}>
-                  {submitting ? "Redirection en cours..." : `💳 Payer ${fcfa(total)} maintenant`}
+                  {submitting
+                    ? "Redirection en cours..."
+                    : nbPathologiesDeclarees > 0
+                      ? "📲 Finaliser via WhatsApp"
+                      : `💳 Payer ${fcfa(versement)} maintenant`}
                 </button>
 
                 <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
