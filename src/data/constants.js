@@ -13,6 +13,12 @@ export const C = {
   white:      "#FFFFFF",
 };
 
+// ── LEGACY — retirées du catalogue public au 1er décembre ──────
+// Remplacées par GESTIONNAIRE_PLANS ci-dessous. Conservées ici (export PLANS
+// inchangé) uniquement pour ne rien casser côté code qui afficherait encore
+// la formule d'un adhérent déjà inscrit sur l'une de ces 3 formules. Les
+// adhérents existants gardent leur formule jusqu'à leur renouvellement, où
+// ils choisiront parmi le nouveau catalogue (GESTIONNAIRE_PLANS).
 export const PLANS = [
   {
     name: "Essentielle",
@@ -42,6 +48,105 @@ export const PLANS = [
     avantages: ["Tout Ivoirienne inclus", "Hospitalisation étendue", "Chirurgie couverte", "Ambulance incluse", "Dentisterie couverte"],
   },
 ];
+
+// ── Formule Basique (nouvelle offre, réseau de soins existant) ──
+// Structure différente des 3 formules ci-dessus : pas de cotisation mensuelle,
+// frais d'adhésion + montant payable en 3 versements/mensualités, et des
+// réductions sur le réseau de soins existant (pharmacies, cliniques, hôpitaux)
+// plutôt qu'un pourcentage de couverture fixe.
+export const FORMULE_BASIQUE = {
+  name: "Basique",
+  color: "#2D3748",
+  badge: "Nouveau",
+  reduction_pharmacie: "50%",
+  remise_clinique_hopital: "50%",
+  reseau: "Réseau de soins existant Awoundjô",
+  frais_adhesion: "6 000",
+  offres: [
+    {
+      id: "individuelle",
+      label: "Individuelle",
+      adhesion: "6 000",
+      montant: "60 000",
+      versements: 3,
+      versement_unitaire: "20 000",
+      frequence: "mensualités",
+    },
+    {
+      id: "famille",
+      label: "Famille de 5 personnes",
+      adhesion: "6 000",
+      montant: "120 000",
+      versements: 3,
+      versement_unitaire: "40 000",
+      frequence: "versements",
+    },
+  ],
+  avantages: [
+    "50% de réduction en pharmacies partenaires",
+    "50% de remise en cliniques et hôpitaux partenaires",
+    "Utilise le réseau de soins existant Awoundjô",
+    "Paiement en 3 versements, sans mensualité récurrente",
+  ],
+};
+
+// ── Formules du gestionnaire maladie (nouveau catalogue public, dès le 1er décembre) ──
+// Remplacent Essentielle/Ivoirienne/Turquoise ci-dessus. Primes ANNUELLES
+// (Prime TTC annuelle), gérées entièrement par le gestionnaire maladie
+// partenaire (remboursements, prise en charge, sinistres hors plateforme
+// Awoundjô — la plateforme ne fait qu'adhésion + collecte du paiement).
+// Utilisent le réseau de soins du PDF "RESEAU_GLOBAL" (même réseau que la
+// Formule Basique).
+// Deux grilles tarifaires :
+//  - "particulier" : particuliers et entreprises de MOINS de 10 familles ou 30 solos
+//  - "entreprise"  : entreprises à PARTIR de 10 familles ou 30 solos
+export const GESTIONNAIRE_PLANS = [
+  {
+    name: "Classic",
+    slug: "CLASSIC",
+    color: C.green,
+    couverture: "80%",
+    couverture_label: "80% Côte d'Ivoire",
+    particulier: { solo: "264 600", famille: "470 000", pna_enfant_supplementaire: "65 000", pna_enfant_charge: "115 000" },
+    entreprise:  { solo: "116 000", famille: "350 000", pna_enfant_supplementaire: "45 000",  pna_enfant_charge: "80 000" },
+  },
+  {
+    name: "Aisance",
+    slug: "AISANCE",
+    color: C.gold,
+    couverture: "80%",
+    couverture_label: "80% Côte d'Ivoire",
+    particulier: { solo: "491 750", famille: "875 040", pna_enfant_supplementaire: "117 000", pna_enfant_charge: "201 500" },
+    entreprise:  { solo: "226 000", famille: "680 000", pna_enfant_supplementaire: "90 000",  pna_enfant_charge: "155 000" },
+  },
+  {
+    name: "Harmony",
+    slug: "HARMONY",
+    color: "#00c4b4",
+    couverture: "80%",
+    couverture_label: "80% Côte d'Ivoire",
+    particulier: { solo: "723 031", famille: "1 288 040", pna_enfant_supplementaire: "234 000", pna_enfant_charge: "403 000" },
+    entreprise:  { solo: "437 000", famille: "1 000 000", pna_enfant_supplementaire: "180 000", pna_enfant_charge: "310 000" },
+  },
+  {
+    name: "Premium",
+    slug: "PREMIUM",
+    color: "#2D3748",
+    couverture: "100%",
+    couverture_label: "100% Côte d'Ivoire",
+    particulier: { solo: "985 110", famille: "1 756 040", pna_enfant_supplementaire: "286 000", pna_enfant_charge: "494 000" },
+    entreprise:  { solo: "612 000", famille: "1 360 000", pna_enfant_supplementaire: "220 000", pna_enfant_charge: "380 000" },
+  },
+];
+
+// Seuil de bascule particulier → entreprise, et mentions légales associées
+// (reproduites telles qu'indiquées sur la grille tarifaire du gestionnaire).
+export const GESTIONNAIRE_NOTE = {
+  seuil_entreprise: "Entreprises à partir de 10 familles ou 30 solos",
+  seuil_particulier: "Particuliers et entreprises de moins de 10 familles ou 30 solos",
+  surprime_pathologie: "Ces tarifs concernent les personnes sans pathologies déclarées. En cas de pathologies déclarées, une surprime s'appliquera.",
+  surprime_age: "Une surprime âge est perçue à partir de 55 ans.",
+};
 
 export const STEPS = [
   { n: "01", label: "Inscription", desc: "Remplissez le formulaire en ligne en quelques minutes." },
