@@ -227,7 +227,14 @@ const AdhesionMerciPage  = lazy(() => import("./pages/public/AdhesionMerci"));
 const AdhesionEchecPage  = lazy(() => import("./pages/public/AdhesionEchec"));
 const BlogPage           = lazy(() => import("./pages/public/Blog"));
 const BlogPostPage       = lazy(() => import("./pages/public/BlogPost"));
-const PoliciesPage       = lazy(() => import("./pages/public/PoliciesPage"));
+// PoliciesPage : chargée via import.meta.glob pour ne PAS casser le build Vercel
+// si le fichier est absent du dépôt (non commité, ou casse du nom différente sous Linux).
+// Fichier présent → page normale. Absent → /politiques redirige vers l'accueil.
+const policiesLoaders = import.meta.glob("./pages/public/PoliciesPage.jsx");
+const PoliciesPage = lazy(
+  policiesLoaders["./pages/public/PoliciesPage.jsx"] ??
+  (() => Promise.resolve({ default: () => <Navigate to="/" replace /> }))
+);
 
 // ── Fallback chargement ──────────────────────────────────────
 function PageLoader() {
