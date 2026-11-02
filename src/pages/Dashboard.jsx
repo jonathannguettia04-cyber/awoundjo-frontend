@@ -4,6 +4,7 @@ import { statsAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, PlanBadge, TypeBadge, MethodBadge } from "../components/Badge";
 import PlanModal from "./PlanModal";
+import Reservations from "./Reservations";
 import { ADMIN_BASE } from "../config/adminBase";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -207,6 +208,12 @@ export default function Dashboard() {
   // GET /api/admin/reservations (pending_payments, role RESERVATION_GESTIONNAIRE_2027)
   const [reservations, setReservations] = useState([]);
   const [reservationsTotal, setReservationsTotal] = useState(0);
+  const [showReservations, setShowReservations] = useState(false);
+
+  function openReservations() {
+    setShowReservations(true);
+    setTimeout(() => document.getElementById("reservations-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   const token = localStorage.getItem("token");
   const authHeader = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
@@ -427,10 +434,11 @@ export default function Dashboard() {
                   { key: "client", icon: "ti-user", label: "Espace Adhérent", desc: "Suivi des garanties", color: BRAND_LT, link: `${ADMIN_BASE}/clients`, stat: `${totalActifs} actifs` },
                   { key: "diaspora", icon: "ti-world", label: "Guichet Diaspora", desc: "Souscriptions internationales", color: AMBER, link: `${ADMIN_BASE}/diaspora`, stat: "Canal actif" },
                   { key: "business", icon: "ti-building", label: "Espace Corporate", desc: "Grands comptes CNEPECI", color: VIOLET, link: `${ADMIN_BASE}/business`, stat: "B2B actif" },
-                  { key: "reservations", icon: "ti-calendar-event", label: "Réservations 2027", desc: "Formules gestionnaire à venir", color: "#D4A017", link: `${ADMIN_BASE}/reservations`, stat: `${reservationsTotal} réservation${reservationsTotal > 1 ? "s" : ""}` },
+                  { key: "reservations", icon: "ti-calendar-event", label: "Réservations 2027", desc: "Formules gestionnaire à venir", color: "#D4A017", onClick: openReservations, stat: `${reservationsTotal} réservation${reservationsTotal > 1 ? "s" : ""}` },
                   { key: "parrainage", icon: "ti-link", label: "Affiliation", desc: "Programme de référents", color: "#ea8a4d", link: `${ADMIN_BASE}/federation`, stat: "10% intéressement" },
                 ].map((portal) => (
-                  <Link key={portal.key} to={portal.link} style={{ textDecoration: "none" }}>
+                  <Link key={portal.key} to={portal.link || "#"} style={{ textDecoration: "none" }}
+                    onClick={portal.onClick ? (e) => { e.preventDefault(); portal.onClick(); } : undefined}>
                     <div className="awj-card awj-card-hover" style={{ padding: 16, cursor: "pointer", height: "100%", display: "flex", flexDirection: "column" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                         <span style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: `${portal.color}1f`, borderRadius: 9 }}>
@@ -456,7 +464,7 @@ export default function Dashboard() {
                   <Eyebrow icon="ti-calendar-event" style={{ margin: "0 0 4px" }}>Réservations formules gestionnaire (2027)</Eyebrow>
                   <p style={{ fontSize: 12, color: TEXT_MUTED, margin: 0 }}>Adhésion de réservation à 15 000 FCFA — prime annuelle non incluse</p>
                 </div>
-                <Link to={`${ADMIN_BASE}/reservations`} className="awj-link">Voir la liste <i className="ti ti-arrow-right" style={{ fontSize: 12 }} /></Link>
+                <a href="#reservations-panel" className="awj-link" onClick={(e) => { e.preventDefault(); openReservations(); }}>Voir la liste <i className="ti ti-arrow-right" style={{ fontSize: 12 }} /></a>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
                 <div>
@@ -473,6 +481,12 @@ export default function Dashboard() {
                   <span style={{ fontSize: 22, fontWeight: 800, color: "#D4A017" }}>{fmtShort(reservationsRevenue)} FCFA</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {isAdmin && showReservations && (
+            <div id="reservations-panel" className="awj-card awj-fade-in" style={{ padding: 22, marginBottom: 32 }}>
+              <Reservations embedded onClose={() => setShowReservations(false)} />
             </div>
           )}
 

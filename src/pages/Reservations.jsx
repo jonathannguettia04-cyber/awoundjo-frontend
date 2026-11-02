@@ -39,7 +39,7 @@ function csvEscape(v) {
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export default function Reservations() {
+export default function Reservations({ embedded = false, onClose }) {
   const { isAdmin } = useAuth();
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -109,7 +109,7 @@ export default function Reservations() {
 
   const css = `
     .awj-res * { box-sizing: border-box; }
-    .awj-res { font-family: inherit; background: ${BG}; min-height: 100vh; color: ${TEXT}; }
+    .awj-res { font-family: inherit; color: ${TEXT}; ${embedded ? "" : `background: ${BG}; min-height: 100vh;`} }
     .awj-res-card { background: ${SURFACE}; border: 1px solid ${BORDER}; border-radius: 16px; }
     .awj-res-input { background: ${SURFACE}; border: 1px solid ${BORDER}; color: ${TEXT}; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-family: inherit; outline: none; }
     .awj-res-input:focus { border-color: ${BRAND_LT}; }
@@ -141,14 +141,16 @@ export default function Reservations() {
     <>
       <style>{css}</style>
       <div className="awj-res">
-        <div style={{ maxWidth: 1340, margin: "0 auto", padding: "32px 24px 80px" }}>
+        <div style={{ maxWidth: 1340, margin: "0 auto", padding: embedded ? "0" : "32px 24px 80px" }}>
 
           {/* En-tête */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
             <div>
-              <Link to={ADMIN_BASE} style={{ color: BRAND_LT, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
-                <i className="ti ti-arrow-left" style={{ fontSize: 12 }} /> Tableau de bord
-              </Link>
+              {!embedded && (
+                <Link to={ADMIN_BASE} style={{ color: BRAND_LT, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                  <i className="ti ti-arrow-left" style={{ fontSize: 12 }} /> Tableau de bord
+                </Link>
+              )}
               <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", margin: "8px 0 4px" }}>Réservations 2027</h1>
               <p style={{ color: TEXT_MUTED, fontSize: 13, margin: 0 }}>
                 Adhésions de réservation des formules gestionnaire maladie (Classic, Aisance, Harmony, Premium).
@@ -157,6 +159,9 @@ export default function Reservations() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="awj-res-btn" onClick={() => load(page)}><i className="ti ti-refresh" style={{ fontSize: 14 }} /> Actualiser</button>
               <button className="awj-res-btn" onClick={exportCsv} disabled={!filtered.length}><i className="ti ti-download" style={{ fontSize: 14 }} /> Export CSV</button>
+              {embedded && onClose && (
+                <button className="awj-res-btn" onClick={onClose}><i className="ti ti-x" style={{ fontSize: 14 }} /> Fermer</button>
+              )}
             </div>
           </div>
 

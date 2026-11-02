@@ -1,16 +1,20 @@
 // src/pages/public/LandingPage.jsx
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
-import { GESTIONNAIRE_PLANS } from "../../data/constants";
+import { GESTIONNAIRE_PLANS, FORMULE_BASIQUE } from "../../data/constants";
 
 const WA_NUMBER = "2250171721668";
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
 const APK_DOWNLOAD_URL = "https://vkrnqoajmyyyatfdlmbk.supabase.co/storage/v1/object/public/app-releases/app-release.apk";
+
+const RESERVATION_FEE = "15 000";
+const reservationLink = (slug) =>
+  slug ? `/adhesion?type=reservation&formule=${slug.toLowerCase()}` : "/adhesion?type=reservation";
 
 // ── Tracking conversion (Meta Pixel + Google Analytics) ─────────
 function trackCTA(fbEvent, gaEvent, params = {}) {
@@ -18,60 +22,37 @@ function trackCTA(fbEvent, gaEvent, params = {}) {
   if (typeof window.gtag === "function") window.gtag("event", gaEvent, params);
 }
 
-const STEPS = [
-  { n: 1, title: "Vous vous inscrivez depuis votre téléphone", text: "Vos infos, vos bénéficiaires, votre formule, 5 minutes suffisent" },
-  { n: 2, title: "On valide vos dossiers sous 24h maximum", text: "Vous recevez une confirmation par SMS et WhatsApp" },
-  { n: 3, title: "Payez par Mobile Money vos frais d'adhésion", text: "Wave, Orange Money, MTN MoMo ou Moov, paiement sécurisé" },
-  { n: 4, title: "Vous recevez ensuite votre carte mutualiste", text: "Carte numérique personnalisée, une par bénéficiaire" },
-  { n: 5, title: "Vous la présentez pour avoir accès aux soins", text: "Aucune avance de frais, prise en charge immédiate" },
+const RESERVATION_STEPS = [
+  { title: "Choisissez votre formule", text: "Classic, Aisance, Harmony ou Premium, en solo ou en famille." },
+  { title: `Réglez ${RESERVATION_FEE} F par Mobile Money`, text: "Wave, Orange Money, MTN MoMo ou Moov. Votre place est enregistrée dès la confirmation du paiement." },
+  { title: "Payez la prime en 4 versements", text: "En 2027, la prime annuelle se règle par versements trimestriels. Le premier correspond à un quart de la prime." },
 ];
 
 const BENEFITS = [
-  {
-    highlight: true,
-    icon: "M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-1 10h-4v4h-4v-4H6v-4h4V5h4v4h4v4z",
-    title: "Jusqu'à 100 % de prise en charge",
-    text: "De 80% à 100% de couverture en Côte d'Ivoire selon la formule choisie, sur notre réseau de soins partenaire",
-  },
-  {
-    icon: "M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z",
-    title: "Téléconsultation médicale",
-    text: "Un médecin accessible à distance, directement depuis votre téléphone, où que vous soyez",
-  },
-  {
-    icon: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
-    title: "Dossier médical toujours à jour",
-    text: "Votre historique de soins accessible en permanence sur votre mobile, fini les ordonnances perdues",
-  },
-  {
-    icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
-    title: "Un large réseau de soins partenaire",
-    text: "Cliniques, hôpitaux, pharmacies, laboratoires et cabinets dentaires partout en Côte d'Ivoire",
-  },
+  { title: "Un large réseau de soins", text: "Cliniques, hôpitaux, pharmacies, laboratoires et cabinets dentaires partout en Côte d'Ivoire." },
+  { title: "Téléconsultation médicale", text: "Un médecin à distance, directement depuis votre téléphone, où que vous soyez." },
+  { title: "Dossier médical sur mobile", text: "Votre historique de soins toujours accessible. Fini les ordonnances perdues." },
+  { title: "Carte mutualiste numérique", text: "Votre carte sur votre téléphone, à présenter pour accéder aux soins." },
 ];
 
-const PROOF_STATS = [
-  { num: "120+", label: "Établissements de santé" },
-  { num: "100 %", label: "De prise en charge (formule Premium)" },
-  { num: "24h", label: "Activation de votre carte" },
-];
-
-const PARTNERS = ["🏥 Giepharm", "🏦 Mansa-Bank", "🏛 CNEPECI", "🤝 CEL-CI", "🚑 Meditrans", "🛡 Sonam-Assurances"];
-
-// Formules du gestionnaire maladie partenaire (primes annuelles, grille particulier) — source : GESTIONNAIRE_PLANS
+const PARTNERS = ["Giepharm", "Mansa-Bank", "CNEPECI", "CEL-CI", "Meditrans", "Sonam-Assurances"];
 
 const FAQS = [
   {
-    q: "Et si je ne suis jamais malade, j'ai perdu mon argent ?",
-    a: "Votre cotisation vous garantit la tranquillité de savoir que le jour où un imprévu arrive, vous êtes couvert sur notre réseau de soins sans chercher l'argent en urgence. La vraie perte, c'est de ne pas être prêt.",
+    q: "Pourquoi réserver dès maintenant ?",
+    a: `Les quatre formules Classic, Aisance, Harmony et Premium entrent en vigueur en 2027. Pour ${RESERVATION_FEE} F, vous réservez votre place dès aujourd'hui. Ce montant est une adhésion de réservation : il ne remplace pas la prime annuelle.`,
+  },
+  {
+    q: "Comment se règle la prime annuelle ?",
+    a: "Par Mobile Money (Wave, Orange Money, MTN MoMo ou Moov), en 4 versements trimestriels. Le premier versement correspond à un quart de la prime annuelle.",
+  },
+  {
+    q: "Qu'est-ce que la Formule Basique ?",
+    a: "Une formule proposée par la mutuelle dès le 1er décembre : 50 % de réduction en pharmacie et 50 % de remise en clinique et à l'hôpital, sur le réseau de soins Awoundjô. Adhésion de 6 000 F, puis 60 000 F en 3 mensualités (individuelle) ou 120 000 F en 3 versements (famille de 5 personnes).",
   },
   {
     q: "Quelle est la différence avec la CMU ?",
-    a: "La CMU est le régime public de base. Awoundjô est complémentaire : activation rapide, prise en charge jusqu'à 100 % selon la formule, sur un large réseau de soins partenaire. Les deux se complètent.",
-  },
-  {
-    q: "Comment je règle ma cotisation ?",
-    a: "Par Mobile Money — Wave, Orange Money, MTN MoMo ou Moov. Vous recevez un rappel avant chaque échéance (prime annuelle ou versement selon la formule choisie).",
+    a: "La CMU est le régime public de base. Awoundjô est complémentaire : prise en charge jusqu'à 100 % selon la formule, sur un large réseau de soins partenaire. Les deux se complètent.",
   },
   {
     q: "Est-ce que mes antécédents médicaux comptent ?",
@@ -79,57 +60,31 @@ const FAQS = [
   },
   {
     q: "Combien de personnes puis-je couvrir ?",
-    a: "Vous pouvez inscrire vos bénéficiaires (conjoint, enfants) lors de l'adhésion. Chaque personne reçoit sa propre carte Mansa personnalisée.",
+    a: "Chaque formule existe en version Solo et en version Famille. Vous pouvez ajouter des enfants supplémentaires ou à charge, aux tarifs indiqués dans le tableau des formules.",
+  },
+  {
+    q: "Je dirige une entreprise, quel tarif s'applique ?",
+    a: "Une grille entreprise s'applique à partir de 10 familles ou 30 solos. Faites une demande de devis et nous revenons vers vous.",
   },
 ];
 
 function WaIcon({ size = 22 }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true">
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
     </svg>
   );
 }
 
 export default function LandingPage() {
-  const videoRef = useRef(null);
-  const [videoPlaying, setVideoPlaying] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    // Autoplay dès l'arrivée sur la page (muted requis par les navigateurs pour l'autoplay)
-    video.muted = true;
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => setVideoPlaying(true))
-        .catch(() => setVideoPlaying(false));
-    }
-  }, []);
-
-  const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) {
-      video.play();
-      setVideoPlaying(true);
-    } else {
-      video.pause();
-      setVideoPlaying(false);
-    }
-  };
-
-  const scrollToProblem = (e) => {
+  const scrollTo = (id) => (e) => {
     e.preventDefault();
-    document.getElementById("problem")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const scrollToFormulas = (e) => {
-    e.preventDefault();
-    document.getElementById("formulas")?.scrollIntoView({ behavior: "smooth" });
-  };
+  const premium = GESTIONNAIRE_PLANS.find((p) => p.slug === "PREMIUM");
 
   return (
     <>
@@ -139,411 +94,443 @@ export default function LandingPage() {
 
       <div className="awj-lp">
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Sora:wght@400;500;600;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap');
 
           .awj-lp {
-            --navy: #01417E; --deep: #042A50; --royal: #005FAF; --cyan: #00ADF1;
-            --ice: #E4F2FC; --white: #FFFFFF; --muted: #9DC3E6; --grey: #3B5468; --gold: #D4A843;
-            font-family: 'Sora', sans-serif; color: var(--deep); background: var(--white);
-            -webkit-font-smoothing: antialiased;
+            --ink: #06223F; --navy: #01417E; --royal: #0A5DB0; --cyan: #00ADF1;
+            --paper: #F3F7FB; --white: #FFFFFF; --line: #D8E3EE; --grey: #46607A;
+            --gold: #D4A843; --orange: #F77F00; --green: #009E60;
+            font-family: 'Figtree', system-ui, sans-serif; color: var(--ink); background: var(--paper);
+            -webkit-font-smoothing: antialiased; line-height: 1.55;
           }
           .awj-lp * { box-sizing: border-box; }
-          .awj-lp h1, .awj-lp h2, .awj-lp h3 { font-family: 'Playfair Display', serif; margin: 0; }
-          .awj-lp section { padding: 80px 24px; }
-          .awj-lp .container { max-width: 960px; margin: 0 auto; }
+          .awj-lp h1, .awj-lp h2, .awj-lp h3, .awj-lp h4 { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; margin: 0; letter-spacing: -0.02em; }
+          .awj-lp p { margin: 0; }
+          .awj-lp a:focus-visible, .awj-lp button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+          .awj-lp .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+          .awj-lp .sec { padding: 88px 0; }
+          .awj-lp .sec-white { background: var(--white); }
+          .awj-lp .h2 { font-size: clamp(28px, 4.4vw, 44px); line-height: 1.1; font-weight: 800; max-width: 22ch; }
+          .awj-lp .lede { font-size: 18px; color: var(--grey); max-width: 58ch; margin-top: 16px; }
 
-          .awj-lp .btn-wa {
-            display: inline-flex; align-items: center; gap: 10px;
-            background: var(--cyan); color: var(--deep); font-weight: 700; font-size: 17px;
-            padding: 16px 36px; border-radius: 50px; text-decoration: none; border: none; cursor: pointer;
-            transition: transform .2s, box-shadow .2s;
-            box-shadow: 0 4px 24px rgba(0,173,241,.35);
+          /* Boutons */
+          .awj-lp .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 16px; text-decoration: none; cursor: pointer;
+            padding: 15px 28px; border-radius: 12px; border: 2px solid transparent; transition: transform .15s, box-shadow .15s, background .15s;
           }
-          .awj-lp .btn-wa:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,173,241,.45); }
-          .awj-lp .btn-scroll {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: transparent; color: var(--white); font-weight: 600; font-size: 15px;
-            padding: 14px 30px; border-radius: 50px; text-decoration: none; border: 2px solid rgba(255,255,255,.4);
-            transition: border-color .2s, opacity .6s ease;
-          }
-          .awj-lp .btn-scroll:hover { border-color: var(--cyan); color: var(--cyan); }
+          .awj-lp .btn:hover { transform: translateY(-2px); }
+          .awj-lp .btn-gold { background: var(--gold); color: var(--ink); box-shadow: 0 6px 20px rgba(212,168,67,.35); }
+          .awj-lp .btn-gold:hover { box-shadow: 0 10px 28px rgba(212,168,67,.5); }
+          .awj-lp .btn-ghost { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
+          .awj-lp .btn-ghost:hover { border-color: var(--white); }
+          .awj-lp .btn-navy { background: var(--navy); color: var(--white); }
+          .awj-lp .btn-navy:hover { background: var(--royal); }
+          .awj-lp .btn-line { background: transparent; color: var(--navy); border-color: var(--navy); }
+          .awj-lp .btn-line:hover { background: var(--navy); color: var(--white); }
+          .awj-lp .btn-sm { padding: 11px 20px; font-size: 14px; }
 
           /* HERO */
-          .awj-lp .hero {
-            position: relative; min-height: 100vh; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; text-align: center;
-            background: linear-gradient(160deg, var(--deep) 0%, var(--navy) 60%, var(--royal) 100%);
-            overflow: hidden; padding: 40px 24px;
-          }
-          .awj-lp .hero-video {
-            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-            opacity: 0; transition: opacity .8s ease; z-index: 1;
-          }
-          .awj-lp .hero-video.playing { opacity: .85; }
-          .awj-lp .hero-overlay { position: absolute; inset: 0; background: rgba(4,42,80,.55); z-index: 2; transition: background .8s ease; }
-          .awj-lp .hero-video.playing ~ .hero-overlay { background: rgba(4,42,80,.75); }
-          .awj-lp .hero-pattern { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
-          .awj-lp .hero-pattern-sq { position: absolute; width: 180px; height: 180px; border-radius: 6px; }
-          .awj-lp .hero-glow { position: absolute; right: 5%; top: 10%; width: 500px; height: 500px; border-radius: 50%; }
-          .awj-lp .hero-content { position: relative; z-index: 3; max-width: 720px; transition: opacity .6s ease; }
-          .awj-lp .hero-text { transition: opacity .6s ease; }
-          .awj-lp .hero-content.video-playing .hero-text { opacity: .05; }
-          .awj-lp .hero-content.video-paused .hero-text { opacity: 1; }
-          .awj-lp .hero-content.video-playing .hero-actions .btn-scroll { opacity: .05; }
-          .awj-lp .hero-content.video-paused .hero-actions .btn-scroll { opacity: 1; }
-          .awj-lp .hero-actions .btn-wa { opacity: 1 !important; }
-          .awj-lp .hero-brand { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 4px; margin-bottom: 4px; }
-          .awj-lp .hero-brand-name { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: 2px; margin-bottom: 40px; }
-          .awj-lp .hero h1 { color: var(--white); font-size: clamp(32px,7vw,58px); line-height: 1.15; margin-bottom: 16px; font-weight: 900; }
-          .awj-lp .hero h1 span { color: var(--cyan); }
-          .awj-lp .hero .sub { color: var(--muted); font-size: clamp(16px,3vw,20px); margin-bottom: 40px; line-height: 1.5; }
-          .awj-lp .hero-actions { display: flex; flex-direction: column; gap: 16px; align-items: center; }
-          .awj-lp .hero-play-btn {
-            position: relative; z-index: 4; width: 72px; height: 72px; border-radius: 50%;
-            background: rgba(0,173,241,.9); border: none; cursor: pointer; margin-bottom: 20px;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 0 0 rgba(0,173,241,.5);
-            animation: awj-lp-pulse-ring 2s infinite;
-            transition: transform .2s;
-          }
-          .awj-lp .hero-play-btn:hover { transform: scale(1.08); }
-          .awj-lp .hero-play-btn svg { width: 28px; height: 28px; fill: var(--white); margin-left: 4px; }
-          .awj-lp .hero-play-btn.is-playing svg { margin-left: 0; }
-          @keyframes awj-lp-pulse-ring {
-            0% { box-shadow: 0 0 0 0 rgba(0,173,241,.5); }
-            70% { box-shadow: 0 0 0 20px rgba(0,173,241,0); }
-            100% { box-shadow: 0 0 0 0 rgba(0,173,241,0); }
-          }
+          .awj-lp .hero { background: var(--ink); color: var(--white); padding: 128px 0 96px; overflow: hidden; }
+          .awj-lp .hero-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center; }
+          .awj-lp .hero h1 { font-size: clamp(38px, 6.2vw, 68px); line-height: 1.02; font-weight: 800; }
+          .awj-lp .hero .sub { margin-top: 24px; font-size: 19px; color: #BFD3E6; max-width: 46ch; }
+          .awj-lp .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 36px; }
+          .awj-lp .hero-note { margin-top: 24px; font-size: 14px; color: #8FB0CE; }
+          .awj-lp .hero-note a { color: var(--white); text-underline-offset: 3px; }
 
-          .awj-lp .section-kicker { font-size: 13px; font-weight: 700; letter-spacing: 5px; color: var(--cyan); text-transform: uppercase; margin-bottom: 12px; }
-          .awj-lp .section-title { font-size: clamp(28px,5vw,42px); line-height: 1.2; margin-bottom: 20px; font-weight: 900; }
-          .awj-lp .section-sub { font-size: 17px; color: var(--grey); line-height: 1.6; margin-bottom: 40px; }
-
-          /* PROBLÈME */
-          .awj-lp .problem { background: linear-gradient(160deg, var(--deep), var(--navy)); text-align: center; color: var(--white); }
-          .awj-lp .problem .section-title { color: var(--white); }
-          .awj-lp .problem .stat { font-family: 'Playfair Display', serif; font-size: clamp(56px,12vw,96px); font-weight: 900; color: var(--cyan); margin: 32px 0 16px; }
-          .awj-lp .problem .stat-label { font-size: 19px; color: var(--muted); max-width: 500px; margin: 0 auto 40px; line-height: 1.5; }
-          .awj-lp .problem .bridge { background: rgba(0,173,241,.12); border: 1px solid rgba(0,173,241,.25); border-radius: 16px; padding: 28px 32px; display: inline-block; margin-top: 16px; }
-          .awj-lp .problem .bridge p { font-size: 18px; font-weight: 600; color: var(--white); }
-          .awj-lp .problem .bridge span { color: var(--cyan); }
-
-          /* ÉTAPES */
-          .awj-lp .steps { background: var(--white); }
-          .awj-lp .steps-grid { display: flex; flex-direction: column; gap: 0; position: relative; }
-          .awj-lp .steps-grid::before {
-            content: ''; position: absolute; left: 28px; top: 36px; bottom: 36px; width: 3px;
-            background: linear-gradient(to bottom, var(--cyan), var(--navy)); border-radius: 2px;
+          /* La carte (élément signature) */
+          .awj-lp .cards { position: relative; height: 340px; }
+          .awj-lp .mcard {
+            position: absolute; width: min(360px, 88%); aspect-ratio: 1.586; border-radius: 22px; padding: 22px 24px;
+            display: flex; flex-direction: column; justify-content: space-between; color: var(--white);
+            box-shadow: 0 30px 60px rgba(0,0,0,.45);
           }
-          .awj-lp .step { display: flex; gap: 24px; align-items: flex-start; padding: 24px 0; position: relative; }
-          .awj-lp .step-num {
-            width: 56px; height: 56px; min-width: 56px; border-radius: 50%;
-            background: var(--navy); color: var(--white); font-family: 'Playfair Display', serif;
-            font-size: 22px; font-weight: 900; display: flex; align-items: center; justify-content: center;
-            position: relative; z-index: 2;
+          .awj-lp .mcard-back { background: linear-gradient(140deg, #14395E, #0B2A49); right: 0; top: 0; transform: rotate(7deg); opacity: .9; }
+          .awj-lp .mcard-front {
+            background: linear-gradient(140deg, var(--navy) 0%, var(--royal) 55%, var(--cyan) 130%);
+            left: 0; bottom: 0; transform: rotate(-5deg); overflow: hidden;
+            animation: awj-card-in .9s cubic-bezier(.2,.8,.2,1) both;
           }
-          .awj-lp .step:last-child .step-num { background: var(--cyan); color: var(--deep); }
-          .awj-lp .step-text h3 { font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 700; color: var(--deep); margin-bottom: 4px; }
-          .awj-lp .step-text p { font-size: 14px; color: var(--grey); line-height: 1.5; margin: 0; }
+          @keyframes awj-card-in { from { opacity: 0; transform: translateY(28px) rotate(-9deg); } to { opacity: 1; transform: translateY(0) rotate(-5deg); } }
+          .awj-lp .mcard-top { display: flex; justify-content: space-between; align-items: flex-start; }
+          .awj-lp .mcard-brand { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 20px; line-height: 1; }
+          .awj-lp .mcard-brand small { display: block; font-family: 'Figtree', sans-serif; font-weight: 500; font-size: 11px; opacity: .8; margin-top: 4px; letter-spacing: 0; }
+          .awj-lp .mcard-chip { width: 42px; height: 32px; border-radius: 7px; background: linear-gradient(135deg, #F0D58A, var(--gold)); }
+          .awj-lp .mcard-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 1px; }
+          .awj-lp .mcard-meta { font-size: 11px; opacity: .8; margin-top: 2px; }
+          .awj-lp .mcard-flag { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; display: flex; }
+          .awj-lp .mcard-flag i { flex: 1; display: block; }
+          .awj-lp .cards-caption { position: absolute; left: 0; bottom: -34px; font-size: 12px; color: #6F93B5; }
 
-          /* BÉNÉFICES */
-          .awj-lp .benefits { background: var(--ice); }
-          .awj-lp .benefits-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-          @media (min-width: 640px) { .awj-lp .benefits-grid { grid-template-columns: 1fr 1fr; } }
-          .awj-lp .benefit-card { background: var(--white); border-radius: 16px; padding: 32px 28px; box-shadow: 0 2px 16px rgba(1,65,126,.08); border: 1px solid rgba(0,173,241,.12); }
-          .awj-lp .benefit-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--navy); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
-          .awj-lp .benefit-icon svg { width: 26px; height: 26px; fill: var(--white); }
-          .awj-lp .benefit-card h3 { font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; color: var(--deep); }
-          .awj-lp .benefit-card p { font-size: 14px; color: var(--grey); line-height: 1.5; margin: 0; }
-          .awj-lp .benefit-highlight .benefit-icon { background: var(--cyan); }
-          .awj-lp .benefit-highlight .benefit-icon svg { fill: var(--deep); }
+          /* Bandeau chiffres */
+          .awj-lp .facts { background: var(--navy); color: var(--white); padding: 28px 0; }
+          .awj-lp .facts-row { display: flex; flex-wrap: wrap; gap: 20px 56px; align-items: baseline; }
+          .awj-lp .fact b { font-family: 'Bricolage Grotesque', sans-serif; font-size: 28px; font-weight: 800; margin-right: 10px; }
+          .awj-lp .fact span { color: #B7D3EC; font-size: 15px; }
 
-          /* PREUVE SOCIALE */
-          .awj-lp .proof { background: var(--white); text-align: center; }
-          .awj-lp .proof-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 40px; }
-          @media (max-width: 500px) { .awj-lp .proof-stats { grid-template-columns: 1fr; } }
-          .awj-lp .proof-stat { background: linear-gradient(160deg, var(--deep), var(--navy)); border-radius: 16px; padding: 28px 20px; color: var(--white); }
-          .awj-lp .proof-stat .num { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 900; color: var(--cyan); }
-          .awj-lp .proof-stat .label { font-size: 13px; color: var(--muted); margin-top: 6px; }
-          .awj-lp .proof-partners { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 32px; }
-          .awj-lp .proof-partner { background: var(--ice); border-radius: 10px; padding: 12px 24px; font-size: 14px; font-weight: 600; color: var(--navy); }
+          /* Deux parcours */
+          .awj-lp .paths { display: grid; grid-template-columns: 1.25fr 1fr; gap: 20px; margin-top: 44px; }
+          .awj-lp .path { border-radius: 24px; padding: 40px 36px; display: flex; flex-direction: column; }
+          .awj-lp .path-main { background: var(--navy); color: var(--white); }
+          .awj-lp .path-main h3 { font-size: 30px; font-weight: 800; line-height: 1.1; }
+          .awj-lp .path-main .price { font-family: 'Bricolage Grotesque', sans-serif; font-size: 56px; font-weight: 800; color: var(--gold); line-height: 1; margin: 22px 0 6px; }
+          .awj-lp .path-main .price small { font-size: 20px; font-weight: 700; color: #F0D58A; }
+          .awj-lp .path-main p { color: #C6DBEE; }
+          .awj-lp .path-side { background: var(--white); border: 1px solid var(--line); }
+          .awj-lp .path-side h3 { font-size: 26px; font-weight: 800; }
+          .awj-lp .path-side ul { list-style: none; padding: 0; margin: 18px 0 26px; display: grid; gap: 10px; }
+          .awj-lp .path-side li { padding-left: 22px; position: relative; color: var(--grey); }
+          .awj-lp .path-side li::before { content: ""; position: absolute; left: 0; top: .55em; width: 10px; height: 10px; border-radius: 3px; background: var(--green); }
+          .awj-lp .path-tag { align-self: flex-start; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 99px; margin-bottom: 18px; }
+          .awj-lp .path-main .path-tag { background: rgba(212,168,67,.18); color: #F0D58A; }
+          .awj-lp .path-side .path-tag { background: #E5F6EE; color: #00693F; }
+          .awj-lp .path .btn { margin-top: auto; align-self: flex-start; }
 
-          /* FORMULES */
-          .awj-lp .formulas { background: var(--ice); }
-          .awj-lp .formulas-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-          @media (min-width: 640px) { .awj-lp .formulas-grid { grid-template-columns: 1fr 1fr; } }
-          @media (min-width: 960px) { .awj-lp .formulas-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
-          .awj-lp .formula-card {
-            background: var(--white); border-radius: 20px; padding: 36px 28px; text-align: center;
-            box-shadow: 0 2px 16px rgba(1,65,126,.08); border: 2px solid transparent;
-            position: relative; display: flex; flex-direction: column;
-          }
-          .awj-lp .formula-card.popular { background: var(--deep); color: var(--white); border-color: var(--cyan); box-shadow: 0 8px 40px rgba(0,173,241,.25); transform: scale(1.03); }
-          .awj-lp .formula-badge { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: var(--cyan); color: var(--deep); font-size: 12px; font-weight: 700; padding: 6px 20px; border-radius: 20px; letter-spacing: 2px; }
-          .awj-lp .formula-name { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 900; margin: 20px 0 8px; }
-          .awj-lp .formula-price { font-family: 'Playfair Display', serif; font-size: 40px; font-weight: 900; color: var(--cyan); }
-          .awj-lp .formula-price small { font-size: 14px; font-weight: 400; color: var(--grey); }
-          .awj-lp .popular .formula-price small { color: var(--muted); }
-          .awj-lp .formula-desc { font-size: 14px; color: var(--grey); margin: 16px 0 24px; line-height: 1.5; flex-grow: 1; }
-          .awj-lp .popular .formula-desc { color: var(--muted); }
-          .awj-lp .formula-entry { font-size: 13px; color: var(--grey); margin-bottom: 20px; }
-          .awj-lp .popular .formula-entry { color: var(--muted); }
-          .awj-lp .formula-card .btn-wa { width: 100%; justify-content: center; font-size: 15px; padding: 14px 24px; }
-          .awj-lp .popular .btn-wa { background: var(--cyan); }
+          /* Étapes de réservation (vraie séquence) */
+          .awj-lp .rsteps { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--ink); }
+          .awj-lp .rstep { padding: 26px 28px 0 0; }
+          .awj-lp .rstep + .rstep { padding-left: 28px; border-left: 1px solid var(--line); }
+          .awj-lp .rstep-n { font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; font-weight: 800; color: var(--navy); }
+          .awj-lp .rstep h3 { font-size: 21px; font-weight: 700; margin: 8px 0 8px; }
+          .awj-lp .rstep p { color: var(--grey); font-size: 15px; }
+
+          /* Tableau des formules */
+          .awj-lp .ftable { margin-top: 44px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: var(--white); }
+          .awj-lp .frow { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 16px 24px; align-items: center; padding: 24px 28px; border-bottom: 1px solid var(--line); }
+          .awj-lp .frow:last-child { border-bottom: none; }
+          .awj-lp .frow-head { background: var(--paper); padding-top: 14px; padding-bottom: 14px; font-size: 13px; font-weight: 700; color: var(--grey); }
+          .awj-lp .fname { font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 800; line-height: 1; }
+          .awj-lp .fcov { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: #E4F2FC; color: var(--navy); }
+          .awj-lp .fchild { display: block; margin-top: 6px; font-size: 13px; color: var(--grey); }
+          .awj-lp .fprice { font-family: 'Bricolage Grotesque', sans-serif; font-size: 24px; font-weight: 700; }
+          .awj-lp .fprice small { font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 500; color: var(--grey); margin-left: 4px; }
+          .awj-lp .frow-top { background: var(--ink); color: var(--white); }
+          .awj-lp .frow-top .fcov { background: var(--gold); color: var(--ink); }
+          .awj-lp .frow-top .fchild, .awj-lp .frow-top .fprice small { color: #A9C3DC; }
+          .awj-lp .frow-top .btn-line { color: var(--white); border-color: rgba(255,255,255,.5); }
+          .awj-lp .frow-top .btn-line:hover { background: var(--white); color: var(--ink); }
+          .awj-lp .fnote { margin-top: 18px; font-size: 14px; color: var(--grey); max-width: 80ch; }
+
+          /* Avantages */
+          .awj-lp .benefits { margin-top: 44px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
+          .awj-lp .benefit { padding: 24px 0; border-top: 1px solid var(--line); }
+          .awj-lp .benefit h3 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+          .awj-lp .benefit p { color: var(--grey); font-size: 15px; }
+
+          /* Confiance */
+          .awj-lp .trust { background: var(--white); padding: 56px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+          .awj-lp .trust-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px 48px; }
+          .awj-lp .trust-agree { font-size: 15px; color: var(--grey); max-width: 38ch; }
+          .awj-lp .trust-agree b { color: var(--ink); }
+          .awj-lp .partners { display: flex; flex-wrap: wrap; gap: 10px 28px; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 18px; color: var(--navy); }
 
           /* FAQ */
-          .awj-lp .faq { background: var(--white); }
-          .awj-lp .faq-item { border-bottom: 1px solid var(--ice); padding: 24px 0; cursor: pointer; }
-          .awj-lp .faq-q { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 17px; font-weight: 600; color: var(--deep); background: none; border: none; width: 100%; text-align: left; padding: 0; font-family: inherit; cursor: pointer; }
-          .awj-lp .faq-q-mark { font-size: 28px; font-weight: 300; color: var(--cyan); transition: transform .3s; line-height: 1; }
-          .awj-lp .faq-a { max-height: 0; overflow: hidden; transition: max-height .4s ease, padding .4s ease; font-size: 15px; color: var(--grey); line-height: 1.6; }
-          .awj-lp .faq-item.open .faq-a { max-height: 300px; padding-top: 16px; }
+          .awj-lp .faq-list { margin-top: 36px; max-width: 760px; }
+          .awj-lp .faq-item { border-bottom: 1px solid var(--line); }
+          .awj-lp .faq-q { display: flex; justify-content: space-between; align-items: center; gap: 16px; width: 100%; text-align: left; background: none; border: none; padding: 22px 0; font-family: 'Figtree', sans-serif; font-size: 18px; font-weight: 600; color: var(--ink); cursor: pointer; }
+          .awj-lp .faq-mark { font-size: 26px; color: var(--navy); line-height: 1; flex-shrink: 0; }
+          .awj-lp .faq-a { max-height: 0; overflow: hidden; transition: max-height .3s ease; color: var(--grey); font-size: 16px; }
+          .awj-lp .faq-item.open .faq-a { max-height: 360px; padding-bottom: 22px; }
 
-          /* CTA FINAL */
-          .awj-lp .cta-final { background: linear-gradient(160deg, var(--deep), var(--navy)); text-align: center; color: var(--white); padding: 100px 24px; }
-          .awj-lp .cta-final .section-title { color: var(--white); margin-bottom: 12px; }
-          .awj-lp .cta-final .tagline { color: var(--cyan); font-size: 18px; font-weight: 600; letter-spacing: 3px; margin-bottom: 40px; }
-          .awj-lp .cta-final .contact-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 32px; margin-top: 40px; font-size: 15px; color: var(--muted); }
-          .awj-lp .cta-final .contact-row a { color: var(--white); text-decoration: none; }
-          .awj-lp .cta-final .contact-row a:hover { color: var(--cyan); }
+          /* CTA final */
+          .awj-lp .final { background: var(--navy); color: var(--white); padding: 96px 0; }
+          .awj-lp .final h2 { font-size: clamp(30px, 5vw, 52px); font-weight: 800; line-height: 1.05; max-width: 20ch; }
+          .awj-lp .final p.lede { color: #C6DBEE; }
+          .awj-lp .final-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+          .awj-lp .btn-wa { background: #25D366; color: #06331A; }
+          .awj-lp .contact-row { display: flex; flex-wrap: wrap; gap: 14px 40px; margin-top: 48px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,.18); font-size: 15px; color: #B7D3EC; }
+          .awj-lp .contact-row a { color: var(--white); text-underline-offset: 3px; }
+          .awj-lp .final-corp { margin-top: 22px; font-size: 14px; }
+          .awj-lp .final-corp a { color: #8FD6F7; }
 
-          @media (max-width: 640px) {
-            .awj-lp section { padding: 60px 20px; }
-            .awj-lp .hero { padding: 32px 20px; }
-            .awj-lp .proof-stats { grid-template-columns: 1fr; }
-            .awj-lp .formulas-grid { grid-template-columns: 1fr; }
-            .awj-lp .formula-card.popular { transform: none; }
+          /* Responsive */
+          @media (max-width: 900px) {
+            .awj-lp .hero-grid { grid-template-columns: 1fr; gap: 64px; }
+            .awj-lp .cards { height: 300px; max-width: 420px; }
+            .awj-lp .paths { grid-template-columns: 1fr; }
+            .awj-lp .benefits { grid-template-columns: 1fr; }
+          }
+          @media (max-width: 720px) {
+            .awj-lp .sec { padding: 64px 0; }
+            .awj-lp .hero { padding: 104px 0 72px; }
+            .awj-lp .rsteps { grid-template-columns: 1fr; }
+            .awj-lp .rstep, .awj-lp .rstep + .rstep { padding: 22px 0; border-left: none; border-bottom: 1px solid var(--line); }
+            .awj-lp .frow { grid-template-columns: 1fr 1fr; padding: 22px 20px; }
+            .awj-lp .frow > :first-child, .awj-lp .frow > .btn { grid-column: 1 / -1; }
+            .awj-lp .frow > .btn { width: 100%; }
+            .awj-lp .frow-head { display: none; }
+            .awj-lp .path { padding: 32px 24px; }
+            .awj-lp .hero-actions .btn { width: 100%; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .awj-lp .mcard-front { animation: none; }
+            .awj-lp .btn, .awj-lp .faq-a { transition: none; }
           }
         `}</style>
 
         {/* ===== HERO ===== */}
-        <section className="hero awj-hero-pad" id="hero" style={{ paddingTop: 64 }}>
-          <video ref={videoRef} className={`hero-video ${videoPlaying ? "playing" : ""}`} playsInline autoPlay muted preload="auto" onEnded={() => setVideoPlaying(false)}>
-            {/* <source src="votre-video.mp4" type="video/mp4" /> */}
-          </video>
-          <div className="hero-overlay" />
-
-          <div className="hero-pattern">
-            {Array.from({ length: 14 }).map((_, i) => (
-              <div
-                key={i}
-                className="hero-pattern-sq"
-                style={{
-                  left: `${(i % 5) * 22}%`,
-                  top: `${Math.floor(i / 5) * 40 - 10}%`,
-                  background: i % 2 === 0 ? "var(--gold)" : "var(--cyan)",
-                  opacity: 0.05,
-                  transform: `rotate(45deg) scale(${0.4 + (i % 3) * 0.2})`,
-                }}
-              />
-            ))}
-            <div className="hero-glow" style={{ background: "radial-gradient(circle, var(--gold) 0%, transparent 70%)", opacity: 0.15 }} />
-          </div>
-
-          <div className={`hero-content ${videoPlaying ? "video-playing" : "video-paused"}`}>
-            <div className="hero-brand">MUTUELLE SANTÉ</div>
-            <div className="hero-brand-name">AWOUNDJÔ</div>
-
-            <button className={`hero-play-btn ${videoPlaying ? "is-playing" : ""}`} onClick={togglePlay} aria-label={videoPlaying ? "Mettre en pause" : "Lancer la vidéo"}>
-              {videoPlaying ? (
-                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19" /></svg>
-              )}
-            </button>
-
-            <div className="hero-text">
-              <h1>La santé ne doit pas<br /><span>ruiner votre budget.</span></h1>
-              <p className="sub">Prendre soin de sa santé, c'est aussi la prévenir, et vous pouvez commencer dès aujourd'hui en vous protégeant vous et votre famille<br />Obtenez votre carte mutualiste <strong>en 24 heures</strong>, sans vous déplacer, et bénéficiez de jusqu'à <strong>100 % de vos soins médicaux</strong> pris en charge selon la formule choisie</p>
+        <header className="hero" id="hero">
+          <div className="wrap hero-grid">
+            <div>
+              <h1>Réservez votre mutuelle santé 2027</h1>
+              <p className="sub">
+                Quatre formules, jusqu'à 100 % de prise en charge sur le réseau de soins Awoundjô.
+                Gardez votre place dès aujourd'hui pour {RESERVATION_FEE} F, réglés par Mobile Money.
+              </p>
+              <div className="hero-actions">
+                <Link
+                  to={reservationLink()}
+                  className="btn btn-gold"
+                  onClick={() => trackCTA("InitiateCheckout", "begin_checkout", { content_name: "Réservation 2027 — hero" })}
+                >
+                  Réserver ma place pour {RESERVATION_FEE} F
+                </Link>
+                <a href="#formulas" className="btn btn-ghost" onClick={scrollTo("formulas")}>
+                  Comparer les formules
+                </a>
+              </div>
+              <p className="hero-note">
+                La Formule Basique ouvre dès le 1er décembre.{" "}
+                <a href="#paths" onClick={scrollTo("paths")}>Voir les deux parcours</a>
+              </p>
             </div>
 
-            <div className="hero-actions">
-              <a href="#formulas" className="btn-wa" onClick={scrollToFormulas}>
-                Souscrire maintenant
-              </a>
-              <a href="#problem" className="btn-scroll" onClick={scrollToProblem}>Vous hésitez encore ? ↓</a>
-              <Link to="/adhesion?type=entreprise" className="btn-scroll" style={{ marginTop: 4 }}
-                onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Entreprise", content_category: "segment" })}>
-                Vous êtes une entreprise ? →
+            <div className="cards" aria-hidden="true">
+              <div className="mcard mcard-back">
+                <div className="mcard-top">
+                  <div className="mcard-brand">Awoundjô<small>Formule Basique</small></div>
+                </div>
+                <div className="mcard-meta">Réduction 50 % pharmacies, cliniques, hôpitaux</div>
+              </div>
+              <div className="mcard mcard-front">
+                <div className="mcard-top">
+                  <div className="mcard-brand">Awoundjô<small>Mutuelle santé</small></div>
+                  <div className="mcard-chip" />
+                </div>
+                <div>
+                  <div className="mcard-name">NOM PRÉNOM</div>
+                  <div className="mcard-meta">Carte mutualiste numérique</div>
+                </div>
+                <div className="mcard-flag"><i style={{ background: "var(--orange)" }} /><i style={{ background: "#fff" }} /><i style={{ background: "var(--green)" }} /></div>
+              </div>
+              <div className="cards-caption">Illustration de la carte mutualiste</div>
+            </div>
+          </div>
+        </header>
+
+        {/* ===== CHIFFRES ===== */}
+        <div className="facts">
+          <div className="wrap facts-row">
+            <div className="fact"><b>120+</b><span>établissements de santé partenaires</span></div>
+            <div className="fact"><b>Jusqu'à 100 %</b><span>de prise en charge, formule Premium</span></div>
+            <div className="fact"><b>4 opérateurs</b><span>Wave, Orange Money, MTN MoMo, Moov</span></div>
+          </div>
+        </div>
+
+        {/* ===== DEUX PARCOURS ===== */}
+        <section className="sec" id="paths">
+          <div className="wrap">
+            <h2 className="h2">Deux façons de vous protéger</h2>
+            <p className="lede">
+              Moins de 20 % des Ivoiriens disposent d'une couverture santé. Choisissez le parcours qui vous convient.
+            </p>
+
+            <div className="paths">
+              <article className="path path-main">
+                <span className="path-tag">Réservation ouverte</span>
+                <h3>Les 4 formules 2027</h3>
+                <p>Classic, Aisance, Harmony et Premium, de 80 % à 100 % de couverture en Côte d'Ivoire.</p>
+                <div className="price">{RESERVATION_FEE} <small>F</small></div>
+                <p style={{ marginBottom: 28 }}>
+                  d'adhésion de réservation, payables maintenant. Ce montant ne constitue pas le paiement de la prime annuelle.
+                </p>
+                <Link
+                  to={reservationLink()}
+                  className="btn btn-gold"
+                  onClick={() => trackCTA("InitiateCheckout", "begin_checkout", { content_name: "Réservation 2027 — parcours" })}
+                >
+                  Réserver ma place
+                </Link>
+              </article>
+
+              <article className="path path-side">
+                <span className="path-tag">Dès le 1er décembre</span>
+                <h3>Formule Basique</h3>
+                <ul>
+                  <li>{FORMULE_BASIQUE.reduction_pharmacie} de réduction en pharmacie</li>
+                  <li>{FORMULE_BASIQUE.remise_clinique_hopital} de remise en clinique et à l'hôpital</li>
+                  <li>Adhésion {FORMULE_BASIQUE.frais_adhesion} F, puis 3 versements</li>
+                  <li>À partir de {FORMULE_BASIQUE.offres[0].montant} F en individuel</li>
+                </ul>
+                <Link
+                  to="/formules#basique"
+                  className="btn btn-line"
+                  onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Basique", content_category: "formule" })}
+                >
+                  Découvrir la Formule Basique
+                </Link>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* ===== COMMENT RÉSERVER ===== */}
+        <section className="sec sec-white" id="reserver">
+          <div className="wrap">
+            <h2 className="h2">Réserver sa formule, en trois temps</h2>
+            <p className="lede">Tout se fait depuis votre téléphone, sans déplacement.</p>
+
+            <div className="rsteps">
+              {RESERVATION_STEPS.map((s, i) => (
+                <div className="rstep" key={s.title}>
+                  <div className="rstep-n">Étape {i + 1}</div>
+                  <h3>{s.title}</h3>
+                  <p>{s.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 40 }}>
+              <Link
+                to={reservationLink()}
+                className="btn btn-navy"
+                onClick={() => trackCTA("InitiateCheckout", "begin_checkout", { content_name: "Réservation 2027 — étapes" })}
+              >
+                Commencer ma réservation
               </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ===== PROBLÈME ===== */}
-        <section className="problem" id="problem">
-          <div className="container">
-            <p className="section-kicker">Le saviez-vous ?</p>
-            <div className="stat">20 %</div>
-            <p className="stat-label">Moins de 20 % des Ivoiriens disposent d'une couverture santé et quand l'urgence arrive, il est déjà trop tard.</p>
-            <div className="bridge">
-              <p>Awoundjô répond à cela<br /><span>en 5 étapes simples et faciles.</span></p>
-            </div>
-          </div>
-        </section>
-
-        {/* ===== 5 ÉTAPES ===== */}
-        <section className="steps" id="steps">
-          <div className="container">
-            <p className="section-kicker">Comment ça marche</p>
-            <h2 className="section-title">Votre mutuelle en 5 étapes</h2>
-            <p className="section-sub">Aucun déplacement. Aucune paperasse. Tout se fait depuis votre téléphone.</p>
-
-            <div className="steps-grid">
-              {STEPS.map((s) => (
-                <div className="step" key={s.n}>
-                  <div className="step-num">{s.n}</div>
-                  <div className="step-text">
-                    <h3>{s.title}</h3>
-                    <p>{s.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ textAlign: "center", marginTop: 48 }}>
-              <a href="#formulas" className="btn-wa" onClick={scrollToFormulas}>
-                Souscrire maintenant
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* ===== BÉNÉFICES ===== */}
-        <section className="benefits" id="benefits">
-          <div className="container">
-            <p className="section-kicker">Ce que vous obtenez</p>
-            <h2 className="section-title">Bien plus qu'une assurance.</h2>
-            <p className="section-sub">Votre carte Awoundjô vous donne accès à un écosystème de soins complet.</p>
-
-            <div className="benefits-grid">
-              {BENEFITS.map((b) => (
-                <div className={`benefit-card ${b.highlight ? "benefit-highlight" : ""}`} key={b.title}>
-                  <div className="benefit-icon"><svg viewBox="0 0 24 24"><path d={b.icon} /></svg></div>
-                  <h3>{b.title}</h3>
-                  <p>{b.text}</p>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ textAlign: "center", marginTop: 48 }}>
-              <a href={waLink("Bonjour, je veux plus d'informations sur Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer"
-                onClick={() => trackCTA("Contact", "contact", { content_name: "WhatsApp — plus d'infos" })}>
-                <WaIcon />
-                Contactez-nous pour plus d'infos
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* ===== PREUVE SOCIALE ===== */}
-        <section className="proof" id="proof">
-          <div className="container">
-            <p className="section-kicker">Ils nous font confiance</p>
-            <h2 className="section-title">Un réseau solide, une mutuelle agréée.</h2>
-
-            <div className="proof-stats">
-              {PROOF_STATS.map((s) => (
-                <div className="proof-stat" key={s.label}>
-                  <div className="num">{s.num}</div>
-                  <div className="label">{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <p style={{ fontSize: 14, color: "var(--grey)", marginBottom: 8 }}>Mutuelle agréée n° 019-072/MEPS/CAB du 27/08/2019</p>
-
-            <div className="proof-partners">
-              {PARTNERS.map((p) => (
-                <div className="proof-partner" key={p}>{p}</div>
-              ))}
             </div>
           </div>
         </section>
 
         {/* ===== FORMULES ===== */}
-        <section className="formulas" id="formulas">
-          <div className="container">
-            <p className="section-kicker">Nos formules</p>
-            <h2 className="section-title">Une couverture pour chaque besoin.</h2>
-            <p className="section-sub">Primes annuelles. Sans sélection médicale pour les pathologies non déclarées. Tarifs particulier — grille entreprise sur demande.</p>
+        <section className="sec" id="formulas">
+          <div className="wrap">
+            <h2 className="h2">Les quatre formules, prime annuelle</h2>
+            <p className="lede">
+              Tarifs particuliers, par an. Couverture en Côte d'Ivoire, sur le réseau de soins Awoundjô.
+              Chaque réservation coûte {RESERVATION_FEE} F, quelle que soit la formule.
+            </p>
 
-            <div className="formulas-grid">
-              {GESTIONNAIRE_PLANS.map((p, i) => (
-                <div className={`formula-card ${i === 3 ? "popular" : ""}`} key={p.slug}>
-                  {i === 3 && <div className="formula-badge">100% CI</div>}
-                  <div className="formula-name">{p.name}</div>
-                  <div className="formula-price">{p.particulier.solo}<small> F/an (solo)</small></div>
-                  <p className="formula-desc">Famille : {p.particulier.famille} F/an — couverture {p.couverture} Côte d'Ivoire, réseau de soins Awoundjô.</p>
-                  <p className="formula-entry"><strong>Enfant à charge :</strong> {p.particulier.pna_enfant_charge} F</p>
-                  <Link to="/formules" className="btn-wa"
-                    onClick={() => trackCTA("ViewContent", "select_item", { content_name: p.name, content_category: "formule" })}>
-                    Choisir {p.name}
-                  </Link>
-                </div>
-              ))}
+            <div className="ftable" role="table" aria-label="Formules et primes annuelles">
+              <div className="frow frow-head" role="row">
+                <span>Formule</span><span>Solo</span><span>Famille</span><span />
+              </div>
+              {GESTIONNAIRE_PLANS.map((p) => {
+                const top = p.slug === "PREMIUM";
+                return (
+                  <div className={`frow ${top ? "frow-top" : ""}`} role="row" key={p.slug}>
+                    <div>
+                      <div className="fname">{p.name}</div>
+                      <span className="fcov">Couverture {p.couverture}</span>
+                      <span className="fchild">Enfant à charge : {p.particulier.pna_enfant_charge} F</span>
+                    </div>
+                    <div className="fprice">{p.particulier.solo} F<small>/ an</small></div>
+                    <div className="fprice">{p.particulier.famille} F<small>/ an</small></div>
+                    <Link
+                      to={reservationLink(p.slug)}
+                      className="btn btn-line btn-sm"
+                      onClick={() => trackCTA("InitiateCheckout", "begin_checkout", { content_name: `Réservation ${p.name}` })}
+                    >
+                      Réserver {p.name}
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
 
-            <div style={{
-              marginTop: 32, background: "var(--deep)", borderRadius: 18, padding: "24px 28px",
-              display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16,
-            }}>
-              <div>
-                <div style={{ color: "var(--cyan)", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Nouveau — à partir du 1er décembre</div>
-                <div style={{ color: "var(--white)", fontSize: 16, fontWeight: 700 }}>Formule Basique : 50% de réduction pharmacies, cliniques et hôpitaux</div>
-              </div>
-              <Link to="/formules#basique" className="btn-wa" style={{ padding: "12px 26px", fontSize: 14 }}>
-                Découvrir la Formule Basique →
-              </Link>
+            <p className="fnote">
+              Ces tarifs concernent les personnes sans pathologie déclarée. Une surprime s'applique en cas de pathologie
+              déclarée et à partir de 55 ans. Grille entreprise à partir de 10 familles ou 30 solos : sur demande.
+              {premium ? ` La formule ${premium.name} offre la couverture ${premium.couverture}.` : ""}
+            </p>
+          </div>
+        </section>
+
+        {/* ===== AVANTAGES ===== */}
+        <section className="sec sec-white" id="benefits">
+          <div className="wrap">
+            <h2 className="h2">Ce que votre carte vous donne</h2>
+            <div className="benefits">
+              {BENEFITS.map((b) => (
+                <div className="benefit" key={b.title}>
+                  <h3>{b.title}</h3>
+                  <p>{b.text}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ===== FAQ ===== */}
-        <section className="faq" id="faq">
-          <div className="container">
-            <p className="section-kicker">Questions fréquentes</p>
-            <h2 className="section-title">Vous avez des questions ?</h2>
+        {/* ===== CONFIANCE ===== */}
+        <div className="trust" id="proof">
+          <div className="wrap trust-row">
+            <p className="trust-agree"><b>Mutuelle agréée</b><br />n° 019-072/MEPS/CAB du 27/08/2019</p>
+            <div className="partners">
+              {PARTNERS.map((p) => <span key={p}>{p}</span>)}
+            </div>
+          </div>
+        </div>
 
-            {FAQS.map((f, i) => (
-              <div className={`faq-item ${openFaq === i ? "open" : ""}`} key={f.q}>
-                <button className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i}>
-                  {f.q}
-                  <span className="faq-q-mark">{openFaq === i ? "\u2212" : "+"}</span>
-                </button>
-                <div className="faq-a">{f.a}</div>
-              </div>
-            ))}
+        {/* ===== FAQ ===== */}
+        <section className="sec" id="faq">
+          <div className="wrap">
+            <h2 className="h2">Vos questions</h2>
+            <div className="faq-list">
+              {FAQS.map((f, i) => (
+                <div className={`faq-item ${openFaq === i ? "open" : ""}`} key={f.q}>
+                  <button className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i}>
+                    {f.q}
+                    <span className="faq-mark" aria-hidden="true">{openFaq === i ? "−" : "+"}</span>
+                  </button>
+                  <div className="faq-a">{f.a}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* ===== CTA FINAL ===== */}
-        <section className="cta-final" id="cta">
-          <div className="container">
-            <h2 className="section-title">Tout le monde a droit à la santé</h2>
-            <div className="tagline">VOTRE CARTE. VOTRE SANTÉ. VOTRE DIGNITÉ.</div>
+        <section className="final" id="cta">
+          <div className="wrap">
+            <h2>Gardez votre place pour 2027</h2>
+            <p className="lede">{RESERVATION_FEE} F par Mobile Money, et votre formule est réservée.</p>
 
-            <a href={waLink("Bonjour, je veux ma carte Awoundjô.")} className="btn-wa" target="_blank" rel="noopener noreferrer" style={{ fontSize: 20, padding: "20px 48px" }}
-              onClick={() => trackCTA("Contact", "contact", { content_name: "WhatsApp — obtenir ma carte" })}>
-              <WaIcon size={26} />
-              Obtenir ma carte maintenant
-            </a>
+            <div className="final-actions">
+              <Link
+                to={reservationLink()}
+                className="btn btn-gold"
+                onClick={() => trackCTA("InitiateCheckout", "begin_checkout", { content_name: "Réservation 2027 — final" })}
+              >
+                Réserver ma place
+              </Link>
+              <a
+                href={waLink("Bonjour, je veux des informations sur les formules Awoundjô 2027.")}
+                className="btn btn-wa"
+                target="_blank" rel="noopener noreferrer"
+                onClick={() => trackCTA("Contact", "contact", { content_name: "WhatsApp — final" })}
+              >
+                <WaIcon /> Poser une question sur WhatsApp
+              </a>
+            </div>
 
             <div className="contact-row">
-              <span>📞 <a href="tel:+2250171721668">01 71 72 16 68</a></span>
-              <span>🌐 <a href="https://www.mutuelleawoundjo.org" target="_blank" rel="noopener noreferrer">mutuelleawoundjo.org</a></span>
-              <span>📧 <a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a></span>
-              <span>📲 <a href={APK_DOWNLOAD_URL} download
-                onClick={() => trackCTA("ViewContent", "select_item", { content_name: "App Android", content_category: "download" })}>
-                Télécharger l'app Android</a></span>
+              <span>Tél. <a href="tel:+2250171721668">01 71 72 16 68</a></span>
+              <span><a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a></span>
+              <span>
+                <a href={APK_DOWNLOAD_URL} download
+                  onClick={() => trackCTA("ViewContent", "select_item", { content_name: "App Android", content_category: "download" })}>
+                  Télécharger l'app Android
+                </a>
+              </span>
             </div>
 
-            <div style={{ marginTop: 32, fontSize: 14 }}>
-              <Link to="/adhesion?type=entreprise" style={{ color: "var(--cyan)", textDecoration: "underline" }}
+            <p className="final-corp">
+              <Link to="/adhesion?type=entreprise"
                 onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Entreprise", content_category: "segment" })}>
-                Vous dirigez une entreprise ? Demandez un devis pour vos salariés →
+                Vous dirigez une entreprise ? Demandez un devis pour vos salariés
               </Link>
-            </div>
+            </p>
           </div>
         </section>
       </div>
