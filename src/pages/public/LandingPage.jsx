@@ -6,6 +6,7 @@ import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
+import { GESTIONNAIRE_PLANS } from "../../data/constants";
 
 const WA_NUMBER = "2250171721668";
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
@@ -29,8 +30,8 @@ const BENEFITS = [
   {
     highlight: true,
     icon: "M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-1 10h-4v4h-4v-4H6v-4h4V5h4v4h4v4z",
-    title: "Jusqu'à 80 % de prise en charge",
-    text: "Consultations, médicaments, hospitalisation, maternité, dentaire, optique selon votre formule",
+    title: "Jusqu'à 100 % de prise en charge",
+    text: "De 80% à 100% de couverture en Côte d'Ivoire selon la formule choisie, sur notre réseau de soins partenaire",
   },
   {
     icon: "M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z",
@@ -44,56 +45,37 @@ const BENEFITS = [
   },
   {
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
-    title: "Bilan de santé annuel offert",
-    text: "Chaque année, un bilan complet offert à tous les comptes actifs, la prévention en action",
+    title: "Un large réseau de soins partenaire",
+    text: "Cliniques, hôpitaux, pharmacies, laboratoires et cabinets dentaires partout en Côte d'Ivoire",
   },
 ];
 
 const PROOF_STATS = [
   { num: "120+", label: "Établissements de santé" },
-  { num: "80 %", label: "De prise en charge" },
+  { num: "100 %", label: "De prise en charge (formule Premium)" },
   { num: "24h", label: "Activation de votre carte" },
 ];
 
 const PARTNERS = ["🏥 Giepharm", "🏦 Mansa-Bank", "🏛 CNEPECI", "🤝 CEL-CI", "🚑 Meditrans", "🛡 Sonam-Assurances"];
 
-const FORMULAS = [
-  {
-    name: "Essentielle",
-    price: "10 000",
-    desc: "L'accès aux soins de base, consultations, médicaments, hospitalisation, la porte d'entrée vers votre protection santé",
-    popular: false,
-  },
-  {
-    name: "Ivoirienne",
-    price: "15 000",
-    desc: "La formule de référence des familles avec maternité renforcée et couverture élargie, la plus choisie par nos adhérents",
-    popular: true,
-  },
-  {
-    name: "Turquoise",
-    price: "35 000",
-    desc: "La couverture maximale avec dentisterie, optique et prestations étendues pour une protection complète",
-    popular: false,
-  },
-];
+// Formules du gestionnaire maladie partenaire (primes annuelles, grille particulier) — source : GESTIONNAIRE_PLANS
 
 const FAQS = [
   {
     q: "Et si je ne suis jamais malade, j'ai perdu mon argent ?",
-    a: "Votre cotisation finance un bilan de santé annuel offert, la téléconsultation, et la tranquillité de savoir que le jour où un imprévu arrive, vous êtes couvert sans chercher l'argent en urgence. La vraie perte, c'est de ne pas être prêt.",
+    a: "Votre cotisation vous garantit la tranquillité de savoir que le jour où un imprévu arrive, vous êtes couvert sur notre réseau de soins sans chercher l'argent en urgence. La vraie perte, c'est de ne pas être prêt.",
   },
   {
     q: "Quelle est la différence avec la CMU ?",
-    a: "La CMU est le régime public de base. Awoundjô est complémentaire : activation en 24h, prise en charge jusqu'à 80 %, téléconsultation, aucune sélection médicale. Les deux se complètent.",
+    a: "La CMU est le régime public de base. Awoundjô est complémentaire : activation rapide, prise en charge jusqu'à 100 % selon la formule, sur un large réseau de soins partenaire. Les deux se complètent.",
   },
   {
-    q: "Comment je renouvelle ma cotisation chaque mois ?",
-    a: "Par Mobile Money — Wave, Orange Money, MTN MoMo ou Moov. Vous recevez un rappel avant l'échéance. Le paiement prend moins d'une minute.",
+    q: "Comment je règle ma cotisation ?",
+    a: "Par Mobile Money — Wave, Orange Money, MTN MoMo ou Moov. Vous recevez un rappel avant chaque échéance (prime annuelle ou versement selon la formule choisie).",
   },
   {
     q: "Est-ce que mes antécédents médicaux comptent ?",
-    a: "Aucune sélection médicale à l'adhésion, tout le monde est accepté quels que soient ses antécédents, c'est un principe fondateur d'Awoundjô.",
+    a: "Aucune sélection médicale à l'adhésion : tout le monde est accepté. Une surprime s'applique en cas de pathologie déclarée ou à partir de 55 ans, mais personne n'est refusé.",
   },
   {
     q: "Combien de personnes puis-je couvrir ?",
@@ -289,7 +271,8 @@ export default function LandingPage() {
           /* FORMULES */
           .awj-lp .formulas { background: var(--ice); }
           .awj-lp .formulas-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-          @media (min-width: 720px) { .awj-lp .formulas-grid { grid-template-columns: 1fr 1fr 1fr; } }
+          @media (min-width: 640px) { .awj-lp .formulas-grid { grid-template-columns: 1fr 1fr; } }
+          @media (min-width: 960px) { .awj-lp .formulas-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
           .awj-lp .formula-card {
             background: var(--white); border-radius: 20px; padding: 36px 28px; text-align: center;
             box-shadow: 0 2px 16px rgba(1,65,126,.08); border: 2px solid transparent;
@@ -371,7 +354,7 @@ export default function LandingPage() {
 
             <div className="hero-text">
               <h1>La santé ne doit pas<br /><span>ruiner votre budget.</span></h1>
-              <p className="sub">Prendre soin de sa santé, c'est aussi la prévenir, et vous pouvez commencer dès aujourd'hui en vous protégeant vous et votre famille<br />Obtenez votre carte mutualiste <strong>en 24 heures</strong>, sans vous déplacer, et bénéficiez de jusqu'à <strong>80 % de vos soins médicaux</strong> pris en charge</p>
+              <p className="sub">Prendre soin de sa santé, c'est aussi la prévenir, et vous pouvez commencer dès aujourd'hui en vous protégeant vous et votre famille<br />Obtenez votre carte mutualiste <strong>en 24 heures</strong>, sans vous déplacer, et bénéficiez de jusqu'à <strong>100 % de vos soins médicaux</strong> pris en charge selon la formule choisie</p>
             </div>
 
             <div className="hero-actions">
@@ -483,22 +466,35 @@ export default function LandingPage() {
           <div className="container">
             <p className="section-kicker">Nos formules</p>
             <h2 className="section-title">Une couverture pour chaque besoin.</h2>
-            <p className="section-sub">Adhésion unique : 15 000 FCFA. Sans sélection médicale.</p>
+            <p className="section-sub">Primes annuelles. Sans sélection médicale pour les pathologies non déclarées. Tarifs particulier — grille entreprise sur demande.</p>
 
             <div className="formulas-grid">
-              {FORMULAS.map((f) => (
-                <div className={`formula-card ${f.popular ? "popular" : ""}`} key={f.name}>
-                  {f.popular && <div className="formula-badge">POPULAIRE</div>}
-                  <div className="formula-name">{f.name}</div>
-                  <div className="formula-price">{f.price}<small> F/mois</small></div>
-                  <p className="formula-desc">{f.desc}</p>
-                  <p className="formula-entry"><strong>Adhésion :</strong> 15 000 F</p>
-                  <Link to={`/adhesion?formule=${f.name.toLowerCase()}`} className="btn-wa"
-                    onClick={() => trackCTA("ViewContent", "select_item", { content_name: f.name, content_category: "formule" })}>
-                    Choisir {f.name}
+              {GESTIONNAIRE_PLANS.map((p, i) => (
+                <div className={`formula-card ${i === 3 ? "popular" : ""}`} key={p.slug}>
+                  {i === 3 && <div className="formula-badge">100% CI</div>}
+                  <div className="formula-name">{p.name}</div>
+                  <div className="formula-price">{p.particulier.solo}<small> F/an (solo)</small></div>
+                  <p className="formula-desc">Famille : {p.particulier.famille} F/an — couverture {p.couverture} Côte d'Ivoire, réseau de soins Awoundjô.</p>
+                  <p className="formula-entry"><strong>Enfant à charge :</strong> {p.particulier.pna_enfant_charge} F</p>
+                  <Link to="/formules" className="btn-wa"
+                    onClick={() => trackCTA("ViewContent", "select_item", { content_name: p.name, content_category: "formule" })}>
+                    Choisir {p.name}
                   </Link>
                 </div>
               ))}
+            </div>
+
+            <div style={{
+              marginTop: 32, background: "var(--deep)", borderRadius: 18, padding: "24px 28px",
+              display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16,
+            }}>
+              <div>
+                <div style={{ color: "var(--cyan)", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Nouveau — à partir du 1er décembre</div>
+                <div style={{ color: "var(--white)", fontSize: 16, fontWeight: 700 }}>Formule Basique : 50% de réduction pharmacies, cliniques et hôpitaux</div>
+              </div>
+              <Link to="/formules#basique" className="btn-wa" style={{ padding: "12px 26px", fontSize: 14 }}>
+                Découvrir la Formule Basique →
+              </Link>
             </div>
           </div>
         </section>
