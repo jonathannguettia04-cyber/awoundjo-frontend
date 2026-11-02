@@ -2,207 +2,218 @@
 import { Link } from "react-router-dom";
 import { C, CONTACT } from "../../data/constants";
 
-const PORTAILS = [
-  { label: "Espace Adhérent",       href: "/client/login",        desc: "Gérez votre couverture" },
-  { label: "Espace Établissement",  href: "/etablissement/login", desc: "Portail prestataires" },
-  { label: "Espace Ambassadeur",    href: "/diaspora/login",      desc: "Réseau Diaspora" },
-  { label: "Espace Parrainage",     href: "/referral",            desc: "Réseau Référral" },
-  { label: "Espace Affilié",        href: "/affilie",             desc: "Réseau Affilié" },
-  { label: "Espace Commercial",     href: "/business/login",      desc: "Réseau Business" },
+const NAV = [
+  { to: "/",               label: "Accueil" },
+  { to: "/about",          label: "À propos" },
+  { to: "/formules",       label: "Nos formules" },
+  { to: "/fonctionnement", label: "Comment ça marche" },
+  { to: "/reseau",         label: "Réseau de soins" },
+  { to: "/simulateur",     label: "Simulateur de budget" },
+  { to: "/avis",           label: "Témoignages" },
+  { to: "/blog",           label: "Blog santé" },
+  { to: "/faq",            label: "FAQ" },
+  { to: "/contact",        label: "Contact" },
+];
+
+// Espaces connectés, regroupés par public
+const ESPACES = [
+  {
+    titre: "Adhérents et établissements",
+    liens: [
+      { label: "Espace adhérent",      href: "/client/login" },
+      { label: "Espace établissement", href: "/etablissement/login" },
+    ],
+  },
+  {
+    titre: "Réseaux de partenaires",
+    liens: [
+      { label: "Ambassadeurs diaspora", href: "/diaspora/login" },
+      { label: "Parrainage",            href: "/referral" },
+      { label: "Affiliés",              href: "/affilie" },
+      { label: "Commerciaux",           href: "/business/login" },
+    ],
+  },
 ];
 
 const SOCIAL = [
-  { label: "Facebook",  href: "https://facebook.com",  icon: "f" },
-  { label: "Instagram", href: "https://instagram.com", icon: "in" },
-  { label: "LinkedIn",  href: "https://linkedin.com",  icon: "li" },
-  { label: "WhatsApp",  href: `https://wa.me/${CONTACT.whatsapp}`, icon: "wa" },
+  { label: "Facebook",  href: "https://facebook.com" },
+  { label: "Instagram", href: "https://instagram.com" },
+  { label: "LinkedIn",  href: "https://linkedin.com" },
+  { label: "WhatsApp",  href: `https://wa.me/${CONTACT.whatsapp}` },
 ];
+
+const LEGAL = [
+  { label: "Mentions légales",              to: "/politiques#mentions" },
+  { label: "Politique de confidentialité", to: "/politiques#confidentialite" },
+  { label: "CGU",                           to: "/politiques#cgu" },
+];
+
+const FONT = "Inter, sans-serif";
 
 export default function Footer() {
   return (
-    <footer style={{ background: "#08172B", borderTop: `3px solid ${C.greenLight}` }}>
-      {/* Bandeau CTA */}
-      <div style={{
-        background: `linear-gradient(135deg, ${C.green}, #0F2A4A)`,
-        padding: "48px 24px",
-        textAlign: "center",
-        borderBottom: "1px solid #16324F",
-      }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, color: C.greenLight, fontWeight: 700, marginBottom: 12 }}>
-          PRÊT À PROTÉGER VOTRE FAMILLE ?
-        </p>
-        <h3 style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: "clamp(1.3rem, 2.5vw, 2rem)", color: "#FFFFFF", margin: "0 0 20px" }}>
-          Rejoignez 2 400 familles ivoiriennes déjà protégées
-        </h3>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link to="/adhesion" style={{
-            background: C.greenLight, color: "#08172B", fontFamily: "Inter, sans-serif", fontWeight: 800,
-            fontSize: 14, padding: "13px 28px", borderRadius: 10, textDecoration: "none",
-            letterSpacing: 0.3,
-          }}>Adhérer maintenant</Link>
-          <Link to="/simulateur" style={{
-            background: "transparent", color: "#FFFFFF", fontFamily: "Inter, sans-serif", fontWeight: 600,
-            fontSize: 14, padding: "13px 28px", borderRadius: 10, textDecoration: "none",
-            border: "1.5px solid rgba(255,255,255,0.3)",
-          }}>Tester mon budget →</Link>
+    <footer className="awj-footer" style={{ background: "#08172B", borderTop: `3px solid ${C.greenLight}`, fontFamily: FONT }}>
+
+      {/* ── Bandeau d'appel ──────────────────────────────────── */}
+      <div className="awj-footer-cta">
+        <div className="awj-footer-cta-inner">
+          <div>
+            <h3 className="awj-footer-cta-title">Réservez votre formule 2027</h3>
+            <p className="awj-footer-cta-sub">15 000 F par Mobile Money pour garder votre place.</p>
+          </div>
+          <div className="awj-footer-cta-actions">
+            <Link to="/adhesion?type=reservation" className="awj-footer-btn awj-footer-btn-main">Réserver ma place</Link>
+            <Link to="/simulateur" className="awj-footer-btn awj-footer-btn-ghost">Tester mon budget</Link>
+          </div>
         </div>
       </div>
 
-      {/* Corps du footer */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px 32px" }}>
-        <div className="awj-footer-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "2.2fr 1fr 1.4fr 1fr",
-          gap: 48,
-          marginBottom: 48,
-        }}>
-          {/* Colonne marque */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <img
-                src="/logo-icon.png"
-                alt="Awoundjô"
-                style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-              />
+      {/* ── Corps ───────────────────────────────────────────── */}
+      <div className="awj-footer-body">
+        <div className="awj-footer-grid">
+
+          {/* Marque */}
+          <div className="awj-footer-brand">
+            <div className="awj-footer-logo">
+              <img src="/logo-icon.png" alt="Awoundjô" width="40" height="40" />
               <div>
-                <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 700, fontSize: 18, color: "#FFFFFF", lineHeight: 1 }}>Awoundjô</div>
-                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 9, color: C.greenLight, letterSpacing: 1.5, marginTop: 2 }}>MUTUELLE DE SANTÉ</div>
+                <strong>Awoundjô</strong>
+                <span>Mutuelle de santé</span>
               </div>
             </div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#8FADC9", lineHeight: 1.75, maxWidth: 290, margin: "0 0 20px" }}>
-              La première mutuelle de santé digitale de Côte d'Ivoire. Solidarité, accessibilité et innovation pour chaque famille ivoirienne.
+            <p className="awj-footer-about">
+              La mutuelle de santé digitale de Côte d'Ivoire. Solidarité, accessibilité et innovation pour chaque famille.
             </p>
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-              {SOCIAL.map(s => (
-                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" title={s.label} style={{
-                  width: 34, height: 34, borderRadius: 8,
-                  background: "#0F2440",
-                  border: "1px solid #16324F",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  textDecoration: "none",
-                  transition: "background 0.15s",
-                }}>
-                  <span style={{ color: C.greenLight, fontSize: 11, fontWeight: 700, fontFamily: "Inter, sans-serif", textTransform: "uppercase" }}>{s.icon}</span>
-                </a>
-              ))}
-            </div>
-            {/* Certifications / badges */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {["CIMA agréé", "Paiement sécurisé", "RGPD conforme"].map(b => (
-                <span key={b} style={{
-                  fontFamily: "Inter, sans-serif", fontSize: 10, color: "#5A85A8",
-                  border: "1px solid #16324F", borderRadius: 4,
-                  padding: "3px 8px", letterSpacing: 0.3,
-                }}>{b}</span>
+            <p className="awj-footer-agree">Mutuelle agréée n° 019-072/MEPS/CAB du 27/08/2019</p>
+            <div className="awj-footer-social">
+              {SOCIAL.map((s) => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>
               ))}
             </div>
           </div>
 
           {/* Navigation */}
-          <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.greenLight, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Navigation</div>
-            <nav style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-              {[
-                { to: "/",             label: "Accueil" },
-                { to: "/about",        label: "À propos" },
-                { to: "/formules",     label: "Nos formules" },
-                { to: "/fonctionnement", label: "Comment ça marche" },
-                { to: "/reseau",       label: "Réseau de soins" },
-                { to: "/avis",         label: "Témoignages" },
-                { to: "/blog",         label: "Blog santé" },
-                { to: "/faq",          label: "FAQ" },
-                { to: "/contact",      label: "Contact" },
-              ].map(l => (
-                <Link key={l.to} to={l.to} style={{
-                  fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#8FADC9",
-                  textDecoration: "none", transition: "color 0.15s",
-                }}>{l.label}</Link>
+          <nav aria-label="Navigation du site">
+            <h4 className="awj-footer-h">Découvrir</h4>
+            <ul className="awj-footer-list">
+              {NAV.map((l) => (
+                <li key={l.to}><Link to={l.to}>{l.label}</Link></li>
               ))}
-            </nav>
-          </div>
+            </ul>
+          </nav>
 
-          {/* Portails */}
+          {/* Espaces connectés */}
           <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.greenLight, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Espaces connectés</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {PORTAILS.map(p => (
-                <Link key={p.href} to={p.href} style={{
-                  textDecoration: "none",
-                  display: "flex", flexDirection: "column", gap: 1,
-                  padding: "9px 12px", borderRadius: 8,
-                  background: "#102A47",
-                  border: "1px solid #16324F",
-                  transition: "border-color 0.15s",
-                }}>
-                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#C8DCEE" }}>{p.label}</span>
-                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#5A85A8" }}>{p.desc}</span>
-                </Link>
-              ))}
-            </div>
+            <h4 className="awj-footer-h">Espaces connectés</h4>
+            {ESPACES.map((g) => (
+              <div key={g.titre} className="awj-footer-group">
+                <p className="awj-footer-group-t">{g.titre}</p>
+                <ul className="awj-footer-list">
+                  {g.liens.map((l) => (
+                    <li key={l.href}><Link to={l.href}>{l.label}</Link></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
           {/* Contact */}
           <div>
-            <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 11, color: C.greenLight, letterSpacing: 1.5, marginBottom: 18, textTransform: "uppercase" }}>Contact</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {[
-                { icon: "📞", val: CONTACT.phone, href: `tel:${CONTACT.phone.replace(/\s/g,"")}` },
-                { icon: "✉️", val: CONTACT.email, href: `mailto:${CONTACT.email}` },
-                { icon: "📍", val: CONTACT.address, href: null },
-              ].map((c, i) => (
-                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 14, lineHeight: 1.6, flexShrink: 0 }}>{c.icon}</span>
-                  {c.href ? (
-                    <a href={c.href} style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#8FADC9", textDecoration: "none", lineHeight: 1.55, wordBreak: "break-word" }}>{c.val}</a>
-                  ) : (
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#8FADC9", lineHeight: 1.55 }}>{c.val}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: 24, padding: "14px 16px", background: "#102A47", borderRadius: 10, border: "1px solid #16324F" }}>
-              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: C.greenLight, fontWeight: 700, marginBottom: 6 }}>HORAIRES D'OUVERTURE</div>
-              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#8FADC9", lineHeight: 1.6 }}>
-                Lun – Ven : 8h00 – 17h00<br />
-                Sam : 8h00 – 13h00
-              </div>
-            </div>
+            <h4 className="awj-footer-h">Nous joindre</h4>
+            <ul className="awj-footer-list awj-footer-contact">
+              <li>
+                <span>Téléphone</span>
+                <a href={`tel:${CONTACT.phone.replace(/\s/g, "")}`}>{CONTACT.phone}</a>
+              </li>
+              <li>
+                <span>Email</span>
+                <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
+              </li>
+              <li>
+                <span>Adresse</span>
+                <address>{CONTACT.address}</address>
+              </li>
+              <li>
+                <span>Horaires</span>
+                <p>Lun – Ven : 8h00 – 17h00<br />Sam : 8h00 – 13h00</p>
+              </li>
+            </ul>
           </div>
         </div>
 
-        {/* Bas de page */}
-        <div className="awj-footer-bottom" style={{
-          borderTop: "1px solid #16324F",
-          paddingTop: 24,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-        }}>
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#3A5A78" }}>
-            © 2026 Awoundjô — Tous droits réservés. Mutuelle de Santé, Côte d'Ivoire.
-          </span>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            {[
-              { label: "Mentions légales", to: "/politiques#mentions" },
-              { label: "Politique de confidentialité", to: "/politiques#confidentialite" },
-              { label: "CGU", to: "/politiques#cgu" },
-            ].map(l => (
-              <Link key={l.to} to={l.to} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#3A5A78", textDecoration: "none" }}>{l.label}</Link>
+        {/* ── Bas de page ──────────────────────────────────── */}
+        <div className="awj-footer-bottom">
+          <span>© 2026 Awoundjô. Tous droits réservés.</span>
+          <div className="awj-footer-legal">
+            {LEGAL.map((l) => (
+              <Link key={l.to} to={l.to}>{l.label}</Link>
             ))}
           </div>
         </div>
       </div>
 
       <style>{`
-        @media (max-width: 900px) {
-          .awj-footer-grid { grid-template-columns: 1fr 1fr !important; gap: 32px !important; }
+        .awj-footer a { text-decoration: none; }
+        .awj-footer a:focus-visible { outline: 2px solid ${C.greenLight}; outline-offset: 3px; border-radius: 4px; }
+
+        /* Bandeau */
+        .awj-footer-cta { background: linear-gradient(135deg, ${C.green}, #0F2A4A); border-bottom: 1px solid #16324F; padding: 36px 24px; }
+        .awj-footer-cta-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+        .awj-footer-cta-title { font-family: "Playfair Display", serif; font-weight: 700; font-size: clamp(1.3rem, 2.4vw, 1.8rem); color: #fff; margin: 0 0 4px; }
+        .awj-footer-cta-sub { color: #B7D3EC; font-size: 14px; margin: 0; }
+        .awj-footer-cta-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .awj-footer-btn { font-weight: 700; font-size: 14px; padding: 12px 24px; border-radius: 10px; transition: transform .15s, background .15s; }
+        .awj-footer-btn:hover { transform: translateY(-1px); }
+        .awj-footer-btn-main { background: ${C.greenLight}; color: #08172B; }
+        .awj-footer-btn-ghost { color: #fff; border: 1.5px solid rgba(255,255,255,.35); }
+        .awj-footer-btn-ghost:hover { border-color: #fff; }
+
+        /* Corps */
+        .awj-footer-body { max-width: 1200px; margin: 0 auto; padding: 56px 24px 28px; }
+        .awj-footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.1fr 1.3fr; gap: 48px; padding-bottom: 44px; }
+        .awj-footer-h { font-size: 13px; font-weight: 700; color: #fff; margin: 0 0 16px; letter-spacing: .2px; }
+        .awj-footer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+        .awj-footer-list a { font-size: 14px; color: #8FADC9; transition: color .15s; }
+        .awj-footer-list a:hover { color: #fff; }
+
+        /* Marque */
+        .awj-footer-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .awj-footer-logo img { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .awj-footer-logo strong { display: block; font-family: "Playfair Display", serif; font-size: 20px; color: #fff; line-height: 1.1; }
+        .awj-footer-logo span { font-size: 12px; color: ${C.greenLight}; }
+        .awj-footer-about { font-size: 14px; color: #8FADC9; line-height: 1.7; max-width: 32ch; margin: 0 0 14px; }
+        .awj-footer-agree { font-size: 12.5px; color: #6F93B5; margin: 0 0 18px; }
+        .awj-footer-social { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+        .awj-footer-social a { font-size: 13.5px; color: #C8DCEE; transition: color .15s; }
+        .awj-footer-social a:hover { color: ${C.greenLight}; }
+
+        /* Espaces connectés */
+        .awj-footer-group + .awj-footer-group { margin-top: 22px; }
+        .awj-footer-group-t { font-size: 12px; color: #5F86A8; margin: 0 0 10px; }
+
+        /* Contact */
+        .awj-footer-contact li span { display: block; font-size: 12px; color: #5F86A8; margin-bottom: 2px; }
+        .awj-footer-contact a, .awj-footer-contact address, .awj-footer-contact p { font-size: 14px; color: #C8DCEE; font-style: normal; line-height: 1.55; margin: 0; word-break: break-word; }
+        .awj-footer-contact a:hover { color: #fff; }
+
+        /* Bas de page */
+        .awj-footer-bottom { border-top: 1px solid #16324F; padding-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap; font-size: 13px; color: #6F93B5; }
+        .awj-footer-legal { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+        .awj-footer-legal a { color: #6F93B5; transition: color .15s; }
+        .awj-footer-legal a:hover { color: #fff; }
+
+        @media (max-width: 960px) {
+          .awj-footer-grid { grid-template-columns: 1fr 1fr; gap: 36px; }
+          .awj-footer-brand { grid-column: 1 / -1; }
         }
         @media (max-width: 560px) {
-          .awj-footer-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
-          .awj-footer-bottom { flex-direction: column; align-items: flex-start !important; }
+          .awj-footer-grid { grid-template-columns: 1fr; gap: 32px; }
+          .awj-footer-cta-actions { width: 100%; }
+          .awj-footer-btn { flex: 1; text-align: center; }
+          .awj-footer-bottom { flex-direction: column; align-items: flex-start; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .awj-footer-btn, .awj-footer a { transition: none; }
         }
       `}</style>
     </footer>

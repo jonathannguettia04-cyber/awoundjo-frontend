@@ -205,7 +205,7 @@ export default function Dashboard() {
   const [editingPlan, setEditingPlan] = useState(null);
 
   // Réservations 2027 (formules gestionnaire maladie) — lues depuis
-  // GET /api/admin/reservations (pending_payments, role RESERVATION_GESTIONNAIRE_2027)
+  // GET /api/payments/reservations (pending_payments, role RESERVATION_GESTIONNAIRE_2027)
   const [reservations, setReservations] = useState([]);
   const [reservationsTotal, setReservationsTotal] = useState(0);
   const [showReservations, setShowReservations] = useState(false);
@@ -226,7 +226,7 @@ export default function Dashboard() {
   }
 
   function fetchReservations() {
-    fetch(`${API}/api/admin/reservations?limit=200`, { headers: authHeader })
+    fetch(`${API}/api/payments/reservations?limit=200`, { headers: authHeader })
       .then((r) => r.json())
       .then(({ data }) => {
         setReservations(data?.reservations || []);

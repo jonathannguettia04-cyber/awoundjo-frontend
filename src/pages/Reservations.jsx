@@ -55,7 +55,7 @@ export default function Reservations({ embedded = false, onClose }) {
   function load(p = page) {
     setLoading(true);
     setError("");
-    fetch(`${API}/api/admin/reservations?page=${p}&limit=${PAGE_SIZE}`, {
+    fetch(`${API}/api/payments/reservations?page=${p}&limit=${PAGE_SIZE}`, {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
