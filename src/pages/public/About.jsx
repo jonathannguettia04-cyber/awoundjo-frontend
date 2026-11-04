@@ -5,17 +5,17 @@ import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
-import { C, STATS } from "../../data/constants";
+import { C, STATS, NB_PRESTATAIRES } from "../../data/constants";
 
 const TEAM_PHOTO = "/images/equipe-awoundjo.jpg";
 const OFFICE_PHOTO = "/images/bureaux-awoundjo.jpg";
 
 const VALEURS = [
   { icon: "🤝", label: "Solidarité", desc: "Chaque cotisation aide une famille dans le besoin. La force du collectif au service de chacun." },
-  { icon: "🏥", label: "Accessibilité", desc: "Des formules adaptées à tous les budgets, dès 10 000 F/mois. La santé n'est pas un luxe." },
+  { icon: "🏥", label: "Accessibilité", desc: "Des formules adaptées à tous les budgets, de la Formule Basique aux formules Premium. La santé n'est pas un luxe." },
   { icon: "🔍", label: "Transparence", desc: "Tarifs clairs, remboursements traçables, aucun frais caché. Vous savez toujours où en est votre dossier." },
   { icon: "💡", label: "Innovation", desc: "Adhésion digitale, téléconsultation, carte NFC : nous modernisons l'accès aux soins pour tous." },
-  { icon: "🌱", label: "Prévention", desc: "Bilan de santé offert à l'adhésion. Nous agissons avant la maladie, pas seulement après." },
+  { icon: "🌱", label: "Prévention", desc: "Téléconsultation et dossier médical sur mobile : nous agissons avant la maladie, pas seulement après." },
   { icon: "🇨🇮", label: "Ancrage local", desc: "Né en Côte d'Ivoire, pour les Ivoiriens. Notre réseau, notre équipe et nos valeurs sont 100% locaux." },
 ];
 
@@ -25,7 +25,7 @@ const TIMELINE = [
   { year: "2021", title: "Digitalisation", desc: "Lancement de la carte Mansa numérique et du portail adhérent en ligne. Fin des paperasses." },
   { year: "2022", title: "Expansion", desc: "Ouverture dans 8 nouvelles villes. 500+ adhérents actifs. Partenariats entreprises et associations." },
   { year: "2024", title: "Téléconsultation", desc: "Intégration de la téléconsultation médicale. Les adhérents consultent un médecin sans se déplacer." },
-  { year: "2026", title: "Aujourd'hui", desc: "2 400+ adhérents, 120+ établissements partenaires, 12 villes. La croissance continue chaque mois.", current: true },
+  { year: "2026", title: "Aujourd'hui", desc: `2 400+ adhérents, ${NB_PRESTATAIRES} prestataires de santé partenaires, 12 villes. Réservations ouvertes pour les formules 2027.`, current: true },
 ];
 
 export default function About() {

@@ -156,9 +156,13 @@ export const STEPS = [
   { n: "05", label: "Accès aux soins", desc: "Consultez dans tout notre réseau partenaire." },
 ];
 
+// Nombre de prestataires de santé du réseau (pharmacies, cliniques, hôpitaux, laboratoires…).
+// Source : PDF RESEAU_GLOBAL du 30/09/2026 (~1 600 prestataires listés). Un seul endroit à modifier.
+export const NB_PRESTATAIRES = "1 500+";
+
 export const STATS = [
   { value: "2 400+", label: "Adhérents actifs" },
-  { value: "120+",   label: "Établissements partenaires" },
+  { value: NB_PRESTATAIRES, label: "Prestataires de santé partenaires" },
   { value: "12",     label: "Villes couvertes" },
   { value: "96%",    label: "Taux de satisfaction" },
 ];
