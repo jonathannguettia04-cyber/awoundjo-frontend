@@ -391,7 +391,7 @@ export default function LandingPage() {
         {/* ===== CHIFFRES ===== */}
         <div className="facts">
           <div className="wrap facts-row">
-            <div className="fact rv"><b>120+</b><span>établissements de santé partenaires</span></div>
+            <div className="fact rv"><b>1 500+</b><span>prestataires de santé partenaires</span></div>
             <div className="fact rv" style={{ "--d": ".12s" }}><b>Jusqu'à 100 %</b><span>de prise en charge, formule Premium</span></div>
             <div className="fact rv" style={{ "--d": ".24s" }}><b>4 opérateurs</b><span>Wave, Orange Money, MTN MoMo, Moov</span></div>
           </div>
@@ -433,7 +433,7 @@ export default function LandingPage() {
                   <li>À partir de {FORMULE_BASIQUE.offres[0].montant} F en individuel</li>
                 </ul>
                 <Link
-                  to="/formules#basique"
+                  to="/formule-basique"
                   className="btn btn-line"
                   onClick={() => trackCTA("ViewContent", "select_item", { content_name: "Basique", content_category: "formule" })}
                 >

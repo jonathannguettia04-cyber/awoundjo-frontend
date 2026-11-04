@@ -215,6 +215,7 @@ const ClientParrainagePage = lazy(() => import("./pages/parrainage/ClientParrain
 const LandingPage = lazy(() => import("./pages/public/LandingPage"));
 const AboutPage         = lazy(() => import("./pages/public/About"));
 const FormulesPage       = lazy(() => import("./pages/public/Formules"));
+const FormuleBasiquePage = lazy(() => import("./pages/public/FormuleBasique"));
 const FonctionnementPage = lazy(() => import("./pages/public/Fonctionnement"));
 const ReseauPage         = lazy(() => import("./pages/public/Reseau"));
 const SimulateurPage     = lazy(() => import("./pages/public/Simulateur"));
@@ -258,7 +259,7 @@ import { ADMIN_BASE } from "./config/adminBase";
 export { ADMIN_BASE };
 
 // [LANDING] Pages vitrine publiques (hors "/", gérée séparément via isLandingPage)
-const PUBLIC_PATHS = ["/about", "/formules", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/adhesion/merci", "/adhesion/echec", "/blog", "/politiques"];
+const PUBLIC_PATHS = ["/about", "/formules", "/formule-basique", "/fonctionnement", "/reseau", "/simulateur", "/avis", "/faq", "/verification", "/contact", "/adhesion", "/adhesion/merci", "/adhesion/echec", "/blog", "/politiques"];
 
 function ProtectedRoute({ children, allowedRoles = null, requiredPermission = null }) {
   const { user, initializing } = useAuth();
@@ -400,6 +401,7 @@ export default function App() {
             } />
             <Route path="/about"          element={<AboutPage />} />
             <Route path="/formules"       element={<FormulesPage />} />
+            <Route path="/formule-basique" element={<FormuleBasiquePage />} />
             <Route path="/fonctionnement" element={<FonctionnementPage />} />
             <Route path="/reseau"         element={<ReseauPage />} />
             <Route path="/simulateur"     element={<SimulateurPage />} />

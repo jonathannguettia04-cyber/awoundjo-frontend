@@ -6,6 +6,7 @@ const NAV = [
   { to: "/",               label: "Accueil" },
   { to: "/about",          label: "À propos" },
   { to: "/formules",       label: "Nos formules" },
+  { to: "/formule-basique", label: "Formule Basique" },
   { to: "/fonctionnement", label: "Comment ça marche" },
   { to: "/reseau",         label: "Réseau de soins" },
   { to: "/simulateur",     label: "Simulateur de budget" },
