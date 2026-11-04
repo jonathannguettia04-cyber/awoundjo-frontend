@@ -67,9 +67,9 @@ export const FORMULE_BASIQUE = {
       id: "individuelle",
       label: "Individuelle",
       adhesion: "6 000",
-      montant: "60 000",
+      montant: "120 000",
       versements: 3,
-      versement_unitaire: "20 000",
+      versement_unitaire: "40 000",
       frequence: "mensualités",
     },
     {
