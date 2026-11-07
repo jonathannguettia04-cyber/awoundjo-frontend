@@ -264,7 +264,7 @@ export default function Formules() {
                   <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 36, color: C.slate }}>{o.montant} F</span>
                 </div>
                 <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.gray, marginBottom: 18 }}>
-                  payable en {o.versements} {o.frequence} de {o.versement_unitaire} F + {o.adhesion} F de frais d'adhésion
+                  en {o.frequence}, + {o.adhesion} F de frais d'adhésion, soit {FORMULE_BASIQUE.total} F au total. Couvre uniquement la personne qui paie.
                 </div>
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", flexGrow: 1 }}>
                   {FORMULE_BASIQUE.avantages.map(a => (
@@ -284,9 +284,37 @@ export default function Formules() {
                   background: FORMULE_BASIQUE.color, color: "#FFFFFF",
                   fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 15,
                   padding: "15px", borderRadius: 12, textDecoration: "none",
-                }}>Souscrire — {o.label} →</a>
+                }}>Souscrire à la Formule Basique →</a>
               </div>
             ))}
+
+            {/* Condition de consommation */}
+            <div style={{
+              borderRadius: 22, background: C.slate, color: "#FFFFFF",
+              padding: "30px 28px", display: "flex", flexDirection: "column",
+            }}>
+              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 10 }}>
+                Pour profiter des réductions
+              </div>
+              <div style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 30, lineHeight: 1.2, marginBottom: 12 }}>
+                Parrainez {FORMULE_BASIQUE.parrainages_requis} personnes
+              </div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "#CBD5E0", lineHeight: 1.7, margin: "0 0 18px" }}>
+                La consommation est débloquée dès que {FORMULE_BASIQUE.parrainages_requis} personnes que vous avez parrainées ont réglé leurs {FORMULE_BASIQUE.prix_unique} F.
+                Un parrainage compte seulement une fois le paiement du filleul confirmé.
+              </p>
+              <ol style={{ margin: "0 0 24px", paddingLeft: 20, flexGrow: 1, fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#E2E8F0", lineHeight: 1.7 }}>
+                <li>Vous réglez {FORMULE_BASIQUE.prix_unique} F + {FORMULE_BASIQUE.frais_adhesion} F d'adhésion.</li>
+                <li>Vous partagez votre lien de parrainage.</li>
+                <li>{FORMULE_BASIQUE.parrainages_requis} filleuls règlent leurs {FORMULE_BASIQUE.prix_unique} F.</li>
+                <li>Vos réductions de 50 % s'activent.</li>
+              </ol>
+              <Link to="/formule-basique" style={{
+                display: "block", textAlign: "center", border: "1.5px solid rgba(255,255,255,0.4)",
+                color: "#FFFFFF", fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14,
+                padding: "13px", borderRadius: 12, textDecoration: "none",
+              }}>Tout savoir sur la Formule Basique</Link>
+            </div>
           </div>
 
           <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 12, color: C.gray, maxWidth: 600, margin: "0 auto" }}>

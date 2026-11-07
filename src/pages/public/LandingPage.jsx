@@ -51,7 +51,7 @@ const FAQS = [
   },
   {
     q: "Qu'est-ce que la Formule Basique ?",
-    a: "Une formule proposée par la mutuelle dès le 1er décembre : 50 % de réduction en pharmacie et 50 % de remise en clinique et à l'hôpital, sur le réseau de soins Awoundjô. Adhésion de 6 000 F, puis 120 000 F en 3 versements, en offre individuelle ou famille de 5 personnes.",
+    a: "Une formule proposée par la mutuelle dès le 1er décembre : 50 % de réduction en pharmacie et 50 % de remise en clinique et à l'hôpital, sur le réseau de soins Awoundjô. Paiement unique de 35 000 F + 6 000 F d'adhésion, pour une personne. Les réductions s'activent dès que 3 personnes que vous avez parrainées ont payé leurs 35 000 F.",
   },
   {
     q: "Quelle est la différence avec la CMU ?",
@@ -429,8 +429,9 @@ export default function LandingPage() {
                 <ul>
                   <li>{FORMULE_BASIQUE.reduction_pharmacie} de réduction en pharmacie</li>
                   <li>{FORMULE_BASIQUE.remise_clinique_hopital} de remise en clinique et à l'hôpital</li>
-                  <li>Adhésion {FORMULE_BASIQUE.frais_adhesion} F, puis 3 versements</li>
-                  <li>{FORMULE_BASIQUE.offres[0].montant} F en {FORMULE_BASIQUE.offres[0].versements} versements, en individuel ou en famille de 5</li>
+                  <li>Adhésion de {FORMULE_BASIQUE.frais_adhesion} F</li>
+                  <li>{FORMULE_BASIQUE.prix_unique} F en paiement unique, pour une personne</li>
+                  <li>Réductions activées après {FORMULE_BASIQUE.parrainages_requis} parrainages payants</li>
                 </ul>
                 <Link
                   to="/formule-basique"

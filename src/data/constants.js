@@ -62,31 +62,28 @@ export const FORMULE_BASIQUE = {
   remise_clinique_hopital: "50%",
   reseau: "Réseau de soins existant Awoundjô",
   frais_adhesion: "6 000",
+  prix_unique: "35 000",            // paiement unique, hors adhésion
+  total: "41 000",                  // 35 000 + 6 000 d'adhésion
+  parrainages_requis: 3,            // filleuls AYANT PAYÉ leurs 35 000 F pour débloquer la consommation
+  couvre: "La personne qui paie uniquement (pas d'offre famille pour le moment)",
+  // Une seule offre (conservée sous forme de tableau pour les pages qui font offres.map)
   offres: [
     {
-      id: "individuelle",
-      label: "Individuelle",
+      id: "unique",
+      label: "Une personne",
       adhesion: "6 000",
-      montant: "120 000",
-      versements: 3,
-      versement_unitaire: "40 000",
-      frequence: "mensualités",
-    },
-    {
-      id: "famille",
-      label: "Famille de 5 personnes",
-      adhesion: "6 000",
-      montant: "120 000",
-      versements: 3,
-      versement_unitaire: "40 000",
-      frequence: "versements",
+      montant: "35 000",
+      versements: 1,
+      versement_unitaire: "35 000",
+      frequence: "paiement unique",
     },
   ],
   avantages: [
     "50% de réduction en pharmacies partenaires",
     "50% de remise en cliniques et hôpitaux partenaires",
     "Utilise le réseau de soins existant Awoundjô",
-    "Paiement en 3 versements, sans mensualité récurrente",
+    "Paiement unique de 35 000 F, sans mensualité",
+    "Réductions activées après 3 parrainages payants",
   ],
 };
 

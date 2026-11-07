@@ -74,6 +74,7 @@ export default function FormuleBasique() {
           .awj-fb .offer.alt dl, .awj-fb .offer.alt dl div { border-color:rgba(255,255,255,.18); }
           .awj-fb .offer.alt .btn-gold { width:100%; }
           .awj-fb .offer .btn-navy { width:100%; }
+          .awj-fb .offer .steps { margin:22px 0 20px; padding-left:20px; display:grid; gap:10px; font-size:16px; color:#E2EEF8; }
 
           .awj-fb .avantages { list-style:none; margin:36px 0 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:0 48px; }
           .awj-fb .avantages li { padding:20px 0 20px 34px; border-top:1px solid var(--line); position:relative; font-size:17px; font-weight:600; }
@@ -109,36 +110,44 @@ export default function FormuleBasique() {
           </div>
         </header>
 
-        {/* ── Les deux offres ── */}
+        {/* ── L'offre ── */}
         <section className="sec" id="offres">
           <div className="wrap">
-            <h2>Choisissez votre offre</h2>
-            <p className="lede">Une adhésion de {B.frais_adhesion} F, puis un paiement en 3 versements. Pas de mensualité récurrente.</p>
+            <h2>Une seule offre, un seul paiement</h2>
+            <p className="lede">{B.prix_unique} F payés une fois, plus {B.frais_adhesion} F d'adhésion. Pas de mensualité. L'offre couvre uniquement la personne qui paie.</p>
 
             <div className="offers">
-              {B.offres.map((o, i) => {
+              {B.offres.map((o) => {
                 const total = num(o.adhesion) + num(o.montant);
-                const alt = i === 1;
                 return (
-                  <article className={`offer ${alt ? "alt" : ""}`} key={o.id}>
+                  <article className="offer" key={o.id}>
                     <h3>{o.label}</h3>
                     <div className="amount">{o.montant}<small>F</small></div>
-                    <p className="detail">en {o.versements} {o.frequence}</p>
+                    <p className="detail">en {o.frequence}</p>
                     <dl>
+                      <div><dt>Paiement unique</dt><dd>{o.montant} F</dd></div>
                       <div><dt>Adhésion</dt><dd>{o.adhesion} F</dd></div>
-                      <div><dt>Versement</dt><dd>{o.versements} x {o.versement_unitaire} F</dd></div>
-                      <div><dt>Total</dt><dd>{fmt(total)} F</dd></div>
+                      <div><dt>Total à régler</dt><dd>{fmt(total)} F</dd></div>
                     </dl>
-                    <a
-                      href={waLink(o.label)}
-                      target="_blank" rel="noopener noreferrer"
-                      className={`btn ${alt ? "btn-gold" : "btn-navy"}`}
-                    >
+                    <a href={waLink(o.label)} target="_blank" rel="noopener noreferrer" className="btn btn-navy">
                       Souscrire sur WhatsApp
                     </a>
                   </article>
                 );
               })}
+
+              <article className="offer alt">
+                <h3>Activez vos réductions</h3>
+                <div className="amount">{B.parrainages_requis}<small>parrainages</small></div>
+                <p className="detail">de personnes qui ont payé leurs {B.prix_unique} F</p>
+                <ol className="steps">
+                  <li>Vous réglez {B.prix_unique} F + {B.frais_adhesion} F d'adhésion.</li>
+                  <li>Vous partagez votre lien de parrainage depuis votre espace adhérent.</li>
+                  <li>{B.parrainages_requis} personnes parrainées règlent leurs {B.prix_unique} F.</li>
+                  <li>Vos réductions de 50 % s'activent.</li>
+                </ol>
+                <p className="detail">Un parrainage compte seulement quand le paiement du filleul est confirmé.</p>
+              </article>
             </div>
           </div>
         </section>
