@@ -110,20 +110,22 @@ function VideoPitch() {
         <div className="vp-frame" ref={boxRef}>
           <video
             ref={vidRef}
-            src={load ? VIDEO_SRC : undefined}
             poster={VIDEO_POSTER}
             muted={muted}
             loop playsInline preload="none"
             controls={false}
             aria-label="Présentation de la mutuelle Awoundjô"
+            onLoadedData={() => { const v = vidRef.current; if (v && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) v.play().catch(() => {}); }}
             onError={() => setFailed(true)}
-          />
+          >
+            {load && <source src={VIDEO_SRC} type="video/mp4" onError={() => setFailed(true)} />}
+          </video>
           <button type="button" className="vp-sound" onClick={() => { setMuted(m => !m); vidRef.current?.play().catch(() => {}); }}>
             {muted ? "Activer le son" : "Couper le son"}
           </button>
         </div>
         <div className="vp-text">
-          <h2>Une facture de consultation ne devrait pas décider de vos soins</h2>
+          <h2 className="h2">Une facture de consultation ne devrait pas décider de vos soins</h2>
           <p className="lede">Avec Awoundjô, vous cotisez à l'avance et la mutuelle prend en charge une part de vos soins. 14 secondes pour comprendre.</p>
           <div className="vp-acts">
             <Link to="/adhesion?type=reservation" className="btn btn-gold">Réserver ma place 2027</Link>
@@ -137,7 +139,7 @@ function VideoPitch() {
         .awj-lp .vp-frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
         .awj-lp .vp-sound { position: absolute; left: 12px; right: 12px; bottom: 12px; border: 0; border-radius: 10px; padding: 10px; font: 700 14px 'Figtree', sans-serif; background: rgba(6,34,63,.82); color: #fff; cursor: pointer; }
         .awj-lp .vp-sound:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
-        .awj-lp .vp-text h2 { max-width: 20ch; }
+        .awj-lp .vp-text .h2 { max-width: 20ch; }
         .awj-lp .vp-acts { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
         @media (max-width: 720px) {
           .awj-lp .vp-grid { grid-template-columns: 1fr; gap: 32px; justify-items: center; }
