@@ -28,7 +28,7 @@ function trackCTA(fbEvent, gaEvent, params = {}) {
 const RESERVATION_STEPS = [
   { title: "Choisissez votre formule", text: "Classic, Aisance, Harmony ou Premium, en solo ou en famille." },
   { title: `Réglez ${RESERVATION_FEE} F par Mobile Money`, text: "Wave, Orange Money, MTN MoMo ou Moov. Votre place est enregistrée dès la confirmation du paiement." },
-  { title: "Payez la prime en 4 versements", text: "En 2027, la prime annuelle se règle par versements trimestriels. Le premier correspond à un quart de la prime." },
+  { title: "Payez la prime en 3 versements", text: `1er versement : ${RESERVATION_FEE} F d'adhésion + un tiers de la prime. 2e versement, le 5 du mois suivant : le deuxième tiers. 3e versement, le mois d'après : le dernier tiers. Votre année est alors soldée.` },
 ];
 
 const BENEFITS = [
@@ -43,11 +43,11 @@ const PARTNERS = ["Giepharm", "Mansa-Bank", "CNEPECI", "CEL-CI", "Meditrans", "S
 const FAQS = [
   {
     q: "Pourquoi réserver dès maintenant ?",
-    a: `Les quatre formules Classic, Aisance, Harmony et Premium entrent en vigueur en 2027. Pour ${RESERVATION_FEE} F, vous réservez votre place dès aujourd'hui. Ce montant est une adhésion de réservation : il ne remplace pas la prime annuelle.`,
+    a: `Les quatre formules Classic, Aisance, Harmony et Premium entrent en vigueur en 2027. Pour ${RESERVATION_FEE} F, vous réservez votre place dès aujourd'hui. Ces ${RESERVATION_FEE} F correspondent à l'adhésion, comprise dans votre premier versement. La prime annuelle se règle ensuite en 3 versements.`,
   },
   {
     q: "Comment se règle la prime annuelle ?",
-    a: "Par Mobile Money (Wave, Orange Money, MTN MoMo ou Moov), en 4 versements trimestriels. Le premier versement correspond à un quart de la prime annuelle.",
+    a: "Par Mobile Money (Wave, Orange Money, MTN MoMo ou Moov), en 3 versements. Le premier comprend les 15 000 F d'adhésion et un tiers de la prime. Le deuxième, le 5 du mois suivant, correspond au deuxième tiers. Le troisième, le mois d'après, au dernier tiers. L'année est alors soldée.",
   },
   {
     q: "Qu'est-ce que la Formule Basique ?",
@@ -486,7 +486,7 @@ export default function LandingPage() {
                 <p>Classic, Aisance, Harmony et Premium, de 80 % à 100 % de couverture en Côte d'Ivoire.</p>
                 <div className="price">{RESERVATION_FEE} <small>F</small></div>
                 <p style={{ marginBottom: 28 }}>
-                  d'adhésion de réservation, payables maintenant. Ce montant ne constitue pas le paiement de la prime annuelle.
+                  d'adhésion, payables maintenant pour réserver. La prime annuelle se règle ensuite en 3 versements : un tiers à chaque fois.
                 </p>
                 <Link
                   to={reservationLink()}
