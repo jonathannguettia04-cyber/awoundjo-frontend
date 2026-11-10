@@ -463,7 +463,7 @@ export default function Adhesion() {
                   Adhésion de réservation — {fcfa(RESERVATION_FEE)}
                 </div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: C.gray, lineHeight: 1.6, margin: "0 0 22px" }}>
-                  Sécurisez votre place sur la formule de votre choix avant son entrée en vigueur en 2027. Ce montant de {fcfa(RESERVATION_FEE)} réserve votre dossier — le détail de l'adhésion complète (prime annuelle, versements trimestriels) vous sera communiqué à l'ouverture.
+                  Sécurisez votre place sur la formule de votre choix avant son entrée en vigueur en 2027. Ce montant de {fcfa(RESERVATION_FEE)} réserve votre dossier — la prime annuelle se règle ensuite en 3 versements : 15 000 F d'adhésion + un tiers au premier, puis un tiers le 5 du mois suivant et le dernier tiers le mois d'après.
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

@@ -1,17 +1,33 @@
 // src/pages/public/FormuleBasique.jsx
 // Page dédiée à la Formule Basique (offre Awoundjô, réseau de soins existant).
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import FontLoader from "../../components/shared/FontLoader";
 import Nav from "../../components/shared/Nav";
 import Footer from "../../components/shared/Footer";
 import WhatsAppFloat from "../../components/shared/WhatsAppFloat";
 import ResponsiveStyles from "../../components/shared/ResponsiveStyles";
-import { FORMULE_BASIQUE, CONTACT } from "../../data/constants";
+import VideoPitch from "../../components/shared/VideoPitch";
+import { FORMULE_BASIQUE } from "../../data/constants";
 
-const waLink = (offre) =>
-  `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(
-    `Bonjour, je souhaite souscrire à la Formule Basique (${offre}) d'Awoundjô.`
-  )}`;
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || data?.message || "Erreur serveur");
+  return data;
+}
+
+const METHODES = [
+  { id: "orange", label: "Orange Money" },
+  { id: "wave",   label: "Wave" },
+  { id: "mtn",    label: "MTN MoMo" },
+  { id: "moov",   label: "Moov Money" },
+];
 
 // Total de la première année = adhésion + montant (chaînes "6 000" → nombres)
 const num = (s) => Number(String(s).replace(/\s/g, ""));
@@ -19,6 +35,81 @@ const fmt = (n) => n.toLocaleString("fr-FR").replace(/ /g, " ");
 
 export default function FormuleBasique() {
   const B = FORMULE_BASIQUE;
+  const TOTAL = num(B.prix_unique) + num(B.frais_adhesion);
+  const [params] = useSearchParams();
+  const retour = params.get("paiement"); // "ok" | "echec" (retour de Jeko)
+
+  const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", parrain: (params.get("ref") || "").trim() });
+  const [methode, setMethode] = useState("orange");
+  const [agreed, setAgreed] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  // Atteindre #payer après le chargement (arrivée depuis l'accueil ou retour de Jeko)
+  useEffect(() => {
+    if (window.location.hash !== "#payer") return undefined;
+    const t = setTimeout(() => document.getElementById("payer")?.scrollIntoView({ behavior: "auto", block: "start" }), 250);
+    return () => clearTimeout(t);
+  }, []);
+
+  const set = (k) => (e) => setForm((v) => ({ ...v, [k]: e.target.value }));
+
+  async function handlePay(e) {
+    e.preventDefault();
+    const errs = {};
+    if (!form.name.trim())  errs.name = "Le nom complet est requis.";
+    if (form.phone.replace(/\D/g, "").length < 8) errs.phone = "Entrez un numéro de téléphone valide.";
+    if (!agreed) errs.agreed = "Veuillez accepter les conditions.";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+
+    setSubmitting(true);
+    setFeedback(null);
+    const BASE = window.location.origin;
+    try {
+      const res = await apiFetch("/api/payments/jeko/init", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: TOTAL,
+          description: `Formule Basique Awoundjô — paiement unique ${B.prix_unique} F + adhésion ${B.frais_adhesion} F`,
+          client_name: form.name.trim(),
+          client_phone: form.phone.trim(),
+          client_email: form.email.trim() || undefined,
+          type: "basique",
+          role: "FORMULE_BASIQUE_2026",
+          form_data: {
+            name: form.name.trim(),
+            phone: form.phone.trim(),
+            email: form.email.trim() || undefined,
+            city: form.city.trim() || undefined,
+            formule_souhaitee: "BASIQUE",
+            composition_souhaitee: "solo",
+            montant_reservation: TOTAL,
+            montant_unique: num(B.prix_unique),
+            montant_adhesion: num(B.frais_adhesion),
+            parrain_code: form.parrain.trim() || undefined,
+          },
+          jeko_method: methode,
+          success_url: `${BASE}/formule-basique?paiement=ok#payer`,
+          failure_url: `${BASE}/formule-basique?paiement=echec#payer`,
+        }),
+      });
+      const redirectUrl = res?.data?.redirect_url || res?.redirect_url;
+      if (redirectUrl) {
+        if (typeof window.fbq === "function") {
+          window.fbq("track", "InitiateCheckout", { content_name: "Formule Basique", value: TOTAL, currency: "XOF" });
+        }
+        window.location.href = redirectUrl;
+      } else {
+        setFeedback({ type: "err", msg: "Lien de paiement indisponible. Réessayez ou contactez-nous." });
+      }
+    } catch (err) {
+      setFeedback({ type: "err", msg: err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -87,7 +178,34 @@ export default function FormuleBasique() {
           .awj-fb .next .btn-line { border-color:rgba(255,255,255,.5); color:#fff; }
           .awj-fb .next .btn-line:hover { background:#fff; color:var(--navy); }
 
+          .awj-fb .pay { background:#fff; }
+          .awj-fb .pay-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:start; }
+          .awj-fb .pay form { display:grid; gap:16px; }
+          .awj-fb .pay label.f { display:grid; gap:6px; font-weight:700; font-size:14px; }
+          .awj-fb .pay input[type=text], .awj-fb .pay input[type=tel], .awj-fb .pay input[type=email] { font:inherit; font-weight:500; padding:13px 14px; border:1.5px solid var(--line); border-radius:10px; background:#FAFCFE; color:var(--ink); width:100%; }
+          .awj-fb .pay input:focus-visible { outline:3px solid var(--cyan); outline-offset:1px; }
+          .awj-fb .pay .err { color:#B42318; font-size:13px; font-weight:600; }
+          .awj-fb .pay .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+          .awj-fb .pay .methods { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+          .awj-fb .pay .methods button { font:inherit; font-weight:700; font-size:14px; padding:13px 10px; border-radius:10px; border:2px solid var(--line); background:#fff; color:var(--grey); cursor:pointer; }
+          .awj-fb .pay .methods button[aria-pressed=true] { border-color:var(--navy); color:var(--navy); background:#E9F2FB; }
+          .awj-fb .pay .agree { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--grey); }
+          .awj-fb .pay .agree input { margin-top:3px; accent-color:var(--green); }
+          .awj-fb .pay .btn { width:100%; border:none; cursor:pointer; font-family:inherit; }
+          .awj-fb .pay .btn[disabled] { opacity:.6; cursor:wait; }
+          .awj-fb .recap { background:var(--ink); color:#fff; border-radius:24px; padding:32px; }
+          .awj-fb .recap h3 { font-size:24px; font-weight:800; }
+          .awj-fb .recap dl { margin:20px 0 0; border-top:1px solid rgba(255,255,255,.18); }
+          .awj-fb .recap dl div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,.18); }
+          .awj-fb .recap dt { color:#B7D3EC; }
+          .awj-fb .recap dd { margin:0; font-weight:800; }
+          .awj-fb .recap p { color:#BFD3E6; margin-top:18px; font-size:15px; }
+          .awj-fb .notice { border-radius:14px; padding:16px 18px; font-weight:600; margin-bottom:22px; }
+          .awj-fb .notice.ok { background:#E5F6EE; color:#00593A; }
+          .awj-fb .notice.ko { background:#FDECEA; color:#8A1C12; }
           @media (max-width:760px) {
+            .awj-fb .pay-grid { grid-template-columns:1fr; gap:32px; }
+            .awj-fb .pay .row2 { grid-template-columns:1fr; }
             .awj-fb .hero { padding:104px 0 64px; }
             .awj-fb .sec { padding:60px 0; }
             .awj-fb .offers, .awj-fb .avantages { grid-template-columns:1fr; }
@@ -110,6 +228,16 @@ export default function FormuleBasique() {
           </div>
         </header>
 
+        {/* ── Vidéo ── */}
+        <VideoPitch
+          title="La Formule Basique en 14 secondes"
+          text="50 % de réduction en pharmacie, clinique et hôpital sur le réseau Awoundjô. Un seul paiement."
+          ctaLabel="Payer maintenant"
+          ctaTo="#payer"
+          secondaryLabel="Voir les 4 formules 2027"
+          secondaryTo="/formules"
+        />
+
         {/* ── L'offre ── */}
         <section className="sec" id="offres">
           <div className="wrap">
@@ -129,8 +257,8 @@ export default function FormuleBasique() {
                       <div><dt>Adhésion</dt><dd>{o.adhesion} F</dd></div>
                       <div><dt>Total à régler</dt><dd>{fmt(total)} F</dd></div>
                     </dl>
-                    <a href={waLink(o.label)} target="_blank" rel="noopener noreferrer" className="btn btn-navy">
-                      Souscrire sur WhatsApp
+                    <a href="#payer" className="btn btn-navy">
+                      Payer {fmt(total)} F
                     </a>
                   </article>
                 );
@@ -148,6 +276,79 @@ export default function FormuleBasique() {
                 </ol>
                 <p className="detail">Un parrainage compte seulement quand le paiement du filleul est confirmé.</p>
               </article>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Paiement ── */}
+        <section className="sec pay" id="payer">
+          <div className="wrap">
+            {retour === "ok" && (
+              <div className="notice ok" role="status">
+                Paiement reçu, merci. Notre équipe vous contacte sur le numéro indiqué pour activer votre carte. Pour débloquer vos réductions, parrainez {B.parrainages_requis} personnes qui paient leurs {B.prix_unique} F.
+              </div>
+            )}
+            {retour === "echec" && (
+              <div className="notice ko" role="alert">
+                Le paiement n'a pas abouti. Aucun montant n'a été débité par Awoundjô. Vous pouvez réessayer ci-dessous.
+              </div>
+            )}
+            <div className="pay-grid">
+              <div>
+                <h2>Payer ma Formule Basique</h2>
+                <p className="lede">Paiement sécurisé par Mobile Money. Vous serez redirigé vers la page de votre opérateur.</p>
+                <form onSubmit={handlePay} noValidate style={{ marginTop: 28 }}>
+                  <label className="f">Nom complet
+                    <input type="text" autoComplete="name" value={form.name} onChange={set("name")} />
+                    {errors.name && <span className="err">{errors.name}</span>}
+                  </label>
+                  <label className="f">Téléphone
+                    <input type="tel" autoComplete="tel" inputMode="tel" placeholder="07 00 00 00 00" value={form.phone} onChange={set("phone")} />
+                    {errors.phone && <span className="err">{errors.phone}</span>}
+                  </label>
+                  <div className="row2">
+                    <label className="f">E-mail (facultatif)
+                      <input type="email" autoComplete="email" value={form.email} onChange={set("email")} />
+                    </label>
+                    <label className="f">Ville (facultatif)
+                      <input type="text" autoComplete="address-level2" placeholder="Ex : Abidjan" value={form.city} onChange={set("city")} />
+                    </label>
+                  </div>
+                  <label className="f">Code de parrainage (facultatif)
+                    <input type="text" value={form.parrain} onChange={set("parrain")} placeholder="Si quelqu'un vous a parrainé" />
+                  </label>
+
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Méthode de paiement</div>
+                    <div className="methods">
+                      {METHODES.map((m) => (
+                        <button key={m.id} type="button" aria-pressed={methode === m.id} onClick={() => setMethode(m.id)}>{m.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label className="agree">
+                    <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                    <span>J'accepte les <a href="/politiques#cgu" style={{ color: "var(--navy)", fontWeight: 700 }}>conditions générales d'utilisation</a>. Je comprends que les réductions s'activent après {B.parrainages_requis} parrainages payants.</span>
+                  </label>
+                  {errors.agreed && <span className="err">{errors.agreed}</span>}
+                  {feedback && <div className="notice ko" role="alert" style={{ marginBottom: 0 }}>{feedback.msg}</div>}
+
+                  <button type="submit" className="btn btn-gold" disabled={submitting}>
+                    {submitting ? "Redirection en cours..." : `Payer ${fmt(TOTAL)} F`}
+                  </button>
+                </form>
+              </div>
+
+              <aside className="recap">
+                <h3>Votre commande</h3>
+                <dl>
+                  <div><dt>Formule Basique, une personne</dt><dd>{B.prix_unique} F</dd></div>
+                  <div><dt>Adhésion</dt><dd>{B.frais_adhesion} F</dd></div>
+                  <div><dt>Total à payer</dt><dd>{fmt(TOTAL)} F</dd></div>
+                </dl>
+                <p>Paiement unique, sans mensualité. 50 % de réduction en pharmacie, clinique et hôpital dès que vos {B.parrainages_requis} filleuls ont payé.</p>
+              </aside>
             </div>
           </div>
         </section>
