@@ -64,6 +64,9 @@ export const FORMULE_BASIQUE = {
   frais_adhesion: "6 000",
   prix_unique: "35 000",            // paiement unique, hors adhésion
   total: "41 000",                  // 35 000 + 6 000 d'adhésion
+  mensualites: 2,                   // les 35 000 F peuvent aussi se payer en 2 mensualités
+  mensualite: "17 500",
+  adhesion_a_part: true,            // l'adhésion (6 000 F) peut être réglée séparément
   parrainages_requis: 3,            // filleuls AYANT PAYÉ leurs 35 000 F pour débloquer la consommation
   couvre: "La personne qui paie uniquement (pas d'offre famille pour le moment)",
   // Une seule offre (conservée sous forme de tableau pour les pages qui font offres.map)
@@ -73,16 +76,17 @@ export const FORMULE_BASIQUE = {
       label: "Une personne",
       adhesion: "6 000",
       montant: "35 000",
-      versements: 1,
-      versement_unitaire: "35 000",
-      frequence: "paiement unique",
+      versements: 2,
+      versement_unitaire: "17 500",
+      frequence: "paiement unique ou en 2 mensualités de 17 500 F",
     },
   ],
   avantages: [
     "50% de réduction en pharmacies partenaires",
     "50% de remise en cliniques et hôpitaux partenaires",
     "Utilise le réseau de soins existant Awoundjô",
-    "Paiement unique de 35 000 F, sans mensualité",
+    "35 000 F en paiement unique ou en 2 mensualités de 17 500 F",
+    "Adhésion de 6 000 F réglable à part",
     "Réductions activées après 3 parrainages payants",
   ],
 };

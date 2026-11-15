@@ -264,7 +264,7 @@ export default function Formules() {
                   <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 900, fontSize: 36, color: C.slate }}>{o.montant} F</span>
                 </div>
                 <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.gray, marginBottom: 18 }}>
-                  en {o.frequence}, + {o.adhesion} F de frais d'adhésion, soit {FORMULE_BASIQUE.total} F au total. Couvre uniquement la personne qui paie.
+                  {FORMULE_BASIQUE.prix_unique} F en paiement unique ou en 2 mensualités de {FORMULE_BASIQUE.mensualite} F. Adhésion de {o.adhesion} F réglable à part, soit {FORMULE_BASIQUE.total} F au total. Couvre uniquement la personne qui paie.
                 </div>
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", flexGrow: 1 }}>
                   {FORMULE_BASIQUE.avantages.map(a => (
@@ -304,7 +304,7 @@ export default function Formules() {
                 Un parrainage compte seulement une fois le paiement du filleul confirmé.
               </p>
               <ol style={{ margin: "0 0 24px", paddingLeft: 20, flexGrow: 1, fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#E2E8F0", lineHeight: 1.7 }}>
-                <li>Vous réglez {FORMULE_BASIQUE.prix_unique} F + {FORMULE_BASIQUE.frais_adhesion} F d'adhésion.</li>
+                <li>Vous réglez {FORMULE_BASIQUE.prix_unique} F (en 1 ou 2 fois) + {FORMULE_BASIQUE.frais_adhesion} F d'adhésion.</li>
                 <li>Vous partagez votre lien de parrainage.</li>
                 <li>{FORMULE_BASIQUE.parrainages_requis} filleuls règlent leurs {FORMULE_BASIQUE.prix_unique} F.</li>
                 <li>Vos réductions de 50 % s'activent.</li>

@@ -53,6 +53,18 @@ export default function FormuleBasique() {
     return () => clearTimeout(t);
   }, []);
 
+  const MENS = num(B.mensualite);
+  const OPTIONS = [
+    { id: "tout",         label: "Tout payer maintenant",         montant: TOTAL,           note: `${B.frais_adhesion} F d'adhésion + ${B.prix_unique} F` },
+    { id: "adhesion",     label: "L'adhésion seule",              montant: num(B.frais_adhesion), note: "les 35 000 F plus tard" },
+    { id: "unique",       label: "Les 35 000 F en une fois",      montant: num(B.prix_unique), note: "sans l'adhésion" },
+    { id: "mensualite_1", label: "1re mensualité",                montant: MENS,            note: `sur ${B.mensualites} de ${B.mensualite} F` },
+    { id: "mensualite_2", label: "2e mensualité",                 montant: MENS,            note: `sur ${B.mensualites} de ${B.mensualite} F` },
+  ];
+  const [versement, setVersement] = useState("tout");
+  const choix = OPTIONS.find((o) => o.id === versement) || OPTIONS[0];
+  const montantChoisi = choix.montant;
+
   const set = (k) => (e) => setForm((v) => ({ ...v, [k]: e.target.value }));
 
   async function handlePay(e) {
@@ -71,8 +83,8 @@ export default function FormuleBasique() {
       const res = await apiFetch("/api/payments/jeko/init", {
         method: "POST",
         body: JSON.stringify({
-          amount: TOTAL,
-          description: `Formule Basique Awoundjô — paiement unique ${B.prix_unique} F + adhésion ${B.frais_adhesion} F`,
+          amount: montantChoisi,
+          description: `Formule Basique Awoundjô — ${choix.label} (${montantChoisi} F)`,
           client_name: form.name.trim(),
           client_phone: form.phone.trim(),
           client_email: form.email.trim() || undefined,
@@ -85,7 +97,9 @@ export default function FormuleBasique() {
             city: form.city.trim() || undefined,
             formule_souhaitee: "BASIQUE",
             composition_souhaitee: "solo",
-            montant_reservation: TOTAL,
+            montant_reservation: montantChoisi,
+            versement,
+            montant_total_formule: TOTAL,
             montant_unique: num(B.prix_unique),
             montant_adhesion: num(B.frais_adhesion),
             parrain_code: form.parrain.trim() || undefined,
@@ -98,7 +112,7 @@ export default function FormuleBasique() {
       const redirectUrl = res?.data?.redirect_url || res?.redirect_url;
       if (redirectUrl) {
         if (typeof window.fbq === "function") {
-          window.fbq("track", "InitiateCheckout", { content_name: "Formule Basique", value: TOTAL, currency: "XOF" });
+          window.fbq("track", "InitiateCheckout", { content_name: "Formule Basique", value: montantChoisi, currency: "XOF" });
         }
         window.location.href = redirectUrl;
       } else {
@@ -189,6 +203,12 @@ export default function FormuleBasique() {
           .awj-fb .pay .methods { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
           .awj-fb .pay .methods button { font:inherit; font-weight:700; font-size:14px; padding:13px 10px; border-radius:10px; border:2px solid var(--line); background:#fff; color:var(--grey); cursor:pointer; }
           .awj-fb .pay .methods button[aria-pressed=true] { border-color:var(--navy); color:var(--navy); background:#E9F2FB; }
+          .awj-fb .pay .opts { display:grid; gap:10px; }
+          .awj-fb .pay .opts button { font:inherit; display:flex; justify-content:space-between; align-items:center; gap:16px; text-align:left; padding:13px 16px; border-radius:12px; border:2px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+          .awj-fb .pay .opts button span { font-weight:700; font-size:15px; }
+          .awj-fb .pay .opts button small { display:block; font-weight:500; font-size:13px; color:var(--grey); margin-top:2px; }
+          .awj-fb .pay .opts button b { font-size:16px; white-space:nowrap; }
+          .awj-fb .pay .opts button[aria-checked=true] { border-color:var(--navy); background:#E9F2FB; }
           .awj-fb .pay .agree { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--grey); }
           .awj-fb .pay .agree input { margin-top:3px; accent-color:var(--green); }
           .awj-fb .pay .btn { width:100%; border:none; cursor:pointer; font-family:inherit; }
@@ -241,8 +261,8 @@ export default function FormuleBasique() {
         {/* ── L'offre ── */}
         <section className="sec" id="offres">
           <div className="wrap">
-            <h2>Une seule offre, un seul paiement</h2>
-            <p className="lede">{B.prix_unique} F payés une fois, plus {B.frais_adhesion} F d'adhésion. Pas de mensualité. L'offre couvre uniquement la personne qui paie.</p>
+            <h2>Une seule offre, vous payez à votre rythme</h2>
+            <p className="lede">{B.prix_unique} F en un seul paiement ou en {B.mensualites} mensualités de {B.mensualite} F, plus {B.frais_adhesion} F d'adhésion que vous pouvez régler à part. L'offre couvre uniquement la personne qui paie.</p>
 
             <div className="offers">
               {B.offres.map((o) => {
@@ -251,10 +271,11 @@ export default function FormuleBasique() {
                   <article className="offer" key={o.id}>
                     <h3>{o.label}</h3>
                     <div className="amount">{o.montant}<small>F</small></div>
-                    <p className="detail">en {o.frequence}</p>
+                    <p className="detail">en 1 paiement ou {B.mensualites} mensualités</p>
                     <dl>
-                      <div><dt>Paiement unique</dt><dd>{o.montant} F</dd></div>
-                      <div><dt>Adhésion</dt><dd>{o.adhesion} F</dd></div>
+                      <div><dt>Adhésion (à part)</dt><dd>{o.adhesion} F</dd></div>
+                      <div><dt>{o.montant} F en 1 fois</dt><dd>{o.montant} F</dd></div>
+                      <div><dt>ou {B.mensualites} mensualités</dt><dd>{B.mensualites} x {B.mensualite} F</dd></div>
                       <div><dt>Total à régler</dt><dd>{fmt(total)} F</dd></div>
                     </dl>
                     <a href="#payer" className="btn btn-navy">
@@ -285,7 +306,7 @@ export default function FormuleBasique() {
           <div className="wrap">
             {retour === "ok" && (
               <div className="notice ok" role="status">
-                Paiement reçu, merci. Notre équipe vous contacte sur le numéro indiqué pour activer votre carte. Pour débloquer vos réductions, parrainez {B.parrainages_requis} personnes qui paient leurs {B.prix_unique} F.
+                Paiement reçu, merci. S'il vous reste un versement à régler (adhésion ou mensualité), revenez ici avec le même numéro de téléphone. Notre équipe vous contacte sur ce numéro pour activer votre carte. Pour débloquer vos réductions, parrainez {B.parrainages_requis} personnes qui paient leurs {B.prix_unique} F.
               </div>
             )}
             {retour === "echec" && (
@@ -319,6 +340,18 @@ export default function FormuleBasique() {
                   </label>
 
                   <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Que souhaitez-vous payer maintenant ?</div>
+                    <div className="opts" role="radiogroup" aria-label="Montant à payer">
+                      {OPTIONS.map((o) => (
+                        <button key={o.id} type="button" role="radio" aria-checked={versement === o.id} onClick={() => setVersement(o.id)}>
+                          <span>{o.label}<small>{o.note}</small></span>
+                          <b>{fmt(o.montant)} F</b>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Méthode de paiement</div>
                     <div className="methods">
                       {METHODES.map((m) => (
@@ -335,7 +368,7 @@ export default function FormuleBasique() {
                   {feedback && <div className="notice ko" role="alert" style={{ marginBottom: 0 }}>{feedback.msg}</div>}
 
                   <button type="submit" className="btn btn-gold" disabled={submitting}>
-                    {submitting ? "Redirection en cours..." : `Payer ${fmt(TOTAL)} F`}
+                    {submitting ? "Redirection en cours..." : `Payer ${fmt(montantChoisi)} F`}
                   </button>
                 </form>
               </div>
@@ -343,11 +376,12 @@ export default function FormuleBasique() {
               <aside className="recap">
                 <h3>Votre commande</h3>
                 <dl>
-                  <div><dt>Formule Basique, une personne</dt><dd>{B.prix_unique} F</dd></div>
+                  <div><dt>Ce paiement</dt><dd>{fmt(montantChoisi)} F</dd></div>
                   <div><dt>Adhésion</dt><dd>{B.frais_adhesion} F</dd></div>
-                  <div><dt>Total à payer</dt><dd>{fmt(TOTAL)} F</dd></div>
+                  <div><dt>Formule (1 ou {B.mensualites} fois)</dt><dd>{B.prix_unique} F</dd></div>
+                  <div><dt>Total de la formule</dt><dd>{fmt(TOTAL)} F</dd></div>
                 </dl>
-                <p>Paiement unique, sans mensualité. 50 % de réduction en pharmacie, clinique et hôpital dès que vos {B.parrainages_requis} filleuls ont payé.</p>
+                <p>Payez l'adhésion à part, puis les {B.prix_unique} F en une fois ou en {B.mensualites} mensualités de {B.mensualite} F. Pour la suite, utilisez le même numéro de téléphone. 50 % de réduction en pharmacie, clinique et hôpital dès que vos {B.parrainages_requis} filleuls ont payé leur formule complète.</p>
               </aside>
             </div>
           </div>
