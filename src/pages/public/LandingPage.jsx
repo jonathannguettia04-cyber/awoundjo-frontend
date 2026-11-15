@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import FontLoader from '../../components/shared/FontLoader';
+import Nav from '../../components/shared/Nav';
+import Footer from '../../components/shared/Footer';
+import WhatsAppFloat from '../../components/shared/WhatsAppFloat';
 import {
   Activity,
   ArrowDownRight,
@@ -24,6 +29,7 @@ const WA_NUMBER = '2250171721668';
 const RESERVATION_FEE = '15 000';
 const APK_DOWNLOAD_URL = 'https://vkrnqoajmyyyatfdlmbk.supabase.co/storage/v1/object/public/app-releases/app-release.apk';
 const waLink = (text) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
+const reservationLink = (slug) => slug ? `/adhesion?type=reservation&formule=${slug.toLowerCase()}` : '/adhesion?type=reservation';
 
 const plans = [
   { name: 'Classic', slug: 'classic', cover: '80 %', solo: 'Sur devis', family: 'Sur devis', tone: 'ice', note: 'L’essentiel, sans compromis.' },
@@ -78,13 +84,10 @@ function LogoLockup() {
   );
 }
 
-function ArrowCta({ children, href = '#reserver', light = false, onClick }) {
-  return (
-    <a className={`arrow-cta ${light ? 'arrow-cta--light' : ''}`} href={href} onClick={onClick}>
-      <span>{children}</span>
-      <span className="arrow-cta__icon"><ArrowUpRight size={17} strokeWidth={2.4} /></span>
-    </a>
-  );
+function ArrowCta({ children, href = '#reserver', to, light = false, onClick }) {
+  const content = <><span>{children}</span><span className="arrow-cta__icon"><ArrowUpRight size={17} strokeWidth={2.4} /></span></>;
+  if (to) return <Link className={`arrow-cta ${light ? 'arrow-cta--light' : ''}`} to={to} onClick={onClick}>{content}</Link>;
+  return <a className={`arrow-cta ${light ? 'arrow-cta--light' : ''}`} href={href} onClick={onClick}>{content}</a>;
 }
 
 function InsuranceCard() {
@@ -170,21 +173,11 @@ export default function LandingPage() {
 
   return (
     <div className="awj-site" ref={rootRef} style={{ '--scroll-progress': scrollProgress }}>
+      <FontLoader />
+      <Nav />
       <div className="scroll-progress" aria-hidden="true" />
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
-
-      <header className="site-nav">
-        <a className="nav-brand" href="#hero" aria-label="Awoundjô, accueil"><LogoLockup /></a>
-        <nav className={`nav-links ${menuOpen ? 'nav-links--open' : ''}`} aria-label="Navigation principale">
-          <a href="#experience" onClick={() => setMenuOpen(false)}>Notre vision</a>
-          <a href="#formulas" onClick={() => setMenuOpen(false)}>Nos formules</a>
-          <a href="#benefits" onClick={() => setMenuOpen(false)}>Votre carte</a>
-          <a href="#faq" onClick={() => setMenuOpen(false)}>Questions</a>
-        </nav>
-        <a className="nav-action" href="#reserver" onClick={reserve}>Réserver <ArrowUpRight size={15} /></a>
-        <button className="menu-toggle" type="button" aria-label="Ouvrir le menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
-      </header>
 
       <main>
         <section className="hero" id="hero">
@@ -195,7 +188,7 @@ export default function LandingPage() {
               <h1>La santé,<br /><em>en confiance.</em></h1>
               <p className="hero__lead">Une mutuelle pensée autour de vous. Une couverture claire pour vous et ceux qui comptent, partout en Côte d’Ivoire.</p>
               <div className="hero__actions">
-                <ArrowCta onClick={reserve}>Réserver ma place pour 15 000 F</ArrowCta>
+                <ArrowCta to={reservationLink()} onClick={reserve}>Réserver ma place pour 15 000 F</ArrowCta>
                 <a className="text-link" href="#experience"><span className="text-link__line" />Entrer dans l’expérience</a>
               </div>
               <div className="hero__assurance"><LockKeyhole size={14} /> Sans sélection médicale à l’adhésion <span /> <strong>Réservations 2027 ouvertes</strong></div>
@@ -258,7 +251,7 @@ export default function LandingPage() {
                 <h3>Les 4 formules<br /><em>2027</em></h3>
                 <p>Classic, Aisance, Harmony et Premium. Une couverture de 80 % à 100 %, en solo ou en famille.</p>
                 <div className="path-card__price"><strong>15 000</strong><span>F<br /><small>pour réserver</small></span></div>
-                <div className="path-card__footer"><span>Prime annuelle réglable en 3 versements</span><ArrowCta light onClick={reserve}>Réserver</ArrowCta></div>
+                <div className="path-card__footer"><span>Prime annuelle réglable en 3 versements</span><ArrowCta to={reservationLink()} light onClick={reserve}>Réserver</ArrowCta></div>
               </article>
               <article className="path-card path-card--basic" data-reveal>
                 <div className="path-card__top"><span className="status-chip status-chip--dark"><span /> Dès le 1er décembre</span><span className="path-card__index">02</span></div>
@@ -266,7 +259,7 @@ export default function LandingPage() {
                 <h3>Formule<br /><em>Basique</em></h3>
                 <p>Une première porte d’entrée pour bénéficier de réductions immédiates sur un réseau de soins partenaire.</p>
                 <ul className="check-list"><li><Check size={15} /> 50 % en pharmacie</li><li><Check size={15} /> 50 % en clinique et hôpital</li><li><Check size={15} /> Dès 35 000 F / personne</li></ul>
-                <div className="path-card__footer"><span>Activation après 3 parrainages payants</span><ArrowCta href="#formulas">Découvrir</ArrowCta></div>
+                <div className="path-card__footer"><span>Activation après 3 parrainages payants</span><ArrowCta to="/formule-basique">Découvrir</ArrowCta></div>
               </article>
             </div>
           </div>
@@ -278,7 +271,7 @@ export default function LandingPage() {
             <div className="steps-list">
               {reservationSteps.map((step, index) => <div className="step-row" data-reveal style={{ '--delay': `${index * 0.1}s` }} key={step.number}><span className="step-row__number">{step.number}</span><div className="step-row__line" /><div className="step-row__copy"><h3>{step.title}</h3><p>{step.text}</p></div><ArrowUpRight className="step-row__arrow" size={21} /></div>)}
             </div>
-            <div className="steps__cta" data-reveal><ArrowCta onClick={reserve}>Commencer ma réservation</ArrowCta><span><MousePointer2 size={15} /> Tout se fait depuis votre téléphone.</span></div>
+            <div className="steps__cta" data-reveal><ArrowCta to={reservationLink()} onClick={reserve}>Commencer ma réservation</ArrowCta><span><MousePointer2 size={15} /> Tout se fait depuis votre téléphone.</span></div>
           </div>
         </section>
 
@@ -289,7 +282,7 @@ export default function LandingPage() {
               <div className="formula-vault__rail"><span>FORMULES</span><span>2027</span></div>
               <div className="formula-table">
                 <div className="formula-table__head"><span>Couverture</span><span>Solo</span><span>Famille</span><span /></div>
-                {plans.map((plan, index) => <div className={`formula-row formula-row--${plan.tone}`} key={plan.slug}><div className="formula-row__name"><span>{String(index + 1).padStart(2, '0')}</span><strong>{plan.name}</strong><small>{plan.note}</small></div><div><span className="coverage-pill">{plan.cover}</span></div><div className="formula-price">{plan.solo}<small>/ an</small></div><div className="formula-price">{plan.family}<small>/ an</small></div><a href="#reserver" className="table-arrow" onClick={reserve} aria-label={`Réserver ${plan.name}`}><ArrowUpRight size={17} /></a></div>)}
+                {plans.map((plan, index) => <div className={`formula-row formula-row--${plan.tone}`} key={plan.slug}><div className="formula-row__name"><span>{String(index + 1).padStart(2, '0')}</span><strong>{plan.name}</strong><small>{plan.note}</small></div><div><span className="coverage-pill">{plan.cover}</span></div><div className="formula-price">{plan.solo}<small>/ an</small></div><div className="formula-price">{plan.family}<small>/ an</small></div><Link to={reservationLink(plan.slug)} className="table-arrow" onClick={reserve} aria-label={`Réserver ${plan.name}`}><ArrowUpRight size={17} /></Link></div>)}
               </div>
             </div>
             <div className="formula-note" data-reveal><span><Zap size={16} /> Une surprime s’applique en cas de pathologie déclarée et à partir de 55 ans.</span><a href={waLink('Bonjour, je veux connaître les tarifs des formules Awoundjô 2027.')} target="_blank" rel="noreferrer">Demander les tarifs sur WhatsApp <ArrowUpRight size={14} /></a></div>
@@ -309,10 +302,11 @@ export default function LandingPage() {
           <div className="container faq__grid"><div className="section-index" data-reveal><span>07</span><i /></div><div><div className="section-head section-head--light" data-reveal><div><p className="kicker">La parole est à vous</p><h2>Les réponses<br /><em>sans détour.</em></h2></div><MessageCircle size={35} strokeWidth={1.2} /></div><div className="faq-list">{faqs.map(([question, answer], index) => <div className={`faq-item ${openFaq === index ? 'faq-item--open' : ''}`} data-reveal key={question}><button type="button" className="faq-question" onClick={() => setOpenFaq(openFaq === index ? null : index)} aria-expanded={openFaq === index}><span><small>{String(index + 1).padStart(2, '0')}</small>{question}</span><ChevronDown size={19} /></button><div className="faq-answer"><p>{answer}</p></div></div>)}</div></div></div>
         </section>
 
-        <section className="final-cta section-space" id="cta"><div className="final-cta__grid" aria-hidden="true"><span /><span /><span /></div><div className="container final-cta__inner" data-reveal><div className="final-cta__eyebrow"><span className="live-dot" /> Porte ouverte <span>AWJ / 2027</span></div><h2>Votre tranquillité<br /><em>commence ici.</em></h2><p>15 000 F par Mobile Money, et votre formule est réservée.</p><div className="final-cta__actions"><ArrowCta light onClick={reserve}>Réserver ma place</ArrowCta><a className="whatsapp-cta" href={waLink('Bonjour, je veux des informations sur les formules Awoundjô 2027.')} target="_blank" rel="noreferrer" onClick={() => trackCTA('contact')}><MessageCircle size={17} /> Poser une question</a></div><div className="final-cta__contacts"><a href="tel:+2250171721668"><PhoneCall size={14} /> 01 71 72 16 68</a><a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a><a href={APK_DOWNLOAD_URL} download onClick={() => trackCTA('download_app')}>Télécharger l’app Android <ArrowUpRight size={13} /></a></div></div></section>
+        <section className="final-cta section-space" id="cta"><div className="final-cta__grid" aria-hidden="true"><span /><span /><span /></div><div className="container final-cta__inner" data-reveal><div className="final-cta__eyebrow"><span className="live-dot" /> Porte ouverte <span>AWJ / 2027</span></div><h2>Votre tranquillité<br /><em>commence ici.</em></h2><p>15 000 F par Mobile Money, et votre formule est réservée.</p><div className="final-cta__actions"><ArrowCta to={reservationLink()} light onClick={reserve}>Réserver ma place</ArrowCta><a className="whatsapp-cta" href={waLink('Bonjour, je veux des informations sur les formules Awoundjô 2027.')} target="_blank" rel="noreferrer" onClick={() => trackCTA('contact')}><MessageCircle size={17} /> Poser une question</a></div><div className="final-cta__contacts"><a href="tel:+2250171721668"><PhoneCall size={14} /> 01 71 72 16 68</a><a href="mailto:mutuelleawoundjo2018@gmail.com">mutuelleawoundjo2018@gmail.com</a><a href={APK_DOWNLOAD_URL} download onClick={() => trackCTA('download_app')}>Télécharger l’app Android <ArrowUpRight size={13} /></a></div></div></section>
       </main>
 
-      <footer className="site-footer"><div className="container site-footer__inner"><LogoLockup /><div className="footer-links"><a href="#experience">Notre vision</a><a href="#formulas">Formules</a><a href="#faq">FAQ</a><a href="#cta">Contact</a></div><span className="footer-copy">© Awoundjô · Mutuelle santé</span></div></footer>
+      <Footer />
+      <WhatsAppFloat />
     </div>
   );
 }
