@@ -14,9 +14,23 @@
 @media(max-width:700px){.office-room{min-height:820px;align-items:start;padding-top:150px}.tour-nav{top:auto;right:18px;bottom:18px;left:18px;width:auto;transform:none;flex-direction:row;align-items:end;justify-content:space-between}.tour-nav__brand,.tour-nav__hint{display:none}.tour-nav__rooms{display:flex;align-items:center;gap:8px}.tour-nav__rooms button{display:block;width:33px;height:25px;text-align:center}.tour-nav__rooms button span{display:block}.tour-nav__rooms button i{width:100%;margin-top:4px}.tour-nav__rooms button.is-active i{width:100%}.tour-nav__rooms button{font-size:0}.room-copy{width:calc(100% - 65px);margin-left:45px}.room-copy h1{font-size:clamp(59px,18vw,86px)}.room-copy h2{font-size:clamp(46px,14vw,68px)}.room-copy p{max-width:320px;font-size:13px}.room-actions{align-items:start;flex-direction:column;gap:20px}.office-wall,.office-window,.plan-wall,.care-wall,.desk-wall{top:40%;right:-22%;width:110vw;height:41vh;transform:perspective(700px) rotateY(-12deg) rotateZ(2deg);opacity:.78}.office-bench,.office-desk,.plans-counter,.care-table,.reception-desk{right:3%;bottom:12%;width:84vw}.office-plant--left{display:none}.floating-card{font-size:8px}.floating-card--welcome,.floating-card--note,.floating-card--coverage,.floating-card--network,.floating-card--confirmation{top:35%;right:8%}.room-floor-label{bottom:74px;left:45px;max-width:290px;line-height:1.5}.office-aftercare{padding:85px 35px 120px}.aftercare-inner{gap:40px}.office-aftercare h2{font-size:48px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.office-experience *,.office-experience *:before,.office-experience *:after{animation-duration:.001ms!important;transition-duration:.001ms!important}.office-room{scroll-snap-align:none}}
 
-.office-experience *{box-sizing:border-box}.office-experience button,.office-experience a{font:inherit;color:inherit}.office-experience a{text-decoration:none}
+.office-experience *{box-sizing:border-box}:where(.office-experience) button,:where(.office-experience) a{font:inherit;color:inherit}:where(.office-experience) a{text-decoration:none}
 
 .office-room--basique:before{background:radial-gradient(circle at 70% 30%,rgba(0,173,241,.2),transparent 30%),linear-gradient(135deg,#06223F,#01417E 58%,#0A5DB0)}.basique-card{position:absolute;z-index:6;right:11%;top:22%;width:min(38vw,500px);padding:34px 36px;border:1px solid rgba(0,173,241,.32);background:rgba(6,34,63,.88);box-shadow:24px 28px 50px rgba(0,0,0,.28);transform:perspective(900px) rotateY(-14deg) rotateZ(1deg);color:#fff}.basique-card>span{color:var(--gold);font:10px 'DM Mono',monospace;letter-spacing:.13em}.basique-card b{display:block;margin-top:16px;font-size:clamp(42px,5vw,72px);letter-spacing:-.06em;line-height:1}.basique-card small{display:block;margin-top:8px;color:#9CB8D0;font-size:13px}.basique-card__row{display:flex;justify-content:space-between;gap:18px;margin-top:20px;padding-top:14px;border-top:1px solid rgba(216,227,238,.18);font-size:12px;color:#B7D3EC}.basique-card__row strong{color:#fff;text-align:right}
 @media(max-width:980px){.basique-card{right:4%;width:50vw}}
 @media(max-width:700px){.basique-card{top:46%;right:6%;width:88vw;padding:24px}}
 .office-experience .awj-vp-btn{font:700 16px 'Figtree',system-ui,sans-serif}.office-experience .awj-vp-btn-main{color:#06223F}.office-experience .awj-vp-btn-line{color:#fff}.office-experience .awj-vp-sound{font:700 14px 'Figtree',system-ui,sans-serif;color:#fff}
+
+@media(max-width:700px){
+.office-wall,.office-window,.plan-wall,.care-wall,.desk-wall,.office-bench,.office-desk,.office-chair,.plans-counter,.care-table,.care-screen,.reception-desk,.office-plant,.desk-lamp,.floating-card,.basique-card,.room-floor-label{display:none}
+.office-room{min-height:0;padding:130px 0 120px;align-items:flex-start}
+.room-copy{width:calc(100% - 80px);margin-left:56px;margin-right:24px}
+.tour-nav{right:84px;left:14px;bottom:16px;padding:6px 8px;border-radius:14px;background:rgba(6,34,63,.82);backdrop-filter:blur(8px)}
+.tour-nav__rooms{gap:4px;width:100%;justify-content:space-between}
+.tour-nav__rooms button{width:auto;flex:1;min-width:0}
+.office-aftercare{padding:80px 28px 130px}
+}
+.desk-actions{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px;margin-top:34px}
+.whatsapp-link{display:inline-flex;align-items:center;gap:8px;color:var(--white);font-size:12px;font-weight:700}
+.desk-contact{display:flex;flex-wrap:wrap;gap:12px 26px;margin-top:30px;color:#B7D3EC;font:11px 'DM Mono',monospace}
+.desk-contact a{display:inline-flex;align-items:center;gap:7px}.desk-contact a:hover,.whatsapp-link:hover{color:var(--cyan)}
